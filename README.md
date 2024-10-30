@@ -57,6 +57,3 @@ This project is licensed under the [MIT License](./LICENSE), granting users exte
 
 ## Contributing
 Contributions are welcome! Please submit a pull request or create an issue to report bugs or suggest features.
-```
-
-This format is comprehensive, clear, and includes key details about the license, project setup, and contributions. Let me know if you'd like any further customization!
