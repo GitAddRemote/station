@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  database:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: stationDbUser
+      POSTGRES_PASSWORD: stationDbPassword1
+      DATABASE_USER: stationDbUser
+      DATABASE_PASSWORD: stationDbPassword1
+      POSTGRES_DB: stationDb
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
