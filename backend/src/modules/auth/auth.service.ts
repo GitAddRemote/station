@@ -13,9 +13,16 @@ export class AuthService {
 
   async validateUser(username: string, pass: string): Promise<any> {
     const user = await this.usersService.findOne(username);
+    if(user){
+      console.log('Login: Entered password:', pass);
+      console.log('Login: Stored password:', user.password);
+      const isMatch = await bcrypt.compare(pass.trim(), user.password);
+      console.log('Login: Passwords match:', isMatch);  
+    }    
     if (user && await bcrypt.compare(pass, user.password)) {
-       const { password, ...result } = user;
-       return result;
+      console.log("password matches"); 
+      const { password, ...result } = user;
+      return result;
     }
     return null;
  }
@@ -28,7 +35,10 @@ export class AuthService {
   }
 
   async register(userDto: UserDto): Promise<any> {
-    const hashedPassword = await bcrypt.hash(userDto.password, 10);
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(userDto.password.trim(), saltRounds);
+    console.log('Register: Plain password:', userDto.password);
+    console.log('Register: Hashed password:', hashedPassword);;
     const newUser = await this.usersService.create({
       ...userDto,
       password: hashedPassword,
