@@ -36,6 +36,7 @@ export class AuthController {
         // Simulate Login
         const isMatch = await bcrypt.compare(plainPassword, hashedPassword);
         console.log('Passwords match:', isMatch);
+        return isMatch;
       })();      
    }
 }

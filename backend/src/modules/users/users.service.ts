@@ -28,9 +28,21 @@ export class UsersService {
   }
 
   async create(userDto: UserDto): Promise<User> {
-    userDto.password = await bcrypt.hash(userDto.password, 10);
-    const hashedPassword = await bcrypt.hash(userDto.password, 10);
-    const user = this.usersRepository.create({...userDto, password: hashedPassword});
+    // 1. Destructure so we don't accidentally mutate the DTO
+    const { password, ...rest } = userDto;
+
+    // 2. Trim and salt+hash exactly once
+    const trimmed = password.trim();
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(trimmed, saltRounds);
+
+    // 3. Create a new entity instance
+    const user = this.usersRepository.create({
+      ...rest,
+      password: hashedPassword,
+    });
+
+    // 4. Persist and return
     return this.usersRepository.save(user);
   }
 
