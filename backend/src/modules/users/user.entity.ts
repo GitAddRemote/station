@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
 @Entity()
 export class User {
@@ -16,4 +17,7 @@ export class User {
 
   @Column({ default: true })
   isActive!: boolean;
+
+  @OneToMany(() => UserOrganizationRole, uor => uor.user)
+  userOrganizationRoles!: UserOrganizationRole[];
 }
