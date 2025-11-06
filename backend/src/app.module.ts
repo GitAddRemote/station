@@ -3,6 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { RolesModule } from './modules/roles/roles.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { UserOrganizationRolesModule } from './modules/user-organization-roles/user-organization-roles.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AppService } from './app.service';
 import { AppController } from './app.controller';
 
@@ -27,6 +31,10 @@ import { AppController } from './app.controller';
     }),
     UsersModule,
     AuthModule,
+    RolesModule,
+    OrganizationsModule,
+    UserOrganizationRolesModule,
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

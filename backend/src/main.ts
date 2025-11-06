@@ -13,7 +13,7 @@ async function bootstrap() {
   // Application configuration
   const port = process.env.PORT || 3001;
   const appName = process.env.APP_NAME || 'STATION BACKEND';
-  
+
   // ASCII Art for Application Name
   console.log(figlet.textSync(appName, { horizontalLayout: 'full' }));
 
@@ -24,7 +24,10 @@ async function bootstrap() {
 
   // Log application startup information
   await app.listen(port);
-  Logger.log(`🚀 Application '${appName}' is running on: http://localhost:${port}`, 'Bootstrap');
+  Logger.log(
+    `🚀 Application '${appName}' is running on: http://localhost:${port}`,
+    'Bootstrap',
+  );
 }
 
 bootstrap();

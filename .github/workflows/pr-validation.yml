@@ -1,0 +1,104 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: PR Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR title format
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "PR Title: $PR_TITLE"
+
+          # Suggest conventional commit format
+          if [[ ! "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:\ .+ ]]; then
+            echo "⚠️  PR title doesn't follow conventional commit format"
+            echo "Suggested format: <type>(<scope>): <description>"
+            echo "Types: feat, fix, docs, style, refactor, test, chore, perf, ci, build, revert"
+            echo ""
+            echo "This is a suggestion, not a requirement."
+          else
+            echo "✅ PR title follows conventional commit format"
+          fi
+
+      - name: Check for conflicts
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          if git merge-tree $(git merge-base HEAD origin/${{ github.base_ref }}) HEAD origin/${{ github.base_ref }} | grep -q '<<<<<<<'; then
+            echo "❌ This PR has merge conflicts with ${{ github.base_ref }}"
+            exit 1
+          else
+            echo "✅ No merge conflicts detected"
+          fi
+
+      - name: Check changed files
+        id: changed-files
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Count changed files
+          NUM_FILES=$(echo "$CHANGED_FILES" | wc -l)
+          echo "num_files=$NUM_FILES" >> $GITHUB_OUTPUT
+
+          # Check if too many files changed (possible mistake)
+          if [ "$NUM_FILES" -gt 100 ]; then
+            echo "⚠️  Warning: $NUM_FILES files changed. This is a large PR."
+            echo "Consider breaking it into smaller PRs for easier review."
+          fi
+
+      - name: PR size label
+        run: |
+          NUM_FILES=${{ steps.changed-files.outputs.num_files }}
+          if [ "$NUM_FILES" -lt 10 ]; then
+            echo "📦 Size: Small (< 10 files)"
+          elif [ "$NUM_FILES" -lt 30 ]; then
+            echo "📦 Size: Medium (10-30 files)"
+          elif [ "$NUM_FILES" -lt 100 ]; then
+            echo "📦 Size: Large (30-100 files)"
+          else
+            echo "📦 Size: Extra Large (100+ files)"
+          fi
+
+      - name: Check for TODOs
+        continue-on-error: true
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '\.(ts|js|tsx|jsx|py|java|go)$' || true)
+
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "Checking for TODO comments in changed files..."
+            TODOS=$(echo "$CHANGED_FILES" | xargs grep -n "TODO\|FIXME\|XXX\|HACK" 2>/dev/null || true)
+
+            if [ -n "$TODOS" ]; then
+              echo "⚠️  Found TODO/FIXME comments:"
+              echo "$TODOS"
+              echo ""
+              echo "Consider creating issues for these items."
+            else
+              echo "✅ No TODO/FIXME comments found"
+            fi
+          fi
+
+      - name: PR validation summary
+        run: |
+          echo "## PR Validation Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Author:** @${{ github.event.pull_request.user.login }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Base:** ${{ github.base_ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Files changed:** ${{ steps.changed-files.outputs.num_files }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All validation checks passed" >> $GITHUB_STEP_SUMMARY
