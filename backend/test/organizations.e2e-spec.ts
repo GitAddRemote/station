@@ -18,13 +18,11 @@ describe('Organizations (e2e)', () => {
     await app.init();
 
     // Register and login a test user
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({
-        username: 'orguser',
-        email: 'org@example.com',
-        password: 'password123',
-      });
+    await request(app.getHttpServer()).post('/auth/register').send({
+      username: 'orguser',
+      email: 'org@example.com',
+      password: 'password123',
+    });
 
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
@@ -142,7 +140,9 @@ describe('Organizations (e2e)', () => {
         })
         .expect(200)
         .then((response) => {
-          expect(response.body.description).toBe('Updated organization description');
+          expect(response.body.description).toBe(
+            'Updated organization description',
+          );
         });
     });
 

@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { UserOrganizationRolesService } from './user-organization-roles.service';
 import { UserOrganizationRole } from './user-organization-role.entity';
 import { User } from '../users/user.entity';
@@ -10,10 +9,6 @@ import { NotFoundException, ConflictException } from '@nestjs/common';
 
 describe('UserOrganizationRolesService', () => {
   let service: UserOrganizationRolesService;
-  let uorRepository: Repository<UserOrganizationRole>;
-  let userRepository: Repository<User>;
-  let orgRepository: Repository<Organization>;
-  let roleRepository: Repository<Role>;
 
   const mockUorRepository = {
     create: jest.fn(),
@@ -59,13 +54,9 @@ describe('UserOrganizationRolesService', () => {
       ],
     }).compile();
 
-    service = module.get<UserOrganizationRolesService>(UserOrganizationRolesService);
-    uorRepository = module.get<Repository<UserOrganizationRole>>(
-      getRepositoryToken(UserOrganizationRole),
+    service = module.get<UserOrganizationRolesService>(
+      UserOrganizationRolesService,
     );
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    orgRepository = module.get<Repository<Organization>>(getRepositoryToken(Organization));
-    roleRepository = module.get<Repository<Role>>(getRepositoryToken(Role));
   });
 
   afterEach(() => {
@@ -99,7 +90,9 @@ describe('UserOrganizationRolesService', () => {
 
       mockUserRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.assignRole(assignDto)).rejects.toThrow(NotFoundException);
+      await expect(service.assignRole(assignDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw ConflictException if assignment already exists', async () => {
@@ -110,7 +103,9 @@ describe('UserOrganizationRolesService', () => {
       mockRoleRepository.findOne.mockResolvedValue({ id: 1 });
       mockUorRepository.findOne.mockResolvedValue({ id: 1, ...assignDto });
 
-      await expect(service.assignRole(assignDto)).rejects.toThrow(ConflictException);
+      await expect(service.assignRole(assignDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -155,7 +150,9 @@ describe('UserOrganizationRolesService', () => {
         { id: 2, userId: 1, organizationId: 1, roleId: 2 },
       ]);
 
-      await expect(service.assignMultipleRoles(assignDto)).rejects.toThrow(ConflictException);
+      await expect(service.assignMultipleRoles(assignDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -174,7 +171,9 @@ describe('UserOrganizationRolesService', () => {
     it('should throw NotFoundException if assignment not found', async () => {
       mockUorRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.removeRole(1, 1, 1)).rejects.toThrow(NotFoundException);
+      await expect(service.removeRole(1, 1, 1)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

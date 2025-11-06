@@ -15,7 +15,10 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(username: string, password: string): Promise<Omit<UserDto, 'password'>> {
+  async validate(
+    username: string,
+    password: string,
+  ): Promise<Omit<UserDto, 'password'>> {
     this.logger.debug(`Validating user: ${username}`);
 
     const user = await this.authService.validateUser(username, password);
@@ -28,4 +31,3 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     return user; // forwarded to AuthController.login() via request.user
   }
 }
-

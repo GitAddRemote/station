@@ -2,19 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
-import { User } from '../users/user.entity'
+import { User } from '../users/user.entity';
 import { UserDto } from '../users/dto/user.dto';
 import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class AuthService {
-
   private readonly logger = new Logger(AuthService.name);
-  private readonly dummyHash = '$2b$10$CwTycUXWue0Thq9StjUM0uJ8WZ0p/7eJYJg6eW9j5Cnz4Gf5Eme1e';
+  private readonly dummyHash =
+    '$2b$10$CwTycUXWue0Thq9StjUM0uJ8WZ0p/7eJYJg6eW9j5Cnz4Gf5Eme1e';
 
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
   ) {}
 
   async validateUser(username: string, pass: string): Promise<any> {
@@ -25,12 +25,12 @@ export class AuthService {
     const isMatch = await bcrypt.compare(trimmedPass, hashToCompare);
 
     if (user && isMatch) {
-      const { password, ...result } = user;
+      const { password: _password, ...result } = user;
       return result;
     }
 
     this.logger.warn(`Authentication failed for user: ${username}`);
-    return null;    
+    return null;
   }
 
   async login(user: any): Promise<{ access_token: string }> {
@@ -41,11 +41,9 @@ export class AuthService {
   }
 
   async register(userDto: UserDto): Promise<Omit<User, 'password'>> {
-    // Don’t hash here any more—UsersService.create() will do it.
+    // Don't hash here any more—UsersService.create() will do it.
     const newUser = await this.usersService.create(userDto);
-    const { password, ...result } = newUser;
+    const { password: _password, ...result } = newUser;
     return result;
   }
-
 }
-

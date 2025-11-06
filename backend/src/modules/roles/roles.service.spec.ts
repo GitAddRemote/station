@@ -1,13 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { RolesService } from './roles.service';
 import { Role } from './role.entity';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 
 describe('RolesService', () => {
   let service: RolesService;
-  let repository: Repository<Role>;
 
   const mockRepository = {
     create: jest.fn(),
@@ -29,7 +27,6 @@ describe('RolesService', () => {
     }).compile();
 
     service = module.get<RolesService>(RolesService);
-    repository = module.get<Repository<Role>>(getRepositoryToken(Role));
   });
 
   afterEach(() => {
@@ -48,7 +45,12 @@ describe('RolesService', () => {
         description: 'Administrator role',
       };
 
-      const savedRole = { id: 1, ...createRoleDto, createdAt: new Date(), updatedAt: new Date() };
+      const savedRole = {
+        id: 1,
+        ...createRoleDto,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
 
       mockRepository.findOne.mockResolvedValue(null);
       mockRepository.create.mockReturnValue(savedRole);
@@ -57,7 +59,9 @@ describe('RolesService', () => {
       const result = await service.create(createRoleDto);
 
       expect(result).toEqual(savedRole);
-      expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { name: 'Admin' } });
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { name: 'Admin' },
+      });
       expect(mockRepository.create).toHaveBeenCalledWith(createRoleDto);
       expect(mockRepository.save).toHaveBeenCalledWith(savedRole);
     });
@@ -68,7 +72,9 @@ describe('RolesService', () => {
 
       mockRepository.findOne.mockResolvedValue(existingRole);
 
-      await expect(service.create(createRoleDto)).rejects.toThrow(ConflictException);
+      await expect(service.create(createRoleDto)).rejects.toThrow(
+        ConflictException,
+      );
       expect(mockRepository.create).not.toHaveBeenCalled();
     });
   });
@@ -85,7 +91,9 @@ describe('RolesService', () => {
       const result = await service.findAll();
 
       expect(result).toEqual(roles);
-      expect(mockRepository.find).toHaveBeenCalledWith({ order: { name: 'ASC' } });
+      expect(mockRepository.find).toHaveBeenCalledWith({
+        order: { name: 'ASC' },
+      });
     });
   });
 
@@ -110,7 +118,12 @@ describe('RolesService', () => {
 
   describe('update', () => {
     it('should update a role', async () => {
-      const existingRole = { id: 1, name: 'Admin', permissions: {}, description: '' };
+      const existingRole = {
+        id: 1,
+        name: 'Admin',
+        permissions: {},
+        description: '',
+      };
       const updateDto = { description: 'Updated description' };
       const updatedRole = { ...existingRole, ...updateDto };
 
@@ -124,14 +137,26 @@ describe('RolesService', () => {
     });
 
     it('should throw ConflictException when updating to existing role name', async () => {
-      const existingRole = { id: 1, name: 'Admin', permissions: {}, description: '' };
-      const conflictingRole = { id: 2, name: 'SuperAdmin', permissions: {}, description: '' };
+      const existingRole = {
+        id: 1,
+        name: 'Admin',
+        permissions: {},
+        description: '',
+      };
+      const conflictingRole = {
+        id: 2,
+        name: 'SuperAdmin',
+        permissions: {},
+        description: '',
+      };
 
       mockRepository.findOne
         .mockResolvedValueOnce(existingRole)
         .mockResolvedValueOnce(conflictingRole);
 
-      await expect(service.update(1, { name: 'SuperAdmin' })).rejects.toThrow(ConflictException);
+      await expect(service.update(1, { name: 'SuperAdmin' })).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -163,7 +188,9 @@ describe('RolesService', () => {
       const result = await service.findByName('Admin');
 
       expect(result).toEqual(role);
-      expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { name: 'Admin' } });
+      expect(mockRepository.findOne).toHaveBeenCalledWith({
+        where: { name: 'Admin' },
+      });
     });
 
     it('should return null if role not found', async () => {

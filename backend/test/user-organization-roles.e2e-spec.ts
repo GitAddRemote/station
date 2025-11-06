@@ -20,13 +20,11 @@ describe('UserOrganizationRoles (e2e)', () => {
     await app.init();
 
     // Register and login a test user
-    const registerResponse = await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({
-        username: 'roleuser',
-        email: 'roleuser@example.com',
-        password: 'password123',
-      });
+    await request(app.getHttpServer()).post('/auth/register').send({
+      username: 'roleuser',
+      email: 'roleuser@example.com',
+      password: 'password123',
+    });
 
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
@@ -150,7 +148,9 @@ describe('UserOrganizationRoles (e2e)', () => {
   describe('/user-organization-roles/user/:userId/organization/:organizationId (GET)', () => {
     it('should get user roles in an organization', () => {
       return request(app.getHttpServer())
-        .get(`/user-organization-roles/user/${userId}/organization/${organizationId}`)
+        .get(
+          `/user-organization-roles/user/${userId}/organization/${organizationId}`,
+        )
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .then((response) => {
@@ -194,7 +194,9 @@ describe('UserOrganizationRoles (e2e)', () => {
   describe('/user-organization-roles/organization/:organizationId/role/:roleId/users (GET)', () => {
     it('should get users with a specific role in an organization', () => {
       return request(app.getHttpServer())
-        .get(`/user-organization-roles/organization/${organizationId}/role/${roleId}/users`)
+        .get(
+          `/user-organization-roles/organization/${organizationId}/role/${roleId}/users`,
+        )
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .then((response) => {
@@ -208,14 +210,18 @@ describe('UserOrganizationRoles (e2e)', () => {
   describe('/user-organization-roles/user/:userId/organization/:organizationId/role/:roleId (DELETE)', () => {
     it('should remove a role from a user', () => {
       return request(app.getHttpServer())
-        .delete(`/user-organization-roles/user/${userId}/organization/${organizationId}/role/${roleId}`)
+        .delete(
+          `/user-organization-roles/user/${userId}/organization/${organizationId}/role/${roleId}`,
+        )
         .set('Authorization', `Bearer ${authToken}`)
         .expect(204);
     });
 
     it('should return 404 when removing non-existent assignment', () => {
       return request(app.getHttpServer())
-        .delete(`/user-organization-roles/user/${userId}/organization/${organizationId}/role/99999`)
+        .delete(
+          `/user-organization-roles/user/${userId}/organization/${organizationId}/role/99999`,
+        )
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
     });

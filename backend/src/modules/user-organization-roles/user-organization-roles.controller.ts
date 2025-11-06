@@ -49,7 +49,10 @@ export class UserOrganizationRolesController {
     @Param('userId', ParseIntPipe) userId: number,
     @Param('organizationId', ParseIntPipe) organizationId: number,
   ) {
-    return this.userOrgRolesService.getUserRolesInOrganization(userId, organizationId);
+    return this.userOrgRolesService.getUserRolesInOrganization(
+      userId,
+      organizationId,
+    );
   }
 
   @Get('user/:userId/organizations')
@@ -58,7 +61,9 @@ export class UserOrganizationRolesController {
   }
 
   @Get('organization/:organizationId/members')
-  async getOrganizationMembers(@Param('organizationId', ParseIntPipe) organizationId: number) {
+  async getOrganizationMembers(
+    @Param('organizationId', ParseIntPipe) organizationId: number,
+  ) {
     return this.userOrgRolesService.getOrganizationMembers(organizationId);
   }
 

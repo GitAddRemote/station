@@ -1,13 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { OrganizationsService } from './organizations.service';
 import { Organization } from './organization.entity';
 import { NotFoundException } from '@nestjs/common';
 
 describe('OrganizationsService', () => {
   let service: OrganizationsService;
-  let repository: Repository<Organization>;
 
   const mockRepository = {
     create: jest.fn(),
@@ -29,7 +27,6 @@ describe('OrganizationsService', () => {
     }).compile();
 
     service = module.get<OrganizationsService>(OrganizationsService);
-    repository = module.get<Repository<Organization>>(getRepositoryToken(Organization));
   });
 
   afterEach(() => {
@@ -135,14 +132,20 @@ describe('OrganizationsService', () => {
       expect(result).toEqual(organization);
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: ['userOrganizationRoles', 'userOrganizationRoles.user', 'userOrganizationRoles.role'],
+        relations: [
+          'userOrganizationRoles',
+          'userOrganizationRoles.user',
+          'userOrganizationRoles.role',
+        ],
       });
     });
 
     it('should throw NotFoundException if organization not found', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.findWithMembers(999)).rejects.toThrow(NotFoundException);
+      await expect(service.findWithMembers(999)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -169,7 +172,9 @@ describe('OrganizationsService', () => {
     it('should throw NotFoundException if organization not found', async () => {
       mockRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.update(999, { name: 'New Name' })).rejects.toThrow(NotFoundException);
+      await expect(service.update(999, { name: 'New Name' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

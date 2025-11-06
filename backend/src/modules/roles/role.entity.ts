@@ -1,4 +1,12 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany, Index, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  OneToMany,
+  Index,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
 @Entity()
@@ -16,7 +24,7 @@ export class Role {
   @Column({ nullable: true })
   description?: string;
 
-  @OneToMany(() => UserOrganizationRole, uor => uor.role)
+  @OneToMany(() => UserOrganizationRole, (uor) => uor.role)
   userOrganizationRoles!: UserOrganizationRole[];
 
   @CreateDateColumn()

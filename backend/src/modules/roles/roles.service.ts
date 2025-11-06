@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role } from './role.entity';
@@ -19,7 +23,9 @@ export class RolesService {
     });
 
     if (existingRole) {
-      throw new ConflictException(`Role with name "${createRoleDto.name}" already exists`);
+      throw new ConflictException(
+        `Role with name "${createRoleDto.name}" already exists`,
+      );
     }
 
     const role = this.rolesRepository.create(createRoleDto);
@@ -56,7 +62,9 @@ export class RolesService {
       });
 
       if (existingRole) {
-        throw new ConflictException(`Role with name "${updateRoleDto.name}" already exists`);
+        throw new ConflictException(
+          `Role with name "${updateRoleDto.name}" already exists`,
+        );
       }
     }
 

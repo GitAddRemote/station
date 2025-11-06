@@ -8,7 +8,9 @@ import { Organization } from '../organizations/organization.entity';
 import { Role } from '../roles/role.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserOrganizationRole, User, Organization, Role])],
+  imports: [
+    TypeOrmModule.forFeature([UserOrganizationRole, User, Organization, Role]),
+  ],
   providers: [UserOrganizationRolesService],
   controllers: [UserOrganizationRolesController],
   exports: [UserOrganizationRolesService],

@@ -18,13 +18,11 @@ describe('Roles (e2e)', () => {
     await app.init();
 
     // Register and login a test user to get JWT token
-    await request(app.getHttpServer())
-      .post('/auth/register')
-      .send({
-        username: 'testuser',
-        email: 'test@example.com',
-        password: 'password123',
-      });
+    await request(app.getHttpServer()).post('/auth/register').send({
+      username: 'testuser',
+      email: 'test@example.com',
+      password: 'password123',
+    });
 
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')

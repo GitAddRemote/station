@@ -1,4 +1,17 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Put, Patch, Delete, Body, Req, UseGuards, HttpCode } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Body,
+  Req,
+  UseGuards,
+  HttpCode,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
@@ -42,14 +55,20 @@ export class UsersController {
   // PUT request to update user by ID
   @UseGuards(AuthGuard('jwt'))
   @Put(':id')
-  async updateUser(@Param('id', ParseIntPipe) id: number, @Body() userDto: Partial<UserDto>) {
+  async updateUser(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() userDto: Partial<UserDto>,
+  ) {
     return await this.usersService.update(id, userDto);
   }
 
   // PATCH request to partially update user by ID
   @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
-  async partialUpdateUser(@Param('id', ParseIntPipe) id: number, @Body() userDto: Partial<UserDto>) {
+  async partialUpdateUser(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() userDto: Partial<UserDto>,
+  ) {
     return await this.usersService.update(id, userDto);
   }
 

@@ -12,8 +12,12 @@ export class OrganizationsService {
     private organizationsRepository: Repository<Organization>,
   ) {}
 
-  async create(createOrganizationDto: CreateOrganizationDto): Promise<Organization> {
-    const organization = this.organizationsRepository.create(createOrganizationDto);
+  async create(
+    createOrganizationDto: CreateOrganizationDto,
+  ): Promise<Organization> {
+    const organization = this.organizationsRepository.create(
+      createOrganizationDto,
+    );
     return this.organizationsRepository.save(organization);
   }
 
@@ -39,7 +43,11 @@ export class OrganizationsService {
   async findWithMembers(id: number): Promise<Organization> {
     const organization = await this.organizationsRepository.findOne({
       where: { id },
-      relations: ['userOrganizationRoles', 'userOrganizationRoles.user', 'userOrganizationRoles.role'],
+      relations: [
+        'userOrganizationRoles',
+        'userOrganizationRoles.user',
+        'userOrganizationRoles.role',
+      ],
     });
 
     if (!organization) {
@@ -49,7 +57,10 @@ export class OrganizationsService {
     return organization;
   }
 
-  async update(id: number, updateOrganizationDto: UpdateOrganizationDto): Promise<Organization> {
+  async update(
+    id: number,
+    updateOrganizationDto: UpdateOrganizationDto,
+  ): Promise<Organization> {
     const organization = await this.findOne(id);
     Object.assign(organization, updateOrganizationDto);
     return this.organizationsRepository.save(organization);

@@ -18,6 +18,6 @@ export class User {
   @Column({ default: true })
   isActive!: boolean;
 
-  @OneToMany(() => UserOrganizationRole, uor => uor.user)
+  @OneToMany(() => UserOrganizationRole, (uor) => uor.user)
   userOrganizationRoles!: UserOrganizationRole[];
 }

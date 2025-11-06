@@ -1,12 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { PermissionsService } from './permissions.service';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
 describe('PermissionsService', () => {
   let service: PermissionsService;
-  let repository: Repository<UserOrganizationRole>;
 
   const mockRepository = {
     find: jest.fn(),
@@ -24,9 +22,6 @@ describe('PermissionsService', () => {
     }).compile();
 
     service = module.get<PermissionsService>(PermissionsService);
-    repository = module.get<Repository<UserOrganizationRole>>(
-      getRepositoryToken(UserOrganizationRole),
-    );
   });
 
   afterEach(() => {
@@ -184,7 +179,10 @@ describe('PermissionsService', () => {
 
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasAnyPermission(1, 1, ['canEditUsers', 'canDeployCode']);
+      const result = await service.hasAnyPermission(1, 1, [
+        'canEditUsers',
+        'canDeployCode',
+      ]);
 
       expect(result).toBe(true);
     });
@@ -208,7 +206,10 @@ describe('PermissionsService', () => {
 
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasAnyPermission(1, 1, ['canEditUsers', 'canDeleteUsers']);
+      const result = await service.hasAnyPermission(1, 1, [
+        'canEditUsers',
+        'canDeleteUsers',
+      ]);
 
       expect(result).toBe(false);
     });
@@ -236,7 +237,10 @@ describe('PermissionsService', () => {
 
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasAllPermissions(1, 1, ['canEditUsers', 'canDeleteUsers']);
+      const result = await service.hasAllPermissions(1, 1, [
+        'canEditUsers',
+        'canDeleteUsers',
+      ]);
 
       expect(result).toBe(true);
     });
@@ -260,7 +264,10 @@ describe('PermissionsService', () => {
 
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasAllPermissions(1, 1, ['canEditUsers', 'canDeleteUsers']);
+      const result = await service.hasAllPermissions(1, 1, [
+        'canEditUsers',
+        'canDeleteUsers',
+      ]);
 
       expect(result).toBe(false);
     });

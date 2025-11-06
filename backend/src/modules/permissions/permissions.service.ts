@@ -14,7 +14,10 @@ export class PermissionsService {
    * Get aggregated permissions for a user in an organization
    * Combines permissions from all roles the user has in that organization
    */
-  async getUserPermissions(userId: number, organizationId: number): Promise<Set<string>> {
+  async getUserPermissions(
+    userId: number,
+    organizationId: number,
+  ): Promise<Set<string>> {
     const userRoles = await this.userOrgRoleRepository.find({
       where: { userId, organizationId },
       relations: ['role'],
@@ -23,7 +26,7 @@ export class PermissionsService {
     const permissions = new Set<string>();
 
     // Aggregate permissions from all roles
-    userRoles.forEach(userOrgRole => {
+    userRoles.forEach((userOrgRole) => {
       const rolePermissions = userOrgRole.role.permissions || {};
       Object.entries(rolePermissions).forEach(([permission, enabled]) => {
         if (enabled) {
@@ -55,8 +58,13 @@ export class PermissionsService {
     organizationId: number,
     permissionsToCheck: string[],
   ): Promise<boolean> {
-    const userPermissions = await this.getUserPermissions(userId, organizationId);
-    return permissionsToCheck.some(permission => userPermissions.has(permission));
+    const userPermissions = await this.getUserPermissions(
+      userId,
+      organizationId,
+    );
+    return permissionsToCheck.some((permission) =>
+      userPermissions.has(permission),
+    );
   }
 
   /**
@@ -67,14 +75,22 @@ export class PermissionsService {
     organizationId: number,
     permissionsToCheck: string[],
   ): Promise<boolean> {
-    const userPermissions = await this.getUserPermissions(userId, organizationId);
-    return permissionsToCheck.every(permission => userPermissions.has(permission));
+    const userPermissions = await this.getUserPermissions(
+      userId,
+      organizationId,
+    );
+    return permissionsToCheck.every((permission) =>
+      userPermissions.has(permission),
+    );
   }
 
   /**
    * Get all permissions as an array (useful for API responses)
    */
-  async getUserPermissionsArray(userId: number, organizationId: number): Promise<string[]> {
+  async getUserPermissionsArray(
+    userId: number,
+    organizationId: number,
+  ): Promise<string[]> {
     const permissions = await this.getUserPermissions(userId, organizationId);
     return Array.from(permissions);
   }
