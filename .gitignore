@@ -52,6 +52,3 @@ out/
 # MacOS
 .DS_Store
 
-# GitHub Actions
-.github/
-

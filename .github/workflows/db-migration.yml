@@ -1,0 +1,83 @@
+name: Database Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to run migrations'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      dry_run:
+        description: 'Dry run (show pending migrations without running)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  migrate:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Show pending migrations (dry run)
+        if: inputs.dry_run == true
+        working-directory: backend
+        env:
+          DATABASE_HOST: ${{ secrets.DB_HOST }}
+          DATABASE_PORT: ${{ secrets.DB_PORT }}
+          DATABASE_USER: ${{ secrets.DB_USER }}
+          DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.DB_NAME }}
+        run: |
+          echo "Pending migrations:"
+          npm run typeorm migration:show
+
+      - name: Run migrations
+        if: inputs.dry_run == false
+        working-directory: backend
+        env:
+          DATABASE_HOST: ${{ secrets.DB_HOST }}
+          DATABASE_PORT: ${{ secrets.DB_PORT }}
+          DATABASE_USER: ${{ secrets.DB_USER }}
+          DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.DB_NAME }}
+        run: |
+          echo "Running database migrations..."
+          npm run typeorm migration:run
+          echo "Migrations completed successfully"
+
+      - name: Verify migration status
+        if: inputs.dry_run == false
+        working-directory: backend
+        env:
+          DATABASE_HOST: ${{ secrets.DB_HOST }}
+          DATABASE_PORT: ${{ secrets.DB_PORT }}
+          DATABASE_USER: ${{ secrets.DB_USER }}
+          DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DATABASE_NAME: ${{ secrets.DB_NAME }}
+        run: npm run typeorm migration:show
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Migration failed for ${{ inputs.environment }} environment"
+          exit 1
