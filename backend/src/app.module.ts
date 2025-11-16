@@ -25,7 +25,9 @@ import { AppController } from './app.controller';
         password: configService.get<string>('DATABASE_PASSWORD'),
         database: configService.get<string>('DATABASE_NAME'),
         autoLoadEntities: true,
-        synchronize: true, // Set to false in production
+        synchronize: false, // NEVER use true in production
+        migrations: ['dist/migrations/*.js'],
+        migrationsRun: false, // Run migrations manually for safety
       }),
       inject: [ConfigService],
     }),
