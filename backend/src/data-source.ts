@@ -5,6 +5,7 @@ import { User } from './modules/users/user.entity';
 import { Organization } from './modules/organizations/organization.entity';
 import { Role } from './modules/roles/role.entity';
 import { UserOrganizationRole } from './modules/user-organization-roles/user-organization-role.entity';
+import { RefreshToken } from './modules/auth/refresh-token.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -13,7 +14,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DATABASE_USER,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
-  entities: [User, Organization, Role, UserOrganizationRole],
+  entities: [User, Organization, Role, UserOrganizationRole, RefreshToken],
   migrations: ['src/migrations/*.ts'], // Adjust the path as needed
   synchronize: false,
 });

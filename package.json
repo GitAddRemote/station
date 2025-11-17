@@ -1,9 +1,36 @@
 {
-  "dependencies": {
-    "bcrypt": "^5.1.1",
-    "class-validator": "^0.14.1"
+  "name": "station",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gaming guild and organization management portal",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "typecheck": "turbo run typecheck",
+    "prepare": "husky install"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2"
-  }
+    "turbo": "^2.3.0",
+    "prettier": "^3.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,jsx,json,md}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@10.22.0"
 }

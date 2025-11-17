@@ -3,15 +3,17 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "setupFilesAfterEnv": ["<rootDir>/setup-e2e.ts"],
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
-  },
-  "globals": {
-    "ts-jest": {
-      "tsconfig": {
-        "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      {
+        "tsconfig": {
+          "esModuleInterop": true,
+          "allowSyntheticDefaultImports": true
+        }
       }
-    }
-  }
+    ]
+  },
+  "testTimeout": 30000
 }
