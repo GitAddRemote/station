@@ -20,15 +20,26 @@ import { AppController } from './app.controller';
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        store: await redisStore({
-          socket: {
-            host: configService.get<string>('REDIS_HOST', 'localhost'),
-            port: configService.get<number>('REDIS_PORT', 6379),
-          },
-          ttl: 300000, // 5 minutes default TTL in milliseconds
-        }),
-      }),
+      useFactory: async (configService: ConfigService) => {
+        try {
+          const store = await redisStore({
+            socket: {
+              host: configService.get<string>('REDIS_HOST', 'localhost'),
+              port: configService.get<number>('REDIS_PORT', 6379),
+            },
+            ttl: 300000, // 5 minutes default TTL in milliseconds
+          });
+          console.log('✅ Redis cache connected successfully');
+          return { store };
+        } catch (error) {
+          console.warn('⚠️  Redis connection failed, using in-memory cache:', error.message);
+          // Fall back to in-memory cache if Redis is not available
+          return {
+            ttl: 300000,
+            max: 100,
+          };
+        }
+      },
       inject: [ConfigService],
     }),
     TypeOrmModule.forRootAsync({
