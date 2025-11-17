@@ -75,7 +75,7 @@ jobs:
           DATABASE_PASSWORD: test
           DATABASE_NAME: station_test
           JWT_SECRET: test-secret-key-for-ci
-        run: pnpm test -- --coverage --passWithNoTests
+        run: pnpm test --coverage --passWithNoTests
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
