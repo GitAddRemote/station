@@ -27,7 +27,8 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const registerResponse = await fetch('http://localhost:3000/auth/register', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const registerResponse = await fetch(`${apiUrl}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -37,7 +38,7 @@ const Register = () => {
 
       if (registerResponse.ok) {
         // Auto-login after successful registration
-        const loginResponse = await fetch('http://localhost:3000/auth/login', {
+        const loginResponse = await fetch(`${apiUrl}/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -61,11 +62,12 @@ const Register = () => {
         }
       } else {
         const errorData = await registerResponse.json();
-        setError(errorData.message || 'Registration failed');
+        console.error('Registration error:', errorData);
+        setError(errorData.message || errorData.error || 'Registration failed');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Registration error:', err);
-      setError('An error occurred during registration');
+      setError(err.message || 'Cannot connect to server. Please make sure the backend is running.');
     } finally {
       setLoading(false);
     }

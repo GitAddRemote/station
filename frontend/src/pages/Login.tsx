@@ -26,7 +26,8 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3000/auth/login', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -46,11 +47,12 @@ const Login = () => {
         navigate('/dashboard');
       } else {
         const errorData = await response.json();
-        setError(errorData.message || 'Invalid username or password');
+        console.error('Login error:', errorData);
+        setError(errorData.message || errorData.error || 'Invalid username or password');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login error:', err);
-      setError('An error occurred during login');
+      setError(err.message || 'Cannot connect to server. Please make sure the backend is running.');
     } finally {
       setLoading(false);
     }
