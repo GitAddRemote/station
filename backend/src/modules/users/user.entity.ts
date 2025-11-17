@@ -18,6 +18,18 @@ export class User {
   @Column({ default: true })
   isActive!: boolean;
 
+  @Column({ length: 100, nullable: true })
+  firstName?: string;
+
+  @Column({ length: 100, nullable: true })
+  lastName?: string;
+
+  @Column({ length: 20, nullable: true })
+  phoneNumber?: string;
+
+  @Column({ type: 'text', nullable: true })
+  bio?: string;
+
   @OneToMany(() => UserOrganizationRole, (uor) => uor.user)
   userOrganizationRoles!: UserOrganizationRole[];
 }

@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Organization } from './organization.entity';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -10,6 +12,8 @@ export class OrganizationsService {
   constructor(
     @InjectRepository(Organization)
     private organizationsRepository: Repository<Organization>,
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
   ) {}
 
   async create(
@@ -41,6 +45,15 @@ export class OrganizationsService {
   }
 
   async findWithMembers(id: number): Promise<Organization> {
+    const cacheKey = `org:${id}:members`;
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get<Organization>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // If not in cache, fetch from database
     const organization = await this.organizationsRepository.findOne({
       where: { id },
       relations: [
@@ -54,6 +67,9 @@ export class OrganizationsService {
       throw new NotFoundException(`Organization with ID ${id} not found`);
     }
 
+    // Store in cache with 5 minute TTL
+    await this.cacheManager.set(cacheKey, organization, 300000);
+
     return organization;
   }
 
@@ -63,11 +79,19 @@ export class OrganizationsService {
   ): Promise<Organization> {
     const organization = await this.findOne(id);
     Object.assign(organization, updateOrganizationDto);
-    return this.organizationsRepository.save(organization);
+    const updated = await this.organizationsRepository.save(organization);
+
+    // Invalidate cache
+    await this.cacheManager.del(`org:${id}:members`);
+
+    return updated;
   }
 
   async remove(id: number): Promise<void> {
     const organization = await this.findOne(id);
     await this.organizationsRepository.remove(organization);
+
+    // Invalidate cache
+    await this.cacheManager.del(`org:${id}:members`);
   }
 }
