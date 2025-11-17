@@ -35,6 +35,13 @@ jobs:
 
       - name: Run linter
         working-directory: backend
+        env:
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci
         run: pnpm run lint
 
   unit-tests:
@@ -61,6 +68,13 @@ jobs:
 
       - name: Run unit tests
         working-directory: backend
+        env:
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci
         run: pnpm test -- --coverage --passWithNoTests
 
       - name: Upload coverage reports
@@ -143,6 +157,13 @@ jobs:
 
       - name: Build application
         working-directory: backend
+        env:
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci
         run: pnpm run build
 
       - name: Upload build artifacts
