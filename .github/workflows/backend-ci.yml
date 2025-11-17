@@ -69,6 +69,7 @@ jobs:
       - name: Run unit tests
         working-directory: backend
         env:
+          NODE_ENV: test
           DATABASE_HOST: localhost
           DATABASE_PORT: 5432
           DATABASE_USER: test
@@ -124,6 +125,7 @@ jobs:
       - name: Run E2E tests
         working-directory: backend
         env:
+          NODE_ENV: test
           DATABASE_HOST: localhost
           DATABASE_PORT: 5432
           DATABASE_USER: test
