@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { OrganizationsService } from './organizations.service';
 import { Organization } from './organization.entity';
 import { NotFoundException } from '@nestjs/common';
@@ -15,6 +16,12 @@ describe('OrganizationsService', () => {
     remove: jest.fn(),
   };
 
+  const mockCacheManager = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -22,6 +29,10 @@ describe('OrganizationsService', () => {
         {
           provide: getRepositoryToken(Organization),
           useValue: mockRepository,
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: mockCacheManager,
         },
       ],
     }).compile();
@@ -125,6 +136,7 @@ describe('OrganizationsService', () => {
         ],
       };
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.findOne.mockResolvedValue(organization);
 
       const result = await service.findWithMembers(1);
@@ -138,9 +150,28 @@ describe('OrganizationsService', () => {
           'userOrganizationRoles.role',
         ],
       });
+      expect(mockCacheManager.set).toHaveBeenCalled();
+    });
+
+    it('should return cached organization if available', async () => {
+      const cachedOrganization = {
+        id: 1,
+        name: 'Acme Corp',
+        description: '',
+        isActive: true,
+        userOrganizationRoles: [],
+      };
+
+      mockCacheManager.get.mockResolvedValue(cachedOrganization);
+
+      const result = await service.findWithMembers(1);
+
+      expect(result).toEqual(cachedOrganization);
+      expect(mockRepository.findOne).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if organization not found', async () => {
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(service.findWithMembers(999)).rejects.toThrow(
