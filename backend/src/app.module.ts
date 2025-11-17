@@ -31,8 +31,8 @@ import { AppController } from './app.controller';
           });
           console.log('✅ Redis cache connected successfully');
           return { store };
-        } catch (error) {
-          console.warn('⚠️  Redis connection failed, using in-memory cache:', error.message);
+        } catch (error: any) {
+          console.warn('⚠️  Redis connection failed, using in-memory cache:', error?.message || error);
           // Fall back to in-memory cache if Redis is not available
           return {
             ttl: 300000,
