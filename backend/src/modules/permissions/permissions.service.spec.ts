@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PermissionsService } from './permissions.service';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
@@ -10,6 +11,12 @@ describe('PermissionsService', () => {
     find: jest.fn(),
   };
 
+  const mockCacheManager = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -17,6 +24,10 @@ describe('PermissionsService', () => {
         {
           provide: getRepositoryToken(UserOrganizationRole),
           useValue: mockRepository,
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: mockCacheManager,
         },
       ],
     }).compile();
@@ -65,6 +76,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.getUserPermissions(1, 1);
@@ -74,9 +86,24 @@ describe('PermissionsService', () => {
       expect(result.has('canDeleteUsers')).toBe(true);
       expect(result.has('canDeployCode')).toBe(true);
       expect(result.size).toBe(3);
+      expect(mockCacheManager.set).toHaveBeenCalled();
+    });
+
+    it('should return cached permissions if available', async () => {
+      const cachedPermissions = ['canEditUsers', 'canDeleteUsers'];
+      mockCacheManager.get.mockResolvedValue(cachedPermissions);
+
+      const result = await service.getUserPermissions(1, 1);
+
+      expect(result).toBeInstanceOf(Set);
+      expect(result.has('canEditUsers')).toBe(true);
+      expect(result.has('canDeleteUsers')).toBe(true);
+      expect(result.size).toBe(2);
+      expect(mockRepository.find).not.toHaveBeenCalled();
     });
 
     it('should return empty set if user has no roles', async () => {
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue([]);
 
       const result = await service.getUserPermissions(1, 1);
@@ -100,6 +127,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.getUserPermissions(1, 1);
@@ -127,6 +155,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasPermission(1, 1, 'canEditUsers');
@@ -151,6 +180,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasPermission(1, 1, 'canEditUsers');
@@ -177,6 +207,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasAnyPermission(1, 1, [
@@ -204,6 +235,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasAnyPermission(1, 1, [
@@ -235,6 +267,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasAllPermissions(1, 1, [
@@ -262,6 +295,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasAllPermissions(1, 1, [
@@ -292,6 +326,7 @@ describe('PermissionsService', () => {
         },
       ];
 
+      mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.getUserPermissionsArray(1, 1);

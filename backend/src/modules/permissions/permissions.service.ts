@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
 @Injectable()
@@ -8,6 +10,8 @@ export class PermissionsService {
   constructor(
     @InjectRepository(UserOrganizationRole)
     private userOrgRoleRepository: Repository<UserOrganizationRole>,
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
   ) {}
 
   /**
@@ -18,6 +22,15 @@ export class PermissionsService {
     userId: number,
     organizationId: number,
   ): Promise<Set<string>> {
+    const cacheKey = `permissions:user:${userId}:org:${organizationId}`;
+
+    // Try to get from cache
+    const cached = await this.cacheManager.get<string[]>(cacheKey);
+    if (cached) {
+      return new Set(cached);
+    }
+
+    // If not in cache, fetch from database
     const userRoles = await this.userOrgRoleRepository.find({
       where: { userId, organizationId },
       relations: ['role'],
@@ -35,7 +48,22 @@ export class PermissionsService {
       });
     });
 
+    // Store in cache with 15 minute TTL
+    await this.cacheManager.set(cacheKey, Array.from(permissions), 900000);
+
     return permissions;
+  }
+
+  /**
+   * Invalidate cached permissions for a user in an organization
+   * Call this whenever user roles change
+   */
+  async invalidateUserPermissions(
+    userId: number,
+    organizationId: number,
+  ): Promise<void> {
+    const cacheKey = `permissions:user:${userId}:org:${organizationId}`;
+    await this.cacheManager.del(cacheKey);
   }
 
   /**

@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user.entity';
 import { UsersRepository } from './users.repository';
 import { UserDto } from './dto/user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -56,5 +57,31 @@ export class UsersService {
 
   async delete(id: number): Promise<void> {
     await this.usersRepository.delete(id);
+  }
+
+  async updateProfile(
+    userId: number,
+    updateProfileDto: UpdateProfileDto,
+  ): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Update only the profile fields that are provided
+    if (updateProfileDto.firstName !== undefined) {
+      user.firstName = updateProfileDto.firstName;
+    }
+    if (updateProfileDto.lastName !== undefined) {
+      user.lastName = updateProfileDto.lastName;
+    }
+    if (updateProfileDto.phoneNumber !== undefined) {
+      user.phoneNumber = updateProfileDto.phoneNumber;
+    }
+    if (updateProfileDto.bio !== undefined) {
+      user.bio = updateProfileDto.bio;
+    }
+
+    return this.usersRepository.save(user);
   }
 }

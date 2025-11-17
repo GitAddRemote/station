@@ -5,6 +5,8 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as figlet from 'figlet';
 import * as dotenv from 'dotenv';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 dotenv.config();
 
@@ -29,6 +31,12 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Global Exception Filter for standardized error responses
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Global Response Transform Interceptor for standardized success responses
+  app.useGlobalInterceptors(new TransformInterceptor());
 
   // Swagger/OpenAPI Documentation Setup
   const config = new DocumentBuilder()

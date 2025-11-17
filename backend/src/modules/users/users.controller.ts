@@ -16,6 +16,7 @@ import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UserDto } from './dto/user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('users')
 export class UsersController {
@@ -25,6 +26,16 @@ export class UsersController {
   @Get('profile')
   getProfile(@Req() req: Request) {
     return req.user;
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('profile')
+  async updateProfile(
+    @Req() req: Request,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
+    const userId = (req.user as any).userId;
+    return await this.usersService.updateProfile(userId, updateProfileDto);
   }
 
   @UseGuards(AuthGuard('jwt'))
