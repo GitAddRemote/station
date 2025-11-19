@@ -50,9 +50,9 @@ const Login = () => {
         console.error('Login error:', errorData);
         setError(errorData.message || errorData.error || 'Invalid username or password');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Login error:', err);
-      setError(err.message || 'Cannot connect to server. Please make sure the backend is running.');
+      setError(err instanceof Error ? err.message : 'Cannot connect to server. Please make sure the backend is running.');
     } finally {
       setLoading(false);
     }

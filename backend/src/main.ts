@@ -49,7 +49,10 @@ async function bootstrap() {
     .addTag('users', 'User management endpoints')
     .addTag('organizations', 'Organization management endpoints')
     .addTag('roles', 'Role management endpoints')
-    .addTag('user-organization-roles', 'User-Organization-Role assignment endpoints')
+    .addTag(
+      'user-organization-roles',
+      'User-Organization-Role assignment endpoints',
+    )
     .addTag('permissions', 'Permission aggregation endpoints')
     .addBearerAuth(
       {
