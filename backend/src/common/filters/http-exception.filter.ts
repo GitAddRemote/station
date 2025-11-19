@@ -27,7 +27,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
           ? exceptionResponse
           : (exceptionResponse as any).message || 'An error occurred',
       errors:
-        typeof exceptionResponse === 'object' && (exceptionResponse as any).errors
+        typeof exceptionResponse === 'object' &&
+        (exceptionResponse as any).errors
           ? (exceptionResponse as any).errors
           : undefined,
     };

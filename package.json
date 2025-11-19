@@ -20,8 +20,8 @@
     "lint-staged": "^16.2.6"
   },
   "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix",
+    "backend/**/*.{ts,tsx}": [
+      "pnpm --filter backend exec eslint --fix",
       "prettier --write"
     ],
     "*.{js,jsx,json,md}": [

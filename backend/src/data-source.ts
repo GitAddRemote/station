@@ -6,8 +6,10 @@ import { Organization } from './modules/organizations/organization.entity';
 import { Role } from './modules/roles/role.entity';
 import { UserOrganizationRole } from './modules/user-organization-roles/user-organization-role.entity';
 import { RefreshToken } from './modules/auth/refresh-token.entity';
+import { AuditLog } from './modules/audit-logs/audit-log.entity';
 import { CreateUsersTable1716956654528 } from './migrations/1716956654528-CreateUsersTable';
 import { CreateOrganizationsRolesAndJunctionTable1730841000000 } from './migrations/1730841000000-CreateOrganizationsRolesAndJunctionTable';
+import { CreateAuditLogsTable1730900000000 } from './migrations/1730900000000-CreateAuditLogsTable';
 import { CreateRefreshTokenTable1731715200000 } from './migrations/1731715200000-CreateRefreshTokenTable';
 import { AddUserProfileFields1732000000000 } from './migrations/1732000000000-AddUserProfileFields';
 
@@ -18,10 +20,18 @@ export const AppDataSource = new DataSource({
   username: process.env.DATABASE_USER,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
-  entities: [User, Organization, Role, UserOrganizationRole, RefreshToken],
+  entities: [
+    User,
+    Organization,
+    Role,
+    UserOrganizationRole,
+    RefreshToken,
+    AuditLog,
+  ],
   migrations: [
     CreateUsersTable1716956654528,
     CreateOrganizationsRolesAndJunctionTable1730841000000,
+    CreateAuditLogsTable1730900000000,
     CreateRefreshTokenTable1731715200000,
     AddUserProfileFields1732000000000,
   ],

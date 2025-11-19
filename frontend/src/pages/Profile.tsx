@@ -18,7 +18,6 @@ import {
   Alert,
   Stack,
 } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SaveIcon from '@mui/icons-material/Save';
@@ -214,7 +213,7 @@ const Profile = () => {
         </Typography>
 
         {message.text && (
-          <Alert severity={message.type as any} sx={{ mb: 3 }}>
+          <Alert severity={message.type as 'success' | 'error'} sx={{ mb: 3 }}>
             {message.text}
           </Alert>
         )}

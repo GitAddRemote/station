@@ -52,3 +52,4 @@ out/
 # MacOS
 .DS_Store
 
+.turbo/
