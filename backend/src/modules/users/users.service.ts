@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user.entity';
 import { UsersRepository } from './users.repository';
@@ -42,8 +46,30 @@ export class UsersService {
       password: hashedPassword,
     });
 
-    // 4. Persist and return
-    return this.usersRepository.save(user);
+    // 4. Persist and return with proper error handling
+    try {
+      return await this.usersRepository.save(user);
+    } catch (error: unknown) {
+      // Handle duplicate username or email
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === '23505'
+      ) {
+        // PostgreSQL unique constraint violation
+        const detail = 'detail' in error ? String(error.detail) : '';
+        if (detail.includes('username')) {
+          throw new ConflictException('Username already exists');
+        } else if (detail.includes('email')) {
+          throw new ConflictException('Email already exists');
+        }
+        throw new ConflictException(
+          'User with this information already exists',
+        );
+      }
+      throw error;
+    }
   }
 
   async update(id: number, userDto: Partial<UserDto>): Promise<User> {
