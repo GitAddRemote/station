@@ -115,7 +115,7 @@ export const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          background: '#2a2f35',
+          backgroundColor: '#2a2f35',
           borderRadius: '12px',
           border: '1px solid rgba(74, 158, 255, 0.1)',
           boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
@@ -149,6 +149,14 @@ export const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
+          backgroundColor: '#2a2f35',
+        },
+      },
+    },
+    MuiStack: {
+      styleOverrides: {
+        root: {
+          backgroundColor: 'transparent',
         },
       },
     },
