@@ -27,16 +27,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache: 'pnpm'
 
       - name: Install dependencies
-        working-directory: backend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Show pending migrations (dry run)
         if: inputs.dry_run == true
@@ -49,7 +52,7 @@ jobs:
           DATABASE_NAME: ${{ secrets.DB_NAME }}
         run: |
           echo "Pending migrations:"
-          npm run typeorm migration:show
+          pnpm run typeorm migration:show
 
       - name: Run migrations
         if: inputs.dry_run == false
@@ -62,7 +65,7 @@ jobs:
           DATABASE_NAME: ${{ secrets.DB_NAME }}
         run: |
           echo "Running database migrations..."
-          npm run typeorm migration:run
+          pnpm run migration:run
           echo "Migrations completed successfully"
 
       - name: Verify migration status
@@ -74,7 +77,7 @@ jobs:
           DATABASE_USER: ${{ secrets.DB_USER }}
           DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DATABASE_NAME: ${{ secrets.DB_NAME }}
-        run: npm run typeorm migration:show
+        run: pnpm run typeorm migration:show
 
       - name: Notify on failure
         if: failure()
