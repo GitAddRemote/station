@@ -11,6 +11,8 @@ import { UserOrganizationRolesModule } from './modules/user-organization-roles/u
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AppService } from './app.service';
 import { AppController } from './app.controller';
+import { DatabaseSeederModule } from './database/seeds/database-seeder.module';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -32,7 +34,10 @@ import { AppController } from './app.controller';
           console.log('✅ Redis cache connected successfully');
           return { store };
         } catch (error: any) {
-          console.warn('⚠️  Redis connection failed, using in-memory cache:', error?.message || error);
+          console.warn(
+            '⚠️  Redis connection failed, using in-memory cache:',
+            error?.message || error,
+          );
           // Fall back to in-memory cache if Redis is not available
           return {
             ttl: 300000,
@@ -45,7 +50,9 @@ import { AppController } from './app.controller';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
-        const isTest = process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
+        const isTest =
+          process.env.NODE_ENV === 'test' ||
+          process.env.JEST_WORKER_ID !== undefined;
 
         return {
           type: 'postgres',
@@ -69,6 +76,8 @@ import { AppController } from './app.controller';
     OrganizationsModule,
     UserOrganizationRolesModule,
     PermissionsModule,
+    DatabaseSeederModule,
+    AuditLogsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
