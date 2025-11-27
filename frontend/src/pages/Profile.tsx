@@ -21,6 +21,7 @@ import {
 import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SaveIcon from '@mui/icons-material/Save';
+import LockIcon from '@mui/icons-material/Lock';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -37,6 +38,13 @@ const Profile = () => {
     bio: '',
   });
 
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+  const [changingPassword, setChangingPassword] = useState(false);
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -50,14 +58,13 @@ const Profile = () => {
 
         if (response.ok) {
           const data = await response.json();
-          const userData = data.data || data;
           setProfile({
-            username: userData.username || '',
-            email: userData.email || '',
-            firstName: userData.firstName || '',
-            lastName: userData.lastName || '',
-            phoneNumber: userData.phoneNumber || '',
-            bio: userData.bio || '',
+            username: data.username || '',
+            email: data.email || '',
+            firstName: data.firstName || '',
+            lastName: data.lastName || '',
+            phoneNumber: data.phoneNumber || '',
+            bio: data.bio || '',
           });
         } else {
           navigate('/login');
@@ -132,6 +139,57 @@ const Profile = () => {
       setMessage({ type: 'error', text: 'An error occurred while updating your profile' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage({ type: '', text: '' });
+
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'New passwords do not match' });
+      return;
+    }
+
+    // Validate password length
+    if (newPassword.length < 6) {
+      setPasswordMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${apiUrl}/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setPasswordMessage({ type: 'success', text: data.message });
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setPasswordMessage({ type: 'error', text: data.message || 'Failed to change password' });
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      setPasswordMessage({ type: 'error', text: 'An error occurred while changing your password' });
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -309,6 +367,73 @@ const Profile = () => {
                     Cancel
                   </Button>
                 </Box>
+              </Stack>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Change Password Card */}
+        <Card sx={{ mt: 4 }}>
+          <CardContent sx={{ p: 4 }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#e8eaed' }}>
+              Change Password
+            </Typography>
+
+            {passwordMessage.text && (
+              <Alert severity={passwordMessage.type as 'success' | 'error'} sx={{ mb: 3 }}>
+                {passwordMessage.text}
+              </Alert>
+            )}
+
+            <form onSubmit={handlePasswordChange}>
+              <Stack spacing={3}>
+                <TextField
+                  label="Current Password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  fullWidth
+                  required
+                  inputProps={{
+                    'aria-label': 'Current Password',
+                  }}
+                />
+
+                <TextField
+                  label="New Password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  fullWidth
+                  required
+                  helperText="Minimum 6 characters"
+                  inputProps={{
+                    minLength: 6,
+                    'aria-label': 'New Password',
+                  }}
+                />
+
+                <TextField
+                  label="Confirm New Password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  fullWidth
+                  required
+                  inputProps={{
+                    'aria-label': 'Confirm New Password',
+                  }}
+                />
+
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  startIcon={<LockIcon />}
+                  disabled={changingPassword}
+                >
+                  {changingPassword ? 'Changing Password...' : 'Change Password'}
+                </Button>
               </Stack>
             </form>
           </CardContent>

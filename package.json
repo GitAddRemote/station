@@ -5,6 +5,8 @@
   "description": "Gaming guild and organization management portal",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:frontend": "pnpm --filter frontend dev",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
