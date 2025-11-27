@@ -27,6 +27,11 @@ export class UsersService {
     return user || undefined;
   }
 
+  async findByEmail(email: string): Promise<User | undefined> {
+    const user = await this.usersRepository.findOne({ where: { email } });
+    return user || undefined;
+  }
+
   async findAll(): Promise<User[]> {
     return this.usersRepository.find();
   }
@@ -109,5 +114,9 @@ export class UsersService {
     }
 
     return this.usersRepository.save(user);
+  }
+
+  async updatePassword(userId: number, hashedPassword: string): Promise<void> {
+    await this.usersRepository.update(userId, { password: hashedPassword });
   }
 }

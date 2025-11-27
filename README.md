@@ -164,9 +164,13 @@ Run both frontend and backend in development mode:
 # From root directory
 pnpm dev
 
-# Or individually:
-cd backend && pnpm dev    # Backend on http://localhost:3001
-cd frontend && pnpm dev   # Frontend on http://localhost:5173
+# Or individually from root:
+pnpm dev:backend          # Backend on http://localhost:3001
+pnpm dev:frontend         # Frontend on http://localhost:5173
+
+# Or from package directories:
+cd backend && pnpm dev    # Backend only
+cd frontend && pnpm dev   # Frontend only
 ```
 
 **Note**: Redis is optional. The application will fall back to in-memory caching if Redis is unavailable.

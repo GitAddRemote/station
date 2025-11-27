@@ -48,11 +48,10 @@ const Register = () => {
 
         if (loginResponse.ok) {
           const data = await loginResponse.json();
-          const tokens = data.data || data;
 
           // Store tokens
-          localStorage.setItem('access_token', tokens.access_token);
-          localStorage.setItem('refresh_token', tokens.refresh_token);
+          localStorage.setItem('access_token', data.access_token);
+          localStorage.setItem('refresh_token', data.refresh_token);
 
           // Redirect to dashboard
           navigate('/dashboard');
