@@ -10,8 +10,13 @@ import {
   CardContent,
   Alert,
   Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import LoginIcon from '@mui/icons-material/Login';
+import EmailIcon from '@mui/icons-material/Email';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -19,6 +24,13 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Forgot password state
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -37,11 +49,10 @@ const Login = () => {
 
       if (response.ok) {
         const data = await response.json();
-        const tokens = data.data || data;
 
         // Store tokens
-        localStorage.setItem('access_token', tokens.access_token);
-        localStorage.setItem('refresh_token', tokens.refresh_token);
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
 
         // Redirect to dashboard
         navigate('/dashboard');
@@ -56,6 +67,44 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForgotPassword = async () => {
+    setResetError('');
+    setResetSuccess('');
+    setResetLoading(true);
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/auth/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: resetEmail }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setResetSuccess(data.message);
+        setResetEmail('');
+      } else {
+        setResetError(data.message || 'Failed to send reset email');
+      }
+    } catch (err: unknown) {
+      console.error('Forgot password error:', err);
+      setResetError('Cannot connect to server. Please try again later.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleCloseForgotPassword = () => {
+    setForgotPasswordOpen(false);
+    setResetEmail('');
+    setResetSuccess('');
+    setResetError('');
   };
 
   return (
@@ -135,6 +184,19 @@ const Login = () => {
                 >
                   {loading ? 'Signing In...' : 'Sign In'}
                 </Button>
+
+                <Box sx={{ textAlign: 'right' }}>
+                  <Button
+                    onClick={() => setForgotPasswordOpen(true)}
+                    sx={{
+                      color: '#4A9EFF',
+                      textTransform: 'none',
+                      '&:hover': { backgroundColor: 'rgba(74, 158, 255, 0.1)' },
+                    }}
+                  >
+                    Forgot password?
+                  </Button>
+                </Box>
               </Stack>
             </form>
 
@@ -167,6 +229,71 @@ const Login = () => {
             ← Back to Home
           </Link>
         </Box>
+
+        {/* Forgot Password Dialog */}
+        <Dialog
+          open={forgotPasswordOpen}
+          onClose={handleCloseForgotPassword}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>Reset Password</DialogTitle>
+          <DialogContent>
+            {!resetSuccess && (
+              <Typography sx={{ mb: 2, color: '#9aa0a6' }}>
+                Enter your email address and we'll send you a link to reset your password.
+              </Typography>
+            )}
+
+            {resetSuccess && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                {resetSuccess}
+              </Alert>
+            )}
+
+            {resetError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {resetError}
+              </Alert>
+            )}
+
+            {!resetSuccess && (
+              <TextField
+                label="Email Address"
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                fullWidth
+                required
+                autoFocus
+                inputProps={{
+                  'aria-label': 'Email Address',
+                }}
+              />
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 3 }}>
+            {resetSuccess ? (
+              <Button onClick={handleCloseForgotPassword} variant="contained">
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button onClick={handleCloseForgotPassword} disabled={resetLoading}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleForgotPassword}
+                  variant="contained"
+                  disabled={!resetEmail || resetLoading}
+                  startIcon={<EmailIcon />}
+                >
+                  {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                </Button>
+              </>
+            )}
+          </DialogActions>
+        </Dialog>
       </Container>
     </Box>
   );

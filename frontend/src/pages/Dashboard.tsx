@@ -44,7 +44,7 @@ const Dashboard = () => {
 
         if (response.ok) {
           const data = await response.json();
-          setUser(data.data || data);
+          setUser(data);
         } else {
           navigate('/login');
         }
