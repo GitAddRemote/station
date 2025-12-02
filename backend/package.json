@@ -11,6 +11,8 @@
     "migration:revert": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d src/data-source.ts",
     "migration:generate": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:generate -d src/data-source.ts",
     "migration:create": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:create",
+    "db:backup": "./src/database/scripts/backup-database.sh",
+    "db:health-check": "./src/database/scripts/health-check.sh",
     "seed": "ts-node -r tsconfig-paths/register src/database/seeds/seed.ts",
     "build": "nest build",
     "dev": "nest start --watch",
