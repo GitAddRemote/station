@@ -118,12 +118,14 @@ describe('Auth - Password Reset (e2e)', () => {
 
     beforeEach(async () => {
       const passwordResetRepository = dataSource.getRepository(PasswordReset);
-      const resetRecord = await passwordResetRepository.findOne({
-        where: { userId: testUser.id, used: false },
-        order: { createdAt: 'DESC' },
+      const resetRecord = await passwordResetRepository.save({
+        userId: testUser.id,
+        token: `valid-token-${Date.now()}`,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        used: false,
       });
 
-      validToken = resetRecord!.token;
+      validToken = resetRecord.token;
     });
 
     it('should reset password with valid token', async () => {

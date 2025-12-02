@@ -23,6 +23,20 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
       isGlobal: true,
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
+        const useRedis =
+          configService.get<string>('USE_REDIS_CACHE', 'true') === 'true';
+
+        if (!useRedis) {
+          return {
+            store: 'memory',
+            ttl: 300000,
+            max: 100,
+            // Disable interval cleanup to avoid open handles in tests
+            checkperiod: 0,
+            isCacheableValue: () => true,
+          };
+        }
+
         try {
           const store = await redisStore({
             socket: {
