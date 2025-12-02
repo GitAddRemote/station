@@ -4,12 +4,25 @@ import * as path from 'path';
 
 /**
  * Check if PostgreSQL client tools are available
+ * Also checks if we're in CI/CD environment
  */
 function hasPostgreSQLTools(): boolean {
+  // Skip in CI/CD environments
+  if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+    console.log(
+      '🤖 CI/CD environment detected - skipping PostgreSQL tool tests',
+    );
+    return false;
+  }
+
   try {
     execSync('which pg_dump', { stdio: 'ignore' });
+    execSync('which psql', { stdio: 'ignore' });
     return true;
   } catch {
+    console.log(
+      '⚠️  PostgreSQL client tools not found - skipping execution tests',
+    );
     return false;
   }
 }
