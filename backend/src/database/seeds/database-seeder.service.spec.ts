@@ -7,6 +7,7 @@ import { Role } from '../../modules/roles/role.entity';
 import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
+import { Game } from '../../modules/games/game.entity';
 
 // Mock bcrypt module
 jest.mock('bcrypt', () => ({
@@ -19,9 +20,18 @@ describe('DatabaseSeederService', () => {
   let organizationsRepository: Repository<Organization>;
   let usersRepository: Repository<User>;
   let userOrgRolesRepository: Repository<UserOrganizationRole>;
+  let gamesRepository: Repository<Game>;
   let loggerLogSpy: jest.SpyInstance;
   let loggerWarnSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
+
+  const mockGame = {
+    id: 1,
+    name: 'Star Citizen',
+    code: 'sc',
+    description: 'Star Citizen MMO',
+    active: true,
+  };
 
   const mockRole = {
     id: 1,
@@ -35,6 +45,7 @@ describe('DatabaseSeederService', () => {
     name: 'Demo Organization',
     description: 'Test org',
     isActive: true,
+    gameId: 1,
   };
 
   const mockUser = {
@@ -110,6 +121,14 @@ describe('DatabaseSeederService', () => {
             save: jest.fn(),
           },
         },
+        {
+          provide: getRepositoryToken(Game),
+          useValue: {
+            findOne: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -122,6 +141,7 @@ describe('DatabaseSeederService', () => {
     userOrgRolesRepository = module.get<Repository<UserOrganizationRole>>(
       getRepositoryToken(UserOrganizationRole),
     );
+    gamesRepository = module.get<Repository<Game>>(getRepositoryToken(Game));
   });
 
   it('should be defined', () => {
@@ -130,6 +150,17 @@ describe('DatabaseSeederService', () => {
 
   describe('seedAll', () => {
     it('should seed all data successfully', async () => {
+      // Mock games seeding - first call returns null (new game), second call returns the game for org creation
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValueOnce(null) // First game check (sc)
+        .mockResolvedValueOnce(null) // Second game check (sq42)
+        .mockResolvedValueOnce(mockGame as any) // Get sc game for org creation
+        .mockResolvedValueOnce(null); // Org check
+
+      jest.spyOn(gamesRepository, 'create').mockReturnValue(mockGame as any);
+      jest.spyOn(gamesRepository, 'save').mockResolvedValue(mockGame as any);
+
       jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(rolesRepository, 'create').mockReturnValue(mockRole as any);
       jest.spyOn(rolesRepository, 'save').mockResolvedValue(mockRole as any);
@@ -158,6 +189,7 @@ describe('DatabaseSeederService', () => {
     });
 
     it('should handle existing data gracefully', async () => {
+      jest.spyOn(gamesRepository, 'findOne').mockResolvedValue(mockGame as any);
       jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(mockRole as any);
       jest
         .spyOn(organizationsRepository, 'findOne')
@@ -169,6 +201,7 @@ describe('DatabaseSeederService', () => {
 
       await expect(service.seedAll()).resolves.toBeUndefined();
 
+      expect(gamesRepository.save).not.toHaveBeenCalled();
       expect(rolesRepository.save).not.toHaveBeenCalled();
       expect(organizationsRepository.save).not.toHaveBeenCalled();
       expect(usersRepository.save).not.toHaveBeenCalled();
@@ -177,7 +210,7 @@ describe('DatabaseSeederService', () => {
 
     it('should throw error on failure', async () => {
       jest
-        .spyOn(rolesRepository, 'findOne')
+        .spyOn(gamesRepository, 'findOne')
         .mockRejectedValue(new Error('Database error'));
 
       await expect(service.seedAll()).rejects.toThrow('Database error');

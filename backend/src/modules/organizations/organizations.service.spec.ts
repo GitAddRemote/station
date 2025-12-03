@@ -4,6 +4,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { OrganizationsService } from './organizations.service';
 import { Organization } from './organization.entity';
 import { NotFoundException } from '@nestjs/common';
+import { GamesService } from '../games/games.service';
 
 describe('OrganizationsService', () => {
   let service: OrganizationsService;
@@ -22,6 +23,14 @@ describe('OrganizationsService', () => {
     del: jest.fn(),
   };
 
+  const mockGamesService = {
+    getDefaultGame: jest.fn(),
+    getGameById: jest.fn(),
+    getGameByCode: jest.fn(),
+    getActiveGames: jest.fn(),
+    validateGameId: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -33,6 +42,10 @@ describe('OrganizationsService', () => {
         {
           provide: CACHE_MANAGER,
           useValue: mockCacheManager,
+        },
+        {
+          provide: GamesService,
+          useValue: mockGamesService,
         },
       ],
     }).compile();
@@ -56,6 +69,47 @@ describe('OrganizationsService', () => {
         isActive: true,
       };
 
+      const defaultGame = {
+        id: 1,
+        name: 'Star Citizen',
+        code: 'sc',
+        description: 'Star Citizen MMO',
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const savedOrg = {
+        id: 1,
+        ...createOrgDto,
+        gameId: defaultGame.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockGamesService.getDefaultGame.mockResolvedValue(defaultGame);
+      mockRepository.create.mockReturnValue(savedOrg);
+      mockRepository.save.mockResolvedValue(savedOrg);
+
+      const result = await service.create(createOrgDto);
+
+      expect(result).toEqual(savedOrg);
+      expect(mockGamesService.getDefaultGame).toHaveBeenCalled();
+      expect(mockRepository.create).toHaveBeenCalledWith({
+        ...createOrgDto,
+        gameId: defaultGame.id,
+      });
+      expect(mockRepository.save).toHaveBeenCalledWith(savedOrg);
+    });
+
+    it('should create a new organization with provided gameId', async () => {
+      const createOrgDto = {
+        name: 'Acme Corp',
+        description: 'A test organization',
+        isActive: true,
+        gameId: 2,
+      };
+
       const savedOrg = {
         id: 1,
         ...createOrgDto,
@@ -69,6 +123,7 @@ describe('OrganizationsService', () => {
       const result = await service.create(createOrgDto);
 
       expect(result).toEqual(savedOrg);
+      expect(mockGamesService.getDefaultGame).not.toHaveBeenCalled();
       expect(mockRepository.create).toHaveBeenCalledWith(createOrgDto);
       expect(mockRepository.save).toHaveBeenCalledWith(savedOrg);
     });
