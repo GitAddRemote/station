@@ -5,6 +5,7 @@ import { Role } from '../../modules/roles/role.entity';
 import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
+import { Game } from '../../modules/games/game.entity';
 import { defaultRoles } from './roles.seed';
 import * as bcrypt from 'bcrypt';
 
@@ -21,6 +22,8 @@ export class DatabaseSeederService {
     private usersRepository: Repository<User>,
     @InjectRepository(UserOrganizationRole)
     private userOrgRolesRepository: Repository<UserOrganizationRole>,
+    @InjectRepository(Game)
+    private gamesRepository: Repository<Game>,
   ) {}
 
   async seedAll(): Promise<void> {
@@ -28,6 +31,7 @@ export class DatabaseSeederService {
 
     try {
       // Seed in order of dependencies
+      await this.seedGames();
       await this.seedRoles();
       await this.seedTestOrganization();
       await this.seedTestUser();
@@ -37,6 +41,41 @@ export class DatabaseSeederService {
     } catch (error) {
       this.logger.error('❌ Database seeding failed:', error);
       throw error;
+    }
+  }
+
+  private async seedGames(): Promise<void> {
+    this.logger.log('Seeding games...');
+
+    const games = [
+      {
+        name: 'Star Citizen',
+        code: 'sc',
+        description:
+          'Star Citizen is a multiplayer space trading and combat simulation game.',
+        active: true,
+      },
+      {
+        name: 'Squadron 42',
+        code: 'sq42',
+        description:
+          'Squadron 42 is a single-player space combat game set in the Star Citizen universe.',
+        active: true,
+      },
+    ];
+
+    for (const gameData of games) {
+      const existingGame = await this.gamesRepository.findOne({
+        where: { code: gameData.code },
+      });
+
+      if (!existingGame) {
+        const game = this.gamesRepository.create(gameData);
+        await this.gamesRepository.save(game);
+        this.logger.log(`  ✓ Created game: ${game.name}`);
+      } else {
+        this.logger.log(`  ⊙ Game already exists: ${gameData.name}`);
+      }
     }
   }
 
@@ -66,10 +105,16 @@ export class DatabaseSeederService {
     });
 
     if (!existingOrg) {
+      // Get Star Citizen game (default)
+      const starCitizen = await this.gamesRepository.findOne({
+        where: { code: 'sc' },
+      });
+
       const organization = this.organizationsRepository.create({
         name: 'Demo Organization',
         description: 'A demo organization for testing and development',
         isActive: true,
+        gameId: starCitizen!.id,
       });
       await this.organizationsRepository.save(organization);
       this.logger.log(`  ✓ Created organization: ${organization.name}`);

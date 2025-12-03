@@ -5,10 +5,17 @@ import { Role } from '../../modules/roles/role.entity';
 import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
+import { Game } from '../../modules/games/game.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Role, Organization, User, UserOrganizationRole]),
+    TypeOrmModule.forFeature([
+      Role,
+      Organization,
+      User,
+      UserOrganizationRole,
+      Game,
+    ]),
   ],
   providers: [DatabaseSeederService],
   exports: [DatabaseSeederService],
