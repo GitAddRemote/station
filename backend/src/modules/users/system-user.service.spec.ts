@@ -16,6 +16,8 @@ describe('SystemUserService', () => {
 
   const mockRepository = {
     findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -51,11 +53,49 @@ describe('SystemUserService', () => {
     });
 
     it('should throw error if system user is missing', async () => {
+      // Store original NODE_ENV
+      const originalNodeEnv = process.env.NODE_ENV;
+
+      // Set NODE_ENV to non-test value to prevent auto-creation
+      process.env.NODE_ENV = 'production';
+
       mockRepository.findOne.mockResolvedValue(null);
 
       await expect(service.onModuleInit()).rejects.toThrow(
         'System user not found! Run migrations to seed system user: pnpm migration:run',
       );
+
+      // Restore original NODE_ENV
+      process.env.NODE_ENV = originalNodeEnv;
+    });
+
+    it('should auto-create system user in test environment', async () => {
+      // Store original NODE_ENV
+      const originalNodeEnv = process.env.NODE_ENV;
+
+      // Ensure we're in test environment
+      process.env.NODE_ENV = 'test';
+
+      mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.create.mockReturnValue(mockSystemUser);
+      mockRepository.save.mockResolvedValue(mockSystemUser);
+
+      await service.onModuleInit();
+
+      expect(mockRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 1,
+          username: 'station-system',
+          email: 'system@station.internal',
+          isActive: true,
+          isSystemUser: true,
+        }),
+      );
+      expect(mockRepository.save).toHaveBeenCalled();
+      expect(service.getSystemUserId()).toBe(1);
+
+      // Restore original NODE_ENV
+      process.env.NODE_ENV = originalNodeEnv;
     });
   });
 
