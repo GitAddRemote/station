@@ -6,6 +6,7 @@ import { Cache } from 'cache-manager';
 import { Organization } from './organization.entity';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { GamesService } from '../games/games.service';
 
 @Injectable()
 export class OrganizationsService {
@@ -14,11 +15,18 @@ export class OrganizationsService {
     private organizationsRepository: Repository<Organization>,
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
+    private gamesService: GamesService,
   ) {}
 
   async create(
     createOrganizationDto: CreateOrganizationDto,
   ): Promise<Organization> {
+    // Set default game if not provided
+    if (!createOrganizationDto.gameId) {
+      const defaultGame = await this.gamesService.getDefaultGame();
+      createOrganizationDto.gameId = defaultGame.id;
+    }
+
     const organization = this.organizationsRepository.create(
       createOrganizationDto,
     );

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { DatabaseSeederService } from '../src/database/seeds/database-seeder.service';
 
 describe('UserOrganizationRoles (e2e)', () => {
   let app: INestApplication;
@@ -18,6 +19,12 @@ describe('UserOrganizationRoles (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
+
+    // Seed the database
+    const seeder = moduleFixture.get<DatabaseSeederService>(
+      DatabaseSeederService,
+    );
+    await seeder.seedAll();
 
     // Register and login a test user
     await request(app.getHttpServer()).post('/auth/register').send({

@@ -13,6 +13,7 @@ import { AppService } from './app.service';
 import { AppController } from './app.controller';
 import { DatabaseSeederModule } from './database/seeds/database-seeder.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { GamesModule } from './modules/games/games.module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
     PermissionsModule,
     DatabaseSeederModule,
     AuditLogsModule,
+    GamesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

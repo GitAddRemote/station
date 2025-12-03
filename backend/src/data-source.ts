@@ -8,12 +8,15 @@ import { UserOrganizationRole } from './modules/user-organization-roles/user-org
 import { RefreshToken } from './modules/auth/refresh-token.entity';
 import { PasswordReset } from './modules/auth/password-reset.entity';
 import { AuditLog } from './modules/audit-logs/audit-log.entity';
+import { Game } from './modules/games/game.entity';
 import { CreateUsersTable1716956654528 } from './migrations/1716956654528-CreateUsersTable';
 import { CreateOrganizationsRolesAndJunctionTable1730841000000 } from './migrations/1730841000000-CreateOrganizationsRolesAndJunctionTable';
 import { CreateAuditLogsTable1730900000000 } from './migrations/1730900000000-CreateAuditLogsTable';
 import { CreateRefreshTokenTable1731715200000 } from './migrations/1731715200000-CreateRefreshTokenTable';
 import { AddUserProfileFields1732000000000 } from './migrations/1732000000000-AddUserProfileFields';
 import { CreatePasswordResetsTable1732050000000 } from './migrations/1732050000000-CreatePasswordResetsTable';
+import { CreateGamesTable1733174400000 } from './migrations/1733174400000-CreateGamesTable';
+import { AddGameIdToOrganizations1733174500000 } from './migrations/1733174500000-AddGameIdToOrganizations';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -30,6 +33,7 @@ export const AppDataSource = new DataSource({
     RefreshToken,
     PasswordReset,
     AuditLog,
+    Game,
   ],
   migrations: [
     CreateUsersTable1716956654528,
@@ -38,6 +42,8 @@ export const AppDataSource = new DataSource({
     CreateRefreshTokenTable1731715200000,
     AddUserProfileFields1732000000000,
     CreatePasswordResetsTable1732050000000,
+    CreateGamesTable1733174400000,
+    AddGameIdToOrganizations1733174500000,
   ],
   synchronize: false,
 });
