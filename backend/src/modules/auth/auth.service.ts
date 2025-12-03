@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
+import { SystemUserService } from '../users/system-user.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { User } from '../users/user.entity';
@@ -25,6 +26,7 @@ export class AuthService {
 
   constructor(
     private usersService: UsersService,
+    private systemUserService: SystemUserService,
     private jwtService: JwtService,
     private configService: ConfigService,
     @InjectRepository(RefreshToken)
@@ -36,6 +38,14 @@ export class AuthService {
   async validateUser(username: string, pass: string): Promise<any> {
     const user = await this.usersService.findOne(username);
     const trimmedPass = pass.trim();
+
+    // Block system user from authentication
+    if (user && user.isSystemUser) {
+      this.logger.warn(
+        `System user attempted to authenticate: ${username}. This is not allowed.`,
+      );
+      return null;
+    }
 
     const hashToCompare = user?.password ?? this.dummyHash;
     const isMatch = await bcrypt.compare(trimmedPass, hashToCompare);

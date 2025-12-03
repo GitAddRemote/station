@@ -1,4 +1,10 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  OneToMany,
+  Index,
+} from 'typeorm';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
 @Entity()
@@ -17,6 +23,10 @@ export class User {
 
   @Column({ default: true })
   isActive!: boolean;
+
+  @Column({ default: false })
+  @Index()
+  isSystemUser!: boolean;
 
   @Column({ length: 100, nullable: true })
   firstName?: string;

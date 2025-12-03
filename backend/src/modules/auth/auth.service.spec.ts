@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
+import { SystemUserService } from '../users/system-user.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -17,12 +18,18 @@ describe('AuthService - Password Reset', () => {
     username: 'testuser',
     email: 'test@example.com',
     password: '$2b$10$hashedpassword',
+    isSystemUser: false,
   };
 
   const mockUsersService = {
     findByEmail: jest.fn(),
     findById: jest.fn(),
     updatePassword: jest.fn(),
+  };
+
+  const mockSystemUserService = {
+    getSystemUserId: jest.fn(),
+    isSystemUser: jest.fn(),
   };
 
   const mockPasswordResetRepository = {
@@ -56,6 +63,10 @@ describe('AuthService - Password Reset', () => {
         {
           provide: UsersService,
           useValue: mockUsersService,
+        },
+        {
+          provide: SystemUserService,
+          useValue: mockSystemUserService,
         },
         {
           provide: JwtService,

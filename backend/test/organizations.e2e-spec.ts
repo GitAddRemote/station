@@ -3,6 +3,8 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { DatabaseSeederService } from '../src/database/seeds/database-seeder.service';
+import { DataSource } from 'typeorm';
+import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('Organizations (e2e)', () => {
   let app: INestApplication;
@@ -17,6 +19,10 @@ describe('Organizations (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
+
+    // Seed system user for E2E tests
+    const dataSource = moduleFixture.get<DataSource>(DataSource);
+    await seedSystemUser(dataSource);
 
     // Seed the database
     const seeder = moduleFixture.get<DatabaseSeederService>(

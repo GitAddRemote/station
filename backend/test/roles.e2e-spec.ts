@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { DataSource } from 'typeorm';
+import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('Roles (e2e)', () => {
   let app: INestApplication;
@@ -16,6 +18,10 @@ describe('Roles (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
+
+    // Seed system user for E2E tests
+    const dataSource = moduleFixture.get<DataSource>(DataSource);
+    await seedSystemUser(dataSource);
 
     // Register and login a test user to get JWT token
     await request(app.getHttpServer()).post('/auth/register').send({

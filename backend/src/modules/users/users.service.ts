@@ -18,22 +18,28 @@ export class UsersService {
   ) {}
 
   async findOne(username: string): Promise<User | undefined> {
-    const user = await this.usersRepository.findOne({ where: { username } });
+    const user = await this.usersRepository.findOne({
+      where: { username, isSystemUser: false },
+    });
     return user || undefined;
   }
 
   async findById(id: number): Promise<User | undefined> {
-    const user = await this.usersRepository.findOne({ where: { id } });
+    const user = await this.usersRepository.findOne({
+      where: { id, isSystemUser: false },
+    });
     return user || undefined;
   }
 
   async findByEmail(email: string): Promise<User | undefined> {
-    const user = await this.usersRepository.findOne({ where: { email } });
+    const user = await this.usersRepository.findOne({
+      where: { email, isSystemUser: false },
+    });
     return user || undefined;
   }
 
   async findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+    return this.usersRepository.find({ where: { isSystemUser: false } });
   }
 
   async create(userDto: UserDto): Promise<User> {

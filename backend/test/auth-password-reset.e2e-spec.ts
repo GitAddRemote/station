@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { User } from '../src/modules/users/user.entity';
 import { PasswordReset } from '../src/modules/auth/password-reset.entity';
 import * as bcrypt from 'bcrypt';
+import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('Auth - Password Reset (e2e)', () => {
   let app: INestApplication;
@@ -29,6 +30,9 @@ describe('Auth - Password Reset (e2e)', () => {
     await app.init();
 
     dataSource = moduleFixture.get<DataSource>(DataSource);
+
+    // Seed system user for E2E tests
+    await seedSystemUser(dataSource);
 
     // Create test user
     const userRepository = dataSource.getRepository(User);
