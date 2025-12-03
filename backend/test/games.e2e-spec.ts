@@ -4,6 +4,8 @@ import { AppModule } from '../src/app.module';
 import { GamesService } from '../src/modules/games/games.service';
 import { Game } from '../src/modules/games/game.entity';
 import { DatabaseSeederService } from '../src/database/seeds/database-seeder.service';
+import { DataSource } from 'typeorm';
+import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('Games (e2e)', () => {
   let app: INestApplication;
@@ -17,6 +19,10 @@ describe('Games (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
+
+    // Seed system user for E2E tests
+    const dataSource = moduleFixture.get<DataSource>(DataSource);
+    await seedSystemUser(dataSource);
 
     // Seed the database
     const seeder = moduleFixture.get<DatabaseSeederService>(
