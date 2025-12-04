@@ -15,6 +15,7 @@ import { DatabaseSeederModule } from './database/seeds/database-seeder.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { GamesModule } from './modules/games/games.module';
 import { UexModule } from './modules/uex/uex.module';
+import { UexSyncModule } from './modules/uex-sync/uex-sync.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { UexModule } from './modules/uex/uex.module';
     AuditLogsModule,
     GamesModule,
     UexModule,
+    UexSyncModule,
   ],
   controllers: [AppController],
   providers: [AppService],
