@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, DynamicModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
+import { ScheduleModule } from '@nestjs/schedule';
 import { redisStore } from 'cache-manager-redis-yet';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -17,11 +18,22 @@ import { GamesModule } from './modules/games/games.module';
 import { UexModule } from './modules/uex/uex.module';
 import { UexSyncModule } from './modules/uex-sync/uex-sync.module';
 
+const isTest =
+  process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
+
+const conditionalImports: DynamicModule[] = [];
+
+// Only load ScheduleModule in non-test environments to avoid hanging processes
+if (!isTest) {
+  conditionalImports.push(ScheduleModule.forRoot());
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ...conditionalImports,
     CacheModule.registerAsync({
       isGlobal: true,
       imports: [ConfigModule],
