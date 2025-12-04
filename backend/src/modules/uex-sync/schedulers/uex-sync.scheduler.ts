@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { CategoriesSyncService } from '../services/categories-sync.service';
+import { ItemsSyncService } from '../services/items-sync.service';
 
 @Injectable()
 export class UEXSyncScheduler {
@@ -9,6 +10,7 @@ export class UEXSyncScheduler {
 
   constructor(
     private readonly categoriesSync: CategoriesSyncService,
+    private readonly itemsSync: ItemsSyncService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -43,6 +45,44 @@ export class UEXSyncScheduler {
     } catch (error: any) {
       this.logger.error(
         `Scheduled categories sync failed: ${error.message}`,
+        error.stack,
+      );
+      // Error already recorded in sync state by service
+      // Add alerting here if needed
+    }
+  }
+
+  // Runs daily at 3:00 AM UTC (after categories sync)
+  @Cron('0 3 * * *', {
+    name: 'sync-uex-items',
+  })
+  async scheduledItemsSync(): Promise<void> {
+    const syncEnabled = this.configService.get<boolean>(
+      'UEX_SYNC_ENABLED',
+      true,
+    );
+    const itemsSyncEnabled = this.configService.get<boolean>(
+      'UEX_ITEMS_SYNC_ENABLED',
+      true,
+    );
+
+    if (!syncEnabled || !itemsSyncEnabled) {
+      this.logger.log('Items sync is disabled via configuration');
+      return;
+    }
+
+    this.logger.log('Starting scheduled items sync');
+
+    try {
+      const result = await this.itemsSync.syncItems();
+      this.logger.log(
+        `Scheduled items sync completed successfully: ` +
+          `created: ${result.created}, updated: ${result.updated}, ` +
+          `deleted: ${result.deleted}, duration: ${result.durationMs}ms`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `Scheduled items sync failed: ${error.message}`,
         error.stack,
       );
       // Error already recorded in sync state by service
