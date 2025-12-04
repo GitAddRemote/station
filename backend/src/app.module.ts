@@ -14,6 +14,7 @@ import { AppController } from './app.controller';
 import { DatabaseSeederModule } from './database/seeds/database-seeder.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { GamesModule } from './modules/games/games.module';
+import { UexModule } from './modules/uex/uex.module';
 
 @Module({
   imports: [
@@ -94,6 +95,7 @@ import { GamesModule } from './modules/games/games.module';
     DatabaseSeederModule,
     AuditLogsModule,
     GamesModule,
+    UexModule,
   ],
   controllers: [AppController],
   providers: [AppService],
