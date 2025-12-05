@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { CategoriesSyncService } from '../services/categories-sync.service';
 import { ItemsSyncService } from '../services/items-sync.service';
+import { LocationsSyncService } from '../services/locations-sync.service';
 
 @Injectable()
 export class UEXSyncScheduler {
@@ -11,6 +12,7 @@ export class UEXSyncScheduler {
   constructor(
     private readonly categoriesSync: CategoriesSyncService,
     private readonly itemsSync: ItemsSyncService,
+    private readonly locationsSync: LocationsSyncService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -83,6 +85,44 @@ export class UEXSyncScheduler {
     } catch (error: any) {
       this.logger.error(
         `Scheduled items sync failed: ${error.message}`,
+        error.stack,
+      );
+      // Error already recorded in sync state by service
+      // Add alerting here if needed
+    }
+  }
+
+  // Runs daily at 4:00 AM UTC (after items sync)
+  @Cron('0 4 * * *', {
+    name: 'sync-uex-locations',
+  })
+  async scheduledLocationsSync(): Promise<void> {
+    const syncEnabled = this.configService.get<boolean>(
+      'UEX_SYNC_ENABLED',
+      true,
+    );
+    const locationsSyncEnabled = this.configService.get<boolean>(
+      'UEX_LOCATIONS_SYNC_ENABLED',
+      true,
+    );
+
+    if (!syncEnabled || !locationsSyncEnabled) {
+      this.logger.log('Locations sync is disabled via configuration');
+      return;
+    }
+
+    this.logger.log('Starting scheduled locations sync');
+
+    try {
+      const result = await this.locationsSync.syncAllLocations();
+      this.logger.log(
+        `Scheduled locations sync completed successfully: ` +
+          `total created: ${result.totalCreated}, updated: ${result.totalUpdated}, ` +
+          `deleted: ${result.totalDeleted}, duration: ${result.totalDurationMs}ms`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `Scheduled locations sync failed: ${error.message}`,
         error.stack,
       );
       // Error already recorded in sync state by service
