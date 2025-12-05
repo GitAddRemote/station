@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
+import { InventoryAuditLog } from './entities/inventory-audit-log.entity';
 import { UserInventoryService } from './user-inventory.service';
+import { InventorySharingService } from './inventory-sharing.service';
+import { UserInventoryController } from './user-inventory.controller';
 import { User } from '../users/user.entity';
 import { Game } from '../games/game.entity';
 import { UexItem } from '../uex/entities/uex-item.entity';
@@ -12,6 +15,7 @@ import { Organization } from '../organizations/organization.entity';
   imports: [
     TypeOrmModule.forFeature([
       UserInventoryItem,
+      InventoryAuditLog,
       User,
       Game,
       UexItem,
@@ -19,7 +23,8 @@ import { Organization } from '../organizations/organization.entity';
       Organization,
     ]),
   ],
-  providers: [UserInventoryService],
-  exports: [UserInventoryService],
+  controllers: [UserInventoryController],
+  providers: [UserInventoryService, InventorySharingService],
+  exports: [UserInventoryService, InventorySharingService],
 })
 export class UserInventoryModule {}
