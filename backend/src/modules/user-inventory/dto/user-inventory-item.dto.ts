@@ -16,7 +16,7 @@ export class UserInventoryItemDto {
   locationId!: number;
   quantity!: number;
   notes?: string;
-  sharedOrgId?: number;
+  sharedOrgId?: number | null;
   active!: boolean;
   dateAdded!: Date;
   dateModified!: Date;
