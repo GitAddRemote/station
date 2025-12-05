@@ -58,10 +58,10 @@ export class UserInventoryController {
 
   @Get('audit-log')
   async getAuditLog(
+    @Request() req: any,
     @Query('userId') userId?: number,
     @Query('orgId') orgId?: number,
     @Query('limit') limit?: number,
-    @Request() req: any,
   ) {
     // Only allow users to see their own audit logs unless they have proper permissions
     const requestUserId = req.user.userId;
