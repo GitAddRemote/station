@@ -17,6 +17,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { GamesModule } from './modules/games/games.module';
 import { UexModule } from './modules/uex/uex.module';
 import { UexSyncModule } from './modules/uex-sync/uex-sync.module';
+import { LocationsModule } from './modules/locations/locations.module';
 
 const isTest =
   process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
@@ -110,6 +111,7 @@ if (!isTest) {
     GamesModule,
     UexModule,
     UexSyncModule,
+    LocationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
