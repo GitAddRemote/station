@@ -12,6 +12,9 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../permissions/guards/permissions.guard';
+import { RequirePermission } from '../permissions/decorators/require-permission.decorator';
+import { OrgPermission } from '../permissions/permissions.constants';
 import { InventorySharingService } from './inventory-sharing.service';
 import { ShareItemDto } from './dto/share-item.dto';
 
@@ -48,6 +51,8 @@ export class UserInventoryController {
   }
 
   @Get('shared')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission(OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS)
   async getSharedItems(
     @Query('orgId', ParseIntPipe) orgId: number,
     @Request() req: any,
@@ -57,22 +62,17 @@ export class UserInventoryController {
   }
 
   @Get('audit-log')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission(OrgPermission.CAN_ADMIN_ORG_INVENTORY)
   async getAuditLog(
     @Request() req: any,
     @Query('userId') userId?: number,
     @Query('orgId') orgId?: number,
     @Query('limit') limit?: number,
   ) {
-    // Only allow users to see their own audit logs unless they have proper permissions
+    // With admin permission, can view other users' audit logs
     const requestUserId = req.user.userId;
     const targetUserId = userId ? Number(userId) : requestUserId;
-
-    // TODO: Add proper permission checks for viewing other users' audit logs
-    if (targetUserId !== requestUserId) {
-      // For now, only allow viewing own logs
-      // In future, add org admin check here
-      return [];
-    }
 
     return this.inventorySharingService.getAuditLog(
       targetUserId,
