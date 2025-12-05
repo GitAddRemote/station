@@ -71,7 +71,7 @@ export class UserInventoryItem {
 
   @Column({ name: 'shared_org_id', type: 'bigint', nullable: true })
   @Index()
-  sharedOrgId?: number;
+  sharedOrgId?: number | null;
 
   @ManyToOne(() => Organization, { nullable: true })
   @JoinColumn({ name: 'shared_org_id' })
