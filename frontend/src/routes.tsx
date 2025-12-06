@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import Inventory from './pages/Inventory';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const AppRoutes = () => (
@@ -21,6 +22,7 @@ const AppRoutes = () => (
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/inventory" element={<Inventory />} />
       </Route>
     </Routes>
   </Router>

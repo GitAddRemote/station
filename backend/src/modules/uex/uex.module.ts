@@ -12,6 +12,8 @@ import {
   UexOutpost,
   UexPoi,
 } from './entities';
+import { UexService } from './uex.service';
+import { UexController } from './uex.controller';
 
 @Module({
   imports: [
@@ -28,7 +30,8 @@ import {
       UexPoi,
     ]),
   ],
-  providers: [],
-  exports: [],
+  providers: [UexService],
+  controllers: [UexController],
+  exports: [UexService],
 })
 export class UexModule {}

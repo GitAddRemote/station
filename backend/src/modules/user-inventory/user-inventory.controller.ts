@@ -10,6 +10,7 @@ import {
   Request,
   ParseUUIDPipe,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../permissions/guards/permissions.guard';
@@ -17,13 +18,45 @@ import { RequirePermission } from '../permissions/decorators/require-permission.
 import { OrgPermission } from '../permissions/permissions.constants';
 import { InventorySharingService } from './inventory-sharing.service';
 import { ShareItemDto } from './dto/share-item.dto';
+import { UserInventoryService } from './user-inventory.service';
+import { UserInventorySearchDto } from './dto/user-inventory-item.dto';
 
 @Controller('api/inventory')
 @UseGuards(JwtAuthGuard)
 export class UserInventoryController {
   constructor(
     private readonly inventorySharingService: InventorySharingService,
+    private readonly userInventoryService: UserInventoryService,
   ) {}
+
+  @Get()
+  async list(@Query() query: Record<string, any>, @Request() req: any) {
+    const userId = req.user.userId;
+    const searchDto: UserInventorySearchDto = {
+      gameId: Number(query.game_id ?? query.gameId),
+      categoryId: query.category_id ? Number(query.category_id) : undefined,
+      uexItemId: query.uex_item_id ? Number(query.uex_item_id) : undefined,
+      locationId: query.location_id ? Number(query.location_id) : undefined,
+      sharedOrgId: query.shared_org_id
+        ? Number(query.shared_org_id)
+        : undefined,
+      search: query.search,
+      limit: query.limit ? Number(query.limit) : undefined,
+      offset: query.offset ? Number(query.offset) : undefined,
+      sort: query.sort,
+      order: query.order,
+      sharedOnly:
+        query.shared_only !== undefined
+          ? query.shared_only === 'true' || query.shared_only === true
+          : undefined,
+    };
+
+    if (!searchDto.gameId) {
+      throw new BadRequestException('game_id is required');
+    }
+
+    return this.userInventoryService.findAll(userId, searchDto);
+  }
 
   @Post(':itemId/share')
   async shareItem(

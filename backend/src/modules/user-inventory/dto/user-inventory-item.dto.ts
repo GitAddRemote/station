@@ -25,6 +25,7 @@ export class UserInventoryItemDto {
   itemName?: string;
   locationName?: string;
   sharedOrgName?: string;
+  categoryName?: string;
 }
 
 export class CreateUserInventoryItemDto {
@@ -81,6 +82,10 @@ export class UserInventorySearchDto {
 
   @IsOptional()
   @IsInt()
+  categoryId?: number;
+
+  @IsOptional()
+  @IsInt()
   uexItemId?: number;
 
   @IsOptional()
@@ -98,8 +103,25 @@ export class UserInventorySearchDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(500)
+  @Max(200)
   limit?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  offset?: number;
+
+  @IsOptional()
+  @IsString()
+  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+
+  @IsOptional()
+  @IsString()
+  order?: 'asc' | 'desc';
+
+  @IsOptional()
+  @IsBoolean()
+  sharedOnly?: boolean;
 }
 
 export class UserInventorySummaryDto {
