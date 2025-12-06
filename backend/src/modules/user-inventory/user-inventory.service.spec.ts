@@ -45,7 +45,8 @@ describe('UserInventoryService', () => {
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
-    getMany: jest.fn(),
+    skip: jest.fn().mockReturnThis(),
+    getManyAndCount: jest.fn(),
     select: jest.fn().mockReturnThis(),
     addSelect: jest.fn().mockReturnThis(),
     getRawOne: jest.fn(),
@@ -81,13 +82,17 @@ describe('UserInventoryService', () => {
   describe('findAll', () => {
     it('should return all inventory items for a user', async () => {
       const searchDto: UserInventorySearchDto = { gameId: 1 };
-      mockQueryBuilder.getMany.mockResolvedValue([mockInventoryItem]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
 
       const result = await service.findAll(1, searchDto);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe(mockInventoryItem.id);
-      expect(result[0].itemName).toBe('Test Item');
+      expect(result.items).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.items[0].id).toBe(mockInventoryItem.id);
+      expect(result.items[0].itemName).toBe('Test Item');
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
         'inventory.user_id = :userId',
         { userId: 1 },
@@ -96,7 +101,10 @@ describe('UserInventoryService', () => {
 
     it('should filter by uexItemId', async () => {
       const searchDto: UserInventorySearchDto = { gameId: 1, uexItemId: 100 };
-      mockQueryBuilder.getMany.mockResolvedValue([mockInventoryItem]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
 
       await service.findAll(1, searchDto);
 
@@ -111,7 +119,10 @@ describe('UserInventoryService', () => {
         gameId: 1,
         locationId: 200,
       };
-      mockQueryBuilder.getMany.mockResolvedValue([mockInventoryItem]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
 
       await service.findAll(1, searchDto);
 
@@ -126,7 +137,10 @@ describe('UserInventoryService', () => {
         gameId: 1,
         search: 'test',
       };
-      mockQueryBuilder.getMany.mockResolvedValue([mockInventoryItem]);
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
 
       await service.findAll(1, searchDto);
 

@@ -64,7 +64,7 @@ export class AddGameIdToOrganizations1733174500000
       new TableForeignKey({
         name: 'FK_organization_game',
         columnNames: ['game_id'],
-        referencedTableName: 'game',
+        referencedTableName: 'games',
         referencedColumnNames: ['id'],
         onDelete: 'RESTRICT',
         onUpdate: 'CASCADE',

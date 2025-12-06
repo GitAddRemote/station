@@ -25,7 +25,7 @@ export class CreateGamesTable1733174400000 implements MigrationInterface {
     // Create games table
     await queryRunner.createTable(
       new Table({
-        name: 'game',
+        name: 'games',
         columns: [
           {
             name: 'id',
@@ -78,25 +78,25 @@ export class CreateGamesTable1733174400000 implements MigrationInterface {
 
     // Create index on active column for efficient queries
     await queryRunner.createIndex(
-      'game',
+      'games',
       new TableIndex({
-        name: 'IDX_game_active',
+        name: 'IDX_games_active',
         columnNames: ['active'],
       }),
     );
 
     // Create index on code column for lookups
     await queryRunner.createIndex(
-      'game',
+      'games',
       new TableIndex({
-        name: 'IDX_game_code',
+        name: 'IDX_games_code',
         columnNames: ['code'],
       }),
     );
 
     // Seed initial games
     await queryRunner.query(`
-      INSERT INTO "game" ("name", "code", "description", "active")
+      INSERT INTO "games" ("name", "code", "description", "active")
       VALUES
         ('Star Citizen', 'sc', 'Star Citizen is a multiplayer space trading and combat simulation game.', true),
         ('Squadron 42', 'sq42', 'Squadron 42 is a single-player space combat game set in the Star Citizen universe.', true)
@@ -108,10 +108,10 @@ export class CreateGamesTable1733174400000 implements MigrationInterface {
    */
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop indexes
-    await queryRunner.dropIndex('game', 'IDX_game_code');
-    await queryRunner.dropIndex('game', 'IDX_game_active');
+    await queryRunner.dropIndex('games', 'IDX_games_code');
+    await queryRunner.dropIndex('games', 'IDX_games_active');
 
     // Drop table
-    await queryRunner.dropTable('game');
+    await queryRunner.dropTable('games');
   }
 }

@@ -26,7 +26,7 @@ export class Organization {
   @Column({ default: true })
   isActive!: boolean;
 
-  @Column()
+  @Column({ name: 'game_id' })
   @Index()
   gameId!: number;
 

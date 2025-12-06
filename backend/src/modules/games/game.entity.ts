@@ -7,7 +7,7 @@ import {
   Index,
 } from 'typeorm';
 
-@Entity()
+@Entity({ name: 'games' })
 export class Game {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -26,9 +26,9 @@ export class Game {
   @Index()
   active!: boolean;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
 }

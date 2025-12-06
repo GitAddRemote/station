@@ -1,18 +1,24 @@
 {
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es6",
+    "strict": true,
+    "esModuleInterop": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "resolveJsonModule": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["src/**/*.ts", "src/data-source.ts"],
+  "exclude": ["node_modules", "dist", "test"],
+  "ts-node": {
+    "transpileOnly": true,
+    "files": true,
     "compilerOptions": {
-      "module": "commonjs",
-      "target": "es6",
-      "strict": true,
-      "esModuleInterop": true,
-      "emitDecoratorMetadata": true,
-      "experimentalDecorators": true,      
-      "skipLibCheck": true,
-      "outDir": "./dist",
-      "rootDir": "./src",
-      "resolveJsonModule": true,
-      "types": ["node", "jest"]
-    },
-    "include": ["src/**/*.ts", "src/data-source.ts"],
-    "exclude": ["node_modules", "dist", "test"]
+      "module": "commonjs"
+    }
   }
-  
+}

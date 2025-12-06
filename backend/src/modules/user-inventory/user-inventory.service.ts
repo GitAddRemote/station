@@ -22,10 +22,16 @@ export class UserInventoryService {
   async findAll(
     userId: number,
     searchDto: UserInventorySearchDto,
-  ): Promise<UserInventoryItemDto[]> {
+  ): Promise<{
+    items: UserInventoryItemDto[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
     const queryBuilder = this.inventoryRepository
       .createQueryBuilder('inventory')
       .leftJoinAndSelect('inventory.item', 'item')
+      .leftJoinAndSelect('item.category', 'category')
       .leftJoinAndSelect('inventory.location', 'location')
       .leftJoinAndSelect('inventory.sharedOrg', 'sharedOrg')
       .where('inventory.user_id = :userId', { userId })
@@ -36,6 +42,12 @@ export class UserInventoryService {
     if (searchDto.uexItemId) {
       queryBuilder.andWhere('inventory.uex_item_id = :uexItemId', {
         uexItemId: searchDto.uexItemId,
+      });
+    }
+
+    if (searchDto.categoryId) {
+      queryBuilder.andWhere('item.idCategory = :categoryId', {
+        categoryId: searchDto.categoryId,
       });
     }
 
@@ -51,6 +63,10 @@ export class UserInventoryService {
       });
     }
 
+    if (searchDto.sharedOnly) {
+      queryBuilder.andWhere('inventory.shared_org_id IS NOT NULL');
+    }
+
     if (searchDto.search) {
       queryBuilder.andWhere(
         '(item.name ILIKE :search OR inventory.notes ILIKE :search)',
@@ -58,12 +74,26 @@ export class UserInventoryService {
       );
     }
 
-    queryBuilder.orderBy('inventory.date_modified', 'DESC');
-    queryBuilder.take(searchDto.limit || 100);
+    const sortColumn = this.resolveSortColumn(searchDto.sort);
+    const sortDirection = (searchDto.order || 'desc').toUpperCase() as
+      | 'ASC'
+      | 'DESC';
+    queryBuilder.orderBy(sortColumn, sortDirection);
 
-    const items = await queryBuilder.getMany();
+    const limit = Math.min(searchDto.limit ?? 50, 200);
+    const offset = searchDto.offset ?? 0;
 
-    return items.map((item) => this.toDto(item));
+    queryBuilder.take(limit);
+    queryBuilder.skip(offset);
+
+    const [items, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      items: items.map((item) => this.toDto(item)),
+      total,
+      limit,
+      offset,
+    };
   }
 
   async findById(id: string, userId: number): Promise<UserInventoryItemDto> {
@@ -209,6 +239,21 @@ export class UserInventoryService {
       itemName: item.item?.name,
       locationName: item.location?.displayName,
       sharedOrgName: item.sharedOrg?.name,
+      categoryName: item.item?.category?.name || item.item?.categoryName,
     };
+  }
+
+  private resolveSortColumn(sort?: string): string {
+    switch (sort) {
+      case 'name':
+        return 'item.name';
+      case 'quantity':
+        return 'inventory.quantity';
+      case 'date_added':
+        return 'inventory.date_added';
+      case 'date_modified':
+      default:
+        return 'inventory.date_modified';
+    }
   }
 }

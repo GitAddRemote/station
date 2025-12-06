@@ -19,6 +19,7 @@ import {
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
+import InventoryPortlet from '../components/inventory/InventoryPortlet';
 
 interface User {
   username: string;
@@ -247,6 +248,14 @@ const Dashboard = () => {
                 </Typography>
               </CardContent>
             </Card>
+          </Grid>
+
+          {/* Inventory Portlet - Full Width */}
+          <Grid item xs={12}>
+            <InventoryPortlet
+              gameId={1}
+              onExpand={() => navigate('/inventory')}
+            />
           </Grid>
         </Grid>
 
