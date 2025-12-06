@@ -78,10 +78,15 @@ export class OrgInventoryService {
     userId: number,
     dto: CreateOrgInventoryItemDto,
   ): Promise<OrgInventoryItemDto> {
+    if (!dto.orgId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
     await this.verifyInventoryPermission(userId, dto.orgId, 'manage');
 
     const item = this.orgInventoryRepository.create({
       ...dto,
+      orgId: dto.orgId, // Ensure orgId is set
       addedBy: userId,
       modifiedBy: userId,
       active: true,
