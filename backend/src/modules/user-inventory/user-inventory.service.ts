@@ -250,10 +250,10 @@ export class UserInventoryService {
       case 'quantity':
         return 'inventory.quantity';
       case 'date_added':
-        return 'inventory.date_added';
+        return 'inventory.dateAdded';
       case 'date_modified':
       default:
-        return 'inventory.date_modified';
+        return 'inventory.dateModified';
     }
   }
 }
