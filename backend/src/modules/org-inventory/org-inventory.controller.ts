@@ -9,6 +9,9 @@ import {
   Query,
   UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrgInventoryService } from './org-inventory.service';
@@ -19,48 +22,109 @@ import {
   OrgInventoryItemDto,
   OrgInventorySummaryDto,
 } from './dto/org-inventory-item.dto';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+} from '@nestjs/swagger';
 
-@Controller('org-inventory')
+@ApiTags('Organization Inventory')
+@ApiBearerAuth()
+@Controller('api/orgs/:orgId/inventory')
 @UseGuards(JwtAuthGuard)
 export class OrgInventoryController {
   constructor(private readonly orgInventoryService: OrgInventoryService) {}
 
   /**
-   * Create a new org inventory item
-   * POST /org-inventory
+   * List org inventory items with filtering
+   * GET /api/orgs/:orgId/inventory
    */
-  @Post()
-  async create(
+  @Get()
+  @ApiOperation({ summary: 'List organization inventory items' })
+  @ApiParam({ name: 'orgId', description: 'Organization ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns list of org inventory items',
+    type: [OrgInventoryItemDto],
+  })
+  async list(
     @Request() req: any,
-    @Body() createDto: CreateOrgInventoryItemDto,
-  ): Promise<OrgInventoryItemDto> {
-    return this.orgInventoryService.create(req.user.userId, createDto);
+    @Param('orgId', ParseIntPipe) orgId: number,
+    @Query() searchDto: OrgInventorySearchDto,
+  ): Promise<OrgInventoryItemDto[]> {
+    const userId = req.user.userId;
+    // Extract gameId from query params and use search
+    return this.orgInventoryService.search(userId, {
+      ...searchDto,
+      orgId,
+    });
   }
 
   /**
-   * Get inventory items for an org by game
-   * GET /org-inventory/org/:orgId/game/:gameId
+   * Create a new org inventory item
+   * POST /api/orgs/:orgId/inventory
    */
-  @Get('org/:orgId/game/:gameId')
-  async findByOrgAndGame(
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new organization inventory item' })
+  @ApiParam({ name: 'orgId', description: 'Organization ID' })
+  @ApiResponse({
+    status: 201,
+    description: 'Inventory item created successfully',
+    type: OrgInventoryItemDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiResponse({ status: 403, description: 'Permission denied' })
+  async create(
     @Request() req: any,
-    @Param('orgId') orgId: string,
-    @Param('gameId') gameId: string,
-  ): Promise<OrgInventoryItemDto[]> {
-    return this.orgInventoryService.findByOrgAndGame(
-      req.user.userId,
-      parseInt(orgId, 10),
-      parseInt(gameId, 10),
-    );
+    @Param('orgId', ParseIntPipe) orgId: number,
+    @Body() createDto: CreateOrgInventoryItemDto,
+  ): Promise<OrgInventoryItemDto> {
+    return this.orgInventoryService.create(req.user.userId, {
+      ...createDto,
+      orgId,
+    });
+  }
+
+  /**
+   * Get org inventory summary statistics
+   * GET /api/orgs/:orgId/inventory/summary
+   */
+  @Get('summary')
+  @ApiOperation({ summary: 'Get organization inventory summary statistics' })
+  @ApiParam({ name: 'orgId', description: 'Organization ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns inventory summary',
+    type: OrgInventorySummaryDto,
+  })
+  async getSummary(
+    @Request() req: any,
+    @Param('orgId', ParseIntPipe) orgId: number,
+    @Query('gameId', ParseIntPipe) gameId: number,
+  ): Promise<OrgInventorySummaryDto> {
+    return this.orgInventoryService.getSummary(req.user.userId, orgId, gameId);
   }
 
   /**
    * Get a specific inventory item by ID
-   * GET /org-inventory/:id
+   * GET /api/orgs/:orgId/inventory/:id
    */
   @Get(':id')
+  @ApiOperation({ summary: 'Get a specific organization inventory item' })
+  @ApiParam({ name: 'orgId', description: 'Organization ID' })
+  @ApiParam({ name: 'id', description: 'Inventory item ID (UUID)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns inventory item',
+    type: OrgInventoryItemDto,
+  })
+  @ApiResponse({ status: 404, description: 'Item not found' })
   async findById(
     @Request() req: any,
+    @Param('orgId', ParseIntPipe) orgId: number,
     @Param('id') id: string,
   ): Promise<OrgInventoryItemDto> {
     return this.orgInventoryService.findById(req.user.userId, id);
@@ -68,11 +132,22 @@ export class OrgInventoryController {
 
   /**
    * Update an inventory item
-   * PUT /org-inventory/:id
+   * PUT /api/orgs/:orgId/inventory/:id
    */
   @Put(':id')
+  @ApiOperation({ summary: 'Update an organization inventory item' })
+  @ApiParam({ name: 'orgId', description: 'Organization ID' })
+  @ApiParam({ name: 'id', description: 'Inventory item ID (UUID)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventory item updated successfully',
+    type: OrgInventoryItemDto,
+  })
+  @ApiResponse({ status: 404, description: 'Item not found' })
+  @ApiResponse({ status: 403, description: 'Permission denied' })
   async update(
     @Request() req: any,
+    @Param('orgId', ParseIntPipe) orgId: number,
     @Param('id') id: string,
     @Body() updateDto: UpdateOrgInventoryItemDto,
   ): Promise<OrgInventoryItemDto> {
@@ -81,73 +156,21 @@ export class OrgInventoryController {
 
   /**
    * Delete an inventory item (soft delete)
-   * DELETE /org-inventory/:id
+   * DELETE /api/orgs/:orgId/inventory/:id
    */
   @Delete(':id')
-  async delete(@Request() req: any, @Param('id') id: string): Promise<void> {
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an organization inventory item' })
+  @ApiParam({ name: 'orgId', description: 'Organization ID' })
+  @ApiParam({ name: 'id', description: 'Inventory item ID (UUID)' })
+  @ApiResponse({ status: 204, description: 'Item deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Item not found' })
+  @ApiResponse({ status: 403, description: 'Permission denied' })
+  async delete(
+    @Request() req: any,
+    @Param('orgId', ParseIntPipe) orgId: number,
+    @Param('id') id: string,
+  ): Promise<void> {
     return this.orgInventoryService.delete(req.user.userId, id);
-  }
-
-  /**
-   * Search inventory with filters
-   * GET /org-inventory/search
-   */
-  @Get('search')
-  async search(
-    @Request() req: any,
-    @Query() searchDto: OrgInventorySearchDto,
-  ): Promise<OrgInventoryItemDto[]> {
-    return this.orgInventoryService.search(req.user.userId, searchDto);
-  }
-
-  /**
-   * Get inventory summary for an org
-   * GET /org-inventory/org/:orgId/game/:gameId/summary
-   */
-  @Get('org/:orgId/game/:gameId/summary')
-  async getSummary(
-    @Request() req: any,
-    @Param('orgId') orgId: string,
-    @Param('gameId') gameId: string,
-  ): Promise<OrgInventorySummaryDto> {
-    return this.orgInventoryService.getSummary(
-      req.user.userId,
-      parseInt(orgId, 10),
-      parseInt(gameId, 10),
-    );
-  }
-
-  /**
-   * Get inventory by location
-   * GET /org-inventory/org/:orgId/location/:locationId
-   */
-  @Get('org/:orgId/location/:locationId')
-  async findByLocation(
-    @Request() req: any,
-    @Param('orgId') orgId: string,
-    @Param('locationId') locationId: string,
-  ): Promise<OrgInventoryItemDto[]> {
-    return this.orgInventoryService.findByLocation(
-      req.user.userId,
-      parseInt(orgId, 10),
-      parseInt(locationId, 10),
-    );
-  }
-
-  /**
-   * Get inventory by UEX item
-   * GET /org-inventory/org/:orgId/item/:uexItemId
-   */
-  @Get('org/:orgId/item/:uexItemId')
-  async findByUexItem(
-    @Request() req: any,
-    @Param('orgId') orgId: string,
-    @Param('uexItemId') uexItemId: string,
-  ): Promise<OrgInventoryItemDto[]> {
-    return this.orgInventoryService.findByUexItem(
-      req.user.userId,
-      parseInt(orgId, 10),
-      parseInt(uexItemId, 10),
-    );
   }
 }
