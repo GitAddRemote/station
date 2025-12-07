@@ -149,6 +149,48 @@ describe('UserInventoryService', () => {
         { search: '%test%' },
       );
     });
+
+    it('should filter by min and max quantity', async () => {
+      const searchDto: UserInventorySearchDto = {
+        gameId: 1,
+        minQuantity: 5,
+        maxQuantity: 20,
+      };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
+
+      await service.findAll(1, searchDto);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'inventory.quantity >= :minQuantity',
+        { minQuantity: 5 },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'inventory.quantity <= :maxQuantity',
+        { maxQuantity: 20 },
+      );
+    });
+
+    it('should sort by location when requested', async () => {
+      const searchDto: UserInventorySearchDto = {
+        gameId: 1,
+        sort: 'location',
+        order: 'asc',
+      };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
+
+      await service.findAll(1, searchDto);
+
+      expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
+        'location.displayName',
+        'ASC',
+      );
+    });
   });
 
   describe('findById', () => {

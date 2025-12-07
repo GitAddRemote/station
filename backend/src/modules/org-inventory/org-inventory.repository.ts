@@ -138,13 +138,20 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     orgId: number;
     gameId: number;
     uexItemId?: number;
+    categoryId?: number;
     locationId?: number;
     activeOnly?: boolean;
     limit?: number;
     offset?: number;
-  }): Promise<OrgInventoryItem[]> {
+    search?: string;
+    minQuantity?: number;
+    maxQuantity?: number;
+    sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+    order?: 'asc' | 'desc';
+  }): Promise<{ items: OrgInventoryItem[]; total: number }> {
     const query = this.createQueryBuilder('oii')
       .leftJoinAndSelect('oii.item', 'item')
+      .leftJoinAndSelect('item.category', 'category')
       .leftJoinAndSelect('oii.location', 'location')
       .leftJoinAndSelect('oii.game', 'game')
       .leftJoinAndSelect('oii.org', 'org')
@@ -160,9 +167,27 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
       });
     }
 
+    if (filters.categoryId) {
+      query.andWhere('item.idCategory = :categoryId', {
+        categoryId: filters.categoryId,
+      });
+    }
+
     if (filters.locationId) {
       query.andWhere('oii.location_id = :locationId', {
         locationId: filters.locationId,
+      });
+    }
+
+    if (filters.minQuantity !== undefined) {
+      query.andWhere('oii.quantity >= :minQuantity', {
+        minQuantity: filters.minQuantity,
+      });
+    }
+
+    if (filters.maxQuantity !== undefined) {
+      query.andWhere('oii.quantity <= :maxQuantity', {
+        maxQuantity: filters.maxQuantity,
       });
     }
 
@@ -170,16 +195,42 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
       query.andWhere('oii.active = true');
     }
 
-    query.orderBy('oii.date_modified', 'DESC');
-
-    if (filters.limit) {
-      query.limit(filters.limit);
+    if (filters.search) {
+      query.andWhere('(item.name ILIKE :search OR oii.notes ILIKE :search)', {
+        search: `%${filters.search}%`,
+      });
     }
 
-    if (filters.offset) {
-      query.offset(filters.offset);
-    }
+    const limit = Math.min(filters.limit ?? 100, 500);
+    const offset = filters.offset ?? 0;
 
-    return query.getMany();
+    const sortColumn = this.resolveSortColumn(filters.sort);
+    const sortDirection = (filters.order || 'desc').toUpperCase() as
+      | 'ASC'
+      | 'DESC';
+
+    query.orderBy(sortColumn, sortDirection).take(limit).skip(offset);
+
+    const [items, total] = await query.getManyAndCount();
+
+    return { items, total };
+  }
+
+  private resolveSortColumn(
+    sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified',
+  ): string {
+    switch (sort) {
+      case 'name':
+        return 'item.name';
+      case 'quantity':
+        return 'oii.quantity';
+      case 'location':
+        return 'location.displayName';
+      case 'date_added':
+        return 'oii.date_added';
+      case 'date_modified':
+      default:
+        return 'oii.date_modified';
+    }
   }
 }

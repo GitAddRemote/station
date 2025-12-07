@@ -32,6 +32,13 @@ export class UserInventoryController {
   @Get()
   async list(@Query() query: Record<string, any>, @Request() req: any) {
     const userId = req.user.userId;
+    const parsedMinQuantity = Number(
+      query.min_quantity ?? query.minQuantity ?? Number.NaN,
+    );
+    const parsedMaxQuantity = Number(
+      query.max_quantity ?? query.maxQuantity ?? Number.NaN,
+    );
+
     const searchDto: UserInventorySearchDto = {
       gameId: Number(query.game_id ?? query.gameId),
       categoryId: query.category_id ? Number(query.category_id) : undefined,
@@ -49,6 +56,12 @@ export class UserInventoryController {
         query.shared_only !== undefined
           ? query.shared_only === 'true' || query.shared_only === true
           : undefined,
+      minQuantity: Number.isNaN(parsedMinQuantity)
+        ? undefined
+        : parsedMinQuantity,
+      maxQuantity: Number.isNaN(parsedMaxQuantity)
+        ? undefined
+        : parsedMaxQuantity,
     };
 
     if (!searchDto.gameId) {

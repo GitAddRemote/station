@@ -52,9 +52,11 @@ export interface InventorySearchParams {
   sharedOnly?: boolean;
   sharedOrgId?: number;
   search?: string;
+  minQuantity?: number;
+  maxQuantity?: number;
   limit?: number;
   offset?: number;
-  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
   order?: 'asc' | 'desc';
 }
 
@@ -93,6 +95,8 @@ const buildInventoryQuery = (params: InventorySearchParams) => {
   if (params.sharedOnly !== undefined) query.shared_only = params.sharedOnly;
   if (params.sharedOrgId !== undefined) query.shared_org_id = params.sharedOrgId;
   if (params.search) query.search = params.search;
+  if (params.minQuantity !== undefined) query.min_quantity = params.minQuantity;
+  if (params.maxQuantity !== undefined) query.max_quantity = params.maxQuantity;
   if (params.limit !== undefined) query.limit = params.limit;
   if (params.offset !== undefined) query.offset = params.offset;
   if (params.sort) query.sort = params.sort;
@@ -111,9 +115,14 @@ const getAuthHeader = () => {
 const buildOrgInventoryQuery = (params: {
   gameId: number;
   uexItemId?: number;
+  categoryId?: number;
   locationId?: number;
   activeOnly?: boolean;
   search?: string;
+  minQuantity?: number;
+  maxQuantity?: number;
+  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+  order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }) => {
@@ -122,9 +131,14 @@ const buildOrgInventoryQuery = (params: {
   };
 
   if (params.uexItemId !== undefined) query.uexItemId = params.uexItemId;
+  if (params.categoryId !== undefined) query.categoryId = params.categoryId;
   if (params.locationId !== undefined) query.locationId = params.locationId;
   if (params.activeOnly !== undefined) query.activeOnly = params.activeOnly;
   if (params.search) query.search = params.search;
+  if (params.minQuantity !== undefined) query.minQuantity = params.minQuantity;
+  if (params.maxQuantity !== undefined) query.maxQuantity = params.maxQuantity;
+  if (params.sort) query.sort = params.sort;
+  if (params.order) query.order = params.order;
   if (params.limit !== undefined) query.limit = params.limit;
   if (params.offset !== undefined) query.offset = params.offset;
 
@@ -242,9 +256,14 @@ export const inventoryService = {
     params: {
       gameId: number;
       uexItemId?: number;
+      categoryId?: number;
       locationId?: number;
       activeOnly?: boolean;
       search?: string;
+      minQuantity?: number;
+      maxQuantity?: number;
+      sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+      order?: 'asc' | 'desc';
       limit?: number;
       offset?: number;
     },
@@ -257,13 +276,7 @@ export const inventoryService = {
       },
     );
 
-    const items: OrgInventoryItem[] = response.data;
-    return {
-      items,
-      total: items.length,
-      limit: params.limit ?? items.length,
-      offset: params.offset ?? 0,
-    };
+    return response.data;
   },
 
   /**

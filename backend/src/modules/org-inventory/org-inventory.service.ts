@@ -68,6 +68,7 @@ export class OrgInventoryService {
       orgName: entity.org?.name,
       addedByUsername: entity.addedByUser?.username,
       modifiedByUsername: entity.modifiedByUser?.username,
+      categoryName: entity.item?.category?.name || entity.item?.categoryName,
     };
   }
 
@@ -209,20 +210,39 @@ export class OrgInventoryService {
   async search(
     userId: number,
     searchDto: OrgInventorySearchDto,
-  ): Promise<OrgInventoryItemDto[]> {
+  ): Promise<{
+    items: OrgInventoryItemDto[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
     await this.verifyInventoryPermission(userId, searchDto.orgId, 'view');
 
-    const items = await this.orgInventoryRepository.searchInventory({
+    const limit = Math.min(searchDto.limit || 100, 500);
+    const offset = searchDto.offset || 0;
+
+    const { items, total } = await this.orgInventoryRepository.searchInventory({
       orgId: searchDto.orgId,
       gameId: searchDto.gameId,
       uexItemId: searchDto.uexItemId,
+      categoryId: searchDto.categoryId,
       locationId: searchDto.locationId,
       activeOnly: searchDto.activeOnly,
-      limit: searchDto.limit || 100,
-      offset: searchDto.offset || 0,
+      limit,
+      offset,
+      search: searchDto.search,
+      minQuantity: searchDto.minQuantity,
+      maxQuantity: searchDto.maxQuantity,
+      sort: searchDto.sort || 'date_modified',
+      order: searchDto.order || 'desc',
     });
 
-    return items.map((item) => this.toDto(item));
+    return {
+      items: items.map((item) => this.toDto(item)),
+      total,
+      limit,
+      offset,
+    };
   }
 
   /**

@@ -53,7 +53,12 @@ export class OrgInventoryController {
     @Request() req: any,
     @Param('orgId', ParseIntPipe) orgId: number,
     @Query() searchDto: OrgInventorySearchDto,
-  ): Promise<OrgInventoryItemDto[]> {
+  ): Promise<{
+    items: OrgInventoryItemDto[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
     const userId = req.user.userId;
     // Extract gameId from query params and use search
     return this.orgInventoryService.search(userId, {
