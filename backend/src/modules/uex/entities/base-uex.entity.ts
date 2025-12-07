@@ -28,13 +28,6 @@ export abstract class BaseUexEntity {
   dateModified!: Date;
 
   @Column({
-    name: 'uex_date_added',
-    type: 'timestamptz',
-    nullable: true,
-  })
-  uexDateAdded?: Date;
-
-  @Column({
     name: 'uex_date_modified',
     type: 'timestamptz',
     nullable: true,

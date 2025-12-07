@@ -42,7 +42,9 @@ export class CategoriesSyncService {
     );
   }
 
-  async syncCategories(): Promise<SyncResult> {
+  async syncCategories(
+    forceFull?: boolean,
+  ): Promise<SyncResult & { syncMode: 'delta' | 'full' }> {
     const endpoint = 'categories';
     const startTime = Date.now();
 
@@ -52,9 +54,10 @@ export class CategoriesSyncService {
 
       // Determine sync mode (delta vs full)
       const syncDecision = await this.syncService.shouldUseDeltaSync(endpoint);
+      const useDelta = !forceFull && syncDecision.useDelta;
       const filters: any = { type: 'item' }; // MVP: only item categories
 
-      if (syncDecision.useDelta && syncDecision.lastSyncAt) {
+      if (useDelta && syncDecision.lastSyncAt) {
         filters.date_modified = syncDecision.lastSyncAt;
         this.logger.log(
           `Using delta sync with lastSyncAt: ${syncDecision.lastSyncAt.toISOString()}`,
@@ -69,7 +72,7 @@ export class CategoriesSyncService {
       // Process records
       const result = await this.processCategories(
         categories,
-        syncDecision.useDelta ? 'delta' : 'full',
+        useDelta ? 'delta' : 'full',
       );
 
       const durationMs = Date.now() - startTime;
@@ -79,17 +82,17 @@ export class CategoriesSyncService {
         recordsCreated: result.created,
         recordsUpdated: result.updated,
         recordsDeleted: result.deleted,
-        syncMode: syncDecision.useDelta ? 'delta' : 'full',
+        syncMode: useDelta ? 'delta' : 'full',
         durationMs,
       });
 
       this.logger.log(
-        `Categories sync completed: ${syncDecision.useDelta ? 'delta' : 'full'} mode, ` +
+        `Categories sync completed: ${useDelta ? 'delta' : 'full'} mode, ` +
           `created: ${result.created}, updated: ${result.updated}, ` +
           `deleted: ${result.deleted}, duration: ${durationMs}ms`,
       );
 
-      return { ...result, durationMs };
+      return { ...result, durationMs, syncMode: useDelta ? 'delta' : 'full' };
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
       await this.syncService.recordSyncFailure(endpoint, error, durationMs);

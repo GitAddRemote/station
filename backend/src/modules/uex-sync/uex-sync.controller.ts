@@ -1,16 +1,28 @@
-import { Controller, Get, UseGuards, Param } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UexSyncService } from './uex-sync.service';
 import {
   SyncHealthResponseDto,
   EndpointHealthDto,
+  SyncTriggerRequestDto,
+  SyncTriggerResultDto,
 } from './dto/sync-health.dto';
 import { SyncStatus } from './uex-sync-state.entity';
+import { CategoriesSyncService } from './services/categories-sync.service';
+import { ItemsSyncService } from './services/items-sync.service';
+import { CompaniesSyncService } from './services/companies-sync.service';
+import { LocationsSyncService } from './services/locations-sync.service';
 
 @Controller('admin/uex-sync')
 @UseGuards(JwtAuthGuard)
 export class UexSyncController {
-  constructor(private readonly syncService: UexSyncService) {}
+  constructor(
+    private readonly syncService: UexSyncService,
+    private readonly categoriesSyncService: CategoriesSyncService,
+    private readonly itemsSyncService: ItemsSyncService,
+    private readonly companiesSyncService: CompaniesSyncService,
+    private readonly locationsSyncService: LocationsSyncService,
+  ) {}
 
   @Get('health')
   async getHealth(): Promise<SyncHealthResponseDto> {
@@ -95,6 +107,110 @@ export class UexSyncController {
       endpoints: staleEndpoints,
       timestamp: new Date(),
     };
+  }
+
+  /**
+   * Trigger sync immediately for selected endpoints.
+   * Optional forceFull=true to bypass delta logic for this invocation.
+   */
+  @Post('run')
+  async runSyncNow(
+    @Body() body: SyncTriggerRequestDto,
+  ): Promise<{ results: SyncTriggerResultDto[] }> {
+    const requested: (
+      | 'categories'
+      | 'items'
+      | 'companies'
+      | 'locations'
+      | 'all'
+    )[] =
+      body.endpoints && body.endpoints.length > 0
+        ? body.endpoints
+        : ['categories', 'companies', 'items', 'locations'];
+
+    const endpoints: Array<'categories' | 'items' | 'companies' | 'locations'> =
+      requested.includes('all') || requested.length === 0
+        ? ['categories', 'companies', 'items', 'locations']
+        : requested.filter(
+            (e): e is 'categories' | 'items' | 'companies' | 'locations' =>
+              e === 'categories' ||
+              e === 'items' ||
+              e === 'companies' ||
+              e === 'locations',
+          );
+
+    const results: SyncTriggerResultDto[] = [];
+
+    for (const endpoint of endpoints) {
+      const start = Date.now();
+      try {
+        let result:
+          | Awaited<
+              ReturnType<typeof this.categoriesSyncService.syncCategories>
+            >
+          | Awaited<ReturnType<typeof this.itemsSyncService.syncItems>>
+          | Awaited<ReturnType<typeof this.companiesSyncService.syncCompanies>>
+          | Awaited<
+              ReturnType<typeof this.locationsSyncService.syncAllLocations>
+            >;
+
+        if (endpoint === 'categories') {
+          result = await this.categoriesSyncService.syncCategories(
+            body.forceFull,
+          );
+        } else if (endpoint === 'items') {
+          result = await this.itemsSyncService.syncItems(body.forceFull);
+        } else if (endpoint === 'companies') {
+          result = await this.companiesSyncService.syncCompanies(
+            body.forceFull,
+          );
+        } else {
+          result = await this.locationsSyncService.syncAllLocations(
+            body.forceFull,
+          );
+        }
+
+        const created =
+          'totalCreated' in result
+            ? result.totalCreated
+            : (result.created ?? 0);
+        const updated =
+          'totalUpdated' in result
+            ? result.totalUpdated
+            : (result.updated ?? 0);
+        const deleted =
+          'totalDeleted' in result
+            ? result.totalDeleted
+            : (result.deleted ?? 0);
+        const durationMs =
+          'totalDurationMs' in result
+            ? result.totalDurationMs
+            : (result.durationMs ?? Date.now() - start);
+
+        results.push({
+          endpoint,
+          status: SyncStatus.SUCCESS,
+          mode: result.syncMode ?? (body.forceFull ? 'full' : 'delta'),
+          created,
+          updated,
+          deleted,
+          durationMs,
+        });
+      } catch (error: any) {
+        results.push({
+          endpoint,
+          status: SyncStatus.FAILED,
+          mode: body.forceFull ? 'full' : 'delta',
+          created: 0,
+          updated: 0,
+          deleted: 0,
+          durationMs: Date.now() - start,
+          errorMessage: error?.message || 'Sync failed',
+        });
+      }
+    }
+
+    return { results };
   }
 
   private calculateOverallStatus(

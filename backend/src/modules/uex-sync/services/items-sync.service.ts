@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { UexItem } from '../../uex/entities/uex-item.entity';
 import { UexCategory } from '../../uex/entities/uex-category.entity';
+import { UexCompany } from '../../uex/entities/uex-company.entity';
 import { UexSyncService } from '../uex-sync.service';
 import { SystemUserService } from '../../users/system-user.service';
 import { UEXItemsClient, UEXItemResponse } from '../clients/uex-items.client';
@@ -41,6 +42,8 @@ export class ItemsSyncService {
     private readonly itemRepository: Repository<UexItem>,
     @InjectRepository(UexCategory)
     private readonly categoryRepository: Repository<UexCategory>,
+    @InjectRepository(UexCompany)
+    private readonly companyRepository: Repository<UexCompany>,
     private readonly uexClient: UEXItemsClient,
     private readonly syncService: UexSyncService,
     private readonly systemUserService: SystemUserService,
@@ -62,7 +65,9 @@ export class ItemsSyncService {
     );
   }
 
-  async syncItems(): Promise<SyncResult> {
+  async syncItems(
+    forceFull?: boolean,
+  ): Promise<SyncResult & { syncMode: 'delta' | 'full' }> {
     const endpoint = 'items';
     const startTime = Date.now();
 
@@ -72,6 +77,7 @@ export class ItemsSyncService {
 
       // Determine sync mode (delta vs full)
       const syncDecision = await this.syncService.shouldUseDeltaSync(endpoint);
+      const useDelta = !forceFull && syncDecision.useDelta;
 
       // Get all active item categories
       const categories = await this.categoryRepository.find({
@@ -88,18 +94,27 @@ export class ItemsSyncService {
           'No active item categories found. Skipping items sync',
         );
         const durationMs = Date.now() - startTime;
-        return { created: 0, updated: 0, deleted: 0, durationMs };
+        return {
+          created: 0,
+          updated: 0,
+          deleted: 0,
+          durationMs,
+          syncMode: useDelta ? 'delta' : 'full',
+        };
       }
 
       this.logger.log(
-        `Starting items sync: ${syncDecision.useDelta ? 'delta' : 'full'} mode, ` +
+        `Starting items sync: ${useDelta ? 'delta' : 'full'} mode, ` +
           `${categories.length} categories to process`,
       );
+
+      const companySet = await this.buildCompanySet();
 
       // Process categories with controlled concurrency
       const categoryResults = await this.processCategoriesInBatches(
         categories,
-        syncDecision.useDelta ? syncDecision.lastSyncAt : undefined,
+        useDelta ? syncDecision.lastSyncAt : undefined,
+        companySet,
       );
 
       // Aggregate results
@@ -114,7 +129,7 @@ export class ItemsSyncService {
       let deleted = 0;
 
       // Mark missing items as deleted (full sync only)
-      if (!syncDecision.useDelta) {
+      if (!useDelta) {
         deleted = await this.markMissingItemsAsDeleted();
       }
 
@@ -125,17 +140,22 @@ export class ItemsSyncService {
         recordsCreated: totalResult.created,
         recordsUpdated: totalResult.updated,
         recordsDeleted: deleted,
-        syncMode: syncDecision.useDelta ? 'delta' : 'full',
+        syncMode: useDelta ? 'delta' : 'full',
         durationMs,
       });
 
       this.logger.log(
-        `Items sync completed: ${syncDecision.useDelta ? 'delta' : 'full'} mode, ` +
+        `Items sync completed: ${useDelta ? 'delta' : 'full'} mode, ` +
           `created: ${totalResult.created}, updated: ${totalResult.updated}, ` +
           `deleted: ${deleted}, duration: ${durationMs}ms`,
       );
 
-      return { ...totalResult, deleted, durationMs };
+      return {
+        ...totalResult,
+        deleted,
+        durationMs,
+        syncMode: useDelta ? 'delta' : 'full',
+      };
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
       await this.syncService.recordSyncFailure(endpoint, error, durationMs);
@@ -148,6 +168,7 @@ export class ItemsSyncService {
   private async processCategoriesInBatches(
     categories: Array<{ uexId: number; name: string }>,
     lastSyncAt?: Date,
+    companySet?: Set<number>,
   ): Promise<CategorySyncResult[]> {
     const results: CategorySyncResult[] = [];
 
@@ -156,7 +177,9 @@ export class ItemsSyncService {
       const chunk = categories.slice(i, i + this.concurrentCategories);
 
       const chunkResults = await Promise.allSettled(
-        chunk.map((category) => this.syncCategoryItems(category, lastSyncAt)),
+        chunk.map((category) =>
+          this.syncCategoryItems(category, lastSyncAt, companySet),
+        ),
       );
 
       // Process results
@@ -195,6 +218,7 @@ export class ItemsSyncService {
   private async syncCategoryItems(
     category: { uexId: number; name: string },
     lastSyncAt?: Date,
+    companySet?: Set<number>,
   ): Promise<CategorySyncResult> {
     this.logger.debug(
       `Syncing items for category: ${category.name} (${category.uexId})`,
@@ -220,7 +244,11 @@ export class ItemsSyncService {
       };
     }
 
-    const result = await this.processItemsBatch(items, category.uexId);
+    const result = await this.processItemsBatch(
+      items,
+      category.uexId,
+      companySet,
+    );
 
     this.logger.log(
       `Synced ${items.length} items for category ${category.name}: ` +
@@ -278,6 +306,7 @@ export class ItemsSyncService {
   private async processItemsBatch(
     items: UEXItemResponse[],
     categoryId: number,
+    companySet?: Set<number>,
   ): Promise<{ created: number; updated: number }> {
     const systemUserId = this.systemUserService.getSystemUserId();
     let created = 0;
@@ -296,7 +325,10 @@ export class ItemsSyncService {
 
             const itemData = {
               idCategory: categoryId,
-              idCompany: item.id_company,
+              idCompany:
+                item.id_company && companySet?.has(item.id_company)
+                  ? item.id_company
+                  : undefined,
               name: item.name,
               section: item.section,
               categoryName: item.category,
@@ -331,9 +363,6 @@ export class ItemsSyncService {
                 uexId: item.id,
                 ...itemData,
                 active: true,
-                uexDateAdded: item.date_added
-                  ? new Date(item.date_added)
-                  : undefined,
                 addedById: systemUserId,
               });
               created++;
@@ -371,5 +400,20 @@ export class ItemsSyncService {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async buildCompanySet(): Promise<Set<number>> {
+    const companies = await this.companyRepository.find({
+      select: ['uexId'],
+    });
+
+    const set = new Set<number>();
+    for (const company of companies) {
+      if (company.uexId !== undefined && company.uexId !== null) {
+        set.add(company.uexId);
+      }
+    }
+
+    return set;
   }
 }

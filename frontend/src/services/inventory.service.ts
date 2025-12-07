@@ -20,6 +20,30 @@ export interface InventoryItem {
   categoryName?: string;
 }
 
+export interface OrgInventoryItem extends InventoryItem {
+  orgId: number;
+  orgName?: string;
+  addedBy?: number;
+  modifiedBy?: number;
+  addedByUsername?: string;
+  modifiedByUsername?: string;
+}
+
+export interface UserOrganizationMembership {
+  id: number;
+  userId: number;
+  organizationId: number;
+  roleId: number;
+  organization?: {
+    id: number;
+    name: string;
+  };
+  role?: {
+    id: number;
+    name: string;
+  };
+}
+
 export interface InventorySearchParams {
   gameId: number;
   categoryId?: number;
@@ -84,6 +108,29 @@ const getAuthHeader = () => {
   };
 };
 
+const buildOrgInventoryQuery = (params: {
+  gameId: number;
+  uexItemId?: number;
+  locationId?: number;
+  activeOnly?: boolean;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) => {
+  const query: Record<string, string | number | boolean> = {
+    gameId: params.gameId,
+  };
+
+  if (params.uexItemId !== undefined) query.uexItemId = params.uexItemId;
+  if (params.locationId !== undefined) query.locationId = params.locationId;
+  if (params.activeOnly !== undefined) query.activeOnly = params.activeOnly;
+  if (params.search) query.search = params.search;
+  if (params.limit !== undefined) query.limit = params.limit;
+  if (params.offset !== undefined) query.offset = params.offset;
+
+  return query;
+};
+
 export const inventoryService = {
   /**
    * Get user inventory with filters
@@ -146,6 +193,126 @@ export const inventoryService = {
    */
   async deleteItem(id: string): Promise<void> {
     await axios.delete(`${API_URL}/api/inventory/${id}`, {
+      headers: getAuthHeader(),
+    });
+  },
+
+  /**
+   * Share an item with an organization
+   */
+  async shareItem(itemId: string, orgId: number, quantity: number) {
+    await axios.post(
+      `${API_URL}/api/inventory/${itemId}/share`,
+      { orgId, quantity },
+      {
+        headers: getAuthHeader(),
+      },
+    );
+  },
+
+  /**
+   * Unshare an item from any organization
+   */
+  async unshareItem(itemId: string) {
+    await axios.delete(`${API_URL}/api/inventory/${itemId}/share`, {
+      headers: getAuthHeader(),
+    });
+  },
+
+  /**
+   * Get organizations for the current user
+   */
+  async getUserOrganizations(
+    userId: number,
+  ): Promise<UserOrganizationMembership[]> {
+    const response = await axios.get(
+      `${API_URL}/user-organization-roles/user/${userId}/organizations`,
+      {
+        headers: getAuthHeader(),
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Get organization inventory with filters
+   */
+  async getOrgInventory(
+    orgId: number,
+    params: {
+      gameId: number;
+      uexItemId?: number;
+      locationId?: number;
+      activeOnly?: boolean;
+      search?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<InventoryListResponse> {
+    const response = await axios.get(
+      `${API_URL}/api/orgs/${orgId}/inventory`,
+      {
+        params: buildOrgInventoryQuery(params),
+        headers: getAuthHeader(),
+      },
+    );
+
+    const items: OrgInventoryItem[] = response.data;
+    return {
+      items,
+      total: items.length,
+      limit: params.limit ?? items.length,
+      offset: params.offset ?? 0,
+    };
+  },
+
+  /**
+   * Create org inventory item
+   */
+  async createOrgItem(
+    orgId: number,
+    item: Omit<
+      OrgInventoryItem,
+      | 'id'
+      | 'userId'
+      | 'dateAdded'
+      | 'dateModified'
+      | 'active'
+      | 'orgId'
+      | 'orgName'
+      | 'addedBy'
+      | 'modifiedBy'
+    >,
+  ): Promise<OrgInventoryItem> {
+    const response = await axios.post(
+      `${API_URL}/api/orgs/${orgId}/inventory`,
+      item,
+      { headers: getAuthHeader() },
+    );
+    return response.data;
+  },
+
+  /**
+   * Update org inventory item
+   */
+  async updateOrgItem(
+    orgId: number,
+    id: string,
+    updates: Partial<OrgInventoryItem>,
+  ): Promise<OrgInventoryItem> {
+    const response = await axios.put(
+      `${API_URL}/api/orgs/${orgId}/inventory/${id}`,
+      updates,
+      { headers: getAuthHeader() },
+    );
+    return response.data;
+  },
+
+  /**
+   * Delete org inventory item
+   */
+  async deleteOrgItem(orgId: number, id: string): Promise<void> {
+    await axios.delete(`${API_URL}/api/orgs/${orgId}/inventory/${id}`, {
       headers: getAuthHeader(),
     });
   },

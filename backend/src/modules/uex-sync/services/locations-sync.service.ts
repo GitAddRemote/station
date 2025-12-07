@@ -90,7 +90,9 @@ export class LocationsSyncService {
     );
   }
 
-  async syncAllLocations(): Promise<LocationsSyncResult> {
+  async syncAllLocations(
+    forceFull?: boolean,
+  ): Promise<LocationsSyncResult & { syncMode: 'delta' | 'full' }> {
     const startTime = Date.now();
     const endpointResults = new Map<string, Omit<SyncResult, 'durationMs'>>();
     let totalCreated = 0;
@@ -107,7 +109,7 @@ export class LocationsSyncService {
           `Syncing ${endpoint} (${i + 1}/${this.syncOrder.length})`,
         );
 
-        const result = await this.syncLocationEndpoint(endpoint);
+        const result = await this.syncLocationEndpoint(endpoint, forceFull);
 
         endpointResults.set(endpoint, {
           created: result.created,
@@ -147,19 +149,24 @@ export class LocationsSyncService {
       totalDeleted,
       totalDurationMs,
       endpointResults,
+      syncMode: forceFull ? 'full' : 'delta',
     };
   }
 
-  private async syncLocationEndpoint(endpoint: string): Promise<SyncResult> {
+  private async syncLocationEndpoint(
+    endpoint: string,
+    forceFull?: boolean,
+  ): Promise<SyncResult> {
     const startTime = Date.now();
 
     try {
       await this.syncService.acquireSyncLock(endpoint);
 
       const syncDecision = await this.syncService.shouldUseDeltaSync(endpoint);
+      const useDelta = !forceFull && syncDecision.useDelta;
       const filters: any = {};
 
-      if (syncDecision.useDelta && syncDecision.lastSyncAt) {
+      if (useDelta && syncDecision.lastSyncAt) {
         filters.date_modified = syncDecision.lastSyncAt;
         this.logger.log(
           `Using delta sync for ${endpoint} with lastSyncAt: ${syncDecision.lastSyncAt.toISOString()}`,
@@ -177,7 +184,7 @@ export class LocationsSyncService {
       const result = await this.processLocations(
         endpoint,
         locations,
-        syncDecision.useDelta ? 'delta' : 'full',
+        useDelta ? 'delta' : 'full',
       );
 
       const durationMs = Date.now() - startTime;
@@ -187,7 +194,7 @@ export class LocationsSyncService {
         recordsCreated: result.created,
         recordsUpdated: result.updated,
         recordsDeleted: result.deleted,
-        syncMode: syncDecision.useDelta ? 'delta' : 'full',
+        syncMode: useDelta ? 'delta' : 'full',
         durationMs,
       });
 
@@ -394,8 +401,23 @@ export class LocationsSyncService {
     const systemUserId = this.systemUserService.getSystemUserId();
     let created = 0;
     let updated = 0;
+    let skipped = 0;
 
     for (const moon of moons) {
+      // Ensure parent planet exists; if not, skip to avoid FK error
+      const parentPlanet = await this.planetRepository.findOne({
+        where: { uexId: moon.id_planet },
+        select: ['id'],
+      });
+
+      if (!parentPlanet) {
+        skipped++;
+        this.logger.warn(
+          `Skipping moon ${moon.name} (${moon.id}) because parent planet ${moon.id_planet} is missing`,
+        );
+        continue;
+      }
+
       const existing = await this.moonRepository.findOne({
         where: { uexId: moon.id },
       });
@@ -438,6 +460,12 @@ export class LocationsSyncService {
       }
     }
 
+    if (skipped > 0) {
+      this.logger.warn(
+        `Skipped ${skipped} moons due to missing parent planets`,
+      );
+    }
+
     return { created, updated, deleted: 0 };
   }
 
@@ -448,8 +476,60 @@ export class LocationsSyncService {
     const systemUserId = this.systemUserService.getSystemUserId();
     let created = 0;
     let updated = 0;
+    let skipped = 0;
 
     for (const city of cities) {
+      const planetId =
+        city.id_planet !== null &&
+        city.id_planet !== undefined &&
+        city.id_planet > 0
+          ? city.id_planet
+          : undefined;
+      const moonId =
+        city.id_moon !== null && city.id_moon !== undefined && city.id_moon > 0
+          ? city.id_moon
+          : undefined;
+
+      const hasPlanet = planetId !== undefined;
+      const hasMoon = moonId !== undefined;
+
+      // Must have exactly one parent (planet or moon)
+      if (!hasPlanet && !hasMoon) {
+        skipped++;
+        this.logger.warn(
+          `Skipping city ${city.name} (${city.id}) because no parent planet/moon was provided`,
+        );
+        continue;
+      }
+
+      if (hasPlanet) {
+        const parentPlanet = await this.planetRepository.findOne({
+          where: { uexId: planetId },
+          select: ['id'],
+        });
+        if (!parentPlanet) {
+          skipped++;
+          this.logger.warn(
+            `Skipping city ${city.name} (${city.id}) because parent planet ${planetId} is missing`,
+          );
+          continue;
+        }
+      }
+
+      if (hasMoon) {
+        const parentMoon = await this.moonRepository.findOne({
+          where: { uexId: moonId },
+          select: ['id'],
+        });
+        if (!parentMoon) {
+          skipped++;
+          this.logger.warn(
+            `Skipping city ${city.name} (${city.id}) because parent moon ${moonId} is missing`,
+          );
+          continue;
+        }
+      }
+
       const existing = await this.cityRepository.findOne({
         where: { uexId: city.id },
       });
@@ -458,8 +538,8 @@ export class LocationsSyncService {
         await this.cityRepository.update(
           { uexId: city.id },
           {
-            planetId: city.id_planet,
-            moonId: city.id_moon,
+            planetId,
+            moonId,
             name: city.name,
             code: city.code,
             isAvailable: city.is_available !== false,
@@ -474,8 +554,8 @@ export class LocationsSyncService {
       } else {
         await this.cityRepository.save({
           uexId: city.id,
-          planetId: city.id_planet,
-          moonId: city.id_moon,
+          planetId,
+          moonId,
           name: city.name,
           code: city.code,
           isAvailable: city.is_available !== false,
@@ -492,6 +572,12 @@ export class LocationsSyncService {
       }
     }
 
+    if (skipped > 0) {
+      this.logger.warn(
+        `Skipped ${skipped} cities due to missing parent planet/moon`,
+      );
+    }
+
     return { created, updated, deleted: 0 };
   }
 
@@ -502,8 +588,113 @@ export class LocationsSyncService {
     const systemUserId = this.systemUserService.getSystemUserId();
     let created = 0;
     let updated = 0;
+    let skipped = 0;
 
     for (const station of stations) {
+      const planetId =
+        station.id_planet !== null &&
+        station.id_planet !== undefined &&
+        station.id_planet > 0
+          ? station.id_planet
+          : undefined;
+      const moonId =
+        station.id_moon !== null &&
+        station.id_moon !== undefined &&
+        station.id_moon > 0
+          ? station.id_moon
+          : undefined;
+      let starSystemUexId =
+        station.id_orbit && station.id_orbit > 0 ? station.id_orbit : undefined;
+
+      if (planetId) {
+        const parentPlanet = await this.planetRepository.findOne({
+          where: { uexId: planetId },
+          select: ['id', 'starSystemId'],
+        });
+        if (!parentPlanet) {
+          skipped++;
+          this.logger.warn(
+            `Skipping space station ${station.name} (${station.id}) because parent planet ${planetId} is missing`,
+          );
+          continue;
+        }
+
+        if (moonId) {
+          const parentMoon = await this.moonRepository.findOne({
+            where: { uexId: moonId },
+            select: ['id'],
+          });
+
+          if (!parentMoon) {
+            skipped++;
+            this.logger.warn(
+              `Skipping space station ${station.name} (${station.id}) because parent moon ${moonId} is missing`,
+            );
+            continue;
+          }
+        }
+
+        if (!starSystemUexId) {
+          starSystemUexId = parentPlanet.starSystemId;
+        }
+      } else if (moonId) {
+        const parentMoon = await this.moonRepository.findOne({
+          where: { uexId: moonId },
+          select: ['id', 'planetId'],
+        });
+        if (!parentMoon) {
+          skipped++;
+          this.logger.warn(
+            `Skipping space station ${station.name} (${station.id}) because parent moon ${moonId} is missing`,
+          );
+          continue;
+        }
+
+        if (!starSystemUexId && parentMoon.planetId) {
+          const parentPlanet = await this.planetRepository.findOne({
+            where: { uexId: parentMoon.planetId },
+            select: ['id', 'starSystemId'],
+          });
+
+          if (!parentPlanet) {
+            skipped++;
+            this.logger.warn(
+              `Skipping space station ${station.name} (${station.id}) because parent planet ${parentMoon.planetId} for moon ${station.id_moon} is missing`,
+            );
+            continue;
+          }
+
+          starSystemUexId = parentPlanet.starSystemId;
+        }
+      } else {
+        skipped++;
+        this.logger.warn(
+          `Skipping space station ${station.name} (${station.id}) because no parent planet/moon provided`,
+        );
+        continue;
+      }
+
+      if (!starSystemUexId) {
+        skipped++;
+        this.logger.warn(
+          `Skipping space station ${station.name} (${station.id}) because no star system was provided or derived`,
+        );
+        continue;
+      }
+
+      const parentStarSystem = await this.starSystemRepository.findOne({
+        where: { uexId: starSystemUexId },
+        select: ['id'],
+      });
+
+      if (!parentStarSystem) {
+        skipped++;
+        this.logger.warn(
+          `Skipping space station ${station.name} (${station.id}) because parent star system ${starSystemUexId} is missing`,
+        );
+        continue;
+      }
+
       const existing = await this.spaceStationRepository.findOne({
         where: { uexId: station.id },
       });
@@ -512,9 +703,9 @@ export class LocationsSyncService {
         await this.spaceStationRepository.update(
           { uexId: station.id },
           {
-            starSystemId: station.id_orbit,
-            planetId: station.id_planet,
-            moonId: station.id_moon,
+            starSystemId: starSystemUexId,
+            planetId,
+            moonId,
             name: station.name,
             code: station.code,
             isAvailable: station.is_available !== false,
@@ -529,9 +720,9 @@ export class LocationsSyncService {
       } else {
         await this.spaceStationRepository.save({
           uexId: station.id,
-          starSystemId: station.id_orbit,
-          planetId: station.id_planet,
-          moonId: station.id_moon,
+          starSystemId: starSystemUexId,
+          planetId,
+          moonId,
           name: station.name,
           code: station.code,
           isAvailable: station.is_available !== false,
@@ -550,6 +741,12 @@ export class LocationsSyncService {
       }
     }
 
+    if (skipped > 0) {
+      this.logger.warn(
+        `Skipped ${skipped} space stations due to missing parent star systems`,
+      );
+    }
+
     return { created, updated, deleted: 0 };
   }
 
@@ -560,8 +757,58 @@ export class LocationsSyncService {
     const systemUserId = this.systemUserService.getSystemUserId();
     let created = 0;
     let updated = 0;
+    let skipped = 0;
 
     for (const outpost of outposts) {
+      const planetId =
+        outpost.id_planet !== null &&
+        outpost.id_planet !== undefined &&
+        outpost.id_planet > 0
+          ? outpost.id_planet
+          : undefined;
+      const moonId =
+        outpost.id_moon !== null &&
+        outpost.id_moon !== undefined &&
+        outpost.id_moon > 0
+          ? outpost.id_moon
+          : undefined;
+
+      if (!planetId && !moonId) {
+        skipped++;
+        this.logger.warn(
+          `Skipping outpost ${outpost.name} (${outpost.id}) because no parent planet/moon provided`,
+        );
+        continue;
+      }
+
+      if (planetId) {
+        const parentPlanet = await this.planetRepository.findOne({
+          where: { uexId: planetId },
+          select: ['id'],
+        });
+        if (!parentPlanet) {
+          skipped++;
+          this.logger.warn(
+            `Skipping outpost ${outpost.name} (${outpost.id}) because parent planet ${planetId} is missing`,
+          );
+          continue;
+        }
+      }
+
+      if (moonId) {
+        const parentMoon = await this.moonRepository.findOne({
+          where: { uexId: moonId },
+          select: ['id'],
+        });
+        if (!parentMoon) {
+          skipped++;
+          this.logger.warn(
+            `Skipping outpost ${outpost.name} (${outpost.id}) because parent moon ${moonId} is missing`,
+          );
+          continue;
+        }
+      }
+
       const existing = await this.outpostRepository.findOne({
         where: { uexId: outpost.id },
       });
@@ -570,8 +817,8 @@ export class LocationsSyncService {
         await this.outpostRepository.update(
           { uexId: outpost.id },
           {
-            planetId: outpost.id_planet,
-            moonId: outpost.id_moon,
+            planetId,
+            moonId,
             name: outpost.name,
             code: undefined,
             isAvailable: outpost.is_available !== false,
@@ -586,8 +833,8 @@ export class LocationsSyncService {
       } else {
         await this.outpostRepository.save({
           uexId: outpost.id,
-          planetId: outpost.id_planet,
-          moonId: outpost.id_moon,
+          planetId,
+          moonId,
           name: outpost.name,
           code: undefined,
           isAvailable: outpost.is_available !== false,
@@ -606,6 +853,12 @@ export class LocationsSyncService {
       }
     }
 
+    if (skipped > 0) {
+      this.logger.warn(
+        `Skipped ${skipped} outposts due to missing parent planet/moon`,
+      );
+    }
+
     return { created, updated, deleted: 0 };
   }
 
@@ -616,8 +869,234 @@ export class LocationsSyncService {
     const systemUserId = this.systemUserService.getSystemUserId();
     let created = 0;
     let updated = 0;
+    let skipped = 0;
 
     for (const poi of pois) {
+      const starSystemId =
+        poi.id_star_system && poi.id_star_system > 0
+          ? poi.id_star_system
+          : undefined;
+      const planetId =
+        poi.id_planet && poi.id_planet > 0 ? poi.id_planet : undefined;
+      const moonId = poi.id_moon && poi.id_moon > 0 ? poi.id_moon : undefined;
+      const orbitId =
+        poi.id_orbit && poi.id_orbit > 0 ? poi.id_orbit : undefined;
+      const spaceStationId =
+        poi.id_space_station && poi.id_space_station > 0
+          ? poi.id_space_station
+          : undefined;
+      const cityId = poi.id_city && poi.id_city > 0 ? poi.id_city : undefined;
+      const outpostId =
+        poi.id_outpost && poi.id_outpost > 0 ? poi.id_outpost : undefined;
+
+      let resolvedStarSystemId = starSystemId ?? orbitId;
+
+      // Ensure we have at least one parent
+      if (
+        !resolvedStarSystemId &&
+        !planetId &&
+        !moonId &&
+        !spaceStationId &&
+        !cityId &&
+        !outpostId
+      ) {
+        skipped++;
+        this.logger.warn(
+          `Skipping POI ${poi.name} (${poi.id}) because no parent reference was provided`,
+        );
+        continue;
+      }
+
+      if (planetId) {
+        const parentPlanet = await this.planetRepository.findOne({
+          where: { uexId: planetId },
+          select: ['id', 'starSystemId'],
+        });
+        if (!parentPlanet) {
+          skipped++;
+          this.logger.warn(
+            `Skipping POI ${poi.name} (${poi.id}) because parent planet ${planetId} is missing`,
+          );
+          continue;
+        }
+        if (!resolvedStarSystemId) {
+          resolvedStarSystemId = parentPlanet.starSystemId;
+        }
+      }
+
+      if (moonId) {
+        const parentMoon = await this.moonRepository.findOne({
+          where: { uexId: moonId },
+          select: ['id', 'planetId'],
+        });
+        if (!parentMoon) {
+          skipped++;
+          this.logger.warn(
+            `Skipping POI ${poi.name} (${poi.id}) because parent moon ${moonId} is missing`,
+          );
+          continue;
+        }
+        if (!planetId && parentMoon.planetId) {
+          const parentPlanet = await this.planetRepository.findOne({
+            where: { uexId: parentMoon.planetId },
+            select: ['id', 'starSystemId'],
+          });
+          if (!parentPlanet) {
+            skipped++;
+            this.logger.warn(
+              `Skipping POI ${poi.name} (${poi.id}) because parent planet ${parentMoon.planetId} for moon ${moonId} is missing`,
+            );
+            continue;
+          }
+          if (!resolvedStarSystemId) {
+            resolvedStarSystemId = parentPlanet.starSystemId;
+          }
+        }
+      }
+
+      if (spaceStationId) {
+        const station = await this.spaceStationRepository.findOne({
+          where: { uexId: spaceStationId },
+          select: ['id', 'starSystemId'],
+        });
+        if (!station) {
+          skipped++;
+          this.logger.warn(
+            `Skipping POI ${poi.name} (${poi.id}) because parent space station ${spaceStationId} is missing`,
+          );
+          continue;
+        }
+        if (!resolvedStarSystemId && station.starSystemId) {
+          resolvedStarSystemId = station.starSystemId;
+        }
+      }
+
+      if (cityId) {
+        const city = await this.cityRepository.findOne({
+          where: { uexId: cityId },
+          select: ['id', 'planetId', 'moonId'],
+        });
+        if (!city) {
+          skipped++;
+          this.logger.warn(
+            `Skipping POI ${poi.name} (${poi.id}) because parent city ${cityId} is missing`,
+          );
+          continue;
+        }
+
+        if (!planetId && city.planetId) {
+          const parentPlanet = await this.planetRepository.findOne({
+            where: { uexId: city.planetId },
+            select: ['id', 'starSystemId'],
+          });
+          if (!parentPlanet) {
+            skipped++;
+            this.logger.warn(
+              `Skipping POI ${poi.name} (${poi.id}) because parent planet ${city.planetId} for city ${cityId} is missing`,
+            );
+            continue;
+          }
+          if (!resolvedStarSystemId) {
+            resolvedStarSystemId = parentPlanet.starSystemId;
+          }
+        }
+
+        if (!moonId && city.moonId) {
+          const parentMoon = await this.moonRepository.findOne({
+            where: { uexId: city.moonId },
+            select: ['id', 'planetId'],
+          });
+          if (!parentMoon) {
+            skipped++;
+            this.logger.warn(
+              `Skipping POI ${poi.name} (${poi.id}) because parent moon ${city.moonId} for city ${cityId} is missing`,
+            );
+            continue;
+          }
+          if (!planetId && parentMoon.planetId && !resolvedStarSystemId) {
+            const parentPlanet = await this.planetRepository.findOne({
+              where: { uexId: parentMoon.planetId },
+              select: ['id', 'starSystemId'],
+            });
+            if (!parentPlanet) {
+              skipped++;
+              this.logger.warn(
+                `Skipping POI ${poi.name} (${poi.id}) because parent planet ${parentMoon.planetId} for moon ${city.moonId} is missing`,
+              );
+              continue;
+            }
+            resolvedStarSystemId = parentPlanet.starSystemId;
+          }
+        }
+      }
+
+      if (outpostId) {
+        const outpost = await this.outpostRepository.findOne({
+          where: { uexId: outpostId },
+          select: ['id', 'planetId', 'moonId'],
+        });
+        if (!outpost) {
+          skipped++;
+          this.logger.warn(
+            `Skipping POI ${poi.name} (${poi.id}) because parent outpost ${outpostId} is missing`,
+          );
+          continue;
+        }
+
+        if (!planetId && outpost.planetId) {
+          const parentPlanet = await this.planetRepository.findOne({
+            where: { uexId: outpost.planetId },
+            select: ['id', 'starSystemId'],
+          });
+          if (!parentPlanet) {
+            skipped++;
+            this.logger.warn(
+              `Skipping POI ${poi.name} (${poi.id}) because parent planet ${outpost.planetId} for outpost ${outpostId} is missing`,
+            );
+            continue;
+          }
+          if (!resolvedStarSystemId) {
+            resolvedStarSystemId = parentPlanet.starSystemId;
+          }
+        }
+
+        if (!moonId && outpost.moonId) {
+          const parentMoon = await this.moonRepository.findOne({
+            where: { uexId: outpost.moonId },
+            select: ['id', 'planetId'],
+          });
+          if (!parentMoon) {
+            skipped++;
+            this.logger.warn(
+              `Skipping POI ${poi.name} (${poi.id}) because parent moon ${outpost.moonId} for outpost ${outpostId} is missing`,
+            );
+            continue;
+          }
+          if (!planetId && parentMoon.planetId && !resolvedStarSystemId) {
+            const parentPlanet = await this.planetRepository.findOne({
+              where: { uexId: parentMoon.planetId },
+              select: ['id', 'starSystemId'],
+            });
+            if (!parentPlanet) {
+              skipped++;
+              this.logger.warn(
+                `Skipping POI ${poi.name} (${poi.id}) because parent planet ${parentMoon.planetId} for moon ${outpost.moonId} is missing`,
+              );
+              continue;
+            }
+            resolvedStarSystemId = parentPlanet.starSystemId;
+          }
+        }
+      }
+
+      if (!resolvedStarSystemId) {
+        skipped++;
+        this.logger.warn(
+          `Skipping POI ${poi.name} (${poi.id}) because no star system was provided or derived`,
+        );
+        continue;
+      }
+
       const existing = await this.poiRepository.findOne({
         where: { uexId: poi.id },
       });
@@ -626,9 +1105,9 @@ export class LocationsSyncService {
         await this.poiRepository.update(
           { uexId: poi.id },
           {
-            starSystemId: poi.id_star_system,
-            planetId: poi.id_planet,
-            moonId: poi.id_moon,
+            starSystemId: resolvedStarSystemId,
+            planetId,
+            moonId,
             name: poi.name,
             code: undefined,
             type: poi.type,
@@ -644,9 +1123,9 @@ export class LocationsSyncService {
       } else {
         await this.poiRepository.save({
           uexId: poi.id,
-          starSystemId: poi.id_star_system,
-          planetId: poi.id_planet,
-          moonId: poi.id_moon,
+          starSystemId: resolvedStarSystemId,
+          planetId,
+          moonId,
           name: poi.name,
           code: undefined,
           type: poi.type,
@@ -662,6 +1141,12 @@ export class LocationsSyncService {
         });
         created++;
       }
+    }
+
+    if (skipped > 0) {
+      this.logger.warn(
+        `Skipped ${skipped} POI due to missing or invalid parent references`,
+      );
     }
 
     return { created, updated, deleted: 0 };
