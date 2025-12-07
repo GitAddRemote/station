@@ -52,7 +52,6 @@ type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
 
 const GAME_ID = 1;
-const FETCH_LIMIT = 1000;
 
 const valueText = (value: number) => `${value.toLocaleString()} qty`;
 
@@ -64,6 +63,7 @@ const InventoryPage = () => {
   const [viewMode, setViewMode] = useState<'personal' | 'org'>('personal');
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [items, setItems] = useState<InventoryRecord[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,41 +170,66 @@ const InventoryPage = () => {
         typeof filters.categoryId === 'number' ? filters.categoryId : undefined;
       const locationId =
         typeof filters.locationId === 'number' ? filters.locationId : undefined;
+      const [minQuantity, maxQuantity] = filters.valueRange;
+      const apiSort =
+        sortBy === 'date'
+          ? 'date_modified'
+          : sortBy === 'location'
+          ? 'location'
+          : sortBy;
+      const limit = rowsPerPage;
+      const offset = page * rowsPerPage;
 
       if (viewMode === 'org' && selectedOrgId) {
         const data = await inventoryService.getOrgInventory(selectedOrgId, {
           gameId: GAME_ID,
           search: debouncedSearch || undefined,
+          categoryId,
           locationId,
-          limit: FETCH_LIMIT,
-          offset: 0,
+          minQuantity,
+          maxQuantity,
+          sort: apiSort,
+          order: sortDir,
+          limit,
+          offset,
         });
         setItems(data.items);
+        setTotalCount(data.total);
+        if (page > 0) {
+          const lastPage = Math.max(0, Math.floor((data.total - 1) / rowsPerPage));
+          if (page > lastPage) {
+            setPage(lastPage);
+          }
+        }
       } else {
-        const apiSort =
-          sortBy === 'date'
-            ? 'date_modified'
-            : sortBy === 'location'
-            ? undefined
-            : sortBy;
         const params = {
           gameId: GAME_ID,
-          limit: FETCH_LIMIT,
-          offset: 0,
+          limit,
+          offset,
           search: debouncedSearch || undefined,
           categoryId,
           locationId,
+          minQuantity,
+          maxQuantity,
           sharedOnly: filters.sharedOnly || undefined,
           sort: apiSort,
           order: sortDir,
         } as const;
         const data = await inventoryService.getInventory(params);
         setItems(data.items);
+        setTotalCount(data.total);
+        if (page > 0) {
+          const lastPage = Math.max(0, Math.floor((data.total - 1) / rowsPerPage));
+          if (page > lastPage) {
+            setPage(lastPage);
+          }
+        }
       }
     } catch (err) {
       console.error('Error fetching inventory', err);
       setError('Unable to load inventory right now.');
       setItems([]);
+      setTotalCount(0);
     } finally {
       if (initialLoading) {
         setInitialLoading(false);
@@ -218,9 +243,12 @@ const InventoryPage = () => {
     filters.categoryId,
     filters.locationId,
     filters.sharedOnly,
+    filters.valueRange,
     debouncedSearch,
     sortBy,
     sortDir,
+    page,
+    rowsPerPage,
     initialLoading,
   ]);
 
@@ -243,7 +271,7 @@ const InventoryPage = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, filters.categoryId, filters.locationId, filters.sharedOnly, viewMode, selectedOrgId]);
+  }, [debouncedSearch, filters.categoryId, filters.locationId, filters.sharedOnly, filters.valueRange, viewMode, selectedOrgId]);
 
   useEffect(() => {
     if (actionMode && actionItem) {
@@ -282,100 +310,15 @@ const InventoryPage = () => {
     }
   }, [maxQuantity, currentMaxValue]);
 
-  const filteredItems = useMemo(() => {
-    const [minValue, maxValue] = filters.valueRange;
-    const searchTerm = (debouncedSearch || '').toLowerCase();
-    const categoryId =
-      typeof filters.categoryId === 'number' ? filters.categoryId : undefined;
-    const locationId =
-      typeof filters.locationId === 'number' ? filters.locationId : undefined;
-    const targetCategory = categoryId
-      ? categories.find((c) => c.id === categoryId)?.name
-      : undefined;
-
-    const filtered = items.filter((item) => {
-      const qty = Number(item.quantity) || 0;
-      const matchesValue = qty >= minValue && qty <= (maxValue || Infinity);
-      const matchesLocation = locationId ? item.locationId === locationId : true;
-      const matchesCategory = categoryId
-        ? item.categoryName === targetCategory
-        : true;
-      const matchesSearch =
-        searchTerm.length === 0
-          ? true
-          : (item.itemName || '')
-              .toLowerCase()
-              .includes(searchTerm) ||
-            (item.notes || '').toLowerCase().includes(searchTerm) ||
-            (item.locationName || '').toLowerCase().includes(searchTerm);
-      const matchesShared =
-        viewMode === 'personal'
-          ? filters.sharedOnly
-            ? Boolean(item.sharedOrgId)
-            : true
-          : true;
-
-      return matchesValue && matchesLocation && matchesCategory && matchesSearch && matchesShared;
-    });
-
-    const sorted = filtered.sort((a, b) => {
-      const aName = a.itemName || `Item ${a.uexItemId}`;
-      const bName = b.itemName || `Item ${b.uexItemId}`;
-      const aQty = Number(a.quantity) || 0;
-      const bQty = Number(b.quantity) || 0;
-      const aLoc = a.locationName || '';
-      const bLoc = b.locationName || '';
-      const aDate = new Date(a.dateModified || a.dateAdded || '').getTime();
-      const bDate = new Date(b.dateModified || b.dateAdded || '').getTime();
-
-      let compare = 0;
-      switch (sortBy) {
-        case 'name':
-          compare = aName.localeCompare(bName);
-          break;
-        case 'quantity':
-          compare = aQty - bQty;
-          break;
-        case 'location':
-          compare = aLoc.localeCompare(bLoc);
-          break;
-        default:
-          compare = aDate - bDate;
-      }
-
-      return sortDir === 'asc' ? compare : -compare;
-    });
-
-    return sorted;
-  }, [
-    items,
-    filters.valueRange,
-    filters.categoryId,
-    filters.locationId,
-    filters.sharedOnly,
-    debouncedSearch,
-    sortBy,
-    sortDir,
-    viewMode,
-    categories,
-  ]);
-
-  const paginatedItems = useMemo(
-    () =>
-      filteredItems.slice(
-        page * rowsPerPage,
-        page * rowsPerPage + rowsPerPage,
-      ),
-    [filteredItems, page, rowsPerPage],
-  );
+  const filteredItems = useMemo(() => items, [items]);
 
   const groupedItems = useMemo(() => {
     if (groupBy === 'none') {
-      return new Map<string, InventoryRecord[]>([['All items', paginatedItems]]);
+      return new Map<string, InventoryRecord[]>([['All items', filteredItems]]);
     }
 
     const groups = new Map<string, InventoryRecord[]>();
-    paginatedItems.forEach((item) => {
+    filteredItems.forEach((item) => {
       let key = 'Other';
       if (groupBy === 'category') {
         key = item.categoryName || 'Uncategorized';
@@ -391,7 +334,7 @@ const InventoryPage = () => {
     });
 
     return groups;
-  }, [groupBy, paginatedItems]);
+  }, [groupBy, filteredItems]);
 
   const openActionDialog = (mode: ActionMode) => {
     setActionMode(mode);
@@ -1071,8 +1014,8 @@ const InventoryPage = () => {
                     >
                       <ViewAgendaIcon fontSize="small" />
                       <Typography variant="body2">
-                        Showing {paginatedItems.length.toLocaleString()} of{' '}
-                        {filteredItems.length.toLocaleString()} items
+                        Showing {items.length.toLocaleString()} of{' '}
+                        {totalCount.toLocaleString()} items
                       </Typography>
                     </Stack>
                     <Stack spacing={2}>
@@ -1173,7 +1116,7 @@ const InventoryPage = () => {
                     </Stack>
                     <TablePagination
                       component="div"
-                      count={filteredItems.length}
+                      count={totalCount}
                       page={page}
                       onPageChange={(_, newPage) => setPage(newPage)}
                       rowsPerPage={rowsPerPage}

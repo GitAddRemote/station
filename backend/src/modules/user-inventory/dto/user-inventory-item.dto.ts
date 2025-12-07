@@ -81,6 +81,16 @@ export class UserInventorySearchDto {
   gameId!: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  maxQuantity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minQuantity?: number;
+
+  @IsOptional()
   @IsInt()
   categoryId?: number;
 
@@ -113,7 +123,7 @@ export class UserInventorySearchDto {
 
   @IsOptional()
   @IsString()
-  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
 
   @IsOptional()
   @IsString()

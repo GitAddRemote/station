@@ -30,6 +30,7 @@ export class OrgInventoryItemDto {
   orgName?: string;
   addedByUsername?: string;
   modifiedByUsername?: string;
+  categoryName?: string;
 }
 
 export class CreateOrgInventoryItemDto {
@@ -108,10 +109,38 @@ export class OrgInventorySearchDto {
   @IsInt()
   gameId!: number;
 
+  @ApiPropertyOptional({
+    description: 'Minimum quantity filter',
+    example: 10,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  minQuantity?: number;
+
+  @ApiPropertyOptional({
+    description: 'Maximum quantity filter',
+    example: 1000,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  maxQuantity?: number;
+
   @ApiPropertyOptional({ description: 'Filter by UEX Item ID', example: 100 })
   @IsOptional()
   @IsInt()
   uexItemId?: number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by UEX category ID',
+    example: 12,
+  })
+  @IsOptional()
+  @IsInt()
+  categoryId?: number;
 
   @ApiPropertyOptional({ description: 'Filter by Location ID', example: 200 })
   @IsOptional()
@@ -134,6 +163,24 @@ export class OrgInventorySearchDto {
   @IsOptional()
   @IsBoolean()
   activeOnly?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Sort column',
+    example: 'date_modified',
+    enum: ['name', 'quantity', 'location', 'date_added', 'date_modified'],
+  })
+  @IsOptional()
+  @IsString()
+  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+
+  @ApiPropertyOptional({
+    description: 'Sort order',
+    example: 'desc',
+    enum: ['asc', 'desc'],
+  })
+  @IsOptional()
+  @IsString()
+  order?: 'asc' | 'desc';
 
   @ApiPropertyOptional({
     description: 'Maximum number of results',

@@ -276,19 +276,26 @@ describe('OrgInventoryService', () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
       jest
         .spyOn(repository, 'searchInventory')
-        .mockResolvedValue([mockOrgInventoryItem]);
+        .mockResolvedValue({ items: [mockOrgInventoryItem], total: 1 });
 
       const result = await service.search(1, searchDto);
 
-      expect(result).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
+      expect(result.total).toBe(1);
       expect(repository.searchInventory).toHaveBeenCalledWith({
         orgId: 1,
         gameId: 1,
         activeOnly: true,
-        limit: 100,
-        offset: 0,
         locationId: undefined,
         uexItemId: undefined,
+        categoryId: undefined,
+        limit: 100,
+        offset: 0,
+        search: undefined,
+        minQuantity: undefined,
+        maxQuantity: undefined,
+        sort: 'date_modified',
+        order: 'desc',
       });
     });
 

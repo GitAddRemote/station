@@ -67,6 +67,18 @@ export class UserInventoryService {
       queryBuilder.andWhere('inventory.shared_org_id IS NOT NULL');
     }
 
+    if (searchDto.minQuantity !== undefined) {
+      queryBuilder.andWhere('inventory.quantity >= :minQuantity', {
+        minQuantity: searchDto.minQuantity,
+      });
+    }
+
+    if (searchDto.maxQuantity !== undefined) {
+      queryBuilder.andWhere('inventory.quantity <= :maxQuantity', {
+        maxQuantity: searchDto.maxQuantity,
+      });
+    }
+
     if (searchDto.search) {
       queryBuilder.andWhere(
         '(item.name ILIKE :search OR inventory.notes ILIKE :search)',
@@ -249,6 +261,8 @@ export class UserInventoryService {
         return 'item.name';
       case 'quantity':
         return 'inventory.quantity';
+      case 'location':
+        return 'location.displayName';
       case 'date_added':
         return 'inventory.dateAdded';
       case 'date_modified':
