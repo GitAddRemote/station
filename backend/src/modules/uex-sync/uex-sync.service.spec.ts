@@ -7,21 +7,23 @@ import { UexSyncConfig } from './uex-sync-config.entity';
 
 describe('UexSyncService', () => {
   let service: UexSyncService;
-
-  const mockSyncStateRepository = {
-    findOne: jest.fn(),
-    find: jest.fn(),
-    update: jest.fn(),
-    save: jest.fn(),
-    createQueryBuilder: jest.fn(),
-  };
-
-  const mockSyncConfigRepository = {
-    findOne: jest.fn(),
-    save: jest.fn(),
-  };
+  let mockSyncStateRepository: any;
+  let mockSyncConfigRepository: any;
 
   beforeEach(async () => {
+    mockSyncStateRepository = {
+      findOne: jest.fn().mockResolvedValue(null),
+      find: jest.fn(),
+      update: jest.fn(),
+      save: jest.fn(),
+      insert: jest.fn().mockResolvedValue({}),
+      createQueryBuilder: jest.fn(),
+    };
+
+    mockSyncConfigRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UexSyncService,
@@ -65,6 +67,7 @@ describe('UexSyncService', () => {
         service.acquireSyncLock('categories'),
       ).resolves.not.toThrow();
 
+      expect(mockSyncStateRepository.insert).toHaveBeenCalled();
       expect(mockQueryBuilder.execute).toHaveBeenCalled();
     });
 
