@@ -17,46 +17,55 @@ export enum SyncStatus {
 @Entity('uex_sync_state')
 @Index(['syncStatus', 'lastSuccessfulSyncAt'])
 export class UexSyncState {
-  @PrimaryColumn({ type: 'varchar', length: 100 })
+  @PrimaryColumn({ name: 'endpoint_name', type: 'varchar', length: 100 })
   endpointName!: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'last_successful_sync_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
   lastSuccessfulSyncAt?: Date;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'last_full_sync_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
   lastFullSyncAt?: Date;
 
   @Column({
+    name: 'sync_status',
     type: 'enum',
     enum: SyncStatus,
     default: SyncStatus.IDLE,
   })
   syncStatus!: SyncStatus;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ name: 'sync_started_at', type: 'timestamptz', nullable: true })
   syncStartedAt?: Date;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'records_created_count', type: 'int', default: 0 })
   recordsCreatedCount!: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'records_updated_count', type: 'int', default: 0 })
   recordsUpdatedCount!: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ name: 'records_deleted_count', type: 'int', default: 0 })
   recordsDeletedCount!: number;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'error_message', type: 'text', nullable: true })
   errorMessage?: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ name: 'error_stack', type: 'text', nullable: true })
   errorStack?: string;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ name: 'sync_duration_ms', type: 'int', nullable: true })
   syncDurationMs?: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'date_added' })
   dateAdded!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'date_modified' })
   dateModified!: Date;
 }

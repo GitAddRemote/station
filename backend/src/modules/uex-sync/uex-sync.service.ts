@@ -34,6 +34,17 @@ export class UexSyncService {
   async acquireSyncLock(endpointName: string): Promise<void> {
     const lockTimeoutDate = new Date(Date.now() - this.LOCK_TIMEOUT_MS);
 
+    // Ensure sync state row exists
+    const existing = await this.syncStateRepository.findOne({
+      where: { endpointName },
+    });
+    if (!existing) {
+      await this.syncStateRepository.insert({
+        endpointName,
+        syncStatus: SyncStatus.IDLE,
+      });
+    }
+
     const result = await this.syncStateRepository
       .createQueryBuilder()
       .update(UexSyncState)
@@ -41,9 +52,9 @@ export class UexSyncService {
         syncStatus: SyncStatus.IN_PROGRESS,
         syncStartedAt: new Date(),
       })
-      .where('endpointName = :endpointName', { endpointName })
+      .where('endpoint_name = :endpointName', { endpointName })
       .andWhere(
-        '(syncStatus != :inProgress OR syncStartedAt < :lockTimeoutDate)',
+        '(sync_status != :inProgress OR sync_started_at < :lockTimeoutDate)',
         {
           inProgress: SyncStatus.IN_PROGRESS,
           lockTimeoutDate,

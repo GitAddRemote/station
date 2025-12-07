@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -8,44 +9,85 @@ import {
   Container,
   Box,
   CircularProgress,
+  Grid,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Switch,
+  FormControlLabel,
+  Slider,
+  Chip,
+  Button,
+  Divider,
+  Card,
+  CardContent,
+  Stack,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  TablePagination,
+  Tooltip,
+  LinearProgress,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import InventoryPortlet from '../components/inventory/InventoryPortlet';
-import { useEffect, useState } from 'react';
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import SortIcon from '@mui/icons-material/Sort';
+import GroupWorkIcon from '@mui/icons-material/GroupWork';
+import InventoryIcon from '@mui/icons-material/Inventory';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import EditIcon from '@mui/icons-material/Edit';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
+import ShareIcon from '@mui/icons-material/Share';
+import UnpublishedIcon from '@mui/icons-material/Unpublished';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
+import ApartmentIcon from '@mui/icons-material/Apartment';
+import { inventoryService, InventoryCategory, InventoryItem, OrgInventoryItem } from '../services/inventory.service';
+import { useDebounce } from '../hooks/useDebounce';
+
+type InventoryRecord = InventoryItem | OrgInventoryItem;
+type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
+
+const GAME_ID = 1;
+const FETCH_LIMIT = 1000;
+
+const valueText = (value: number) => `${value.toLocaleString()} qty`;
 
 const InventoryPage = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<{ userId: number; username: string } | null>(null);
+  const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'personal' | 'org'>('personal');
+  const [categories, setCategories] = useState<InventoryCategory[]>([]);
+  const [items, setItems] = useState<InventoryRecord[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [actionAnchor, setActionAnchor] = useState<null | HTMLElement>(null);
+  const [actionItem, setActionItem] = useState<InventoryRecord | null>(null);
+  const [actionMode, setActionMode] = useState<ActionMode>(null);
+  const [actionWorking, setActionWorking] = useState(false);
+  const [shareOrgId, setShareOrgId] = useState<number | ''>('');
+  const [actionQuantity, setActionQuantity] = useState<number>(0);
 
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-        const token = localStorage.getItem('access_token');
-        const response = await fetch(`${apiUrl}/users/profile`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+  const [filters, setFilters] = useState({
+    search: '',
+    categoryId: '' as number | '',
+    locationId: '' as number | '',
+    sharedOnly: false,
+    valueRange: [0, 100000] as [number, number],
+  });
+  const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'location' | 'date'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [groupBy, setGroupBy] = useState<'none' | 'category' | 'location' | 'share'>('none');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
-        if (response.ok) {
-          const data = await response.json();
-          setUsername(data.username);
-        } else {
-          navigate('/login');
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        navigate('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, [navigate]);
+  const debouncedSearch = useDebounce(filters.search, 350);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -53,7 +95,664 @@ const InventoryPage = () => {
     navigate('/login');
   };
 
-  if (loading) {
+  const closeActionMenu = () => {
+    setActionAnchor(null);
+    setActionItem(null);
+    setActionMode(null);
+  };
+
+  const handleActionOpen = (event: React.MouseEvent<HTMLElement>, item: InventoryRecord) => {
+    setActionAnchor(event.currentTarget);
+    setActionItem(item);
+  };
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${apiUrl}/users/profile`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        navigate('/login');
+        return;
+      }
+
+      const data = await response.json();
+      setUser({ userId: data.userId, username: data.username });
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const data = await inventoryService.getCategories();
+      setCategories(data);
+    } catch (err) {
+      console.error('Error loading categories', err);
+    }
+  }, []);
+
+  const fetchOrganizations = useCallback(
+    async (userId: number) => {
+      try {
+        const orgs = await inventoryService.getUserOrganizations(userId);
+        const mapped = orgs.map((entry) => ({
+          id: entry.organization?.id ?? entry.organizationId,
+          name: entry.organization?.name ?? `Org #${entry.organizationId}`,
+        }));
+        setOrgOptions(mapped);
+      } catch (err) {
+        console.error('Error loading organizations', err);
+      }
+    },
+    [],
+  );
+
+  const fetchInventory = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    try {
+      setError(null);
+      if (initialLoading) {
+        setInitialLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+      const categoryId =
+        typeof filters.categoryId === 'number' ? filters.categoryId : undefined;
+      const locationId =
+        typeof filters.locationId === 'number' ? filters.locationId : undefined;
+
+      if (viewMode === 'org' && selectedOrgId) {
+        const data = await inventoryService.getOrgInventory(selectedOrgId, {
+          gameId: GAME_ID,
+          search: debouncedSearch || undefined,
+          locationId,
+          limit: FETCH_LIMIT,
+          offset: 0,
+        });
+        setItems(data.items);
+      } else {
+        const apiSort =
+          sortBy === 'date'
+            ? 'date_modified'
+            : sortBy === 'location'
+            ? undefined
+            : sortBy;
+        const params = {
+          gameId: GAME_ID,
+          limit: FETCH_LIMIT,
+          offset: 0,
+          search: debouncedSearch || undefined,
+          categoryId,
+          locationId,
+          sharedOnly: filters.sharedOnly || undefined,
+          sort: apiSort,
+          order: sortDir,
+        } as const;
+        const data = await inventoryService.getInventory(params);
+        setItems(data.items);
+      }
+    } catch (err) {
+      console.error('Error fetching inventory', err);
+      setError('Unable to load inventory right now.');
+      setItems([]);
+    } finally {
+      if (initialLoading) {
+        setInitialLoading(false);
+      }
+      setRefreshing(false);
+    }
+  }, [
+    user,
+    viewMode,
+    selectedOrgId,
+    filters.categoryId,
+    filters.locationId,
+    filters.sharedOnly,
+    debouncedSearch,
+    sortBy,
+    sortDir,
+    initialLoading,
+  ]);
+
+  useEffect(() => {
+    fetchProfile();
+    fetchCategories();
+  }, [fetchProfile, fetchCategories]);
+
+  useEffect(() => {
+    if (user?.userId) {
+      fetchOrganizations(user.userId);
+    }
+  }, [user, fetchOrganizations]);
+
+  useEffect(() => {
+    if (user) {
+      fetchInventory();
+    }
+  }, [user, fetchInventory]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, filters.categoryId, filters.locationId, filters.sharedOnly, viewMode, selectedOrgId]);
+
+  useEffect(() => {
+    if (actionMode && actionItem) {
+      setActionQuantity(Number(actionItem.quantity) || 0);
+    }
+  }, [actionMode, actionItem]);
+
+  const locationOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    items.forEach((item) => {
+      if (item.locationId) {
+        const label = item.locationName || `Location #${item.locationId}`;
+        map.set(item.locationId, label);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [items]);
+
+  const maxQuantity = useMemo(
+    () =>
+      items.reduce((max, item) => {
+        const qty = Number(item.quantity) || 0;
+        return qty > max ? qty : max;
+      }, 0),
+    [items],
+  );
+
+  const currentMaxValue = filters.valueRange[1];
+
+  useEffect(() => {
+    if (maxQuantity > currentMaxValue) {
+      setFilters((prev) => ({
+        ...prev,
+        valueRange: [0, Math.ceil(maxQuantity)],
+      }));
+    }
+  }, [maxQuantity, currentMaxValue]);
+
+  const filteredItems = useMemo(() => {
+    const [minValue, maxValue] = filters.valueRange;
+    const searchTerm = (debouncedSearch || '').toLowerCase();
+    const categoryId =
+      typeof filters.categoryId === 'number' ? filters.categoryId : undefined;
+    const locationId =
+      typeof filters.locationId === 'number' ? filters.locationId : undefined;
+    const targetCategory = categoryId
+      ? categories.find((c) => c.id === categoryId)?.name
+      : undefined;
+
+    const filtered = items.filter((item) => {
+      const qty = Number(item.quantity) || 0;
+      const matchesValue = qty >= minValue && qty <= (maxValue || Infinity);
+      const matchesLocation = locationId ? item.locationId === locationId : true;
+      const matchesCategory = categoryId
+        ? item.categoryName === targetCategory
+        : true;
+      const matchesSearch =
+        searchTerm.length === 0
+          ? true
+          : (item.itemName || '')
+              .toLowerCase()
+              .includes(searchTerm) ||
+            (item.notes || '').toLowerCase().includes(searchTerm) ||
+            (item.locationName || '').toLowerCase().includes(searchTerm);
+      const matchesShared =
+        viewMode === 'personal'
+          ? filters.sharedOnly
+            ? Boolean(item.sharedOrgId)
+            : true
+          : true;
+
+      return matchesValue && matchesLocation && matchesCategory && matchesSearch && matchesShared;
+    });
+
+    const sorted = filtered.sort((a, b) => {
+      const aName = a.itemName || `Item ${a.uexItemId}`;
+      const bName = b.itemName || `Item ${b.uexItemId}`;
+      const aQty = Number(a.quantity) || 0;
+      const bQty = Number(b.quantity) || 0;
+      const aLoc = a.locationName || '';
+      const bLoc = b.locationName || '';
+      const aDate = new Date(a.dateModified || a.dateAdded || '').getTime();
+      const bDate = new Date(b.dateModified || b.dateAdded || '').getTime();
+
+      let compare = 0;
+      switch (sortBy) {
+        case 'name':
+          compare = aName.localeCompare(bName);
+          break;
+        case 'quantity':
+          compare = aQty - bQty;
+          break;
+        case 'location':
+          compare = aLoc.localeCompare(bLoc);
+          break;
+        default:
+          compare = aDate - bDate;
+      }
+
+      return sortDir === 'asc' ? compare : -compare;
+    });
+
+    return sorted;
+  }, [
+    items,
+    filters.valueRange,
+    filters.categoryId,
+    filters.locationId,
+    filters.sharedOnly,
+    debouncedSearch,
+    sortBy,
+    sortDir,
+    viewMode,
+    categories,
+  ]);
+
+  const paginatedItems = useMemo(
+    () =>
+      filteredItems.slice(
+        page * rowsPerPage,
+        page * rowsPerPage + rowsPerPage,
+      ),
+    [filteredItems, page, rowsPerPage],
+  );
+
+  const groupedItems = useMemo(() => {
+    if (groupBy === 'none') {
+      return new Map<string, InventoryRecord[]>([['All items', paginatedItems]]);
+    }
+
+    const groups = new Map<string, InventoryRecord[]>();
+    paginatedItems.forEach((item) => {
+      let key = 'Other';
+      if (groupBy === 'category') {
+        key = item.categoryName || 'Uncategorized';
+      } else if (groupBy === 'location') {
+        key = item.locationName || 'Unknown location';
+      } else if (groupBy === 'share') {
+        key = item.sharedOrgId ? 'Shared' : 'Private';
+      }
+
+      const current = groups.get(key) || [];
+      current.push(item);
+      groups.set(key, current);
+    });
+
+    return groups;
+  }, [groupBy, paginatedItems]);
+
+  const openActionDialog = (mode: ActionMode) => {
+    setActionMode(mode);
+    setActionAnchor(null);
+    if (mode === 'share') {
+      setShareOrgId('');
+    }
+  };
+
+  const handleUpdateItem = async (payload: {
+    quantity?: number;
+    locationId?: number;
+    notes?: string;
+  }) => {
+    if (!actionItem) return;
+    try {
+      setActionWorking(true);
+      setError(null);
+      const sanitizedPayload = { ...payload };
+      if (
+        sanitizedPayload.locationId !== undefined &&
+        Number.isNaN(sanitizedPayload.locationId)
+      ) {
+        delete sanitizedPayload.locationId;
+      }
+      if (viewMode === 'org' && selectedOrgId) {
+        await inventoryService.updateOrgItem(
+          selectedOrgId,
+          actionItem.id,
+          sanitizedPayload,
+        );
+      } else {
+        await inventoryService.updateItem(actionItem.id, sanitizedPayload);
+      }
+      closeActionMenu();
+      await fetchInventory();
+    } finally {
+      setActionWorking(false);
+    }
+  };
+
+  const handleSplit = async (quantity: number, locationId?: number) => {
+    if (!actionItem || quantity <= 0) return;
+    try {
+      setActionWorking(true);
+      setError(null);
+      const remaining = Number(actionItem.quantity) - quantity;
+      if (remaining < 0) {
+        setError('Split quantity exceeds available amount.');
+        throw new Error('Split quantity exceeds available amount');
+      }
+      const destination = locationId ?? actionItem.locationId;
+      if (!destination) {
+        setError('Choose a destination location for the split.');
+        setActionWorking(false);
+        return;
+      }
+
+      if (viewMode === 'org' && selectedOrgId) {
+        await inventoryService.updateOrgItem(selectedOrgId, actionItem.id, {
+          quantity: remaining,
+        });
+        await inventoryService.createOrgItem(selectedOrgId, {
+          gameId: GAME_ID,
+          uexItemId: actionItem.uexItemId,
+          locationId: destination,
+          quantity,
+          notes: actionItem.notes,
+        });
+      } else {
+        await inventoryService.updateItem(actionItem.id, { quantity: remaining });
+        await inventoryService.createItem({
+          gameId: GAME_ID,
+          uexItemId: actionItem.uexItemId,
+          locationId: destination,
+          quantity,
+          notes: actionItem.notes,
+          sharedOrgId: actionItem.sharedOrgId,
+        });
+      }
+      closeActionMenu();
+      await fetchInventory();
+    } finally {
+      setActionWorking(false);
+    }
+  };
+
+  const handleShare = async (orgId: number, quantity: number) => {
+    if (!actionItem) return;
+    try {
+      setActionWorking(true);
+      setError(null);
+      const available = Number(actionItem.quantity) || 0;
+      if (quantity <= 0 || quantity > available) {
+        setError('Share quantity must be between 0 and the available amount.');
+        setActionWorking(false);
+        return;
+      }
+      await inventoryService.shareItem(actionItem.id, orgId, quantity);
+      setShareOrgId('');
+      closeActionMenu();
+      await fetchInventory();
+    } finally {
+      setActionWorking(false);
+    }
+  };
+
+  const handleUnshare = async () => {
+    if (!actionItem) return;
+    try {
+      setActionWorking(true);
+      await inventoryService.unshareItem(actionItem.id);
+      closeActionMenu();
+      await fetchInventory();
+    } finally {
+      setActionWorking(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!actionItem) return;
+    try {
+      setActionWorking(true);
+      setError(null);
+      if (viewMode === 'org' && selectedOrgId) {
+        await inventoryService.deleteOrgItem(selectedOrgId, actionItem.id);
+      } else {
+        await inventoryService.deleteItem(actionItem.id);
+      }
+      closeActionMenu();
+      await fetchInventory();
+    } finally {
+      setActionWorking(false);
+    }
+  };
+
+  const renderActionDialog = () => {
+    if (!actionMode || !actionItem) return null;
+
+    const quantityValue = Number(actionItem.quantity) || 0;
+
+    return (
+      <Box
+        sx={{
+          position: 'fixed',
+          right: 24,
+          bottom: 24,
+          width: 360,
+          bgcolor: '#1f2933',
+          borderRadius: 2,
+          boxShadow: 6,
+          p: 3,
+          border: '1px solid rgba(255,255,255,0.08)',
+          zIndex: 10,
+        }}
+      >
+        <Stack spacing={2}>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {actionMode === 'edit' && <EditIcon fontSize="small" />}
+            {actionMode === 'split' && <CallSplitIcon fontSize="small" />}
+            {actionMode === 'share' && <ShareIcon fontSize="small" />}
+            {actionMode === 'delete' && <DeleteForeverIcon fontSize="small" />}
+            {actionMode === 'edit'
+              ? 'Edit item'
+              : actionMode === 'split'
+              ? 'Split item'
+              : actionMode === 'share'
+              ? 'Share item'
+              : 'Delete item'}
+          </Typography>
+          {actionMode === 'edit' && (
+            <>
+              <TextField
+                label="Quantity"
+                type="number"
+                value={actionQuantity}
+                fullWidth
+                inputProps={{ min: 0, step: 0.01 }}
+                onChange={(e) => setActionQuantity(Number(e.target.value))}
+              />
+              <FormControl fullWidth>
+                <InputLabel id="edit-location-label">Location</InputLabel>
+                <Select
+                  labelId="edit-location-label"
+                  label="Location"
+                  value={actionItem.locationId ?? ''}
+                  onChange={(e) =>
+                    setActionItem((prev) =>
+                      prev
+                        ? { ...prev, locationId: Number(e.target.value) }
+                        : prev,
+                    )
+                  }
+                >
+                  {locationOptions.map((loc) => (
+                    <MenuItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Notes"
+                fullWidth
+                multiline
+                minRows={2}
+                value={actionItem.notes || ''}
+                onChange={(e) =>
+                  setActionItem((prev) =>
+                    prev ? { ...prev, notes: e.target.value } : prev,
+                  )
+                }
+              />
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button variant="text" onClick={closeActionMenu}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() =>
+                    handleUpdateItem({
+                      quantity: actionQuantity,
+                      locationId: Number(actionItem.locationId),
+                      notes: actionItem.notes,
+                    })
+                  }
+                  disabled={actionWorking}
+                >
+                  Save changes
+                </Button>
+              </Stack>
+            </>
+          )}
+          {actionMode === 'split' && (
+            <>
+              <Typography variant="body2" color="text.secondary">
+                Current quantity: {quantityValue.toLocaleString()}
+              </Typography>
+              <TextField
+                label="Quantity to split"
+                type="number"
+                fullWidth
+                inputProps={{ min: 0.01, max: quantityValue, step: 0.01 }}
+                value={actionQuantity}
+                onChange={(e) => setActionQuantity(Number(e.target.value))}
+              />
+              <FormControl fullWidth>
+                <InputLabel id="split-location-label">Destination</InputLabel>
+                <Select
+                  labelId="split-location-label"
+                  label="Destination"
+                  value={actionItem.locationId ?? ''}
+                  onChange={(e) =>
+                    setActionItem((prev) =>
+                      prev
+                        ? { ...prev, locationId: Number(e.target.value) }
+                        : prev,
+                    )
+                  }
+                >
+                  {locationOptions.map((loc) => (
+                    <MenuItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button variant="text" onClick={closeActionMenu}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={actionWorking}
+                  onClick={() =>
+                    handleSplit(actionQuantity, Number(actionItem.locationId))
+                  }
+                >
+                  Split
+                </Button>
+              </Stack>
+            </>
+          )}
+          {actionMode === 'share' && (
+            <>
+              <Typography variant="body2" color="text.secondary">
+                Share a quantity with an organization
+              </Typography>
+              <FormControl fullWidth>
+                <InputLabel id="share-org-label">Organization</InputLabel>
+                <Select
+                  labelId="share-org-label"
+                  label="Organization"
+                  value={shareOrgId}
+                  onChange={(e) =>
+                    setShareOrgId(
+                      e.target.value === '' ? '' : Number(e.target.value),
+                    )
+                  }
+                >
+                  {orgOptions.map((org) => (
+                    <MenuItem key={org.id} value={org.id}>
+                      {org.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Quantity to share"
+                type="number"
+                fullWidth
+                inputProps={{ min: 0.01, max: quantityValue, step: 0.01 }}
+                value={actionQuantity}
+                onChange={(e) => setActionQuantity(Number(e.target.value))}
+              />
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button variant="text" onClick={closeActionMenu}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={actionWorking || shareOrgId === ''}
+                  onClick={() =>
+                    typeof shareOrgId === 'number' &&
+                    handleShare(shareOrgId, actionQuantity)
+                  }
+                >
+                  Share
+                </Button>
+              </Stack>
+            </>
+          )}
+          {actionMode === 'delete' && (
+            <>
+              <Typography variant="body2">
+                Delete <strong>{actionItem.itemName || `Item ${actionItem.uexItemId}`}</strong>?
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                This removes the record from the inventory. You can recreate it later.
+              </Typography>
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button variant="text" onClick={closeActionMenu}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  color="error"
+                  disabled={actionWorking}
+                  onClick={handleDelete}
+                >
+                  Delete
+                </Button>
+              </Stack>
+            </>
+          )}
+        </Stack>
+      </Box>
+    );
+  };
+
+  if (!user || initialLoading) {
     return (
       <Box
         sx={{
@@ -61,7 +760,7 @@ const InventoryPage = () => {
           justifyContent: 'center',
           alignItems: 'center',
           minHeight: '100vh',
-          backgroundColor: '#1e2328',
+          backgroundColor: '#0b1118',
         }}
       >
         <CircularProgress />
@@ -70,8 +769,8 @@ const InventoryPage = () => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#1e2328' }}>
-      <AppBar position="static">
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#0b1118' }}>
+      <AppBar position="sticky" color="transparent" sx={{ backdropFilter: 'blur(6px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <Toolbar>
           <IconButton color="inherit" onClick={() => navigate('/dashboard')}>
             <ArrowBackIcon />
@@ -89,23 +788,453 @@ const InventoryPage = () => {
             }}
             onClick={() => navigate('/dashboard')}
           >
-            Inventory
+            Inventory Command
           </Typography>
+          <Chip
+            icon={<InventoryIcon />}
+            label={viewMode === 'org' ? 'Org Inventory' : 'Personal'}
+            sx={{ mr: 2 }}
+            color="primary"
+            variant="outlined"
+          />
           <IconButton color="inherit" onClick={handleLogout}>
             <LogoutIcon />
           </IconButton>
           <Avatar sx={{ width: 32, height: 32, ml: 1, bgcolor: '#4A9EFF' }}>
-            {username?.charAt(0).toUpperCase() || 'U'}
+            {user?.username?.charAt(0).toUpperCase() || 'U'}
           </Avatar>
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Typography variant="h4" sx={{ mb: 3, fontWeight: 700, color: '#e8eaed' }}>
-          My Inventory
-        </Typography>
-        <InventoryPortlet gameId={1} />
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Card
+              sx={{
+                background: 'linear-gradient(120deg, #0f1724 0%, #0f1b2c 50%, #0c1220 100%)',
+                border: '1px solid rgba(255,255,255,0.05)',
+              }}
+            >
+              <CardContent>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} md={4} lg={3}>
+                    <TextField
+                      fullWidth
+                      label="Search by name, note, or location"
+                      placeholder="Prospector, Lorville, armors..."
+                      value={filters.search}
+                      onChange={(e) =>
+                        setFilters((prev) => ({ ...prev, search: e.target.value }))
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <FormControl fullWidth>
+                      <InputLabel id="category-filter-label">Category</InputLabel>
+                      <Select
+                        labelId="category-filter-label"
+                        label="Category"
+                        value={filters.categoryId}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            categoryId:
+                              e.target.value === '' ? '' : Number(e.target.value),
+                          }))
+                        }
+                      >
+                        <MenuItem value="">
+                          <em>All</em>
+                        </MenuItem>
+                        {categories.map((category) => (
+                          <MenuItem key={category.id} value={category.id}>
+                            {category.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <FormControl fullWidth>
+                      <InputLabel id="location-filter-label">Location</InputLabel>
+                      <Select
+                        labelId="location-filter-label"
+                        label="Location"
+                        value={filters.locationId}
+                        onChange={(e) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            locationId:
+                              e.target.value === '' ? '' : Number(e.target.value),
+                          }))
+                        }
+                      >
+                        <MenuItem value="">
+                          <em>All</em>
+                        </MenuItem>
+                        {locationOptions.map((loc) => (
+                          <MenuItem key={loc.id} value={loc.id}>
+                            {loc.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={12} md={4} lg={3}>
+                    <Box sx={{ px: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Value (quantity) range
+                      </Typography>
+                      <Slider
+                        value={filters.valueRange}
+                        min={0}
+                        max={Math.max(filters.valueRange[1], maxQuantity || 1000)}
+                        onChange={(_, value) =>
+                          setFilters((prev) => ({
+                            ...prev,
+                            valueRange: value as [number, number],
+                          }))
+                        }
+                        valueLabelDisplay="auto"
+                        getAriaValueText={valueText}
+                      />
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={2} lg={2}>
+                    <FormControl fullWidth>
+                      <InputLabel id="org-selector-label">View</InputLabel>
+                      <Select
+                        labelId="org-selector-label"
+                        label="View"
+                        value={viewMode === 'personal' ? 'personal' : selectedOrgId ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === 'personal') {
+                            setViewMode('personal');
+                            setSelectedOrgId(null);
+                          } else {
+                            setViewMode('org');
+                            setSelectedOrgId(Number(value));
+                          }
+                        }}
+                      >
+                        <MenuItem value="personal">
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Avatar sx={{ width: 24, height: 24 }}>
+                              {user.username.charAt(0).toUpperCase()}
+                            </Avatar>
+                            <ListItemText primary="My Inventory" />
+                          </Stack>
+                        </MenuItem>
+                        {orgOptions.map((org) => (
+                          <MenuItem key={org.id} value={org.id}>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <ApartmentIcon fontSize="small" />
+                              <ListItemText primary={org.name} />
+                            </Stack>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+
+                <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.06)' }} />
+
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={filters.sharedOnly}
+                          onChange={(e) =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              sharedOnly: e.target.checked,
+                            }))
+                          }
+                          size="small"
+                          disabled={viewMode === 'org'}
+                        />
+                      }
+                      label="Shared only"
+                    />
+                  </Grid>
+                  <Grid item>
+                    <Button
+                      startIcon={<SortIcon />}
+                      variant="outlined"
+                      color="inherit"
+                      onClick={() =>
+                        setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
+                      }
+                    >
+                      Sort: {sortBy} ({sortDir})
+                    </Button>
+                  </Grid>
+                  <Grid item>
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel id="sort-by-label">Sort By</InputLabel>
+                      <Select
+                        labelId="sort-by-label"
+                        label="Sort By"
+                        value={sortBy}
+                        onChange={(e) =>
+                          setSortBy(e.target.value as 'name' | 'quantity' | 'location' | 'date')
+                        }
+                      >
+                        <MenuItem value="date">Last updated</MenuItem>
+                        <MenuItem value="name">Name</MenuItem>
+                        <MenuItem value="quantity">Quantity</MenuItem>
+                        <MenuItem value="location">Location</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item>
+                    <FormControl size="small" sx={{ minWidth: 180 }}>
+                      <InputLabel id="group-by-label">Group By</InputLabel>
+                      <Select
+                        labelId="group-by-label"
+                        label="Group By"
+                        value={groupBy}
+                        onChange={(e) =>
+                          setGroupBy(e.target.value as 'none' | 'category' | 'location' | 'share')
+                        }
+                        startAdornment={<GroupWorkIcon sx={{ mr: 1 }} />}
+                      >
+                        <MenuItem value="none">No grouping</MenuItem>
+                        <MenuItem value="category">Category</MenuItem>
+                        <MenuItem value="location">Location</MenuItem>
+                        <MenuItem value="share">Share status</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item>
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      startIcon={<FilterAltIcon />}
+                      onClick={() =>
+                        setFilters({
+                          search: '',
+                          categoryId: '',
+                          locationId: '',
+                          sharedOnly: false,
+                          valueRange: [0, maxQuantity || 100000],
+                        })
+                      }
+                    >
+                      Clear filters
+                    </Button>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12}>
+            <Card sx={{ backgroundColor: '#0e1520', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <CardContent>
+                {refreshing && (
+                  <LinearProgress sx={{ mb: 2 }} color="primary" />
+                )}
+                {error && (
+                  <Box
+                    sx={{
+                      backgroundColor: 'rgba(255,99,71,0.08)',
+                      border: '1px solid rgba(255,99,71,0.2)',
+                      borderRadius: 2,
+                      p: 2,
+                      mb: 2,
+                    }}
+                  >
+                    <Typography color="error">{error}</Typography>
+                  </Box>
+                )}
+                {filteredItems.length === 0 && !refreshing ? (
+                  <Box sx={{ textAlign: 'center', py: 8 }}>
+                    <InventoryIcon sx={{ fontSize: 42, color: '#4A9EFF' }} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                      No inventory matches your filters
+                    </Typography>
+                    <Typography color="text.secondary">
+                      Adjust filters or sync new items to get started.
+                    </Typography>
+                  </Box>
+                ) : (
+                  <>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={2}
+                      sx={{ mb: 2, color: '#9aa0a6' }}
+                    >
+                      <ViewAgendaIcon fontSize="small" />
+                      <Typography variant="body2">
+                        Showing {paginatedItems.length.toLocaleString()} of{' '}
+                        {filteredItems.length.toLocaleString()} items
+                      </Typography>
+                    </Stack>
+                    <Stack spacing={2}>
+                      {Array.from(groupedItems.entries()).map(([group, groupItems]) => (
+                        <Box key={group} sx={{ border: '1px solid rgba(255,255,255,0.04)', borderRadius: 2 }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              px: 2,
+                              py: 1.5,
+                              backgroundColor: 'rgba(255,255,255,0.02)',
+                            }}
+                          >
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Chip
+                                size="small"
+                                label={group}
+                                color="primary"
+                                variant="outlined"
+                              />
+                              <Typography variant="body2" color="text.secondary">
+                                {groupItems.length} item{groupItems.length === 1 ? '' : 's'}
+                              </Typography>
+                            </Stack>
+                          </Box>
+                          <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
+                          <Stack divider={<Divider flexItem sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />}>
+                            {groupItems.map((item) => (
+                              <Box
+                                key={item.id}
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: { xs: '1fr', md: '2fr 1fr 1fr 1fr auto' },
+                                  gap: 2,
+                                  alignItems: 'center',
+                                  px: 2,
+                                  py: 1.5,
+                                }}
+                              >
+                                <Stack spacing={0.5}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                    {item.itemName || `Item #${item.uexItemId}`}
+                                  </Typography>
+                                  <Stack direction="row" spacing={1} alignItems="center">
+                                    <Chip
+                                      label={item.categoryName || 'General'}
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                    {item.sharedOrgId && (
+                                      <Chip
+                                        size="small"
+                                        color="primary"
+                                        variant="outlined"
+                                        label={item.sharedOrgName || 'Shared'}
+                                      />
+                                    )}
+                                  </Stack>
+                                </Stack>
+                                <Stack spacing={0.5}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Location
+                                  </Typography>
+                                  <Typography variant="body1">
+                                    {item.locationName || 'Unknown'}
+                                  </Typography>
+                                </Stack>
+                                <Stack spacing={0.5}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Quantity
+                                  </Typography>
+                                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                    {Number(item.quantity).toLocaleString()}
+                                  </Typography>
+                                </Stack>
+                                <Stack spacing={0.5}>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Updated
+                                  </Typography>
+                                  <Typography variant="body1">
+                                    {new Date(item.dateModified || item.dateAdded || '').toLocaleDateString()}
+                                  </Typography>
+                                </Stack>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                  <Tooltip title="Actions">
+                                    <IconButton onClick={(e) => handleActionOpen(e, item)}>
+                                      <MoreVertIcon />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              </Box>
+                            ))}
+                          </Stack>
+                        </Box>
+                      ))}
+                    </Stack>
+                    <TablePagination
+                      component="div"
+                      count={filteredItems.length}
+                      page={page}
+                      onPageChange={(_, newPage) => setPage(newPage)}
+                      rowsPerPage={rowsPerPage}
+                      onRowsPerPageChange={(event) => {
+                        setRowsPerPage(parseInt(event.target.value, 10));
+                        setPage(0);
+                      }}
+                      rowsPerPageOptions={[10, 25, 50, 100]}
+                      sx={{ mt: 2 }}
+                    />
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       </Container>
+
+      <Menu
+        anchorEl={actionAnchor}
+        open={Boolean(actionAnchor)}
+        onClose={closeActionMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <MenuItem onClick={() => openActionDialog('edit')}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => openActionDialog('split')}>
+          <ListItemIcon>
+            <CallSplitIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Split</ListItemText>
+        </MenuItem>
+        {viewMode === 'personal' && (
+          <MenuItem onClick={() => openActionDialog('share')}>
+            <ListItemIcon>
+              <ShareIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Share</ListItemText>
+          </MenuItem>
+        )}
+        {viewMode === 'personal' && actionItem?.sharedOrgId && (
+          <MenuItem onClick={handleUnshare}>
+            <ListItemIcon>
+              <UnpublishedIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Unshare</ListItemText>
+          </MenuItem>
+        )}
+        <MenuItem onClick={() => openActionDialog('delete')}>
+          <ListItemIcon>
+            <DeleteForeverIcon fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText>Delete</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {renderActionDialog()}
     </Box>
   );
 };

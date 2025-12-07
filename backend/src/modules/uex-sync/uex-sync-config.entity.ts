@@ -11,40 +11,51 @@ import { UexSyncState } from './uex-sync-state.entity';
 
 @Entity('uex_sync_config')
 export class UexSyncConfig {
-  @PrimaryColumn({ type: 'varchar', length: 100 })
+  @PrimaryColumn({ name: 'endpoint_name', type: 'varchar', length: 100 })
   endpointName!: string;
 
   @OneToOne(() => UexSyncState)
-  @JoinColumn({ name: 'endpointName' })
+  @JoinColumn({ name: 'endpoint_name' })
   syncState?: UexSyncState;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'enabled', type: 'boolean', default: true })
   enabled!: boolean;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ name: 'delta_sync_enabled', type: 'boolean', default: true })
   deltaSyncEnabled!: boolean;
 
-  @Column({ type: 'int', default: 7 })
+  @Column({ name: 'full_sync_interval_days', type: 'int', default: 7 })
   fullSyncIntervalDays!: number;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'sync_schedule_cron',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   syncScheduleCron?: string;
 
-  @Column({ type: 'int', default: 100 })
+  @Column({ name: 'rate_limit_calls_per_hour', type: 'int', default: 100 })
   rateLimitCallsPerHour!: number;
 
-  @Column({ type: 'int', default: 300 })
+  @Column({ name: 'timeout_seconds', type: 'int', default: 300 })
   timeoutSeconds!: number;
 
-  @Column({ type: 'int', default: 3 })
+  @Column({ name: 'retry_attempts', type: 'int', default: 3 })
   retryAttempts!: number;
 
-  @Column({ type: 'decimal', precision: 3, scale: 2, default: 2.0 })
+  @Column({
+    name: 'retry_backoff_multiplier',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 2.0,
+  })
   retryBackoffMultiplier!: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'date_added' })
   dateAdded!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'date_modified' })
   dateModified!: Date;
 }

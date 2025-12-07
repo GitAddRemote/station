@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { ItemsSyncService } from './items-sync.service';
 import { UexItem } from '../../uex/entities/uex-item.entity';
 import { UexCategory } from '../../uex/entities/uex-category.entity';
+import { UexCompany } from '../../uex/entities/uex-company.entity';
 import { UexSyncService } from '../uex-sync.service';
 import { SystemUserService } from '../../users/system-user.service';
 import { UEXItemsClient } from '../clients/uex-items.client';
@@ -16,6 +17,7 @@ describe('ItemsSyncService', () => {
   let service: ItemsSyncService;
   let mockItemRepository: any;
   let mockCategoryRepository: any;
+  let mockCompanyRepository: any;
   let mockUexClient: any;
   let mockSyncService: any;
   let mockSystemUserService: any;
@@ -26,12 +28,18 @@ describe('ItemsSyncService', () => {
       save: jest.fn(),
       update: jest.fn(),
       manager: {
-        transaction: jest.fn(),
+        transaction: jest
+          .fn()
+          .mockImplementation(async (cb) => cb(mockItemRepository.manager)),
       },
     };
 
     mockCategoryRepository = {
       find: jest.fn(),
+    };
+
+    mockCompanyRepository = {
+      find: jest.fn().mockResolvedValue([]),
     };
 
     mockUexClient = {
@@ -60,6 +68,10 @@ describe('ItemsSyncService', () => {
         {
           provide: getRepositoryToken(UexCategory),
           useValue: mockCategoryRepository,
+        },
+        {
+          provide: getRepositoryToken(UexCompany),
+          useValue: mockCompanyRepository,
         },
         {
           provide: UEXItemsClient,
