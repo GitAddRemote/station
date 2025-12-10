@@ -27,9 +27,17 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItemButton,
+  Radio,
   TablePagination,
   Tooltip,
   LinearProgress,
+  Alert,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -46,6 +54,8 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import ApartmentIcon from '@mui/icons-material/Apartment';
 import { inventoryService, InventoryCategory, InventoryItem, OrgInventoryItem } from '../services/inventory.service';
+import { uexService, CatalogItem } from '../services/uex.service';
+import SystemLocationSelector, { SystemLocationValue } from '../components/location/SystemLocationSelector';
 import { useDebounce } from '../hooks/useDebounce';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
@@ -73,6 +83,23 @@ const InventoryPage = () => {
   const [actionWorking, setActionWorking] = useState(false);
   const [shareOrgId, setShareOrgId] = useState<number | ''>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogCategoryId, setCatalogCategoryId] = useState<number | ''>('');
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [catalogTotal, setCatalogTotal] = useState(0);
+  const [catalogPage, setCatalogPage] = useState(0);
+  const [catalogRowsPerPage, setCatalogRowsPerPage] = useState(10);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
+  const [destinationSelection, setDestinationSelection] = useState<SystemLocationValue>({
+    systemId: '',
+    locationId: '',
+  });
+  const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
+  const [newItemNotes, setNewItemNotes] = useState('');
+  const [addSubmitting, setAddSubmitting] = useState(false);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -88,6 +115,7 @@ const InventoryPage = () => {
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const debouncedSearch = useDebounce(filters.search, 350);
+  const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -153,6 +181,30 @@ const InventoryPage = () => {
     },
     [],
   );
+
+  const fetchCatalog = useCallback(async () => {
+    try {
+      setCatalogError(null);
+      setCatalogLoading(true);
+      const params = {
+        search: debouncedCatalogSearch || undefined,
+        categoryId:
+          typeof catalogCategoryId === 'number' ? catalogCategoryId : undefined,
+        limit: catalogRowsPerPage,
+        offset: catalogPage * catalogRowsPerPage,
+      };
+      const data = await uexService.searchItems(params);
+      setCatalogItems(data.items);
+      setCatalogTotal(data.total);
+    } catch (err) {
+      console.error('Error searching catalog', err);
+      setCatalogError('Unable to load catalog items right now.');
+      setCatalogItems([]);
+      setCatalogTotal(0);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, [debouncedCatalogSearch, catalogCategoryId, catalogRowsPerPage, catalogPage]);
 
   const fetchInventory = useCallback(async () => {
     if (!user) {
@@ -252,6 +304,87 @@ const InventoryPage = () => {
     initialLoading,
   ]);
 
+  const openAddDialog = () => {
+    setAddDialogOpen(true);
+    setSelectedCatalogItem(null);
+    setCatalogSearch('');
+    setCatalogCategoryId('');
+    setCatalogPage(0);
+    setDestinationSelection({ systemId: '', locationId: '' });
+    setNewItemQuantity(1);
+    setNewItemNotes('');
+    setCatalogError(null);
+    setAddSubmitting(false);
+  };
+
+  const closeAddDialog = () => {
+    setAddDialogOpen(false);
+  };
+
+  const handleCreateInventoryItem = async () => {
+    if (!selectedCatalogItem) {
+      setCatalogError('Select an item to add.');
+      return;
+    }
+    if (destinationSelection.locationId === '') {
+      setCatalogError('Select a location.');
+      return;
+    }
+    if (newItemQuantity <= 0) {
+      setCatalogError('Quantity must be greater than 0.');
+      return;
+    }
+
+    try {
+      setAddSubmitting(true);
+      setCatalogError(null);
+      const numericLocationId = Number(destinationSelection.locationId);
+      const existing = items.find(
+        (item) =>
+          item.uexItemId === selectedCatalogItem.uexId &&
+          item.locationId === numericLocationId,
+      );
+
+      if (existing) {
+        const shouldMerge = window.confirm(
+          'An item with this location already exists. Merge quantities?',
+        );
+        if (shouldMerge) {
+          const newQuantity =
+            (Number(existing.quantity) || 0) + Number(newItemQuantity);
+          await inventoryService.updateItem(existing.id, {
+            quantity: newQuantity,
+            locationId: numericLocationId,
+          });
+        } else {
+          await inventoryService.createItem({
+            gameId: GAME_ID,
+            uexItemId: selectedCatalogItem.uexId,
+            locationId: numericLocationId,
+            quantity: newItemQuantity,
+            notes: newItemNotes || undefined,
+          });
+        }
+      } else {
+        await inventoryService.createItem({
+          gameId: GAME_ID,
+          uexItemId: selectedCatalogItem.uexId,
+          locationId: numericLocationId,
+          quantity: newItemQuantity,
+          notes: newItemNotes || undefined,
+        });
+      }
+
+      closeAddDialog();
+      await fetchInventory();
+    } catch (err) {
+      console.error('Error adding inventory item', err);
+      setCatalogError('Unable to add item right now.');
+    } finally {
+      setAddSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     fetchProfile();
     fetchCategories();
@@ -272,6 +405,16 @@ const InventoryPage = () => {
   useEffect(() => {
     setPage(0);
   }, [debouncedSearch, filters.categoryId, filters.locationId, filters.sharedOnly, filters.valueRange, viewMode, selectedOrgId]);
+
+  useEffect(() => {
+    setCatalogPage(0);
+  }, [debouncedCatalogSearch, catalogCategoryId]);
+
+  useEffect(() => {
+    if (addDialogOpen) {
+      fetchCatalog();
+    }
+  }, [addDialogOpen, fetchCatalog]);
 
   useEffect(() => {
     if (actionMode && actionItem) {
@@ -970,6 +1113,13 @@ const InventoryPage = () => {
                       Clear filters
                     </Button>
                   </Grid>
+                  {viewMode === 'personal' && (
+                    <Grid item>
+                      <Button variant="contained" onClick={openAddDialog}>
+                        Add item
+                      </Button>
+                    </Grid>
+                  )}
                 </Grid>
               </CardContent>
             </Card>
@@ -1134,6 +1284,134 @@ const InventoryPage = () => {
           </Grid>
         </Grid>
       </Container>
+
+      <Dialog
+        open={addDialogOpen}
+        onClose={closeAddDialog}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>Add inventory item</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            {catalogError && <Alert severity="error">{catalogError}</Alert>}
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Search catalog"
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel id="catalog-category-label">Category</InputLabel>
+                  <Select
+                    labelId="catalog-category-label"
+                    label="Category"
+                    value={catalogCategoryId}
+                    onChange={(e) =>
+                      setCatalogCategoryId(
+                        e.target.value === '' ? '' : Number(e.target.value),
+                      )
+                    }
+                  >
+                    <MenuItem value="">
+                      <em>All</em>
+                    </MenuItem>
+                    {categories.map((category) => (
+                      <MenuItem key={category.id} value={category.id}>
+                        {category.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <SystemLocationSelector
+                  value={destinationSelection}
+                  onChange={setDestinationSelection}
+                  gameId={GAME_ID}
+                />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField
+                  fullWidth
+                  label="Quantity"
+                  type="number"
+                  inputProps={{ min: 0.01, step: 0.01 }}
+                  value={newItemQuantity}
+                  onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                />
+              </Grid>
+              <Grid item xs={12} sm={3}>
+                <TextField
+                  fullWidth
+                  label="Notes"
+                  value={newItemNotes}
+                  onChange={(e) => setNewItemNotes(e.target.value)}
+                />
+              </Grid>
+            </Grid>
+
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Catalog results
+            </Typography>
+            {catalogLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                <CircularProgress size={28} />
+              </Box>
+            ) : catalogItems.length === 0 ? (
+              <Typography color="text.secondary">
+                No catalog items found with these filters.
+              </Typography>
+            ) : (
+              <List disablePadding>
+                {catalogItems.map((item) => (
+                  <ListItemButton
+                    key={item.id}
+                    selected={selectedCatalogItem?.id === item.id}
+                    onClick={() => setSelectedCatalogItem(item)}
+                  >
+                    <ListItemIcon>
+                      <Radio checked={selectedCatalogItem?.id === item.id} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.name}
+                      secondary={item.categoryName || 'Uncategorized'}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            )}
+            <TablePagination
+              component="div"
+              count={catalogTotal}
+              page={catalogPage}
+              onPageChange={(_, newPage) => setCatalogPage(newPage)}
+              rowsPerPage={catalogRowsPerPage}
+              onRowsPerPageChange={(event) => {
+                setCatalogRowsPerPage(parseInt(event.target.value, 10));
+                setCatalogPage(0);
+              }}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeAddDialog} disabled={addSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateInventoryItem}
+            disabled={addSubmitting || !selectedCatalogItem}
+          >
+            Add to inventory
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Menu
         anchorEl={actionAnchor}

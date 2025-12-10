@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsString,
   IsBoolean,
@@ -117,7 +118,9 @@ export class UpdateLocationDto {
 
 export class LocationSearchDto {
   @IsInt()
-  gameId!: number;
+  @IsOptional()
+  @Type(() => Number)
+  gameId?: number;
 
   @IsEnum(LocationType)
   @IsOptional()
@@ -129,5 +132,6 @@ export class LocationSearchDto {
 
   @IsInt()
   @IsOptional()
+  @Type(() => Number)
   limit?: number;
 }

@@ -80,6 +80,23 @@ export class LocationPopulationService {
       where: { deleted: false, active: true },
     });
 
+    if (systems.length === 0) {
+      this.logger.warn('No in-game star systems found to populate');
+    }
+
+    const inGameSystemIds = systems.map((system) => system.uexId);
+
+    if (inGameSystemIds.length > 0) {
+      await this.locationRepository
+        .createQueryBuilder()
+        .update(Location)
+        .set({ active: false })
+        .where('location_type = :type', { type: LocationType.STAR_SYSTEM })
+        .andWhere('deleted = FALSE')
+        .andWhere('star_system_id NOT IN (:...ids)', { ids: inGameSystemIds })
+        .execute();
+    }
+
     for (const system of systems) {
       const existing = await this.locationRepository.findOne({
         where: {
@@ -89,12 +106,14 @@ export class LocationPopulationService {
       });
 
       const hierarchyPath = JSON.stringify({ system: system.name });
+      const isActive = system.active;
 
       if (existing) {
         existing.displayName = system.name;
         existing.shortName = system.name;
         existing.hierarchyPath = hierarchyPath;
         existing.isAvailable = system.isAvailable;
+        existing.active = isActive;
         existing.modifiedById = systemUserId;
         existing.dateModified = new Date();
 
@@ -109,7 +128,7 @@ export class LocationPopulationService {
           shortName: system.name,
           hierarchyPath,
           isAvailable: system.isAvailable,
-          active: true,
+          active: isActive,
           deleted: false,
           addedById: systemUserId,
           modifiedById: systemUserId,

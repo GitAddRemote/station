@@ -192,6 +192,44 @@ describe('LocationsSyncService', () => {
       );
     }, 20000);
 
+    it('should map numeric visibility/availability flags to booleans', async () => {
+      const mockSystems = [
+        {
+          id: 2,
+          name: 'Pyro',
+          code: 'PY',
+          is_available: 0,
+          is_visible: 0,
+        },
+      ];
+
+      mockUexClient.fetchStarSystems.mockResolvedValue(mockSystems);
+      mockStarSystemRepository.findOne.mockResolvedValue(null);
+      mockStarSystemRepository.save.mockResolvedValue({ id: 2 });
+
+      mockUexClient.fetchPlanets.mockResolvedValue([]);
+      mockUexClient.fetchMoons.mockResolvedValue([]);
+      mockUexClient.fetchCities.mockResolvedValue([]);
+      mockUexClient.fetchSpaceStations.mockResolvedValue([]);
+      mockUexClient.fetchOutposts.mockResolvedValue([]);
+      mockUexClient.fetchPOI.mockResolvedValue([]);
+
+      mockSyncService.shouldUseDeltaSync.mockResolvedValue({
+        useDelta: false,
+        reason: 'FIRST_SYNC',
+      });
+
+      await service.syncAllLocations();
+
+      expect(mockStarSystemRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uexId: 2,
+          active: false,
+          isAvailable: false,
+        }),
+      );
+    }, 20000);
+
     it('should update existing planets', async () => {
       const mockPlanets = [
         {
