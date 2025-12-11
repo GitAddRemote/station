@@ -11,6 +11,7 @@ import { LocationType } from '../entities/location.entity';
 export class LocationDto {
   id!: string;
   gameId!: number;
+  starSystemId?: number;
   locationType!: LocationType;
   displayName!: string;
   shortName!: string;
@@ -134,4 +135,9 @@ export class LocationSearchDto {
   @IsOptional()
   @Type(() => Number)
   limit?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  starSystemId?: number;
 }

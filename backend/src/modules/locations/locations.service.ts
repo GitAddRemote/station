@@ -39,6 +39,12 @@ export class LocationsService {
 
     queryBuilder.where(where);
 
+    if (searchDto.starSystemId) {
+      queryBuilder.andWhere('location.star_system_id = :starSystemId', {
+        starSystemId: searchDto.starSystemId,
+      });
+    }
+
     if (searchDto.search) {
       queryBuilder.andWhere(
         '(location.display_name ILIKE :search OR location.short_name ILIKE :search)',
@@ -167,6 +173,7 @@ export class LocationsService {
     return {
       id: location.id.toString(),
       gameId: location.gameId,
+      starSystemId: location.starSystemId,
       locationType: location.locationType,
       displayName: location.displayName,
       shortName: location.shortName,

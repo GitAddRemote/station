@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -55,7 +56,8 @@ import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import ApartmentIcon from '@mui/icons-material/Apartment';
 import { inventoryService, InventoryCategory, InventoryItem, OrgInventoryItem } from '../services/inventory.service';
 import { uexService, CatalogItem } from '../services/uex.service';
-import SystemLocationSelector, { SystemLocationValue } from '../components/location/SystemLocationSelector';
+import { locationCache } from '../services/locationCache';
+import type { SystemLocationValue } from '../components/location/SystemLocationSelector';
 import { useDebounce } from '../hooks/useDebounce';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
@@ -65,8 +67,14 @@ const GAME_ID = 1;
 
 const valueText = (value: number) => `${value.toLocaleString()} qty`;
 
+const LazySystemLocationSelector = lazy(() => import('../components/location/SystemLocationSelector'));
+
 const InventoryPage = () => {
   const navigate = useNavigate();
+  const addSearchRef = useRef<HTMLInputElement | null>(null);
+  const firstCatalogItemRef = useRef<HTMLDivElement | null>(null);
+  const catalogItemRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const systemSelectRef = useRef<HTMLInputElement | null>(null);
   const [user, setUser] = useState<{ userId: number; username: string } | null>(null);
   const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
@@ -113,6 +121,14 @@ const InventoryPage = () => {
   const [groupBy, setGroupBy] = useState<'none' | 'category' | 'location' | 'share'>('none');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [density, setDensity] = useState<'standard' | 'compact'>('standard');
+  const itemGridTemplate = useMemo(
+    () =>
+      density === 'compact'
+        ? { xs: '1fr', md: '2fr 1fr 0.8fr 0.8fr auto' }
+        : { xs: '1fr', md: '2fr 1fr 1fr 1fr auto' },
+    [density],
+  );
 
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
@@ -196,6 +212,15 @@ const InventoryPage = () => {
       const data = await uexService.searchItems(params);
       setCatalogItems(data.items);
       setCatalogTotal(data.total);
+      setSelectedCatalogItem((prev) => {
+        if (data.items.length === 0) {
+          return null;
+        }
+        if (!prev || !data.items.some((item) => item.id === prev.id)) {
+          return data.items[0];
+        }
+        return prev;
+      });
     } catch (err) {
       console.error('Error searching catalog', err);
       setCatalogError('Unable to load catalog items right now.');
@@ -321,7 +346,7 @@ const InventoryPage = () => {
     setAddDialogOpen(false);
   };
 
-  const handleCreateInventoryItem = async () => {
+  const handleCreateInventoryItem = async (options?: { stayOpen?: boolean }) => {
     if (!selectedCatalogItem) {
       setCatalogError('Select an item to add.');
       return;
@@ -375,8 +400,14 @@ const InventoryPage = () => {
         });
       }
 
-      closeAddDialog();
       await fetchInventory();
+      if (options?.stayOpen) {
+        setNewItemQuantity(1);
+        setNewItemNotes('');
+        setCatalogError(null);
+      } else {
+        closeAddDialog();
+      }
     } catch (err) {
       console.error('Error adding inventory item', err);
       setCatalogError('Unable to add item right now.');
@@ -389,6 +420,12 @@ const InventoryPage = () => {
     fetchProfile();
     fetchCategories();
   }, [fetchProfile, fetchCategories]);
+
+  useEffect(() => {
+    locationCache.prefetch(GAME_ID).catch((err) => {
+      console.error('Error preloading systems/locations', err);
+    });
+  }, []);
 
   useEffect(() => {
     if (user?.userId) {
@@ -415,6 +452,17 @@ const InventoryPage = () => {
       fetchCatalog();
     }
   }, [addDialogOpen, fetchCatalog]);
+
+  useEffect(() => {
+    if (!addDialogOpen) return;
+    const handle = window.requestAnimationFrame(() => {
+      if (addSearchRef.current) {
+        addSearchRef.current.focus();
+        addSearchRef.current.select();
+      }
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [addDialogOpen]);
 
   useEffect(() => {
     if (actionMode && actionItem) {
@@ -838,6 +886,67 @@ const InventoryPage = () => {
     );
   };
 
+  const addReady = Boolean(
+    selectedCatalogItem &&
+    destinationSelection.locationId !== '' &&
+    newItemQuantity > 0,
+  );
+
+  const handleAddKeyDown = (event: KeyboardEvent) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && addReady) {
+      event.preventDefault();
+      handleCreateInventoryItem({ stayOpen: true });
+    }
+  };
+
+  const handleCatalogSearchKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Tab' && !event.shiftKey) {
+      if (firstCatalogItemRef.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        firstCatalogItemRef.current.focus();
+      }
+    }
+  };
+
+  const handleCatalogListKeyDown = (event: React.KeyboardEvent) => {
+    if (!catalogItems.length) return;
+
+    const foundIndex = selectedCatalogItem
+      ? catalogItems.findIndex((item) => item.id === selectedCatalogItem.id)
+      : 0;
+    const safeIndex = foundIndex >= 0 ? foundIndex : 0;
+    const focusItem = (index: number) => {
+      const target = catalogItems[index];
+      if (!target) return;
+      setSelectedCatalogItem(target);
+      const ref = catalogItemRefs.current[index];
+      if (ref) {
+        ref.focus();
+      }
+    };
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      const next = Math.min(catalogItems.length - 1, safeIndex + 1);
+      focusItem(next);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      const prev = Math.max(0, safeIndex - 1);
+      focusItem(prev);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (selectedCatalogItem) {
+        handleCreateInventoryItem({ stayOpen: true });
+      }
+    } else if (event.key === 'Tab' && !event.shiftKey) {
+      if (systemSelectRef.current) {
+        event.preventDefault();
+        systemSelectRef.current.focus();
+      }
+    }
+  };
+
   if (!user || initialLoading) {
     return (
       <Box
@@ -1113,6 +1222,22 @@ const InventoryPage = () => {
                       Clear filters
                     </Button>
                   </Grid>
+                  <Grid item>
+                    <FormControl size="small" sx={{ minWidth: 160 }}>
+                      <InputLabel id="density-select-label">View mode</InputLabel>
+                      <Select
+                        labelId="density-select-label"
+                        label="View mode"
+                        value={density}
+                        onChange={(e) =>
+                          setDensity(e.target.value as 'standard' | 'compact')
+                        }
+                      >
+                        <MenuItem value="standard">Standard</MenuItem>
+                        <MenuItem value="compact">Compact</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
                   {viewMode === 'personal' && (
                     <Grid item>
                       <Button variant="contained" onClick={openAddDialog}>
@@ -1168,16 +1293,57 @@ const InventoryPage = () => {
                         {totalCount.toLocaleString()} items
                       </Typography>
                     </Stack>
+                    {density === 'compact' && (
+                      <Box
+                        sx={{
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 2,
+                          backgroundColor: '#0e1520',
+                          px: 1.5,
+                          py: 0.75,
+                          borderTop: '1px solid rgba(255,255,255,0.04)',
+                          borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: itemGridTemplate,
+                            alignItems: 'center',
+                            color: 'text.secondary',
+                            fontSize: 12,
+                            letterSpacing: 0.2,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          <Typography variant="caption">Item</Typography>
+                          <Typography variant="caption">Location</Typography>
+                          <Typography variant="caption">Quantity</Typography>
+                          <Typography variant="caption">Updated</Typography>
+                          <Typography variant="caption" textAlign="right">
+                            Actions
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
                     <Stack spacing={2}>
                       {Array.from(groupedItems.entries()).map(([group, groupItems]) => (
-                        <Box key={group} sx={{ border: '1px solid rgba(255,255,255,0.04)', borderRadius: 2 }}>
+                        <Box
+                          key={group}
+                          sx={{
+                            border: '1px solid rgba(255,255,255,0.04)',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                          }}
+                        >
                           <Box
                             sx={{
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'space-between',
-                              px: 2,
-                              py: 1.5,
+                              px: density === 'compact' ? 1.5 : 2,
+                              py: density === 'compact' ? 1 : 1.5,
                               backgroundColor: 'rgba(255,255,255,0.02)',
                             }}
                           >
@@ -1194,32 +1360,51 @@ const InventoryPage = () => {
                             </Stack>
                           </Box>
                           <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
-                          <Stack divider={<Divider flexItem sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />}>
-                            {groupItems.map((item) => (
-                              <Box
-                                key={item.id}
-                                sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: { xs: '1fr', md: '2fr 1fr 1fr 1fr auto' },
-                                  gap: 2,
-                                  alignItems: 'center',
-                                  px: 2,
-                                  py: 1.5,
+                            <Stack
+                              divider={
+                                <Divider flexItem sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
+                              }
+                            >
+                              {groupItems.map((item) => (
+                                <Box
+                                  key={item.id}
+                                  sx={{
+                                    display: 'grid',
+                                    gridTemplateColumns: itemGridTemplate,
+                                  gap: density === 'compact' ? 0.75 : 2,
+                                  alignItems: density === 'compact' ? 'center' : 'center',
+                                  px: density === 'compact' ? 1.25 : 2,
+                                  py: density === 'compact' ? 0.6 : 1.5,
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255,255,255,0.02)',
+                                  },
                                 }}
                               >
-                                <Stack spacing={0.5}>
-                                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                    {item.itemName || `Item #${item.uexItemId}`}
-                                  </Typography>
-                                  <Stack direction="row" spacing={1} alignItems="center">
+                                <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+                                  <Stack
+                                    direction="row"
+                                    spacing={density === 'compact' ? 0.5 : 1}
+                                    alignItems="center"
+                                    flexWrap="wrap"
+                                    columnGap={density === 'compact' ? 0.75 : 1}
+                                    rowGap={density === 'compact' ? 0.25 : 0.5}
+                                  >
+                                    <Typography
+                                      variant={density === 'compact' ? 'body2' : 'subtitle1'}
+                                      sx={{ fontWeight: 600 }}
+                                      noWrap
+                                      title={item.itemName || `Item #${item.uexItemId}`}
+                                    >
+                                      {item.itemName || `Item #${item.uexItemId}`}
+                                    </Typography>
                                     <Chip
                                       label={item.categoryName || 'General'}
-                                      size="small"
+                                      size={density === 'compact' ? 'small' : 'medium'}
                                       variant="outlined"
                                     />
                                     {item.sharedOrgId && (
                                       <Chip
-                                        size="small"
+                                        size={density === 'compact' ? 'small' : 'medium'}
                                         color="primary"
                                         variant="outlined"
                                         label={item.sharedOrgName || 'Shared'}
@@ -1227,27 +1412,36 @@ const InventoryPage = () => {
                                     )}
                                   </Stack>
                                 </Stack>
-                                <Stack spacing={0.5}>
-                                  <Typography variant="body2" color="text.secondary">
-                                    Location
-                                  </Typography>
-                                  <Typography variant="body1">
+                                <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+                                  {density !== 'compact' && (
+                                    <Typography variant="body2" color="text.secondary">
+                                      Location
+                                    </Typography>
+                                  )}
+                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {item.locationName || 'Unknown'}
                                   </Typography>
                                 </Stack>
-                                <Stack spacing={0.5}>
-                                  <Typography variant="body2" color="text.secondary">
-                                    Quantity
-                                  </Typography>
-                                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+                                  {density !== 'compact' && (
+                                    <Typography variant="body2" color="text.secondary">
+                                      Quantity
+                                    </Typography>
+                                  )}
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 700, letterSpacing: 0.1 }}
+                                  >
                                     {Number(item.quantity).toLocaleString()}
                                   </Typography>
                                 </Stack>
-                                <Stack spacing={0.5}>
-                                  <Typography variant="body2" color="text.secondary">
-                                    Updated
-                                  </Typography>
-                                  <Typography variant="body1">
+                                <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+                                  {density !== 'compact' && (
+                                    <Typography variant="body2" color="text.secondary">
+                                      Updated
+                                    </Typography>
+                                  )}
+                                  <Typography variant="body2">
                                     {new Date(item.dateModified || item.dateAdded || '').toLocaleDateString()}
                                   </Typography>
                                 </Stack>
@@ -1289,114 +1483,192 @@ const InventoryPage = () => {
         open={addDialogOpen}
         onClose={closeAddDialog}
         fullWidth
-        maxWidth="md"
+        maxWidth="lg"
       >
-        <DialogTitle>Add inventory item</DialogTitle>
-        <DialogContent dividers>
+        <DialogTitle>Quick add inventory item</DialogTitle>
+        <DialogContent dividers onKeyDown={handleAddKeyDown}>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {catalogError && <Alert severity="error">{catalogError}</Alert>}
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Search catalog"
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                />
+              <Grid item xs={12} md={5}>
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    backgroundColor: 'rgba(255,255,255,0.02)',
+                  }}
+                >
+                  <Stack spacing={1.5}>
+                    <TextField
+                      fullWidth
+                      label="Search catalog"
+                      value={catalogSearch}
+                      inputRef={addSearchRef}
+                      autoFocus
+                      onChange={(e) => {
+                        setCatalogSearch(e.target.value);
+                        setCatalogPage(0);
+                      }}
+                      onKeyDown={handleCatalogSearchKeyDown}
+                    />
+                    <FormControl fullWidth>
+                      <InputLabel id="catalog-category-label">Category</InputLabel>
+                      <Select
+                        labelId="catalog-category-label"
+                        label="Category"
+                        value={catalogCategoryId}
+                        onChange={(e) =>
+                          setCatalogCategoryId(
+                            e.target.value === '' ? '' : Number(e.target.value),
+                          )
+                        }
+                      >
+                        <MenuItem value="">
+                          <em>All</em>
+                        </MenuItem>
+                        {categories.map((category) => (
+                          <MenuItem key={category.id} value={category.id}>
+                            {category.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Suspense fallback={<LinearProgress sx={{ height: 4, borderRadius: 2 }} />}>
+                      <LazySystemLocationSelector
+                        value={destinationSelection}
+                        onChange={setDestinationSelection}
+                        gameId={GAME_ID}
+                        systemSelectRef={systemSelectRef}
+                      />
+                    </Suspense>
+                    <Stack spacing={1}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <TextField
+                          fullWidth
+                          label="Quantity"
+                          type="number"
+                          inputProps={{ min: 0.01, step: 0.01 }}
+                          value={newItemQuantity}
+                          onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                        />
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() =>
+                              setNewItemQuantity((qty) => Number(Math.max(0.01, qty - 1).toFixed(2)))
+                            }
+                          >
+                            -1
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() =>
+                              setNewItemQuantity((qty) => Number(Math.max(0.01, qty + 1).toFixed(2)))
+                            }
+                          >
+                            +1
+                          </Button>
+                        </Stack>
+                      </Stack>
+                      <TextField
+                        fullWidth
+                        label="Notes"
+                        value={newItemNotes}
+                        onChange={(e) => setNewItemNotes(e.target.value)}
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        Tip: Ctrl/Cmd + Enter to add and keep this dialog open for rapid entry.
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel id="catalog-category-label">Category</InputLabel>
-                  <Select
-                    labelId="catalog-category-label"
-                    label="Category"
-                    value={catalogCategoryId}
-                    onChange={(e) =>
-                      setCatalogCategoryId(
-                        e.target.value === '' ? '' : Number(e.target.value),
-                      )
-                    }
-                  >
-                    <MenuItem value="">
-                      <em>All</em>
-                    </MenuItem>
-                    {categories.map((category) => (
-                      <MenuItem key={category.id} value={category.id}>
-                        {category.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12}>
-                <SystemLocationSelector
-                  value={destinationSelection}
-                  onChange={setDestinationSelection}
-                  gameId={GAME_ID}
-                />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField
-                  fullWidth
-                  label="Quantity"
-                  type="number"
-                  inputProps={{ min: 0.01, step: 0.01 }}
-                  value={newItemQuantity}
-                  onChange={(e) => setNewItemQuantity(Number(e.target.value))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={3}>
-                <TextField
-                  fullWidth
-                  label="Notes"
-                  value={newItemNotes}
-                  onChange={(e) => setNewItemNotes(e.target.value)}
-                />
+              <Grid item xs={12} md={7}>
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    backgroundColor: 'rgba(255,255,255,0.02)',
+                    minHeight: 360,
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      Catalog results
+                    </Typography>
+                    {catalogLoading ? (
+                      <LinearProgress sx={{ flex: 1, height: 4, borderRadius: 1 }} />
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        {catalogTotal.toLocaleString()} items
+                      </Typography>
+                    )}
+                  </Stack>
+                  {catalogLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  ) : catalogItems.length === 0 ? (
+                    <Typography color="text.secondary">
+                      No catalog items found with these filters.
+                    </Typography>
+                  ) : (
+                    <List
+                      dense
+                      disablePadding
+                      sx={{
+                        maxHeight: 320,
+                        overflow: 'auto',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: 1,
+                      }}
+                      onKeyDown={handleCatalogListKeyDown}
+                    >
+                      {catalogItems.map((item, index) => (
+                        <ListItemButton
+                          key={item.id}
+                          selected={selectedCatalogItem?.id === item.id}
+                          onClick={() => {
+                            setSelectedCatalogItem(item);
+                            setCatalogError(null);
+                          }}
+                          ref={(el) => {
+                            catalogItemRefs.current[index] = el;
+                            if (index === 0) {
+                              firstCatalogItemRef.current = el;
+                            }
+                          }}
+                        >
+                          <ListItemIcon>
+                            <Radio checked={selectedCatalogItem?.id === item.id} />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={item.name}
+                            secondary={item.categoryName || 'Uncategorized'}
+                          />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  )}
+                  <TablePagination
+                    component="div"
+                    count={catalogTotal}
+                    page={catalogPage}
+                    onPageChange={(_, newPage) => setCatalogPage(newPage)}
+                    rowsPerPage={catalogRowsPerPage}
+                    onRowsPerPageChange={(event) => {
+                      setCatalogRowsPerPage(parseInt(event.target.value, 10));
+                      setCatalogPage(0);
+                    }}
+                    rowsPerPageOptions={[10, 25, 50]}
+                  />
+                </Box>
               </Grid>
             </Grid>
-
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Catalog results
-            </Typography>
-            {catalogLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                <CircularProgress size={28} />
-              </Box>
-            ) : catalogItems.length === 0 ? (
-              <Typography color="text.secondary">
-                No catalog items found with these filters.
-              </Typography>
-            ) : (
-              <List disablePadding>
-                {catalogItems.map((item) => (
-                  <ListItemButton
-                    key={item.id}
-                    selected={selectedCatalogItem?.id === item.id}
-                    onClick={() => setSelectedCatalogItem(item)}
-                  >
-                    <ListItemIcon>
-                      <Radio checked={selectedCatalogItem?.id === item.id} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={item.name}
-                      secondary={item.categoryName || 'Uncategorized'}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
-            )}
-            <TablePagination
-              component="div"
-              count={catalogTotal}
-              page={catalogPage}
-              onPageChange={(_, newPage) => setCatalogPage(newPage)}
-              rowsPerPage={catalogRowsPerPage}
-              onRowsPerPageChange={(event) => {
-                setCatalogRowsPerPage(parseInt(event.target.value, 10));
-                setCatalogPage(0);
-              }}
-              rowsPerPageOptions={[10, 25, 50]}
-            />
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -1404,11 +1676,18 @@ const InventoryPage = () => {
             Cancel
           </Button>
           <Button
-            variant="contained"
-            onClick={handleCreateInventoryItem}
-            disabled={addSubmitting || !selectedCatalogItem}
+            variant="outlined"
+            onClick={() => handleCreateInventoryItem({ stayOpen: true })}
+            disabled={addSubmitting || !addReady}
           >
-            Add to inventory
+            Add & stay
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => handleCreateInventoryItem()}
+            disabled={addSubmitting || !addReady}
+          >
+            Add & close
           </Button>
         </DialogActions>
       </Dialog>

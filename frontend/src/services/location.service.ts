@@ -27,6 +27,7 @@ export const locationService = {
     search?: string;
     type?: string;
     limit?: number;
+    starSystemId?: number;
   }): Promise<LocationRecord[]> {
     const response = await axios.get(`${API_URL}/api/locations`, {
       params,

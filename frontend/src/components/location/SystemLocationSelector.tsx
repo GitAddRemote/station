@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { RefObject } from 'react';
 import {
+  Autocomplete,
   Box,
   CircularProgress,
-  FormControl,
   Grid,
-  InputLabel,
   MenuItem,
-  Select,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
-import { locationService, LocationRecord } from '../../services/location.service';
-import { StarSystem, uexService } from '../../services/uex.service';
+import { LocationRecord } from '../../services/location.service';
+import type { StarSystem } from '../../services/uex.service';
 import { useDebounce } from '../../hooks/useDebounce';
+import { locationCache } from '../../services/locationCache';
 
 export interface SystemLocationValue {
   systemId: number | '';
@@ -25,6 +25,7 @@ interface SystemLocationSelectorProps {
   value: SystemLocationValue;
   onChange: (value: SystemLocationValue) => void;
   disabled?: boolean;
+  systemSelectRef?: RefObject<HTMLInputElement | null>;
 }
 
 const SystemLocationSelector = ({
@@ -32,42 +33,91 @@ const SystemLocationSelector = ({
   value,
   onChange,
   disabled,
+  systemSelectRef,
 }: SystemLocationSelectorProps) => {
   const [systems, setSystems] = useState<StarSystem[]>([]);
   const [locations, setLocations] = useState<LocationRecord[]>([]);
   const [locationSearch, setLocationSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [systemSearch, setSystemSearch] = useState('');
+  const [systemsLoading, setSystemsLoading] = useState(true);
+  const [locationsLoading, setLocationsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(locationSearch, 300);
+  const debouncedSystemSearch = useDebounce(systemSearch, 250);
 
   useEffect(() => {
-    const loadData = async () => {
+    let isMounted = true;
+    const loadSystems = async () => {
       try {
         setError(null);
-        setLoading(true);
-        const [systemData, locationData] = await Promise.all([
-          uexService.getStarSystems(),
-          locationService.searchLocations({ gameId, limit: 1000 }),
-        ]);
+        setSystemsLoading(true);
+        const systemData = await locationCache.getActiveSystems(gameId);
+        if (!isMounted) return;
         setSystems(systemData);
-        setLocations(locationData);
-
-        if (!value.systemId && systemData.length > 0) {
-          onChange({ systemId: systemData[0].id, locationId: '' });
-        }
       } catch (err) {
-        console.error('Failed to load systems or locations', err);
-        setError('Unable to load systems or locations.');
+        console.error('Failed to load star systems', err);
+        if (isMounted) {
+          setError('Unable to load star systems.');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setSystemsLoading(false);
+        }
       }
     };
 
-    loadData();
-  }, [gameId, onChange]);
+    loadSystems();
+    return () => {
+      isMounted = false;
+    };
+  }, [gameId, onChange, value.systemId]);
 
-  const handleSystemChange = (systemId: number) => {
+  useEffect(() => {
+    if (!value.systemId) {
+      setLocations([]);
+      return;
+    }
+
+    let isMounted = true;
+    const loadLocations = async () => {
+      try {
+        setLocationsLoading(true);
+        setError(null);
+        const data = await locationCache.getAllLocations(gameId);
+        if (isMounted) {
+          setLocations(data);
+          setLocationSearch('');
+        }
+      } catch (err) {
+        console.error('Failed to load locations', err);
+        if (isMounted) {
+          setError('Unable to load locations.');
+          setLocations([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLocationsLoading(false);
+        }
+      }
+    };
+
+    loadLocations();
+    return () => {
+      isMounted = false;
+    };
+  }, [gameId, value.systemId]);
+
+  useEffect(() => {
+    if (!value.systemId || systems.length === 0) {
+      setSystemSearch('');
+      return;
+    }
+    const match = systems.find((system) => system.id === value.systemId);
+    setSystemSearch(match?.name ?? '');
+  }, [systems, value.systemId]);
+
+  const handleSystemChange = (systemId: number | '') => {
     setLocationSearch('');
     onChange({ systemId, locationId: '' });
   };
@@ -83,17 +133,14 @@ const SystemLocationSelector = ({
 
   const filteredLocations = useMemo(() => {
     const term = debouncedSearch.trim().toLowerCase();
-    const selectedName = selectedSystem?.name?.toLowerCase() || '';
+    const systemName = selectedSystem?.name?.toLowerCase();
 
     const matching = locations
       .filter((location) => location.locationType !== 'star_system')
       .filter((location) => {
         const hierarchy = location.hierarchyPath as Record<string, string> | undefined;
-        const systemName = hierarchy?.system?.toLowerCase() || '';
-        if (!selectedName) {
-          return false;
-        }
-        if (systemName !== selectedName) {
+        const system = hierarchy?.system?.toLowerCase() || '';
+        if (systemName && system !== systemName) {
           return false;
         }
         if (!term) {
@@ -105,13 +152,25 @@ const SystemLocationSelector = ({
       })
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
     return matching;
-  }, [locations, selectedSystem, debouncedSearch]);
+  }, [locations, debouncedSearch, selectedSystem]);
 
-  if (loading) {
+  const filteredSystems = useMemo(() => {
+    const term = debouncedSystemSearch.trim().toLowerCase();
+    if (!term) {
+      return systems;
+    }
+    return systems.filter((system) => {
+      const name = system.name.toLowerCase();
+      const code = system.code.toLowerCase();
+      return name.includes(term) || code.includes(term);
+    });
+  }, [systems, debouncedSystemSearch]);
+
+  if (systemsLoading) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 1 }}>
         <CircularProgress size={20} />
-        <Typography variant="body2">Loading systems and locations...</Typography>
+        <Typography variant="body2">Loading star systems...</Typography>
       </Box>
     );
   }
@@ -127,79 +186,104 @@ const SystemLocationSelector = ({
   return (
     <Grid container spacing={2}>
       <Grid item xs={12} md={6}>
-        <FormControl fullWidth disabled={disabled}>
-          <InputLabel id="system-select-label">Star system</InputLabel>
-          <Select
-            labelId="system-select-label"
-            label="Star system"
-            value={value.systemId ?? ''}
-            onChange={(e) => handleSystemChange(Number(e.target.value))}
-          >
-            {systems.map((system) => (
-              <MenuItem key={system.id} value={system.id}>
-                {system.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Autocomplete
+          fullWidth
+          options={filteredSystems}
+          value={
+            systems.find((system) => system.id === value.systemId) || null
+          }
+          getOptionLabel={(option) => option.name}
+          onChange={(_, option) => {
+            const systemId = option ? option.id : '';
+            handleSystemChange(systemId);
+            setSystemSearch(option?.name || '');
+          }}
+          inputValue={systemSearch}
+          onInputChange={(_, newValue) => {
+            setSystemSearch(newValue);
+          }}
+          isOptionEqualToValue={(option, val) => option.id === val.id}
+          loading={systemsLoading}
+          disabled={disabled}
+          filterOptions={(options) => options}
+          loadingText="Loading star systems..."
+          noOptionsText={
+            systemsLoading ? 'Loading star systems...' : 'No star systems found'
+          }
+          renderOption={(props, option) => (
+            <MenuItem {...props} key={option.id} value={option.id}>
+              <Stack spacing={0.5}>
+                <Typography variant="body2" fontWeight={600}>
+                  {option.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {option.code}
+                </Typography>
+              </Stack>
+            </MenuItem>
+          )}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Star system"
+              placeholder="Type to search"
+              inputRef={systemSelectRef}
+            />
+          )}
+        />
       </Grid>
 
       <Grid item xs={12} md={6}>
-        <Stack spacing={1}>
-          <TextField
-            label="Filter locations"
-            placeholder="Type to filter by name"
-            value={locationSearch}
-            onChange={(e) => setLocationSearch(e.target.value)}
-            disabled={disabled || !selectedSystem}
-          />
-          <FormControl fullWidth disabled={disabled || !selectedSystem}>
-            <InputLabel id="location-select-label">Location</InputLabel>
-            <Select
-              labelId="location-select-label"
+        <Autocomplete
+          fullWidth
+          options={filteredLocations}
+          value={
+            filteredLocations.find(
+              (loc) => Number(loc.id) === Number(value.locationId),
+            ) || null
+          }
+          getOptionLabel={(option) => option.displayName}
+          onChange={(_, option) =>
+            handleLocationChange(option ? Number(option.id) : '')
+          }
+          inputValue={locationSearch}
+          onInputChange={(_, newValue, reason) => {
+            setLocationSearch(newValue);
+          }}
+          loading={locationsLoading}
+          disabled={disabled || !selectedSystem}
+          isOptionEqualToValue={(option, val) =>
+            Number(option.id) === Number(val.id)
+          }
+          filterOptions={(options) => options}
+          loadingText="Loading locations..."
+          noOptionsText={
+            locationsLoading ? 'Loading locations...' : 'No locations found'
+          }
+          ListboxProps={{ style: { maxHeight: 320 } }}
+          renderOption={(props, option) => (
+            <MenuItem {...props} key={option.id} value={Number(option.id)}>
+              <Stack spacing={0.5}>
+                <Typography variant="body2" fontWeight={600}>
+                  {option.displayName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {option.hierarchyPath?.planet ||
+                    option.hierarchyPath?.moon ||
+                    option.hierarchyPath?.city ||
+                    option.shortName}
+                </Typography>
+              </Stack>
+            </MenuItem>
+          )}
+          renderInput={(params) => (
+            <TextField
+              {...params}
               label="Location"
-            value={value.locationId ?? ''}
-            onChange={(e) =>
-              handleLocationChange(
-                e.target.value === '' ? '' : Number(e.target.value),
-              )
-            }
-            renderValue={(val) => {
-                if (val === undefined || val === null) {
-                  return 'Select a location';
-                }
-                const target = String(val);
-                if (target === '') {
-                  return 'Select a location';
-                }
-                const match = filteredLocations.find(
-                  (loc) => String(loc.id) === target,
-                );
-                return match ? match.displayName : 'Select a location';
-              }}
-              MenuProps={{ PaperProps: { style: { maxHeight: 320 } } }}
-            >
-              {filteredLocations.length === 0 && (
-                <MenuItem disabled>No locations found</MenuItem>
-              )}
-              {filteredLocations.map((location) => (
-                  <MenuItem key={location.id} value={Number(location.id)}>
-                    <Stack spacing={0.5}>
-                      <Typography variant="body2" fontWeight={600}>
-                        {location.displayName}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {location.hierarchyPath?.planet ||
-                          location.hierarchyPath?.moon ||
-                          location.hierarchyPath?.city ||
-                          location.shortName}
-                      </Typography>
-                    </Stack>
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
-        </Stack>
+              placeholder="Type to search and select a location"
+            />
+          )}
+        />
       </Grid>
     </Grid>
   );
