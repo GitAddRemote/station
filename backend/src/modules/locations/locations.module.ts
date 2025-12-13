@@ -13,6 +13,7 @@ import { UexSpaceStation } from '../uex/entities/uex-space-station.entity';
 import { UexOutpost } from '../uex/entities/uex-outpost.entity';
 import { UexPoi } from '../uex/entities/uex-poi.entity';
 import { UsersModule } from '../users/users.module';
+import { LocationsController } from './locations.controller';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { UsersModule } from '../users/users.module';
     UsersModule,
   ],
   providers: [LocationsService, LocationPopulationService],
+  controllers: [LocationsController],
   exports: [LocationsService, LocationPopulationService],
 })
 export class LocationsModule {}

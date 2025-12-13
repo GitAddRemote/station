@@ -9,10 +9,12 @@ import {
   CreateLocationDto,
   UpdateLocationDto,
 } from './dto/location.dto';
+import { LocationPopulationService } from './location-population.service';
 
 describe('LocationsService', () => {
   let service: LocationsService;
   let repository: Repository<Location>;
+  let locationPopulationService: LocationPopulationService;
 
   const mockLocation: Location = {
     id: 1,
@@ -56,9 +58,16 @@ describe('LocationsService', () => {
           useValue: {
             find: jest.fn(),
             findOne: jest.fn(),
+            count: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
             createQueryBuilder: jest.fn(() => mockQueryBuilder),
+          },
+        },
+        {
+          provide: LocationPopulationService,
+          useValue: {
+            populateAllLocations: jest.fn(),
           },
         },
       ],
@@ -66,6 +75,14 @@ describe('LocationsService', () => {
 
     service = module.get<LocationsService>(LocationsService);
     repository = module.get<Repository<Location>>(getRepositoryToken(Location));
+    locationPopulationService = module.get<LocationPopulationService>(
+      LocationPopulationService,
+    );
+
+    jest.spyOn(repository, 'count').mockResolvedValue(1);
+    jest
+      .spyOn(locationPopulationService, 'populateAllLocations')
+      .mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -141,6 +158,15 @@ describe('LocationsService', () => {
         planet: 'Crusader',
         city: 'Orison',
       });
+    });
+
+    it('should populate locations when none exist', async () => {
+      jest.spyOn(repository, 'count').mockResolvedValueOnce(0);
+      mockQueryBuilder.getMany.mockResolvedValue([mockLocation]);
+
+      await service.findAll({ gameId: 1 });
+
+      expect(locationPopulationService.populateAllLocations).toHaveBeenCalled();
     });
   });
 

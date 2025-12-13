@@ -8,19 +8,25 @@ import {
   CreateLocationDto,
   UpdateLocationDto,
 } from './dto/location.dto';
+import { LocationPopulationService } from './location-population.service';
 
 @Injectable()
 export class LocationsService {
   private readonly logger = new Logger(LocationsService.name);
+  private populatingLocations = false;
 
   constructor(
     @InjectRepository(Location)
     private readonly locationRepository: Repository<Location>,
+    private readonly locationPopulationService: LocationPopulationService,
   ) {}
 
   async findAll(searchDto: LocationSearchDto): Promise<LocationDto[]> {
+    const gameId = searchDto.gameId || 1;
+    await this.ensureLocationsPopulated(gameId);
+
     const where: any = {
-      gameId: searchDto.gameId,
+      gameId,
       deleted: false,
       active: true,
     };
@@ -32,6 +38,12 @@ export class LocationsService {
     const queryBuilder = this.locationRepository.createQueryBuilder('location');
 
     queryBuilder.where(where);
+
+    if (searchDto.starSystemId) {
+      queryBuilder.andWhere('location.star_system_id = :starSystemId', {
+        starSystemId: searchDto.starSystemId,
+      });
+    }
 
     if (searchDto.search) {
       queryBuilder.andWhere(
@@ -123,6 +135,28 @@ export class LocationsService {
     this.logger.log(`Deleted location ${id}`);
   }
 
+  private async ensureLocationsPopulated(gameId: number): Promise<void> {
+    const existingCount = await this.locationRepository.count({
+      where: { gameId, deleted: false },
+    });
+
+    if (existingCount > 0 || this.populatingLocations) {
+      return;
+    }
+
+    try {
+      this.populatingLocations = true;
+      await this.locationPopulationService.populateAllLocations();
+    } catch (error) {
+      this.logger.error(
+        'Failed to populate locations from UEX data',
+        error as Error,
+      );
+    } finally {
+      this.populatingLocations = false;
+    }
+  }
+
   private async findLocationEntity(id: number): Promise<Location> {
     const location = await this.locationRepository.findOne({
       where: { id, deleted: false },
@@ -139,6 +173,7 @@ export class LocationsService {
     return {
       id: location.id.toString(),
       gameId: location.gameId,
+      starSystemId: location.starSystemId,
       locationType: location.locationType,
       displayName: location.displayName,
       shortName: location.shortName,

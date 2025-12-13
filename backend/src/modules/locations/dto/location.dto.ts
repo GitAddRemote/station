@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsString,
   IsBoolean,
@@ -10,6 +11,7 @@ import { LocationType } from '../entities/location.entity';
 export class LocationDto {
   id!: string;
   gameId!: number;
+  starSystemId?: number;
   locationType!: LocationType;
   displayName!: string;
   shortName!: string;
@@ -117,7 +119,9 @@ export class UpdateLocationDto {
 
 export class LocationSearchDto {
   @IsInt()
-  gameId!: number;
+  @IsOptional()
+  @Type(() => Number)
+  gameId?: number;
 
   @IsEnum(LocationType)
   @IsOptional()
@@ -129,5 +133,11 @@ export class LocationSearchDto {
 
   @IsInt()
   @IsOptional()
+  @Type(() => Number)
   limit?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  starSystemId?: number;
 }

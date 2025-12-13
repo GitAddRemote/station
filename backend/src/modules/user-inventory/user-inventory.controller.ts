@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Put,
   Delete,
   Get,
   Param,
@@ -11,6 +12,8 @@ import {
   ParseUUIDPipe,
   ParseIntPipe,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../permissions/guards/permissions.guard';
@@ -19,7 +22,11 @@ import { OrgPermission } from '../permissions/permissions.constants';
 import { InventorySharingService } from './inventory-sharing.service';
 import { ShareItemDto } from './dto/share-item.dto';
 import { UserInventoryService } from './user-inventory.service';
-import { UserInventorySearchDto } from './dto/user-inventory-item.dto';
+import {
+  CreateUserInventoryItemDto,
+  UpdateUserInventoryItemDto,
+  UserInventorySearchDto,
+} from './dto/user-inventory-item.dto';
 
 @Controller('api/inventory')
 @UseGuards(JwtAuthGuard)
@@ -69,6 +76,33 @@ export class UserInventoryController {
     }
 
     return this.userInventoryService.findAll(userId, searchDto);
+  }
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  async create(
+    @Body() createDto: CreateUserInventoryItemDto,
+    @Request() req: any,
+  ) {
+    const userId = req.user.userId;
+    return this.userInventoryService.create(userId, createDto);
+  }
+
+  @Put(':id')
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateDto: UpdateUserInventoryItemDto,
+    @Request() req: any,
+  ) {
+    const userId = req.user.userId;
+    return this.userInventoryService.update(id, userId, updateDto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+    const userId = req.user.userId;
+    await this.userInventoryService.delete(id, userId);
   }
 
   @Post(':itemId/share')

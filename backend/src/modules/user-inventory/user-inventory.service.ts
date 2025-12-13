@@ -125,18 +125,63 @@ export class UserInventoryService {
     userId: number,
     createDto: CreateUserInventoryItemDto,
   ): Promise<UserInventoryItemDto> {
-    const item = this.inventoryRepository.create({
-      ...createDto,
-      userId,
-      addedBy: userId,
-      modifiedBy: userId,
-    });
+    let merged = false;
 
-    const saved = await this.inventoryRepository.save(item);
+    const saved = await this.inventoryRepository.manager.transaction(
+      async (manager) => {
+        const repo = manager.getRepository(UserInventoryItem);
 
-    this.logger.log(
-      `Created inventory item ${saved.id} for user ${userId}: ${createDto.quantity}x item ${createDto.uexItemId}`,
+        const existing = await repo
+          .createQueryBuilder('inventory')
+          .setLock('pessimistic_write')
+          .where('inventory.user_id = :userId', { userId })
+          .andWhere('inventory.game_id = :gameId', {
+            gameId: createDto.gameId,
+          })
+          .andWhere('inventory.uex_item_id = :uexItemId', {
+            uexItemId: createDto.uexItemId,
+          })
+          .andWhere('inventory.location_id = :locationId', {
+            locationId: createDto.locationId,
+          })
+          .andWhere(
+            'COALESCE(inventory.shared_org_id, -1) = COALESCE(:sharedOrgId, -1)',
+            { sharedOrgId: createDto.sharedOrgId ?? null },
+          )
+          .andWhere('inventory.deleted = FALSE')
+          .andWhere('inventory.active = TRUE')
+          .getOne();
+
+        if (existing) {
+          existing.quantity =
+            parseFloat(existing.quantity.toString()) + createDto.quantity;
+          existing.notes = createDto.notes ?? existing.notes;
+          existing.modifiedBy = userId;
+
+          merged = true;
+          return repo.save(existing);
+        }
+
+        const item = repo.create({
+          ...createDto,
+          userId,
+          addedBy: userId,
+          modifiedBy: userId,
+        });
+
+        return repo.save(item);
+      },
     );
+
+    if (merged) {
+      this.logger.log(
+        `Merged inventory item ${saved.id} for user ${userId}: added ${createDto.quantity} to item ${createDto.uexItemId} at location ${createDto.locationId}`,
+      );
+    } else {
+      this.logger.log(
+        `Created inventory item ${saved.id} for user ${userId}: ${createDto.quantity}x item ${createDto.uexItemId}`,
+      );
+    }
 
     return this.findById(saved.id, userId);
   }

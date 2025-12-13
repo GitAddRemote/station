@@ -47,6 +47,7 @@ import { AddAutoUnshareInventoryTrigger1764950720430 } from './migrations/176495
 import { AddOrgInventorySummaryView1764950757207 } from './migrations/1764950757207-AddOrgInventorySummaryView';
 import { SeedInventoryManagerRole1764961461064 } from './migrations/1764961461064-SeedInventoryManagerRole';
 import { CreateOrgInventoryItemsTable1764964935270 } from './migrations/1764964935270-CreateOrgInventoryItemsTable';
+import { AddUserInventoryUniqueIndex1765035000000 } from './migrations/1765035000000-AddUserInventoryUniqueIndex';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -112,6 +113,7 @@ export const AppDataSource = new DataSource({
     AddOrgInventorySummaryView1764950757207,
     SeedInventoryManagerRole1764961461064,
     CreateOrgInventoryItemsTable1764964935270,
+    AddUserInventoryUniqueIndex1765035000000,
   ],
   synchronize: false,
 });
