@@ -247,7 +247,7 @@ const SystemLocationSelector = ({
             handleLocationChange(option ? Number(option.id) : '')
           }
           inputValue={locationSearch}
-          onInputChange={(_, newValue, reason) => {
+          onInputChange={(_, newValue) => {
             setLocationSearch(newValue);
           }}
           loading={locationsLoading}

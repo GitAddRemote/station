@@ -4,30 +4,42 @@ import { uexService, StarSystem } from './uex.service';
 const DEFAULT_GAME_ID = 1;
 const LOCATIONS_LIMIT = 2000;
 
-let systemsPromise: Promise<StarSystem[]> | null = null;
-let locationsPromise: Promise<LocationRecord[]> | null = null;
+const systemsPromises = new Map<number, Promise<StarSystem[]>>();
+const locationsPromises = new Map<number, Promise<LocationRecord[]>>();
 
 const fetchActiveSystems = async (gameId: number = DEFAULT_GAME_ID) => {
-  if (!systemsPromise) {
-    systemsPromise = uexService
-      .getStarSystems()
-      .then((systems) => systems.filter((system) => system.active));
+  const cached = systemsPromises.get(gameId);
+  if (cached) {
+    return cached;
   }
 
-  return systemsPromise;
+  const promise = uexService
+    .getStarSystems()
+    .then((systems) => systems.filter((system) => system.active))
+    .catch((error) => {
+      systemsPromises.delete(gameId);
+      throw error;
+    });
+
+  systemsPromises.set(gameId, promise);
+  return promise;
 };
 
 const fetchAllLocations = async (gameId: number = DEFAULT_GAME_ID) => {
-  if (!locationsPromise) {
-    locationsPromise = locationService
-      .searchLocations({ gameId, limit: LOCATIONS_LIMIT })
-      .catch((error) => {
-        locationsPromise = null;
-        throw error;
-      });
+  const cached = locationsPromises.get(gameId);
+  if (cached) {
+    return cached;
   }
 
-  return locationsPromise;
+  const promise = locationService
+    .searchLocations({ gameId, limit: LOCATIONS_LIMIT })
+    .catch((error) => {
+      locationsPromises.delete(gameId);
+      throw error;
+    });
+
+  locationsPromises.set(gameId, promise);
+  return promise;
 };
 
 export const locationCache = {
@@ -43,7 +55,7 @@ export const locationCache = {
     return fetchAllLocations(gameId);
   },
   clear() {
-    systemsPromise = null;
-    locationsPromise = null;
+    systemsPromises.clear();
+    locationsPromises.clear();
   },
 };
