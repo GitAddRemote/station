@@ -13,6 +13,7 @@ export interface UEXStarSystemResponse {
   name: string;
   code: string;
   is_available?: boolean;
+  is_visible?: boolean;
   date_added?: string;
   date_modified?: string;
 }

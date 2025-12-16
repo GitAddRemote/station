@@ -13,6 +13,17 @@ import {
 describe('UserInventoryService', () => {
   let service: UserInventoryService;
   let repository: Repository<UserInventoryItem>;
+  let transactionRepository: {
+    create: jest.Mock;
+    save: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  };
+  let transactionQueryBuilder: {
+    setLock: jest.Mock;
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    getOne: jest.Mock;
+  };
 
   const mockInventoryItem: UserInventoryItem = {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -53,6 +64,21 @@ describe('UserInventoryService', () => {
   };
 
   beforeEach(async () => {
+    transactionQueryBuilder = {
+      setLock: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+    };
+
+    transactionRepository = {
+      create: jest.fn(),
+      save: jest.fn(),
+      createQueryBuilder: jest
+        .fn()
+        .mockReturnValue(transactionQueryBuilder as any),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserInventoryService,
@@ -64,6 +90,22 @@ describe('UserInventoryService', () => {
             create: jest.fn(),
             save: jest.fn(),
             createQueryBuilder: jest.fn(() => mockQueryBuilder),
+            manager: {
+              transaction: jest
+                .fn()
+                .mockImplementation(
+                  (
+                    callback: (manager: {
+                      getRepository: () => typeof transactionRepository;
+                    }) => Promise<unknown>,
+                  ) =>
+                    callback({
+                      getRepository: jest
+                        .fn()
+                        .mockReturnValue(transactionRepository),
+                    }),
+                ),
+            },
           },
         },
       ],
@@ -216,7 +258,7 @@ describe('UserInventoryService', () => {
   });
 
   describe('create', () => {
-    it('should create a new inventory item', async () => {
+    it('should create a new inventory item when none exists', async () => {
       const createDto: CreateUserInventoryItemDto = {
         gameId: 1,
         uexItemId: 100,
@@ -225,20 +267,56 @@ describe('UserInventoryService', () => {
         notes: 'New item',
       };
 
-      jest.spyOn(repository, 'create').mockReturnValue(mockInventoryItem);
-      jest.spyOn(repository, 'save').mockResolvedValue(mockInventoryItem);
+      transactionRepository.create.mockReturnValue(mockInventoryItem);
+      transactionRepository.save.mockResolvedValue(mockInventoryItem);
+      transactionQueryBuilder.getOne.mockResolvedValue(null);
       jest.spyOn(repository, 'findOne').mockResolvedValue(mockInventoryItem);
 
       const result = await service.create(1, createDto);
 
       expect(result.id).toBe(mockInventoryItem.id);
-      expect(repository.create).toHaveBeenCalledWith({
+      expect(transactionRepository.create).toHaveBeenCalledWith({
         ...createDto,
         userId: 1,
         addedBy: 1,
         modifiedBy: 1,
       });
-      expect(repository.save).toHaveBeenCalled();
+      expect(transactionRepository.save).toHaveBeenCalled();
+    });
+
+    it('should merge quantity when item with same keys exists', async () => {
+      const createDto: CreateUserInventoryItemDto = {
+        gameId: 1,
+        uexItemId: 100,
+        locationId: 200,
+        quantity: 2,
+        notes: 'merge note',
+      };
+
+      const existingItem = { ...mockInventoryItem, quantity: 3, notes: 'old' };
+
+      transactionQueryBuilder.getOne.mockResolvedValue(existingItem);
+      transactionRepository.save.mockResolvedValue({
+        ...existingItem,
+        quantity: 5,
+        notes: 'merge note',
+      });
+      jest.spyOn(repository, 'findOne').mockResolvedValue({
+        ...existingItem,
+        quantity: 5,
+        notes: 'merge note',
+      });
+
+      const result = await service.create(1, createDto);
+
+      expect(transactionRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quantity: 5,
+          notes: 'merge note',
+          modifiedBy: 1,
+        }),
+      );
+      expect(result.quantity).toBe(5);
     });
   });
 

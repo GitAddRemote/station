@@ -299,13 +299,17 @@ export class LocationsSyncService {
         where: { uexId: system.id },
       });
 
+      const isActive = this.toBooleanFlag(system.is_visible, true);
+      const isAvailable = this.toBooleanFlag(system.is_available, true);
+
       if (existing) {
         await this.starSystemRepository.update(
           { uexId: system.id },
           {
             name: system.name,
             code: system.code,
-            isAvailable: system.is_available !== false,
+            isAvailable,
+            active: isActive,
             deleted: false,
             uexDateModified: system.date_modified
               ? new Date(system.date_modified)
@@ -319,8 +323,8 @@ export class LocationsSyncService {
           uexId: system.id,
           name: system.name,
           code: system.code,
-          isAvailable: system.is_available !== false,
-          active: true,
+          isAvailable,
+          active: isActive,
           deleted: false,
           uexDateAdded: system.date_added
             ? new Date(system.date_added)
@@ -358,7 +362,7 @@ export class LocationsSyncService {
             starSystemId: planet.id_star_system,
             name: planet.name,
             code: planet.code,
-            isAvailable: planet.is_available !== false,
+            isAvailable: this.toBooleanFlag(planet.is_available, true),
             isLandable: planet.is_landable || false,
             deleted: false,
             uexDateModified: planet.date_modified
@@ -374,7 +378,7 @@ export class LocationsSyncService {
           starSystemId: planet.id_star_system,
           name: planet.name,
           code: planet.code,
-          isAvailable: planet.is_available !== false,
+          isAvailable: this.toBooleanFlag(planet.is_available, true),
           isLandable: planet.is_landable || false,
           active: true,
           deleted: false,
@@ -429,7 +433,7 @@ export class LocationsSyncService {
             planetId: moon.id_planet,
             name: moon.name,
             code: moon.code,
-            isAvailable: moon.is_available !== false,
+            isAvailable: this.toBooleanFlag(moon.is_available, true),
             isLandable: moon.is_landable || false,
             deleted: false,
             uexDateModified: moon.date_modified
@@ -445,7 +449,7 @@ export class LocationsSyncService {
           planetId: moon.id_planet,
           name: moon.name,
           code: moon.code,
-          isAvailable: moon.is_available !== false,
+          isAvailable: this.toBooleanFlag(moon.is_available, true),
           isLandable: moon.is_landable || false,
           active: true,
           deleted: false,
@@ -542,7 +546,7 @@ export class LocationsSyncService {
             moonId,
             name: city.name,
             code: city.code,
-            isAvailable: city.is_available !== false,
+            isAvailable: this.toBooleanFlag(city.is_available, true),
             deleted: false,
             uexDateModified: city.date_modified
               ? new Date(city.date_modified)
@@ -558,7 +562,7 @@ export class LocationsSyncService {
           moonId,
           name: city.name,
           code: city.code,
-          isAvailable: city.is_available !== false,
+          isAvailable: this.toBooleanFlag(city.is_available, true),
           active: true,
           deleted: false,
           uexDateAdded: city.date_added ? new Date(city.date_added) : undefined,
@@ -708,7 +712,7 @@ export class LocationsSyncService {
             moonId,
             name: station.name,
             code: station.code,
-            isAvailable: station.is_available !== false,
+            isAvailable: this.toBooleanFlag(station.is_available, true),
             deleted: false,
             uexDateModified: station.date_modified
               ? new Date(station.date_modified)
@@ -725,7 +729,7 @@ export class LocationsSyncService {
           moonId,
           name: station.name,
           code: station.code,
-          isAvailable: station.is_available !== false,
+          isAvailable: this.toBooleanFlag(station.is_available, true),
           active: true,
           deleted: false,
           uexDateAdded: station.date_added
@@ -821,7 +825,7 @@ export class LocationsSyncService {
             moonId,
             name: outpost.name,
             code: undefined,
-            isAvailable: outpost.is_available !== false,
+            isAvailable: this.toBooleanFlag(outpost.is_available, true),
             deleted: false,
             uexDateModified: outpost.date_modified
               ? new Date(outpost.date_modified)
@@ -837,7 +841,7 @@ export class LocationsSyncService {
           moonId,
           name: outpost.name,
           code: undefined,
-          isAvailable: outpost.is_available !== false,
+          isAvailable: this.toBooleanFlag(outpost.is_available, true),
           active: true,
           deleted: false,
           uexDateAdded: outpost.date_added
@@ -1111,7 +1115,7 @@ export class LocationsSyncService {
             name: poi.name,
             code: undefined,
             type: poi.type,
-            isAvailable: poi.is_available !== false,
+            isAvailable: this.toBooleanFlag(poi.is_available, true),
             deleted: false,
             uexDateModified: poi.date_modified
               ? new Date(poi.date_modified)
@@ -1129,7 +1133,7 @@ export class LocationsSyncService {
           name: poi.name,
           code: undefined,
           type: poi.type,
-          isAvailable: poi.is_available !== false,
+          isAvailable: this.toBooleanFlag(poi.is_available, true),
           active: true,
           deleted: false,
           uexDateAdded: poi.date_added ? new Date(poi.date_added) : undefined,
@@ -1150,6 +1154,25 @@ export class LocationsSyncService {
     }
 
     return { created, updated, deleted: 0 };
+  }
+
+  private toBooleanFlag(
+    value: boolean | number | null | undefined,
+    fallback = true,
+  ): boolean {
+    if (value === null || value === undefined) {
+      return fallback;
+    }
+
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+
+    return fallback;
   }
 
   private sleep(ms: number): Promise<void> {

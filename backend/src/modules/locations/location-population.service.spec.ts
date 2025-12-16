@@ -41,6 +41,13 @@ describe('LocationPopulationService', () => {
             findOne: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
+            createQueryBuilder: jest.fn(() => ({
+              update: jest.fn().mockReturnThis(),
+              set: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              execute: jest.fn(),
+            })),
           },
         },
         {
