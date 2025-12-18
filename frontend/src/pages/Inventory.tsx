@@ -37,7 +37,7 @@ import {
   Radio,
   TablePagination,
   Tooltip,
-  LinearProgress,
+  LinearProgress, Autocomplete,
   Alert,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -54,11 +54,13 @@ import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import ApartmentIcon from '@mui/icons-material/Apartment';
+import CheckIcon from '@mui/icons-material/Check';
 import { inventoryService, InventoryCategory, InventoryItem, OrgInventoryItem } from '../services/inventory.service';
 import { uexService, CatalogItem } from '../services/uex.service';
 import { locationCache } from '../services/locationCache';
 import type { SystemLocationValue } from '../components/location/SystemLocationSelector';
 import { useDebounce } from '../hooks/useDebounce';
+import { useFocusController } from '../hooks/useFocusController';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
@@ -122,6 +124,15 @@ const InventoryPage = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [density, setDensity] = useState<'standard' | 'compact'>('standard');
+  const [inlineDrafts, setInlineDrafts] = useState<
+    Record<string, { locationId: number | ''; quantity: number | '' }>
+  >({});
+  const [inlineSaving, setInlineSaving] = useState<Set<string>>(new Set());
+  const [inlineError, setInlineError] = useState<Record<string, string | null>>({});
+  const [allLocations, setAllLocations] = useState<{ id: number; name: string }[]>([]);
+  const [inlineLocationInputs, setInlineLocationInputs] = useState<Record<string, string>>({});
+  const [locationEditing, setLocationEditing] = useState<Record<string, boolean>>({});
+  const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] = useState(false);
   const itemGridTemplate = useMemo(
     () =>
       density === 'compact'
@@ -132,6 +143,26 @@ const InventoryPage = () => {
 
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
+  const getRowOrder = useCallback(
+    () => items.map((item) => item.id.toString()),
+    [items],
+  );
+  const handleFocusBoundary = useCallback(async () => {
+    const totalPages = Math.ceil(totalCount / rowsPerPage);
+    if (page < totalPages - 1) {
+      setPendingFocusAfterPageChange(true);
+      setPage((prev) => prev + 1);
+    }
+    return null;
+  }, [page, rowsPerPage, totalCount]);
+  const focusController = useFocusController<string, 'location' | 'quantity' | 'save'>({
+    fieldOrder: ['location', 'quantity', 'save'],
+    getRowOrder,
+    onBoundary: handleFocusBoundary,
+  });
+  const locationRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const saveRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -503,6 +534,25 @@ const InventoryPage = () => {
 
   const filteredItems = useMemo(() => items, [items]);
 
+  useEffect(() => {
+    if (!items.length) {
+      setInlineDrafts({});
+      return;
+    }
+    setInlineDrafts(
+      items.reduce<Record<string, { locationId: number | ''; quantity: number }>>(
+        (acc, item) => {
+          acc[item.id] = {
+            locationId: item.locationId ?? '',
+            quantity: Number(item.quantity) || 0,
+          };
+          return acc;
+        },
+        {},
+      ),
+    );
+  }, [items, setInlineDrafts]);
+
   const groupedItems = useMemo(() => {
     if (groupBy === 'none') {
       return new Map<string, InventoryRecord[]>([['All items', filteredItems]]);
@@ -526,6 +576,155 @@ const InventoryPage = () => {
 
     return groups;
   }, [groupBy, filteredItems]);
+
+  const setInlineDraft = (
+    id: string,
+    changes: Partial<{ locationId: number | ''; quantity: number | '' }>,
+  ) => {
+    setInlineDrafts((prev) => {
+      const nextLocation =
+        changes.locationId === undefined
+          ? prev[id]?.locationId ?? ''
+          : Number.isNaN(Number(changes.locationId))
+          ? ''
+          : (Number(changes.locationId) as number);
+      return {
+        ...prev,
+        [id]: {
+          locationId: nextLocation,
+          quantity:
+            changes.quantity === undefined ? prev[id]?.quantity ?? 0 : (changes.quantity as number | ''),
+        },
+      };
+    });
+    setInlineError((prev) => ({ ...prev, [id]: null }));
+  };
+  useEffect(() => {
+    const unregisters: Array<() => void> = [];
+    items.forEach((item) => {
+      const key = item.id.toString();
+      const locationRef = locationRefs.current[key];
+      const quantityRef = quantityRefs.current[key];
+      const saveRef = saveRefs.current[key];
+      if (locationRef) {
+        unregisters.push(
+          focusController.register(key, 'location', () => {
+            locationRef.focus();
+            locationRef.select?.();
+          }),
+        );
+      }
+      if (quantityRef) {
+        unregisters.push(
+          focusController.register(key, 'quantity', () => {
+            quantityRef.focus();
+            quantityRef.select?.();
+          }),
+        );
+      }
+      if (saveRef) {
+        unregisters.push(
+          focusController.register(key, 'save', () => {
+            saveRef.focus();
+          }),
+        );
+      }
+    });
+    return () => {
+      unregisters.forEach((fn) => fn());
+    };
+  }, [items, focusController]);
+
+  useEffect(() => {
+    if (pendingFocusAfterPageChange && items.length > 0) {
+      focusController.focus(items[0].id.toString(), 'location');
+      setPendingFocusAfterPageChange(false);
+    }
+  }, [pendingFocusAfterPageChange, items, focusController]);
+
+  useEffect(() => {
+    locationCache
+      .getAllLocations(GAME_ID)
+      .then((locs) => {
+        const deduped = Array.from(
+          new Map(
+            locs.map((loc) => [
+              Number(loc.id),
+              {
+                id: Number(loc.id),
+                name: loc.displayName || loc.shortName || `Location #${loc.id}`,
+              },
+            ]),
+          ).values(),
+        );
+        setAllLocations(deduped);
+      })
+      .catch((err) => {
+        console.error('Failed to load locations', err);
+      });
+  }, []);
+
+  const handleInlineSave = async (item: InventoryRecord) => {
+    const draft = inlineDrafts[item.id] ?? {
+      locationId: item.locationId ?? '',
+      quantity: Number(item.quantity) || 0,
+    };
+    const parsedLocationId =
+      draft.locationId === '' ? NaN : Number(draft.locationId);
+    const parsedQuantity = Number(draft.quantity);
+
+    if (!Number.isInteger(parsedLocationId) || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      setInlineError((prev) => ({
+        ...prev,
+        [item.id]:
+          !Number.isInteger(parsedLocationId)
+            ? 'Select a valid location'
+            : 'Quantity must be greater than 0',
+      }));
+      return false;
+    }
+
+    const nextSaving = new Set(inlineSaving);
+    nextSaving.add(item.id);
+    setInlineSaving(nextSaving);
+
+    try {
+      if (viewMode === 'org' && selectedOrgId) {
+        await inventoryService.updateOrgItem(selectedOrgId, item.id, {
+          locationId: parsedLocationId,
+          quantity: parsedQuantity,
+        });
+      } else {
+        await inventoryService.updateItem(item.id, {
+          locationId: parsedLocationId,
+          quantity: parsedQuantity,
+        });
+      }
+      await fetchInventory();
+      return true;
+    } catch (err) {
+      console.error('Inline save failed', err);
+      setInlineError((prev) => ({
+        ...prev,
+        [item.id]: 'Unable to save. Please try again.',
+      }));
+      return false;
+    } finally {
+      const updated = new Set(inlineSaving);
+      updated.delete(item.id);
+      setInlineSaving(updated);
+    }
+  };
+
+  const handleInlineSaveAndAdvance = async (item: InventoryRecord) => {
+    const saved = await handleInlineSave(item);
+    if (saved) {
+      const advanced = await focusController.focusNext(item.id.toString(), 'save');
+      if (!advanced && items.length > 0) {
+        focusController.focus(items[0].id.toString(), 'location');
+      }
+    }
+  };
 
   const openActionDialog = (mode: ActionMode) => {
     setActionMode(mode);
@@ -1234,7 +1433,7 @@ const InventoryPage = () => {
                         }
                       >
                         <MenuItem value="standard">Standard</MenuItem>
-                        <MenuItem value="compact">Editor Mode</MenuItem>
+                      <MenuItem value="compact">Editor Mode</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1360,100 +1559,336 @@ const InventoryPage = () => {
                             </Stack>
                           </Box>
                           <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
-                            <Stack
-                              divider={
-                                <Divider flexItem sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
-                              }
-                            >
-                              {groupItems.map((item) => (
+                          <Stack divider={<Divider flexItem sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />}>
+                            {groupItems.map((item) => {
+                              const rowKey = item.id.toString();
+                              const draft = inlineDrafts[item.id] ?? {
+                                locationId: Number(item.locationId) || '',
+                                quantity: Number(item.quantity) || 0,
+                              };
+                              const originalLocationId = Number(item.locationId) || '';
+                              const originalQuantity = Number(item.quantity) || 0;
+                              const draftLocationId =
+                                typeof draft.locationId === 'string'
+                                  ? Number(draft.locationId)
+                                  : draft.locationId;
+                              const selectedLocation =
+                                allLocations.find((loc) => loc.id === draftLocationId) ||
+                                (typeof draftLocationId === 'number'
+                                  ? {
+                                      id: draftLocationId,
+                                      name:
+                                        item.locationName || `Location #${draftLocationId}`,
+                                    }
+                                  : null);
+                              const inputValue =
+                                inlineLocationInputs[rowKey] ??
+                                (locationEditing[rowKey] ? '' : selectedLocation?.name ?? '');
+                              const filterTerm = inputValue.trim().toLowerCase();
+                              const filteredOptions = allLocations
+                                .filter((opt) => opt.name.toLowerCase().includes(filterTerm))
+                                .sort((a, b) => {
+                                  const aName = a.name.toLowerCase();
+                                  const bName = b.name.toLowerCase();
+                                  const aStarts = aName.startsWith(filterTerm);
+                                  const bStarts = bName.startsWith(filterTerm);
+                                  if (aStarts !== bStarts) return aStarts ? -1 : 1;
+                                  const aIndex = aName.indexOf(filterTerm);
+                                  const bIndex = bName.indexOf(filterTerm);
+                                  if (aIndex !== bIndex) return aIndex - bIndex;
+                                  return a.name.localeCompare(b.name);
+                                });
+                              const saving = inlineSaving.has(item.id);
+                              const errorText = inlineError[item.id];
+                              const draftQuantityNumber = Number(draft.quantity);
+                              const isDirty =
+                                draftLocationId !== originalLocationId ||
+                                draftQuantityNumber !== originalQuantity;
+                              return (
                                 <Box
                                   key={item.id}
                                   sx={{
                                     display: 'grid',
-                                    gridTemplateColumns: itemGridTemplate,
-                                  gap: density === 'compact' ? 0.75 : 2,
-                                  alignItems: density === 'compact' ? 'center' : 'center',
-                                  px: density === 'compact' ? 1.25 : 2,
-                                  py: density === 'compact' ? 0.6 : 1.5,
-                                  '&:hover': {
-                                    backgroundColor: 'rgba(255,255,255,0.02)',
-                                  },
-                                }}
-                              >
-                                <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-                                  <Stack
-                                    direction="row"
-                                    spacing={density === 'compact' ? 0.5 : 1}
-                                    alignItems="center"
-                                    flexWrap="wrap"
-                                    columnGap={density === 'compact' ? 0.75 : 1}
-                                    rowGap={density === 'compact' ? 0.25 : 0.5}
-                                  >
-                                    <Typography
-                                      variant={density === 'compact' ? 'body2' : 'subtitle1'}
-                                      sx={{ fontWeight: 600 }}
-                                      noWrap
-                                      title={item.itemName || `Item #${item.uexItemId}`}
+                                    gridTemplateColumns: {
+                                      xs: '1fr',
+                                      md: density === 'compact' ? '2fr 1fr 1fr 1fr auto' : '2fr 1fr 1fr 1fr auto',
+                                    },
+                                    gap: density === 'compact' ? 0.75 : 2,
+                                    alignItems: 'center',
+                                    px: density === 'compact' ? 1 : 2,
+                                    py: density === 'compact' ? 0.45 : 1.5,
+                                    '&:hover': {
+                                      backgroundColor: 'rgba(255,255,255,0.02)',
+                                    },
+                                  }}
+                                >
+                                  <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+                                    <Stack
+                                      direction="row"
+                                      spacing={density === 'compact' ? 0.5 : 1}
+                                      alignItems="center"
+                                      flexWrap="wrap"
+                                      columnGap={density === 'compact' ? 0.75 : 1}
+                                      rowGap={density === 'compact' ? 0.25 : 0.5}
                                     >
-                                      {item.itemName || `Item #${item.uexItemId}`}
-                                    </Typography>
-                                    <Chip
-                                      label={item.categoryName || 'General'}
-                                      size={density === 'compact' ? 'small' : 'medium'}
-                                      variant="outlined"
-                                    />
-                                    {item.sharedOrgId && (
+                                      <Typography
+                                        variant={density === 'compact' ? 'body2' : 'subtitle1'}
+                                        sx={{ fontWeight: 600 }}
+                                        noWrap
+                                        title={item.itemName || `Item #${item.uexItemId}`}
+                                      >
+                                        {item.itemName || `Item #${item.uexItemId}`}
+                                      </Typography>
                                       <Chip
+                                        label={item.categoryName || 'General'}
                                         size={density === 'compact' ? 'small' : 'medium'}
-                                        color="primary"
                                         variant="outlined"
-                                        label={item.sharedOrgName || 'Shared'}
+                                      />
+                                      {item.sharedOrgId && (
+                                        <Chip
+                                          size={density === 'compact' ? 'small' : 'medium'}
+                                          color="primary"
+                                          variant="outlined"
+                                          label={item.sharedOrgName || 'Shared'}
+                                        />
+                                      )}
+                                    </Stack>
+                                  </Stack>
+                                  <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+                                    {density !== 'compact' ? (
+                                      <>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Location
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                          {item.locationName || 'Unknown'}
+                                        </Typography>
+                                      </>
+                                    ) : (
+                                      <Autocomplete
+                                        size="small"
+                                        fullWidth
+                                        options={filteredOptions}
+                                        autoHighlight
+                                        openOnFocus
+                                        filterOptions={(options) => options}
+                                        value={locationEditing[rowKey] ? null : selectedLocation}
+                                        inputValue={inputValue}
+                                        getOptionLabel={(option) => option?.name ?? ''}
+                                        isOptionEqualToValue={(option, value) => option.id === value.id}
+                                        onChange={(_, value) => {
+                                          setInlineDraft(item.id, {
+                                            locationId: value ? value.id : '',
+                                          });
+                                          setInlineLocationInputs((prev) => ({
+                                            ...prev,
+                                            [rowKey]: value?.name ?? '',
+                                          }));
+                                          setLocationEditing((prev) => ({ ...prev, [rowKey]: false }));
+                                          setInlineError((prev) => ({ ...prev, [item.id]: null }));
+                                        }}
+                                        onInputChange={(_, value) => {
+                                          setInlineLocationInputs((prev) => ({
+                                            ...prev,
+                                            [rowKey]: value,
+                                          }));
+                                        }}
+                                        onFocus={() => {
+                                          setInlineLocationInputs((prev) => ({
+                                            ...prev,
+                                            [rowKey]: '',
+                                          }));
+                                          setLocationEditing((prev) => ({ ...prev, [rowKey]: true }));
+                                          setInlineError((prev) => ({ ...prev, [item.id]: null }));
+                                        }}
+                                        onBlur={() => {
+                                          setInlineLocationInputs((prev) => ({
+                                            ...prev,
+                                            [rowKey]: selectedLocation?.name ?? '',
+                                          }));
+                                          setLocationEditing((prev) => ({ ...prev, [rowKey]: false }));
+                                          setInlineError((prev) => ({ ...prev, [item.id]: null }));
+                                        }}
+                                        renderOption={(props, option) => (
+                                          <li {...props} key={option.id}>
+                                            {option.name}
+                                          </li>
+                                        )}
+                                        renderInput={(params) => (
+                                          <TextField
+                                            {...params}
+                                            label="Location"
+                                            data-testid={`inline-location-${item.id}`}
+                                            inputRef={(el) => {
+                                              locationRefs.current[rowKey] = el;
+                                            }}
+                                            onKeyDown={(event) => {
+                                              if (event.key === 'Enter') {
+                                                event.preventDefault();
+                                                const bestMatch = filteredOptions[0];
+                                                if (bestMatch) {
+                                                  setInlineDraft(item.id, { locationId: bestMatch.id });
+                                                  setInlineLocationInputs((prev) => ({
+                                                    ...prev,
+                                                    [rowKey]: bestMatch.name,
+                                                  }));
+                                                  setLocationEditing((prev) => ({
+                                                    ...prev,
+                                                    [rowKey]: false,
+                                                  }));
+                                                  setInlineError((prev) => ({ ...prev, [item.id]: null }));
+                                                  focusController.focus(rowKey, 'quantity');
+                                                } else {
+                                                  setInlineError((prev) => ({
+                                                    ...prev,
+                                                    [item.id]: 'No matches found',
+                                                  }));
+                                                }
+                                              }
+                                            }}
+                                          />
+                                        )}
                                       />
                                     )}
                                   </Stack>
-                                </Stack>
-                                <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-                                  {density !== 'compact' && (
-                                    <Typography variant="body2" color="text.secondary">
-                                      Location
-                                    </Typography>
-                                  )}
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                    {item.locationName || 'Unknown'}
-                                  </Typography>
-                                </Stack>
-                                <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-                                  {density !== 'compact' && (
-                                    <Typography variant="body2" color="text.secondary">
-                                      Quantity
-                                    </Typography>
-                                  )}
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ fontWeight: 700, letterSpacing: 0.1 }}
+                                  <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+                                    {density !== 'compact' ? (
+                                      <>
+                                        <Typography variant="body2" color="text.secondary">
+                                          Quantity
+                                        </Typography>
+                                        <Typography
+                                          variant="body2"
+                                          sx={{ fontWeight: 700, letterSpacing: 0.1 }}
+                                        >
+                                          {Number(item.quantity).toLocaleString()}
+                                        </Typography>
+                                      </>
+                                    ) : (
+                                      <TextField
+                                        type="text"
+                                        size="small"
+                                        data-testid={`inline-quantity-${item.id}`}
+                                        value={draft.quantity}
+                                        onChange={(e) => {
+                                          const raw = e.target.value.trim();
+                                          if (raw === '') {
+                                            setInlineDraft(item.id, { quantity: '' });
+                                            setInlineError((prev) => ({
+                                              ...prev,
+                                              [item.id]: 'Quantity is required',
+                                            }));
+                                            return;
+                                          }
+                                          const numeric = Number(raw);
+                                          setInlineDraft(item.id, {
+                                            quantity: numeric,
+                                          });
+                                          if (!Number.isFinite(numeric) || numeric <= 0) {
+                                            setInlineError((prev) => ({
+                                              ...prev,
+                                              [item.id]: 'Quantity must be greater than 0',
+                                            }));
+                                          } else {
+                                            setInlineError((prev) => ({ ...prev, [item.id]: null }));
+                                          }
+                                        }}
+                                        inputProps={{
+                                          inputMode: 'numeric',
+                                          pattern: '[0-9]*',
+                                        }}
+                                        inputRef={(el) => {
+                                          quantityRefs.current[rowKey] = el;
+                                        }}
+                                        onKeyDown={(event) => {
+                                          if (event.key === 'Enter') {
+                                            event.preventDefault();
+                                            focusController.focus(rowKey, 'save');
+                                          }
+                                        }}
+                                        sx={{
+                                          maxWidth: 120,
+                                          '& input': {
+                                            MozAppearance: 'textfield',
+                                          },
+                                          '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button':
+                                            {
+                                              WebkitAppearance: 'none',
+                                              margin: 0,
+                                            },
+                                        }}
+                                      />
+                                    )}
+                                  </Stack>
+                                  <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+                                    {density !== 'compact' && (
+                                      <Typography variant="body2" color="text.secondary">
+                                        Updated
+                                      </Typography>
+                                    )}
+                                      <Typography variant="body2">
+                                        {new Date(item.dateModified || item.dateAdded || '').toLocaleDateString()}
+                                      </Typography>
+                                    {Number.isFinite(draftQuantityNumber) && draftQuantityNumber > 100000 && (
+                                      <Typography variant="caption" sx={{ color: 'warning.main' }}>
+                                        Large quantity entered &mdash; verify value.
+                                      </Typography>
+                                    )}
+                                    {errorText && (
+                                      <Typography variant="caption" color="error">
+                                        {errorText}
+                                      </Typography>
+                                    )}
+                                  </Stack>
+                                  <Stack
+                                    direction="row"
+                                    spacing={density === 'compact' ? 0.5 : 1}
+                                    justifyContent="flex-end"
+                                    alignItems="center"
+                                    sx={{
+                                      minWidth: density === 'compact' ? 140 : undefined,
+                                      flexWrap: 'nowrap',
+                                    }}
                                   >
-                                    {Number(item.quantity).toLocaleString()}
-                                  </Typography>
-                                </Stack>
-                                <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-                                  {density !== 'compact' && (
-                                    <Typography variant="body2" color="text.secondary">
-                                      Updated
-                                    </Typography>
-                                  )}
-                                  <Typography variant="body2">
-                                    {new Date(item.dateModified || item.dateAdded || '').toLocaleDateString()}
-                                  </Typography>
-                                </Stack>
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                  <Tooltip title="Actions">
-                                    <IconButton onClick={(e) => handleActionOpen(e, item)}>
-                                      <MoreVertIcon />
-                                    </IconButton>
-                                  </Tooltip>
+                                    {density === 'compact' && isDirty && (
+                                      <Chip
+                                        label="Unsaved"
+                                        size="small"
+                                        color="warning"
+                                        variant="outlined"
+                                        sx={{ height: 22, fontSize: 12, flexShrink: 0 }}
+                                      />
+                                    )}
+                                    {density === 'compact' ? (
+                                      <IconButton
+                                        color="primary"
+                                        size="small"
+                                        onClick={() => handleInlineSaveAndAdvance(item)}
+                                        disabled={saving}
+                                        data-testid={`inline-save-${item.id}`}
+                                        onKeyDown={(event) => {
+                                          if (event.key === 'Enter') {
+                                            event.preventDefault();
+                                            handleInlineSaveAndAdvance(item);
+                                          }
+                                        }}
+                                        ref={(el: HTMLButtonElement | null) => {
+                                          saveRefs.current[rowKey] = el;
+                                        }}
+                                      >
+                                        <CheckIcon fontSize="small" />
+                                      </IconButton>
+                                    ) : (
+                                      <Tooltip title="Actions">
+                                        <IconButton onClick={(e) => handleActionOpen(e, item)}>
+                                          <MoreVertIcon />
+                                        </IconButton>
+                                      </Tooltip>
+                                    )}
+                                  </Stack>
                                 </Box>
-                              </Box>
-                            ))}
+                              );
+                            })}
                           </Stack>
                         </Box>
                       ))}
@@ -1468,7 +1903,7 @@ const InventoryPage = () => {
                         setRowsPerPage(parseInt(event.target.value, 10));
                         setPage(0);
                       }}
-                      rowsPerPageOptions={[10, 25, 50, 100]}
+                      rowsPerPageOptions={[10, 25, 50, 100, 250]}
                       sx={{ mt: 2 }}
                     />
                   </>
