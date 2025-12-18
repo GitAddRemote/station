@@ -10,6 +10,8 @@ import {
   UpdateLocationDto,
 } from './dto/location.dto';
 import { LocationPopulationService } from './location-population.service';
+import { Game } from '../games/game.entity';
+import { UexCity } from '../uex/entities/uex-city.entity';
 
 describe('LocationsService', () => {
   let service: LocationsService;
@@ -37,16 +39,28 @@ describe('LocationsService', () => {
     dateModified: new Date(),
     addedById: 1,
     modifiedById: 1,
-    game: undefined as any,
-    city: undefined as any,
+    game: undefined as unknown as Game,
+    city: undefined as unknown as UexCity,
   };
 
-  const mockQueryBuilder: any = {
+  const mockQueryBuilder = {
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
     getMany: jest.fn(),
+    getRawOne: jest.fn(),
+  } as {
+    where: jest.Mock;
+    andWhere: jest.Mock;
+    orderBy: jest.Mock;
+    take: jest.Mock;
+    select: jest.Mock;
+    addSelect: jest.Mock;
+    getMany: jest.Mock;
+    getRawOne: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -210,6 +224,62 @@ describe('LocationsService', () => {
         },
         order: { displayName: 'ASC' },
       });
+    });
+  });
+
+  describe('findStorableLocations', () => {
+    it('should return storable locations with etag and parsed hierarchy', async () => {
+      const storableLocation: Location = {
+        ...mockLocation,
+        id: 2,
+        hierarchyPath: JSON.stringify({
+          system: 'Stanton',
+          planet: 'Crusader',
+          city: 'Orison',
+        }),
+      };
+
+      jest.spyOn(repository, 'find').mockResolvedValue([storableLocation]);
+      mockQueryBuilder.getRawOne.mockResolvedValue({
+        count: '1',
+        maxDateModified: new Date('2024-01-01T00:00:00Z').toISOString(),
+      });
+
+      const result = await service.findStorableLocations(1);
+
+      expect(repository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            gameId: 1,
+            deleted: false,
+            active: true,
+            isAvailable: true,
+          }),
+          take: 5000,
+        }),
+      );
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith(
+        'COUNT(location.id)',
+        'count',
+      );
+      expect(result.locations).toHaveLength(1);
+      expect(result.locations[0].hierarchyPath).toEqual({
+        system: 'Stanton',
+        planet: 'Crusader',
+        city: 'Orison',
+      });
+      expect(result.etag).toBeDefined();
+      expect(result.etag).not.toHaveLength(0);
+    });
+
+    it('should fall back gracefully when stats are missing', async () => {
+      jest.spyOn(repository, 'find').mockResolvedValue([]);
+      mockQueryBuilder.getRawOne.mockResolvedValue(null);
+
+      const result = await service.findStorableLocations(1);
+
+      expect(result.etag).toBeDefined();
+      expect(result.locations).toHaveLength(0);
     });
   });
 

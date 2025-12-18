@@ -21,6 +21,12 @@ export interface LocationRecord {
   hierarchyPath?: Record<string, string>;
 }
 
+export interface StorableLocationsResponse {
+  data: LocationRecord[];
+  etag?: string;
+  notModified: boolean;
+}
+
 export const locationService = {
   async searchLocations(params: {
     gameId: number;
@@ -34,5 +40,34 @@ export const locationService = {
       headers: getAuthHeader(),
     });
     return response.data;
+  },
+
+  async getStorableLocations(params: {
+    gameId: number;
+    etag?: string;
+  }): Promise<StorableLocationsResponse> {
+    const response = await axios.get(`${API_URL}/api/locations/storable`, {
+      params: { gameId: params.gameId },
+      headers: {
+        ...getAuthHeader(),
+        ...(params.etag ? { 'If-None-Match': params.etag } : {}),
+      },
+      validateStatus: (status) => status === 200 || status === 304,
+    });
+
+    if (response.status === 304) {
+      return { data: [], etag: params.etag, notModified: true };
+    }
+
+    const nextEtag =
+      typeof response.headers.etag === 'string'
+        ? response.headers.etag
+        : undefined;
+
+    return {
+      data: response.data as LocationRecord[],
+      etag: nextEtag,
+      notModified: false,
+    };
   },
 };

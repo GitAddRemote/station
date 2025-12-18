@@ -7,8 +7,11 @@ import {
   LocationSearchDto,
   CreateLocationDto,
   UpdateLocationDto,
+  StorableLocationDto,
 } from './dto/location.dto';
 import { LocationPopulationService } from './location-population.service';
+import { In } from 'typeorm';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class LocationsService {
@@ -25,7 +28,7 @@ export class LocationsService {
     const gameId = searchDto.gameId || 1;
     await this.ensureLocationsPopulated(gameId);
 
-    const where: any = {
+    const where: Record<string, unknown> = {
       gameId,
       deleted: false,
       active: true,
@@ -58,6 +61,70 @@ export class LocationsService {
     const locations = await queryBuilder.getMany();
 
     return locations.map((location) => this.toDto(location));
+  }
+
+  async findStorableLocations(
+    gameId: number,
+  ): Promise<{ etag: string; locations: StorableLocationDto[] }> {
+    await this.ensureLocationsPopulated(gameId);
+
+    const storableTypes: LocationType[] = [
+      LocationType.CITY,
+      LocationType.SPACE_STATION,
+      LocationType.OUTPOST,
+      LocationType.POI,
+      LocationType.MOON,
+      LocationType.PLANET,
+    ];
+
+    const baseFilters = {
+      gameId,
+      deleted: false,
+      active: true,
+      isAvailable: true,
+      locationType: In(storableTypes),
+    } as const;
+
+    const locations = await this.locationRepository.find({
+      where: baseFilters,
+      order: { displayName: 'ASC' },
+      select: [
+        'id',
+        'gameId',
+        'locationType',
+        'displayName',
+        'shortName',
+        'hierarchyPath',
+        'isAvailable',
+        'isLandable',
+        'hasArmistice',
+      ],
+      take: 5000,
+    });
+
+    const stats = await this.locationRepository
+      .createQueryBuilder('location')
+      .select('COUNT(location.id)', 'count')
+      .addSelect('MAX(location.date_modified)', 'maxDateModified')
+      .where('location.deleted = FALSE')
+      .andWhere('location.active = TRUE')
+      .andWhere('location.is_available = TRUE')
+      .andWhere('location.game_id = :gameId', { gameId })
+      .andWhere('location.location_type IN (:...types)', {
+        types: storableTypes,
+      })
+      .getRawOne<{ count: string; maxDateModified: string | null }>();
+
+    const etag = this.createEtag(
+      gameId,
+      stats?.count ?? '0',
+      stats?.maxDateModified ?? '',
+    );
+
+    return {
+      etag,
+      locations: locations.map((location) => this.toStorableDto(location)),
+    };
   }
 
   async findById(id: number): Promise<LocationDto> {
@@ -177,14 +244,55 @@ export class LocationsService {
       locationType: location.locationType,
       displayName: location.displayName,
       shortName: location.shortName,
-      hierarchyPath: location.hierarchyPath
-        ? JSON.parse(location.hierarchyPath)
-        : undefined,
+      hierarchyPath: this.parseHierarchyPath(location.hierarchyPath),
       isAvailable: location.isAvailable,
       isLandable: location.isLandable,
       hasArmistice: location.hasArmistice,
       active: location.active,
     };
+  }
+
+  private toStorableDto(location: Location): StorableLocationDto {
+    return {
+      id: location.id.toString(),
+      gameId: location.gameId,
+      locationType: location.locationType,
+      displayName: location.displayName,
+      shortName: location.shortName,
+      hierarchyPath: this.parseHierarchyPath(location.hierarchyPath),
+      isAvailable: location.isAvailable,
+      isLandable: location.isLandable,
+      hasArmistice: location.hasArmistice,
+    };
+  }
+
+  private parseHierarchyPath(
+    hierarchyPath?: string,
+  ): Record<string, string> | undefined {
+    if (!hierarchyPath) {
+      return undefined;
+    }
+
+    try {
+      const parsed = JSON.parse(hierarchyPath) as unknown;
+      if (parsed && typeof parsed === 'object') {
+        return parsed as Record<string, string>;
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to parse hierarchyPath: ${error}`);
+    }
+
+    return undefined;
+  }
+
+  private createEtag(
+    gameId: number,
+    count: string,
+    maxDateModified: string,
+  ): string {
+    return createHash('sha256')
+      .update(`${gameId}|${count}|${maxDateModified}|storable_v1`)
+      .digest('hex');
   }
 
   private getRelationsForType(): string[] {

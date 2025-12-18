@@ -22,6 +22,18 @@ export class LocationDto {
   active!: boolean;
 }
 
+export class StorableLocationDto {
+  id!: string;
+  gameId!: number;
+  locationType!: LocationType;
+  displayName!: string;
+  shortName!: string;
+  hierarchyPath?: Record<string, string>;
+  isAvailable!: boolean;
+  isLandable?: boolean;
+  hasArmistice?: boolean;
+}
+
 export class LocationSelectorDto {
   id!: string;
   displayName!: string;
