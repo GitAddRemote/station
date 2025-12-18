@@ -9,11 +9,33 @@ import {
   UpdateOrgInventoryItemDto,
   OrgInventorySearchDto,
 } from './dto/org-inventory-item.dto';
+import { Organization } from '../organizations/organization.entity';
+import { Game } from '../games/game.entity';
+import { UexItem } from '../uex/entities/uex-item.entity';
+import { Location, LocationType } from '../locations/entities/location.entity';
+import { User } from '../users/user.entity';
+import { OrgPermission } from '../permissions/permissions.constants';
 
 describe('OrgInventoryService', () => {
   let service: OrgInventoryService;
   let repository: OrgInventoryRepository;
   let permissionsService: PermissionsService;
+
+  const mockOrg: Organization = { id: 1, name: 'Test Org' } as Organization;
+  const mockGame: Game = { id: 1, name: 'Star Citizen' } as Game;
+  const mockItem: UexItem = { id: 1, uexId: 100, name: 'Test Item' } as UexItem;
+  const mockLocation: Location = {
+    id: 200,
+    gameId: 1,
+    displayName: 'Test Location',
+    shortName: 'Test Location',
+    locationType: LocationType.CITY,
+    active: true,
+    deleted: false,
+    dateAdded: new Date(),
+    dateModified: new Date(),
+  } as unknown as Location;
+  const mockUser: User = { id: 1, username: 'testuser' } as User;
 
   const mockOrgInventoryItem: OrgInventoryItem = {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -29,12 +51,12 @@ describe('OrgInventoryService', () => {
     dateModified: new Date(),
     addedBy: 1,
     modifiedBy: 1,
-    org: { id: 1, name: 'Test Org' } as any,
-    game: { id: 1, name: 'Star Citizen' } as any,
-    item: { name: 'Test Item' } as any,
-    location: { displayName: 'Test Location' } as any,
-    addedByUser: { username: 'testuser' } as any,
-    modifiedByUser: { username: 'testuser' } as any,
+    org: mockOrg,
+    game: mockGame,
+    item: mockItem,
+    location: mockLocation,
+    addedByUser: mockUser,
+    modifiedByUser: mockUser,
   };
 
   beforeEach(async () => {
@@ -97,7 +119,7 @@ describe('OrgInventoryService', () => {
       expect(permissionsService.hasPermission).toHaveBeenCalledWith(
         1,
         1,
-        'inventory.manage',
+        OrgPermission.CAN_EDIT_ORG_INVENTORY,
       );
       expect(repository.create).toHaveBeenCalledWith({
         ...createDto,
@@ -132,7 +154,7 @@ describe('OrgInventoryService', () => {
       expect(permissionsService.hasPermission).toHaveBeenCalledWith(
         1,
         1,
-        'inventory.view',
+        OrgPermission.CAN_VIEW_ORG_INVENTORY,
       );
     });
 
@@ -152,7 +174,7 @@ describe('OrgInventoryService', () => {
         .spyOn(repository, 'findByIdNotDeleted')
         .mockResolvedValue(mockOrgInventoryItem);
 
-      const result = await service.findById(1, mockOrgInventoryItem.id);
+      const result = await service.findById(1, 1, mockOrgInventoryItem.id);
 
       expect(result.id).toBe(mockOrgInventoryItem.id);
       expect(repository.findByIdNotDeleted).toHaveBeenCalledWith(
@@ -163,9 +185,21 @@ describe('OrgInventoryService', () => {
     it('should throw NotFoundException if item not found', async () => {
       jest.spyOn(repository, 'findByIdNotDeleted').mockResolvedValue(null);
 
-      await expect(service.findById(1, 'nonexistent-id')).rejects.toThrow(
+      await expect(service.findById(1, 1, 'nonexistent-id')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should throw NotFoundException if item belongs to a different org', async () => {
+      jest.spyOn(repository, 'findByIdNotDeleted').mockResolvedValue({
+        ...mockOrgInventoryItem,
+        orgId: 999,
+      });
+      jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
+
+      await expect(
+        service.findById(1, 1, mockOrgInventoryItem.id),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException without view permission', async () => {
@@ -175,7 +209,7 @@ describe('OrgInventoryService', () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(false);
 
       await expect(
-        service.findById(1, mockOrgInventoryItem.id),
+        service.findById(1, 1, mockOrgInventoryItem.id),
       ).rejects.toThrow(ForbiddenException);
     });
   });
@@ -196,6 +230,7 @@ describe('OrgInventoryService', () => {
 
       const result = await service.update(
         1,
+        1,
         mockOrgInventoryItem.id,
         updateDto,
       );
@@ -205,7 +240,7 @@ describe('OrgInventoryService', () => {
       expect(permissionsService.hasPermission).toHaveBeenCalledWith(
         1,
         1,
-        'inventory.manage',
+        OrgPermission.CAN_EDIT_ORG_INVENTORY,
       );
     });
 
@@ -213,7 +248,18 @@ describe('OrgInventoryService', () => {
       jest.spyOn(repository, 'findByIdNotDeleted').mockResolvedValue(null);
 
       await expect(
-        service.update(1, 'nonexistent-id', updateDto),
+        service.update(1, 1, 'nonexistent-id', updateDto),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException when item belongs to a different org', async () => {
+      jest.spyOn(repository, 'findByIdNotDeleted').mockResolvedValue({
+        ...mockOrgInventoryItem,
+        orgId: 999,
+      });
+
+      await expect(
+        service.update(1, 1, mockOrgInventoryItem.id, updateDto),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -224,7 +270,7 @@ describe('OrgInventoryService', () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(false);
 
       await expect(
-        service.update(1, mockOrgInventoryItem.id, updateDto),
+        service.update(1, 1, mockOrgInventoryItem.id, updateDto),
       ).rejects.toThrow(ForbiddenException);
     });
   });
@@ -237,7 +283,7 @@ describe('OrgInventoryService', () => {
         .mockResolvedValue(mockOrgInventoryItem);
       jest.spyOn(repository, 'softDeleteItem').mockResolvedValue(true);
 
-      await service.delete(1, mockOrgInventoryItem.id);
+      await service.delete(1, 1, mockOrgInventoryItem.id);
 
       expect(repository.softDeleteItem).toHaveBeenCalledWith(
         mockOrgInventoryItem.id,
@@ -248,9 +294,20 @@ describe('OrgInventoryService', () => {
     it('should throw NotFoundException if item not found', async () => {
       jest.spyOn(repository, 'findByIdNotDeleted').mockResolvedValue(null);
 
-      await expect(service.delete(1, 'nonexistent-id')).rejects.toThrow(
+      await expect(service.delete(1, 1, 'nonexistent-id')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should throw NotFoundException when deleting item from another org', async () => {
+      jest.spyOn(repository, 'findByIdNotDeleted').mockResolvedValue({
+        ...mockOrgInventoryItem,
+        orgId: 999,
+      });
+
+      await expect(
+        service.delete(1, 1, mockOrgInventoryItem.id),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException without manage permission', async () => {
@@ -259,9 +316,9 @@ describe('OrgInventoryService', () => {
         .mockResolvedValue(mockOrgInventoryItem);
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(false);
 
-      await expect(service.delete(1, mockOrgInventoryItem.id)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.delete(1, 1, mockOrgInventoryItem.id),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

@@ -14,6 +14,7 @@ import {
   OrgInventorySummaryDto,
   OrgInventoryItemDto,
 } from './dto/org-inventory-item.dto';
+import { OrgPermission } from '../permissions/permissions.constants';
 
 @Injectable()
 export class OrgInventoryService {
@@ -31,7 +32,9 @@ export class OrgInventoryService {
     action: 'view' | 'manage',
   ): Promise<void> {
     const permission =
-      action === 'view' ? 'inventory.view' : 'inventory.manage';
+      action === 'view'
+        ? OrgPermission.CAN_VIEW_ORG_INVENTORY
+        : OrgPermission.CAN_EDIT_ORG_INVENTORY;
 
     const hasPermission = await this.permissionsService.hasPermission(
       userId,
@@ -126,11 +129,19 @@ export class OrgInventoryService {
   /**
    * Get a specific inventory item by ID
    */
-  async findById(userId: number, id: string): Promise<OrgInventoryItemDto> {
+  async findById(
+    userId: number,
+    orgId: number,
+    id: string,
+  ): Promise<OrgInventoryItemDto> {
     const item = await this.orgInventoryRepository.findByIdNotDeleted(id);
 
     if (!item) {
       throw new NotFoundException('Inventory item not found');
+    }
+
+    if (item.orgId !== orgId) {
+      throw new NotFoundException('Inventory item not found in this org');
     }
 
     await this.verifyInventoryPermission(userId, item.orgId, 'view');
@@ -143,6 +154,7 @@ export class OrgInventoryService {
    */
   async update(
     userId: number,
+    orgId: number,
     id: string,
     dto: UpdateOrgInventoryItemDto,
   ): Promise<OrgInventoryItemDto> {
@@ -150,6 +162,10 @@ export class OrgInventoryService {
 
     if (!item) {
       throw new NotFoundException('Inventory item not found');
+    }
+
+    if (item.orgId !== orgId) {
+      throw new NotFoundException('Inventory item not found in this org');
     }
 
     await this.verifyInventoryPermission(userId, item.orgId, 'manage');
@@ -185,11 +201,15 @@ export class OrgInventoryService {
   /**
    * Soft delete an inventory item
    */
-  async delete(userId: number, id: string): Promise<void> {
+  async delete(userId: number, orgId: number, id: string): Promise<void> {
     const item = await this.orgInventoryRepository.findByIdNotDeleted(id);
 
     if (!item) {
       throw new NotFoundException('Inventory item not found');
+    }
+
+    if (item.orgId !== orgId) {
+      throw new NotFoundException('Inventory item not found in this org');
     }
 
     await this.verifyInventoryPermission(userId, item.orgId, 'manage');

@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrgInventoryService } from './org-inventory.service';
@@ -130,9 +131,9 @@ export class OrgInventoryController {
   async findById(
     @Request() req: any,
     @Param('orgId', ParseIntPipe) orgId: number,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<OrgInventoryItemDto> {
-    return this.orgInventoryService.findById(req.user.userId, id);
+    return this.orgInventoryService.findById(req.user.userId, orgId, id);
   }
 
   /**
@@ -153,10 +154,15 @@ export class OrgInventoryController {
   async update(
     @Request() req: any,
     @Param('orgId', ParseIntPipe) orgId: number,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateOrgInventoryItemDto,
   ): Promise<OrgInventoryItemDto> {
-    return this.orgInventoryService.update(req.user.userId, id, updateDto);
+    return this.orgInventoryService.update(
+      req.user.userId,
+      orgId,
+      id,
+      updateDto,
+    );
   }
 
   /**
@@ -174,8 +180,8 @@ export class OrgInventoryController {
   async delete(
     @Request() req: any,
     @Param('orgId', ParseIntPipe) orgId: number,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.orgInventoryService.delete(req.user.userId, id);
+    return this.orgInventoryService.delete(req.user.userId, orgId, id);
   }
 }
