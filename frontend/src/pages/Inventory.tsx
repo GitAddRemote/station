@@ -1234,7 +1234,7 @@ const InventoryPage = () => {
                         }
                       >
                         <MenuItem value="standard">Standard</MenuItem>
-                        <MenuItem value="compact">Compact</MenuItem>
+                        <MenuItem value="compact">Editor Mode</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
