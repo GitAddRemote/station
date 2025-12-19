@@ -239,7 +239,7 @@ describe('Inventory editor mode inline controls', () => {
     // Switch to org view without choosing an org
     fireEvent.mouseDown(viewSelect);
     const listbox = await screen.findByRole('presentation');
-    const options = Array.from(listbox.querySelectorAll('[role=\"option\"]'));
+    const options = Array.from(listbox.querySelectorAll('[role="option"]'));
     const maybeOrgOption = options.find((opt) => opt.textContent && opt.textContent !== 'My Inventory');
     if (maybeOrgOption) {
       fireEvent.click(maybeOrgOption);
