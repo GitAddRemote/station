@@ -153,6 +153,7 @@ const InventoryPage = () => {
     item?: string | null;
     location?: string | null;
     quantity?: string | null;
+    org?: string | null;
     api?: string | null;
   }>({});
   const [newRowSaving, setNewRowSaving] = useState(false);
@@ -660,6 +661,7 @@ const InventoryPage = () => {
     ],
   );
   const isEditorMode = density === 'compact';
+  const newRowOrgBlocked = viewMode === 'org' && !selectedOrgId;
 
   const setInlineDraft = (
     id: string,
@@ -698,6 +700,13 @@ const InventoryPage = () => {
   };
 
   const handleNewRowSave = async () => {
+    if (newRowOrgBlocked) {
+      setNewRowErrors((prev) => ({
+        ...prev,
+        org: 'Select an organization to add items in org view.',
+      }));
+      return;
+    }
     const selectedItemId =
       newRowSelectedItem?.uexId ??
       (typeof newRowDraft.itemId === 'number' ? newRowDraft.itemId : null);
@@ -713,7 +722,7 @@ const InventoryPage = () => {
       errors.location = 'Select a valid location';
     }
     if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
-      errors.quantity = 'Quantity must be greater than 0';
+      errors.quantity = 'Quantity must be an integer greater than 0';
     }
 
     if (errors.item || errors.location || errors.quantity) {
@@ -750,6 +759,7 @@ const InventoryPage = () => {
       setNewRowErrors({
         api: 'Unable to add item. Please try again.',
       });
+      newRowFocusController.focus('new-row', 'save');
     } finally {
       setNewRowSaving(false);
     }
@@ -849,6 +859,12 @@ const InventoryPage = () => {
   }, [isEditorMode]);
 
   useEffect(() => {
+    if (!newRowOrgBlocked) {
+      setNewRowErrors((prev) => ({ ...prev, org: null }));
+    }
+  }, [newRowOrgBlocked]);
+
+  useEffect(() => {
     if (pendingFocusAfterPageChange && items.length > 0) {
       focusController.focus(items[0].id.toString(), 'location');
       setPendingFocusAfterPageChange(false);
@@ -879,6 +895,11 @@ const InventoryPage = () => {
 
   useEffect(() => {
     let isMounted = true;
+    if (!isEditorMode) {
+      setNewRowItemLoading(false);
+      setNewRowItemOptions([]);
+      return;
+    }
     const searchKey = debouncedNewItemSearch.trim().toLowerCase();
     const cached = newRowItemCache.current.get(searchKey);
     if (cached) {
@@ -917,7 +938,7 @@ const InventoryPage = () => {
     return () => {
       isMounted = false;
     };
-  }, [debouncedNewItemSearch]);
+  }, [debouncedNewItemSearch, isEditorMode]);
 
   const handleInlineSave = async (item: InventoryRecord) => {
     const draft = inlineDrafts[item.id] ?? {
@@ -928,14 +949,19 @@ const InventoryPage = () => {
       draft.locationId === '' ? NaN : Number(draft.locationId);
     const parsedQuantity = Number(draft.quantity);
 
-    if (!Number.isInteger(parsedLocationId) || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+    if (!Number.isInteger(parsedLocationId) || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
       setInlineError((prev) => ({
         ...prev,
         [item.id]:
           !Number.isInteger(parsedLocationId)
             ? 'Select a valid location'
-            : 'Quantity must be greater than 0',
+            : 'Quantity must be an integer greater than 0',
       }));
+      if (!Number.isInteger(parsedLocationId)) {
+        focusController.focus(item.id.toString(), 'location');
+      } else {
+        focusController.focus(item.id.toString(), 'quantity');
+      }
       return false;
     }
 
@@ -1598,7 +1624,7 @@ const InventoryPage = () => {
               if (!Number.isInteger(numeric) || numeric <= 0) {
                 setNewRowErrors((prev) => ({
                   ...prev,
-                  quantity: 'Quantity must be greater than 0',
+                  quantity: 'Quantity must be an integer greater than 0',
                   api: null,
                 }));
               } else {
@@ -1631,6 +1657,11 @@ const InventoryPage = () => {
           <Typography variant="body2" color="text.secondary">
             New entry
           </Typography>
+          {newRowErrors.org && (
+            <Typography variant="caption" color="error">
+              {newRowErrors.org}
+            </Typography>
+          )}
           {newRowErrors.api && (
             <Typography variant="caption" color="error">
               {newRowErrors.api}
@@ -1653,25 +1684,36 @@ const InventoryPage = () => {
               sx={{ height: 22, fontSize: 12 }}
             />
           )}
-          <Button
-            size="small"
-            variant="contained"
-            color="primary"
-            onClick={() => handleNewRowSave()}
-            disabled={newRowSaving}
-            data-testid="new-row-save"
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                handleNewRowSave();
-              }
-            }}
-            ref={(el) => {
-              newRowSaveRef.current = el;
-            }}
+          <Tooltip
+            title={
+              newRowOrgBlocked
+                ? 'Select an organization to save items in org view.'
+                : ''
+            }
+            disableHoverListener={!newRowOrgBlocked}
           >
-            Save
-          </Button>
+            <span>
+              <Button
+                size="small"
+                variant="contained"
+                color="primary"
+                onClick={() => handleNewRowSave()}
+                disabled={newRowSaving || newRowOrgBlocked}
+                data-testid="new-row-save"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleNewRowSave();
+                  }
+                }}
+                ref={(el) => {
+                  newRowSaveRef.current = el;
+                }}
+              >
+                Save
+              </Button>
+            </span>
+          </Tooltip>
         </Stack>
       </Box>
     );
@@ -2321,10 +2363,10 @@ const InventoryPage = () => {
                                           setInlineDraft(item.id, {
                                             quantity: numeric,
                                           });
-                                          if (!Number.isFinite(numeric) || numeric <= 0) {
+                                          if (!Number.isInteger(numeric) || numeric <= 0) {
                                             setInlineError((prev) => ({
                                               ...prev,
-                                              [item.id]: 'Quantity must be greater than 0',
+                                              [item.id]: 'Quantity must be an integer greater than 0',
                                             }));
                                           } else {
                                             setInlineError((prev) => ({ ...prev, [item.id]: null }));

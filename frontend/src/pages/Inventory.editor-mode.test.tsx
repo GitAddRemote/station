@@ -162,4 +162,112 @@ describe('Inventory editor mode inline controls', () => {
       quantity: 7,
     });
   });
+
+  it('surfaces validation errors and focuses the first invalid field for new row', async () => {
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const saveButton = await screen.findByTestId('new-row-save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(screen.getByText('Select an item')).toBeInTheDocument());
+    const itemInput = await screen.findByTestId('new-row-item-input');
+    await waitFor(() => expect(document.activeElement).toBe(itemInput));
+  });
+
+  it('prevents non-integer quantities and shows error', async () => {
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const itemInput = await screen.findByTestId('new-row-item-input');
+    fireEvent.change(itemInput, { target: { value: 'New' } });
+    fireEvent.click(await screen.findByText('New Catalog Item'));
+
+    const locationInput = await screen.findByTestId('new-row-location-input');
+    fireEvent.change(locationInput, { target: { value: 'Test' } });
+    fireEvent.click(await screen.findByText('Test Location'));
+
+    const quantityInput = screen.getByTestId('new-row-quantity');
+    fireEvent.change(quantityInput, { target: { value: '7.5' } });
+    const saveButton = screen.getByTestId('new-row-save');
+    fireEvent.click(saveButton);
+
+    expect(mockCreateItem).not.toHaveBeenCalled();
+    expect(screen.getByText('Quantity must be an integer greater than 0')).toBeInTheDocument();
+  });
+
+  it('keeps the row dirty and shows retry on API failure', async () => {
+    mockCreateItem.mockRejectedValueOnce(new Error('fail'));
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    fireEvent.change(await screen.findByTestId('new-row-item-input'), { target: { value: 'New' } });
+    fireEvent.click(await screen.findByText('New Catalog Item'));
+
+    const locationInput = await screen.findByTestId('new-row-location-input');
+    fireEvent.change(locationInput, { target: { value: 'Test' } });
+    fireEvent.click(await screen.findByText('Test Location'));
+
+    const quantityInput = screen.getByTestId('new-row-quantity');
+    fireEvent.change(quantityInput, { target: { value: '7' } });
+
+    fireEvent.click(screen.getByTestId('new-row-save'));
+
+    await waitFor(() =>
+      expect(screen.getByText('Unable to add item. Please try again.')).toBeInTheDocument(),
+    );
+    expect((screen.getByTestId('new-row-quantity') as HTMLInputElement).value).toBe('7');
+  });
+
+  it('shows inline quantity validation error for non-integer input and focuses the field', async () => {
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const quantityInput = await screen.findByTestId('inline-quantity-item-1');
+    fireEvent.change(quantityInput, { target: { value: '3.5' } });
+    fireEvent.click(screen.getByTestId('inline-save-item-1'));
+
+    await waitFor(() =>
+      expect(screen.getByText('Quantity must be an integer greater than 0')).toBeInTheDocument(),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(quantityInput));
+    expect(mockUpdateItem).not.toHaveBeenCalled();
+  });
 });
