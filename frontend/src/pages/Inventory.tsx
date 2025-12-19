@@ -859,9 +859,10 @@ const InventoryPage = () => {
   }, [isEditorMode]);
 
   useEffect(() => {
-    if (!newRowOrgBlocked) {
-      setNewRowErrors((prev) => ({ ...prev, org: null }));
-    }
+    setNewRowErrors((prev) => ({
+      ...prev,
+      org: newRowOrgBlocked ? 'Select an organization to add items in org view.' : null,
+    }));
   }, [newRowOrgBlocked]);
 
   useEffect(() => {
