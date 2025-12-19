@@ -57,6 +57,7 @@ interface FiltersPanelProps {
   showAddButton: boolean;
   totalCount: number;
   itemCount: number;
+  autoFocusSearch?: boolean;
 }
 
 export const InventoryFiltersPanel = ({
@@ -84,6 +85,7 @@ export const InventoryFiltersPanel = ({
   showAddButton,
   totalCount,
   itemCount,
+  autoFocusSearch = false,
 }: FiltersPanelProps) => {
   return (
     <>
@@ -94,6 +96,7 @@ export const InventoryFiltersPanel = ({
             label="Search by name, note, or location"
             placeholder="Prospector, Lorville, armors..."
             value={filters.search}
+            autoFocus={autoFocusSearch}
             onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
           />
         </Grid>

@@ -30,6 +30,7 @@ interface InventoryInlineRowProps {
   inlineLocationInput: string;
   locationEditing: boolean;
   inlineSaving: boolean;
+  inlineSaved?: boolean;
   inlineError?: string | null;
   isDirty: boolean;
   focusController: FocusController<string, 'location' | 'quantity' | 'save'>;
@@ -54,6 +55,7 @@ export const InventoryInlineRow = ({
   inlineLocationInput,
   locationEditing,
   inlineSaving,
+  inlineSaved,
   inlineError,
   isDirty,
   focusController,
@@ -279,11 +281,6 @@ export const InventoryInlineRow = ({
             Large quantity entered - verify value.
           </Typography>
         )}
-        {inlineError && (
-          <Typography variant="caption" color="error">
-            {inlineError}
-          </Typography>
-        )}
       </Stack>
       <Stack
         direction="row"
@@ -295,6 +292,22 @@ export const InventoryInlineRow = ({
           flexWrap: 'nowrap',
         }}
       >
+        <Box sx={{ minHeight: 18, display: 'flex', alignItems: 'center' }}>
+          {inlineError && (
+            <Typography variant="caption" color="error">
+              {inlineError}
+            </Typography>
+          )}
+          {!inlineError && inlineSaved && (
+            <Chip
+              label="Saved"
+              size="small"
+              color="success"
+              variant="outlined"
+              sx={{ height: 18, fontSize: 11 }}
+            />
+          )}
+        </Box>
         {density === 'compact' && isDirty && (
           <Chip
             label="Unsaved"

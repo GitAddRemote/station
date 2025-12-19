@@ -121,6 +121,7 @@ const InventoryPage = () => {
     Record<string, { locationId: number | ''; quantity: number | '' }>
   >({});
   const [inlineSaving, setInlineSaving] = useState<Set<string>>(new Set());
+  const [inlineSaved, setInlineSaved] = useState<Set<string>>(new Set());
   const [inlineError, setInlineError] = useState<Record<string, string | null>>({});
   const [allLocations, setAllLocations] = useState<{ id: number; name: string }[]>([]);
   const [inlineLocationInputs, setInlineLocationInputs] = useState<Record<string, string>>({});
@@ -150,14 +151,6 @@ const InventoryPage = () => {
     api?: string | null;
   }>({});
   const [newRowSaving, setNewRowSaving] = useState(false);
-  const itemGridTemplate = useMemo(
-    () =>
-      density === 'compact'
-        ? { xs: '1fr', md: '2fr 1fr 0.8fr 0.8fr auto' }
-        : { xs: '1fr', md: '2fr 1fr 1fr 1fr auto' },
-    [density],
-  );
-
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
   const debouncedNewItemSearch = useDebounce(newRowItemInput, 300);
@@ -962,6 +955,21 @@ const InventoryPage = () => {
     const nextSaving = new Set(inlineSaving);
     nextSaving.add(item.id);
     setInlineSaving(nextSaving);
+    const prevItem =
+      items.find((entry) => entry.id === item.id) ??
+      ({
+        ...item,
+      } as InventoryRecord);
+    const updatedItem: InventoryRecord = {
+      ...item,
+      locationId: parsedLocationId,
+      quantity: parsedQuantity,
+      locationName:
+        allLocations.find((loc) => loc.id === parsedLocationId)?.name || item.locationName,
+    };
+    setItems((prev) =>
+      prev.map((entry) => (entry.id === item.id ? updatedItem : entry)),
+    );
 
     try {
       if (viewMode === 'org' && selectedOrgId) {
@@ -975,10 +983,24 @@ const InventoryPage = () => {
           quantity: parsedQuantity,
         });
       }
-      await fetchInventory();
+      setInlineSaved((prev) => {
+        const next = new Set(prev);
+        next.add(item.id.toString());
+        setTimeout(() => {
+          setInlineSaved((current) => {
+            const copy = new Set(current);
+            copy.delete(item.id.toString());
+            return copy;
+          });
+        }, 1200);
+        return next;
+      });
       return true;
     } catch (err) {
       console.error('Inline save failed', err);
+      setItems((prev) =>
+        prev.map((entry) => (entry.id === item.id ? prevItem : entry)),
+      );
       setInlineError((prev) => ({
         ...prev,
         [item.id]: 'Unable to save. Please try again.',
@@ -1461,6 +1483,7 @@ const InventoryPage = () => {
           '');
     const saving = inlineSaving.has(item.id);
     const errorText = inlineError[item.id];
+    const saved = inlineSaved.has(item.id.toString());
 
     return (
       <InventoryInlineRow
@@ -1472,6 +1495,7 @@ const InventoryPage = () => {
         inlineLocationInput={inlineLocationValue}
         locationEditing={Boolean(locationEditing[rowKey])}
         inlineSaving={saving}
+        inlineSaved={saved}
         inlineError={errorText}
         isDirty={isDirty}
         focusController={focusController}
@@ -1596,6 +1620,7 @@ const InventoryPage = () => {
                   showAddButton={viewMode === 'personal'}
                   totalCount={totalCount}
                   itemCount={items.length}
+                  autoFocusSearch
                 />
               </CardContent>
             </Card>
@@ -1650,7 +1675,13 @@ const InventoryPage = () => {
                       <Box
                         sx={{
                           display: 'grid',
-                          gridTemplateColumns: itemGridTemplate,
+                          gridTemplateColumns: {
+                            xs: '1fr',
+                            md:
+                              density === 'compact'
+                                ? '2fr 1fr 1fr 1fr auto'
+                                : '2fr 1fr 1fr 1fr auto',
+                          },
                           alignItems: 'center',
                           color: 'text.secondary',
                           fontSize: 12,
