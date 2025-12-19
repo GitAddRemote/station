@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import type { MouseEvent } from 'react';
 import {
   Autocomplete,
@@ -14,6 +13,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import type { InventoryItem, OrgInventoryItem } from '../../services/inventory.service';
 import type { FocusController } from '../../utils/focusController';
+import { useMemoizedLocations } from '../../hooks/useMemoizedLocations';
 
 export type InventoryRecord = InventoryItem | OrgInventoryItem;
 
@@ -73,31 +73,18 @@ export const InventoryInlineRow = ({
     typeof inlineDraft.locationId === 'string'
       ? Number(inlineDraft.locationId)
       : inlineDraft.locationId;
-  const selectedLocation =
-    allLocations.find((loc) => loc.id === draftLocationId) ||
-    (typeof draftLocationId === 'number'
-      ? {
-          id: draftLocationId,
-          name: item.locationName || `Location #${draftLocationId}`,
-        }
-      : null);
 
-  const filteredOptions = useMemo(() => {
-    const filterTerm = inlineLocationInput.trim().toLowerCase();
-    return allLocations
-      .filter((opt) => opt.name.toLowerCase().includes(filterTerm))
-      .sort((a, b) => {
-        const aName = a.name.toLowerCase();
-        const bName = b.name.toLowerCase();
-        const aStarts = aName.startsWith(filterTerm);
-        const bStarts = bName.startsWith(filterTerm);
-        if (aStarts !== bStarts) return aStarts ? -1 : 1;
-        const aIndex = aName.indexOf(filterTerm);
-        const bIndex = bName.indexOf(filterTerm);
-        if (aIndex !== bIndex) return aIndex - bIndex;
-        return a.name.localeCompare(b.name);
-      });
-  }, [allLocations, inlineLocationInput]);
+  const { filtered: filteredOptions, getSelected } = useMemoizedLocations(
+    allLocations,
+    inlineLocationInput,
+  );
+  const selectedLocation =
+    typeof draftLocationId === 'number'
+      ? getSelected(draftLocationId) ||
+        (item.locationName
+          ? { id: draftLocationId, name: item.locationName }
+          : null)
+      : null;
 
   const draftQuantityNumber = Number(inlineDraft.quantity);
 

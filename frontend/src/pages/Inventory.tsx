@@ -1439,6 +1439,89 @@ const InventoryPage = () => {
   }
 
   const showEmptyState = filteredItems.length === 0 && !refreshing;
+  const renderInlineRow = (item: InventoryRecord) => {
+    const rowKey = item.id.toString();
+    const draft = inlineDrafts[item.id] ?? {
+      locationId: Number(item.locationId) || '',
+      quantity: Number(item.quantity) || 0,
+    };
+    const originalLocationId = Number(item.locationId) || '';
+    const draftLocationId =
+      typeof draft.locationId === 'string' ? Number(draft.locationId) : draft.locationId;
+    const originalQuantity = Number(item.quantity) || 0;
+    const draftQuantityNumber = Number(draft.quantity);
+    const isDirty =
+      draftLocationId !== originalLocationId || draftQuantityNumber !== originalQuantity;
+    const inlineLocationValue =
+      inlineLocationInputs[rowKey] ??
+      (locationEditing[rowKey]
+        ? ''
+        : allLocations.find((loc) => loc.id === (typeof draft.locationId === 'number' ? draft.locationId : Number(draft.locationId)))?.name ??
+          item.locationName ??
+          '');
+    const saving = inlineSaving.has(item.id);
+    const errorText = inlineError[item.id];
+
+    return (
+      <InventoryInlineRow
+        key={item.id}
+        item={item}
+        density={density}
+        allLocations={allLocations}
+        inlineDraft={draft}
+        inlineLocationInput={inlineLocationValue}
+        locationEditing={Boolean(locationEditing[rowKey])}
+        inlineSaving={saving}
+        inlineError={errorText}
+        isDirty={isDirty}
+        focusController={focusController}
+        rowKey={rowKey}
+        onDraftChange={(changes) => setInlineDraft(item.id, changes)}
+        onErrorChange={(message) =>
+          setInlineError((prev) => ({
+            ...prev,
+            [item.id]: message,
+          }))
+        }
+        onLocationInputChange={(value) =>
+          setInlineLocationInputs((prev) => ({
+            ...prev,
+            [rowKey]: value,
+          }))
+        }
+        onLocationFocus={() => {
+          setInlineLocationInputs((prev) => ({
+            ...prev,
+            [rowKey]: '',
+          }));
+          setLocationEditing((prev) => ({ ...prev, [rowKey]: true }));
+          setInlineError((prev) => ({ ...prev, [item.id]: null }));
+        }}
+        onLocationBlur={(selectedName) => {
+          setInlineLocationInputs((prev) => ({
+            ...prev,
+            [rowKey]:
+              selectedName ??
+              allLocations.find((loc) => loc.id === draftLocationId)?.name ??
+              '',
+          }));
+          setLocationEditing((prev) => ({ ...prev, [rowKey]: false }));
+          setInlineError((prev) => ({ ...prev, [item.id]: null }));
+        }}
+        onSave={() => handleInlineSaveAndAdvance(item)}
+        onOpenActions={(e) => handleActionOpen(e, item)}
+        setLocationRef={(ref, key) => {
+          locationRefs.current[key] = ref;
+        }}
+        setQuantityRef={(ref, key) => {
+          quantityRefs.current[key] = ref;
+        }}
+        setSaveRef={(ref, key) => {
+          saveRefs.current[key] = ref;
+        }}
+      />
+    );
+  };
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#0b1118' }}>
@@ -1745,84 +1828,7 @@ const InventoryPage = () => {
                           </Box>
                           <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
                           <Stack divider={<Divider flexItem sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />}>
-                            {groupItems.map((item) => {
-                              const rowKey = item.id.toString();
-                              const draft = inlineDrafts[item.id] ?? {
-                                locationId: Number(item.locationId) || '',
-                                quantity: Number(item.quantity) || 0,
-                              };
-                              const originalLocationId = Number(item.locationId) || '';
-                              const originalQuantity = Number(item.quantity) || 0;
-                              const draftLocationId =
-                                typeof draft.locationId === 'string'
-                                  ? Number(draft.locationId)
-                                  : draft.locationId;
-                              const saving = inlineSaving.has(item.id);
-                              const errorText = inlineError[item.id];
-                              const draftQuantityNumber = Number(draft.quantity);
-                              const isDirty =
-                                draftLocationId !== originalLocationId ||
-                                draftQuantityNumber !== originalQuantity;
-                              return (
-                                <InventoryInlineRow
-                                  key={item.id}
-                                  item={item}
-                                  density={density}
-                                  allLocations={allLocations}
-                                  inlineDraft={draft}
-                                  inlineLocationInput={
-                                    inlineLocationInputs[rowKey] ??
-                                    (locationEditing[rowKey] ? '' : item.locationName || '')
-                                  }
-                                  locationEditing={Boolean(locationEditing[rowKey])}
-                                  inlineSaving={saving}
-                                  inlineError={errorText}
-                                  isDirty={isDirty}
-                                  focusController={focusController}
-                                  rowKey={rowKey}
-                                  onDraftChange={(changes) => setInlineDraft(item.id, changes)}
-                                  onErrorChange={(message) =>
-                                    setInlineError((prev) => ({ ...prev, [item.id]: message }))
-                                  }
-                                  onLocationInputChange={(value) =>
-                                    setInlineLocationInputs((prev) => ({
-                                      ...prev,
-                                      [rowKey]: value,
-                                    }))
-                                  }
-                                  onLocationFocus={() => {
-                                    setInlineLocationInputs((prev) => ({
-                                      ...prev,
-                                      [rowKey]: '',
-                                    }));
-                                    setLocationEditing((prev) => ({ ...prev, [rowKey]: true }));
-                                    setInlineError((prev) => ({ ...prev, [item.id]: null }));
-                                  }}
-                                  onLocationBlur={(selectedName) => {
-                                    setInlineLocationInputs((prev) => ({
-                                      ...prev,
-                                      [rowKey]:
-                                        selectedName ??
-                                        allLocations.find((loc) => loc.id === draftLocationId)?.name ??
-                                        '',
-                                    }));
-                                    setLocationEditing((prev) => ({ ...prev, [rowKey]: false }));
-                                    setInlineError((prev) => ({ ...prev, [item.id]: null }));
-                                  }}
-                                  onSave={() => handleInlineSaveAndAdvance(item)}
-                                  onOpenActions={(e) => handleActionOpen(e, item)}
-                                  setLocationRef={(ref, key) => {
-                                    locationRefs.current[key] = ref;
-                                  }}
-                                  setQuantityRef={(ref, key) => {
-                                    quantityRefs.current[key] = ref;
-                                  }}
-                                  setSaveRef={(ref, key) => {
-                                    saveRefs.current[key] = ref;
-                                  }}
-                                />
-                              );
-                            })}
+                            {groupItems.map((item) => renderInlineRow(item))}
                           </Stack>
                         </Box>
                       ))}

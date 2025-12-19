@@ -40,6 +40,13 @@ jest.mock('../services/uex.service', () => ({
     getStarSystems: jest.fn(),
   },
 }));
+jest.mock('../hooks/useMemoizedLocations', () => {
+  const original = jest.requireActual('../hooks/useMemoizedLocations');
+  return {
+    ...original,
+    useMemoizedLocations: jest.fn((...args: unknown[]) => original.useMemoizedLocations(...args)),
+  };
+});
 const mockItem = {
   id: 'item-1',
   userId: 1,
@@ -445,5 +452,15 @@ describe('Inventory editor mode inline controls', () => {
 
     const saveButton = await screen.findByTestId('inline-save-item-1');
     await waitFor(() => expect(document.activeElement).toBe(saveButton));
+  });
+
+  it('memoizes location filtering for inline rows', () => {
+    const { useMemoizedLocations: mockedHook } = jest.requireMock('../hooks/useMemoizedLocations');
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+    expect(mockedHook).toHaveBeenCalled();
   });
 });
