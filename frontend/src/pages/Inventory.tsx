@@ -133,6 +133,30 @@ const InventoryPage = () => {
   const [inlineLocationInputs, setInlineLocationInputs] = useState<Record<string, string>>({});
   const [locationEditing, setLocationEditing] = useState<Record<string, boolean>>({});
   const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] = useState(false);
+  const [newRowDraft, setNewRowDraft] = useState<{
+    itemId: number | '';
+    locationId: number | '';
+    quantity: number | '';
+  }>({
+    itemId: '',
+    locationId: '',
+    quantity: '',
+  });
+  const [newRowSelectedItem, setNewRowSelectedItem] = useState<CatalogItem | null>(null);
+  const [newRowItemInput, setNewRowItemInput] = useState('');
+  const [newRowItemOptions, setNewRowItemOptions] = useState<CatalogItem[]>([]);
+  const [newRowItemLoading, setNewRowItemLoading] = useState(false);
+  const [newRowItemError, setNewRowItemError] = useState<string | null>(null);
+  const [newRowLocationInput, setNewRowLocationInput] = useState('');
+  const [newRowLocationEditing, setNewRowLocationEditing] = useState(false);
+  const [newRowErrors, setNewRowErrors] = useState<{
+    item?: string | null;
+    location?: string | null;
+    quantity?: string | null;
+    org?: string | null;
+    api?: string | null;
+  }>({});
+  const [newRowSaving, setNewRowSaving] = useState(false);
   const itemGridTemplate = useMemo(
     () =>
       density === 'compact'
@@ -143,10 +167,13 @@ const InventoryPage = () => {
 
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
+  const debouncedNewItemSearch = useDebounce(newRowItemInput, 300);
+  const debouncedNewLocationSearch = useDebounce(newRowLocationInput, 200);
   const getRowOrder = useCallback(
     () => items.map((item) => item.id.toString()),
     [items],
   );
+  const getNewRowOrder = useCallback((): Array<'new-row'> => ['new-row'], []);
   const handleFocusBoundary = useCallback(async () => {
     const totalPages = Math.ceil(totalCount / rowsPerPage);
     if (page < totalPages - 1) {
@@ -156,13 +183,22 @@ const InventoryPage = () => {
     return null;
   }, [page, rowsPerPage, totalCount]);
   const focusController = useFocusController<string, 'location' | 'quantity' | 'save'>({
-    fieldOrder: ['location', 'quantity', 'save'],
+    fieldOrder: useMemo(() => ['location', 'quantity', 'save'] as const, []),
     getRowOrder,
     onBoundary: handleFocusBoundary,
+  });
+  const newRowFocusController = useFocusController<'new-row', 'item' | 'location' | 'quantity' | 'save'>({
+    fieldOrder: useMemo(() => ['item', 'location', 'quantity', 'save'] as const, []),
+    getRowOrder: getNewRowOrder,
   });
   const locationRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const saveRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const newRowItemRef = useRef<HTMLInputElement | null>(null);
+  const newRowLocationRef = useRef<HTMLInputElement | null>(null);
+  const newRowQuantityRef = useRef<HTMLInputElement | null>(null);
+  const newRowSaveRef = useRef<HTMLButtonElement | null>(null);
+  const newRowItemCache = useRef<Map<string, CatalogItem[]>>(new Map());
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -577,6 +613,56 @@ const InventoryPage = () => {
     return groups;
   }, [groupBy, filteredItems]);
 
+  const newRowSelectedLocation = useMemo(
+    () =>
+      allLocations.find(
+        (loc) => Number(loc.id) === Number(newRowDraft.locationId),
+      ) ?? null,
+    [allLocations, newRowDraft.locationId],
+  );
+
+  const newRowFilteredLocations = useMemo(() => {
+    const term = debouncedNewLocationSearch.trim().toLowerCase();
+    return allLocations
+      .filter((opt) => opt.name.toLowerCase().includes(term))
+      .sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        const aStarts = aName.startsWith(term);
+        const bStarts = bName.startsWith(term);
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+        const aIndex = aName.indexOf(term);
+        const bIndex = bName.indexOf(term);
+        if (aIndex !== bIndex) return aIndex - bIndex;
+        return a.name.localeCompare(b.name);
+      });
+  }, [allLocations, debouncedNewLocationSearch]);
+
+  const newRowQuantityNumber = useMemo(
+    () => (newRowDraft.quantity === '' ? NaN : Number(newRowDraft.quantity)),
+    [newRowDraft.quantity],
+  );
+
+  const newRowDirty = useMemo(
+    () =>
+      Boolean(
+        newRowSelectedItem ||
+          newRowDraft.locationId ||
+          newRowDraft.quantity !== '' ||
+          newRowLocationInput.trim() ||
+          newRowItemInput.trim(),
+      ),
+    [
+      newRowDraft.locationId,
+      newRowDraft.quantity,
+      newRowItemInput,
+      newRowLocationInput,
+      newRowSelectedItem,
+    ],
+  );
+  const isEditorMode = density === 'compact';
+  const newRowOrgBlocked = viewMode === 'org' && !selectedOrgId;
+
   const setInlineDraft = (
     id: string,
     changes: Partial<{ locationId: number | ''; quantity: number | '' }>,
@@ -598,6 +684,85 @@ const InventoryPage = () => {
       };
     });
     setInlineError((prev) => ({ ...prev, [id]: null }));
+  };
+
+  const resetNewRowDraft = () => {
+    setNewRowDraft({
+      itemId: '',
+      locationId: '',
+      quantity: '',
+    });
+    setNewRowSelectedItem(null);
+    setNewRowItemInput('');
+    setNewRowLocationInput('');
+    setNewRowLocationEditing(false);
+    setNewRowErrors({});
+  };
+
+  const handleNewRowSave = async () => {
+    if (newRowOrgBlocked) {
+      setNewRowErrors((prev) => ({
+        ...prev,
+        org: 'Select an organization to add items in org view.',
+      }));
+      return;
+    }
+    const selectedItemId =
+      newRowSelectedItem?.uexId ??
+      (typeof newRowDraft.itemId === 'number' ? newRowDraft.itemId : null);
+    const parsedLocationId =
+      newRowDraft.locationId === '' ? NaN : Number(newRowDraft.locationId);
+    const parsedQuantity = Number(newRowDraft.quantity);
+    const errors: typeof newRowErrors = {};
+
+    if (!selectedItemId) {
+      errors.item = 'Select an item';
+    }
+    if (!Number.isInteger(parsedLocationId) || parsedLocationId <= 0) {
+      errors.location = 'Select a valid location';
+    }
+    if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+      errors.quantity = 'Quantity must be an integer greater than 0';
+    }
+
+    if (errors.item || errors.location || errors.quantity) {
+      setNewRowErrors((prev) => ({ ...prev, ...errors, api: null }));
+      if (errors.item) {
+        newRowFocusController.focus('new-row', 'item');
+      } else if (errors.location) {
+        newRowFocusController.focus('new-row', 'location');
+      } else if (errors.quantity) {
+        newRowFocusController.focus('new-row', 'quantity');
+      }
+      return;
+    }
+
+    try {
+      setNewRowSaving(true);
+      setNewRowErrors({});
+      const payload = {
+        gameId: GAME_ID,
+        uexItemId: selectedItemId as number,
+        locationId: parsedLocationId,
+        quantity: parsedQuantity,
+      };
+      if (viewMode === 'org' && selectedOrgId) {
+        await inventoryService.createOrgItem(selectedOrgId, payload);
+      } else {
+        await inventoryService.createItem(payload);
+      }
+      await fetchInventory();
+      resetNewRowDraft();
+      newRowFocusController.focus('new-row', 'item');
+    } catch (err) {
+      console.error('Failed to create inventory item from new row', err);
+      setNewRowErrors({
+        api: 'Unable to add item. Please try again.',
+      });
+      newRowFocusController.focus('new-row', 'save');
+    } finally {
+      setNewRowSaving(false);
+    }
   };
   useEffect(() => {
     const unregisters: Array<() => void> = [];
@@ -636,6 +801,70 @@ const InventoryPage = () => {
   }, [items, focusController]);
 
   useEffect(() => {
+    const unregisters: Array<() => void> = [];
+    const itemRef = newRowItemRef.current;
+    const locationRef = newRowLocationRef.current;
+    const quantityRef = newRowQuantityRef.current;
+    const saveRef = newRowSaveRef.current;
+
+    if (itemRef) {
+      unregisters.push(
+        newRowFocusController.register('new-row', 'item', () => {
+          itemRef.focus();
+          itemRef.select?.();
+        }),
+      );
+    }
+    if (locationRef) {
+      unregisters.push(
+        newRowFocusController.register('new-row', 'location', () => {
+          locationRef.focus();
+          locationRef.select?.();
+        }),
+      );
+    }
+    if (quantityRef) {
+      unregisters.push(
+        newRowFocusController.register('new-row', 'quantity', () => {
+          quantityRef.focus();
+          quantityRef.select?.();
+        }),
+      );
+    }
+    if (saveRef) {
+      unregisters.push(
+        newRowFocusController.register('new-row', 'save', () => {
+          saveRef.focus();
+        }),
+      );
+    }
+
+    return () => {
+      unregisters.forEach((fn) => fn());
+    };
+  }, [newRowFocusController, density]);
+
+  useEffect(() => {
+    if (!isEditorMode) return;
+    const handle = window.requestAnimationFrame(() => {
+      newRowFocusController.focus('new-row', 'item');
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [isEditorMode, newRowFocusController]);
+
+  useEffect(() => {
+    if (!isEditorMode) {
+      resetNewRowDraft();
+    }
+  }, [isEditorMode]);
+
+  useEffect(() => {
+    if (!newRowOrgBlocked) {
+      setNewRowErrors((prev) => ({ ...prev, org: null }));
+    }
+  }, [newRowOrgBlocked]);
+
+  useEffect(() => {
     if (pendingFocusAfterPageChange && items.length > 0) {
       focusController.focus(items[0].id.toString(), 'location');
       setPendingFocusAfterPageChange(false);
@@ -661,8 +890,55 @@ const InventoryPage = () => {
       })
       .catch((err) => {
         console.error('Failed to load locations', err);
-      });
+    });
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!isEditorMode) {
+      setNewRowItemLoading(false);
+      setNewRowItemOptions([]);
+      return;
+    }
+    const searchKey = debouncedNewItemSearch.trim().toLowerCase();
+    const cached = newRowItemCache.current.get(searchKey);
+    if (cached) {
+      setNewRowItemOptions(cached);
+      setNewRowItemError(null);
+      setNewRowItemLoading(false);
+      return;
+    }
+
+    const loadItems = async () => {
+      try {
+        setNewRowItemError(null);
+        setNewRowItemLoading(true);
+        const data = await uexService.searchItems({
+          search: debouncedNewItemSearch || undefined,
+          limit: 20,
+          offset: 0,
+        });
+        if (!isMounted) return;
+        newRowItemCache.current.set(searchKey, data.items);
+        setNewRowItemOptions(data.items);
+      } catch (err) {
+        console.error('Failed to search catalog items for new row', err);
+        if (isMounted) {
+          setNewRowItemError('Unable to load items.');
+          setNewRowItemOptions([]);
+        }
+      } finally {
+        if (isMounted) {
+          setNewRowItemLoading(false);
+        }
+      }
+    };
+
+    loadItems();
+    return () => {
+      isMounted = false;
+    };
+  }, [debouncedNewItemSearch, isEditorMode]);
 
   const handleInlineSave = async (item: InventoryRecord) => {
     const draft = inlineDrafts[item.id] ?? {
@@ -673,14 +949,19 @@ const InventoryPage = () => {
       draft.locationId === '' ? NaN : Number(draft.locationId);
     const parsedQuantity = Number(draft.quantity);
 
-    if (!Number.isInteger(parsedLocationId) || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+    if (!Number.isInteger(parsedLocationId) || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
       setInlineError((prev) => ({
         ...prev,
         [item.id]:
           !Number.isInteger(parsedLocationId)
             ? 'Select a valid location'
-            : 'Quantity must be greater than 0',
+            : 'Quantity must be an integer greater than 0',
       }));
+      if (!Number.isInteger(parsedLocationId)) {
+        focusController.focus(item.id.toString(), 'location');
+      } else {
+        focusController.focus(item.id.toString(), 'quantity');
+      }
       return false;
     }
 
@@ -1146,6 +1427,298 @@ const InventoryPage = () => {
     }
   };
 
+  const renderNewItemRow = () => {
+    if (!isEditorMode) return null;
+    const showQuantityWarning =
+      Number.isFinite(newRowQuantityNumber) && newRowQuantityNumber > 100000;
+    return (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: itemGridTemplate,
+          gap: 0.75,
+          alignItems: 'flex-start',
+          px: 1,
+          py: 0.75,
+          border: '1px dashed rgba(255,255,255,0.15)',
+          borderRadius: 2,
+          backgroundColor: 'rgba(255,255,255,0.02)',
+          mb: 1.5,
+        }}
+      >
+        <Stack spacing={0.5}>
+          <Autocomplete
+            size="small"
+            fullWidth
+            options={newRowItemOptions}
+            value={newRowSelectedItem}
+            inputValue={newRowItemInput}
+            loading={newRowItemLoading}
+            autoHighlight
+            openOnFocus
+            filterOptions={(options) => options}
+            getOptionLabel={(option) => option?.name ?? ''}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            onChange={(_, value) => {
+              setNewRowSelectedItem(value);
+              setNewRowDraft((prev) => ({
+                ...prev,
+                itemId: value ? value.uexId : '',
+              }));
+              setNewRowItemInput(value?.name ?? newRowItemInput);
+              setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
+              if (value) {
+                newRowFocusController.focus('new-row', 'location');
+              }
+            }}
+            onInputChange={(_, value, reason) => {
+              setNewRowItemInput(value);
+              if (reason === 'clear') {
+                setNewRowSelectedItem(null);
+                setNewRowDraft((prev) => ({ ...prev, itemId: '' }));
+              }
+              setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
+            }}
+            renderOption={(props, option) => (
+              <li {...props} key={option.id}>
+                <Stack spacing={0.25}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {option.name}
+                  </Typography>
+                  {option.categoryName && (
+                    <Typography variant="caption" color="text.secondary">
+                      {option.categoryName}
+                    </Typography>
+                  )}
+                </Stack>
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="New item"
+                data-testid="new-row-item-input"
+                inputRef={(el) => {
+                  newRowItemRef.current = el;
+                }}
+                error={Boolean(newRowErrors.item)}
+                helperText={newRowErrors.item || newRowItemError || undefined}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    if (!newRowSelectedItem && newRowItemOptions.length > 0) {
+                      const first = newRowItemOptions[0];
+                      setNewRowSelectedItem(first);
+                      setNewRowDraft((prev) => ({ ...prev, itemId: first.uexId }));
+                      setNewRowItemInput(first.name);
+                    }
+                    newRowFocusController.focus('new-row', 'location');
+                  }
+                }}
+              />
+            )}
+          />
+        </Stack>
+        <Stack spacing={0.5}>
+          <Autocomplete
+            size="small"
+            fullWidth
+            options={newRowFilteredLocations}
+            autoHighlight
+            openOnFocus
+            filterOptions={(options) => options}
+            value={newRowLocationEditing ? null : newRowSelectedLocation}
+            inputValue={
+              newRowLocationEditing
+                ? newRowLocationInput
+                : newRowSelectedLocation?.name ?? newRowLocationInput
+            }
+            getOptionLabel={(option) => option?.name ?? ''}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            onChange={(_, value) => {
+              setNewRowDraft((prev) => ({
+                ...prev,
+                locationId: value ? value.id : '',
+              }));
+              setNewRowLocationEditing(false);
+              setNewRowLocationInput(value?.name ?? '');
+              setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
+              if (value) {
+                newRowFocusController.focus('new-row', 'quantity');
+              }
+            }}
+            onInputChange={(_, value) => {
+              setNewRowLocationInput(value);
+              setNewRowLocationEditing(true);
+              setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
+            }}
+            onFocus={() => {
+              setNewRowLocationEditing(true);
+              setNewRowLocationInput('');
+            }}
+            onBlur={() => {
+              setNewRowLocationEditing(false);
+              setNewRowLocationInput(newRowSelectedLocation?.name ?? '');
+              setNewRowErrors((prev) => ({ ...prev, location: null }));
+            }}
+            renderOption={(props, option) => (
+              <li {...props} key={option.id}>
+                {option.name}
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Location"
+                data-testid="new-row-location-input"
+                inputRef={(el) => {
+                  newRowLocationRef.current = el;
+                }}
+                error={Boolean(newRowErrors.location)}
+                helperText={newRowErrors.location || undefined}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const bestMatch = newRowFilteredLocations[0];
+                    if (bestMatch) {
+                      setNewRowDraft((prev) => ({ ...prev, locationId: bestMatch.id }));
+                      setNewRowLocationInput(bestMatch.name);
+                      setNewRowLocationEditing(false);
+                      setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
+                      newRowFocusController.focus('new-row', 'quantity');
+                    } else {
+                      setNewRowErrors((prev) => ({
+                        ...prev,
+                        location: 'No matches found',
+                      }));
+                    }
+                  }
+                }}
+              />
+            )}
+          />
+        </Stack>
+        <Stack spacing={0.5}>
+          <TextField
+            type="text"
+            size="small"
+            label="Quantity"
+            data-testid="new-row-quantity"
+            value={newRowDraft.quantity}
+            onChange={(e) => {
+              const raw = e.target.value.trim();
+              if (raw === '') {
+                setNewRowDraft((prev) => ({ ...prev, quantity: '' }));
+                setNewRowErrors((prev) => ({
+                  ...prev,
+                  quantity: 'Quantity is required',
+                  api: null,
+                }));
+                return;
+              }
+              const numeric = Number(raw);
+              setNewRowDraft((prev) => ({
+                ...prev,
+                quantity: Number.isNaN(numeric) ? '' : numeric,
+              }));
+              if (!Number.isInteger(numeric) || numeric <= 0) {
+                setNewRowErrors((prev) => ({
+                  ...prev,
+                  quantity: 'Quantity must be an integer greater than 0',
+                  api: null,
+                }));
+              } else {
+                setNewRowErrors((prev) => ({ ...prev, quantity: null, api: null }));
+              }
+            }}
+            inputProps={{
+              inputMode: 'numeric',
+              pattern: '[0-9]*',
+            }}
+            inputRef={(el) => {
+              newRowQuantityRef.current = el;
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                newRowFocusController.focus('new-row', 'save');
+              }
+            }}
+            error={Boolean(newRowErrors.quantity)}
+            helperText={newRowErrors.quantity || undefined}
+          />
+          {showQuantityWarning && (
+            <Typography variant="caption" sx={{ color: 'warning.main' }}>
+              Large quantity entered - verify value.
+            </Typography>
+          )}
+        </Stack>
+        <Stack spacing={0.5}>
+          <Typography variant="body2" color="text.secondary">
+            New entry
+          </Typography>
+          {newRowErrors.org && (
+            <Typography variant="caption" color="error">
+              {newRowErrors.org}
+            </Typography>
+          )}
+          {newRowErrors.api && (
+            <Typography variant="caption" color="error">
+              {newRowErrors.api}
+            </Typography>
+          )}
+        </Stack>
+        <Stack
+          direction="row"
+          spacing={1}
+          justifyContent="flex-end"
+          alignItems="center"
+          sx={{ minWidth: 140 }}
+        >
+          {newRowDirty && (
+            <Chip
+              label={newRowSaving ? 'Saving...' : 'Unsaved'}
+              size="small"
+              color={newRowSaving ? 'primary' : 'warning'}
+              variant="outlined"
+              sx={{ height: 22, fontSize: 12 }}
+            />
+          )}
+          <Tooltip
+            title={
+              newRowOrgBlocked
+                ? 'Select an organization to save items in org view.'
+                : ''
+            }
+            disableHoverListener={!newRowOrgBlocked}
+          >
+            <span>
+              <Button
+                size="small"
+                variant="contained"
+                color="primary"
+                onClick={() => handleNewRowSave()}
+                disabled={newRowSaving || newRowOrgBlocked}
+                data-testid="new-row-save"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleNewRowSave();
+                  }
+                }}
+                ref={(el) => {
+                  newRowSaveRef.current = el;
+                }}
+              >
+                Save
+              </Button>
+            </span>
+          </Tooltip>
+        </Stack>
+      </Box>
+    );
+  };
+
   if (!user || initialLoading) {
     return (
       <Box
@@ -1161,6 +1734,8 @@ const InventoryPage = () => {
       </Box>
     );
   }
+
+  const showEmptyState = filteredItems.length === 0 && !refreshing;
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#0b1118' }}>
@@ -1468,7 +2043,57 @@ const InventoryPage = () => {
                     <Typography color="error">{error}</Typography>
                   </Box>
                 )}
-                {filteredItems.length === 0 && !refreshing ? (
+                {!showEmptyState && (
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={2}
+                    sx={{ mb: 2, color: '#9aa0a6' }}
+                  >
+                    <ViewAgendaIcon fontSize="small" />
+                    <Typography variant="body2">
+                      Showing {items.length.toLocaleString()} of {totalCount.toLocaleString()} items
+                    </Typography>
+                  </Stack>
+                )}
+                {isEditorMode && (
+                  <>
+                    <Box
+                      sx={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 2,
+                        backgroundColor: '#0e1520',
+                        px: 1.5,
+                        py: 0.75,
+                        borderTop: '1px solid rgba(255,255,255,0.04)',
+                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: itemGridTemplate,
+                          alignItems: 'center',
+                          color: 'text.secondary',
+                          fontSize: 12,
+                          letterSpacing: 0.2,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        <Typography variant="caption">Item</Typography>
+                        <Typography variant="caption">Location</Typography>
+                        <Typography variant="caption">Quantity</Typography>
+                        <Typography variant="caption">Updated</Typography>
+                        <Typography variant="caption" textAlign="right">
+                          Actions
+                        </Typography>
+                      </Box>
+                    </Box>
+                    {renderNewItemRow()}
+                  </>
+                )}
+                {showEmptyState ? (
                   <Box sx={{ textAlign: 'center', py: 8 }}>
                     <InventoryIcon sx={{ fontSize: 42, color: '#4A9EFF' }} />
                     <Typography variant="h6" sx={{ mt: 2 }}>
@@ -1480,52 +2105,6 @@ const InventoryPage = () => {
                   </Box>
                 ) : (
                   <>
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      spacing={2}
-                      sx={{ mb: 2, color: '#9aa0a6' }}
-                    >
-                      <ViewAgendaIcon fontSize="small" />
-                      <Typography variant="body2">
-                        Showing {items.length.toLocaleString()} of{' '}
-                        {totalCount.toLocaleString()} items
-                      </Typography>
-                    </Stack>
-                    {density === 'compact' && (
-                      <Box
-                        sx={{
-                          position: 'sticky',
-                          top: 0,
-                          zIndex: 2,
-                          backgroundColor: '#0e1520',
-                          px: 1.5,
-                          py: 0.75,
-                          borderTop: '1px solid rgba(255,255,255,0.04)',
-                          borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: 'grid',
-                            gridTemplateColumns: itemGridTemplate,
-                            alignItems: 'center',
-                            color: 'text.secondary',
-                            fontSize: 12,
-                            letterSpacing: 0.2,
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          <Typography variant="caption">Item</Typography>
-                          <Typography variant="caption">Location</Typography>
-                          <Typography variant="caption">Quantity</Typography>
-                          <Typography variant="caption">Updated</Typography>
-                          <Typography variant="caption" textAlign="right">
-                            Actions
-                          </Typography>
-                        </Box>
-                      </Box>
-                    )}
                     <Stack spacing={2}>
                       {Array.from(groupedItems.entries()).map(([group, groupItems]) => (
                         <Box
@@ -1784,10 +2363,10 @@ const InventoryPage = () => {
                                           setInlineDraft(item.id, {
                                             quantity: numeric,
                                           });
-                                          if (!Number.isFinite(numeric) || numeric <= 0) {
+                                          if (!Number.isInteger(numeric) || numeric <= 0) {
                                             setInlineError((prev) => ({
                                               ...prev,
-                                              [item.id]: 'Quantity must be greater than 0',
+                                              [item.id]: 'Quantity must be an integer greater than 0',
                                             }));
                                           } else {
                                             setInlineError((prev) => ({ ...prev, [item.id]: null }));
