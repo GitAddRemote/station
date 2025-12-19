@@ -59,6 +59,7 @@ type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
 
 const GAME_ID = 1;
+const EDITOR_MODE_QUANTITY_MAX = 100000;
 
 const valueText = (value: number) => `${value.toLocaleString()} qty`;
 
@@ -1715,7 +1716,8 @@ const InventoryPage = () => {
                       saving={newRowSaving}
                       orgBlocked={newRowOrgBlocked}
                       showQuantityWarning={
-                        Number.isFinite(newRowQuantityNumber) && newRowQuantityNumber > 100000
+                        Number.isFinite(newRowQuantityNumber) &&
+                        newRowQuantityNumber >= EDITOR_MODE_QUANTITY_MAX
                       }
                       onItemInputChange={(value, reason) => {
                         setNewRowItemInput(value);
@@ -1789,9 +1791,12 @@ const InventoryPage = () => {
                           return;
                         }
                         const numeric = Number(raw);
+                        const nextQuantity = Number.isNaN(numeric)
+                          ? ''
+                          : Math.min(numeric, EDITOR_MODE_QUANTITY_MAX);
                         setNewRowDraft((prev) => ({
                           ...prev,
-                          quantity: Number.isNaN(numeric) ? '' : numeric,
+                          quantity: nextQuantity,
                         }));
                         if (!Number.isInteger(numeric) || numeric <= 0) {
                           setNewRowErrors((prev) => ({

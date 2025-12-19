@@ -1,5 +1,6 @@
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import InventoryPage from './Inventory';
 import { locationCache } from '../services/locationCache';
 import type { LocationRecord } from '../services/location.service';
@@ -85,16 +86,36 @@ describe('Inventory editor mode inline controls', () => {
       offset: 0,
     });
     const mockedLocationCache = locationCache as jest.Mocked<typeof locationCache>;
-    const mockLocation: LocationRecord = {
-      id: '200',
-      gameId: 1,
-      locationType: 'city',
-      displayName: 'Test Location',
-      shortName: 'Test Loc',
-      isAvailable: true,
-      hierarchyPath: {},
-    };
-    mockedLocationCache.getAllLocations.mockResolvedValue([mockLocation]);
+    const mockLocations: LocationRecord[] = [
+      {
+        id: '200',
+        gameId: 1,
+        locationType: 'city',
+        displayName: 'Test Location',
+        shortName: 'Test Loc',
+        isAvailable: true,
+        hierarchyPath: {},
+      },
+      {
+        id: '201',
+        gameId: 1,
+        locationType: 'outpost',
+        displayName: 'Alpha Base',
+        shortName: 'Alpha',
+        isAvailable: true,
+        hierarchyPath: {},
+      },
+      {
+        id: '202',
+        gameId: 1,
+        locationType: 'station',
+        displayName: 'Beta Port',
+        shortName: 'Beta',
+        isAvailable: true,
+        hierarchyPath: {},
+      },
+    ];
+    mockedLocationCache.getAllLocations.mockResolvedValue(mockLocations);
     // minimal profile fetch
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -452,6 +473,225 @@ describe('Inventory editor mode inline controls', () => {
 
     const saveButton = await screen.findByTestId('inline-save-item-1');
     await waitFor(() => expect(document.activeElement).toBe(saveButton));
+  });
+
+  it('debounces location filtering in the new row combobox', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const locationInput = await screen.findByTestId('new-row-location-input');
+    await user.click(locationInput);
+    expect(await screen.findByText('Test Location')).toBeInTheDocument();
+
+    await user.type(locationInput, 'Al');
+
+    await waitFor(() => expect(screen.queryByText('Beta Port')).not.toBeInTheDocument());
+  });
+
+  it('selects a location via keyboard navigation in the new row combobox', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const locationInput = await screen.findByTestId('new-row-location-input');
+    await user.click(locationInput);
+    await user.keyboard('{ArrowDown}{Enter}');
+
+    expect(locationInput).toHaveValue('Alpha Base');
+  });
+
+  it('blocks save and shows an error when location has no matches', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const itemInput = await screen.findByTestId('new-row-item-input');
+    await user.type(itemInput, 'New');
+    await user.click(await screen.findByText('New Catalog Item'));
+
+    const locationInput = await screen.findByTestId('new-row-location-input');
+    await user.click(locationInput);
+    await user.type(locationInput, 'Nowhere');
+
+    await waitFor(() => expect(screen.queryByText('Beta Port')).not.toBeInTheDocument());
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.getByText('No matches found')).toBeInTheDocument());
+
+    const quantityInput = await screen.findByTestId('new-row-quantity');
+    await user.type(quantityInput, '4');
+    await user.click(screen.getByTestId('new-row-save'));
+
+    await waitFor(() => expect(screen.getByText('Select a valid location')).toBeInTheDocument());
+    expect(mockCreateItem).not.toHaveBeenCalled();
+  });
+
+  it('warns on large quantities and caps the value in editor mode', async () => {
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const quantityInput = await screen.findByTestId('new-row-quantity');
+    fireEvent.change(quantityInput, { target: { value: '100000' } });
+    expect(screen.getByText('Large quantity entered - verify value.')).toBeInTheDocument();
+
+    fireEvent.change(quantityInput, { target: { value: '1000000' } });
+    expect(quantityInput).toHaveValue('100000');
+  });
+
+  it('advances focus across inline row fields and into the next row', async () => {
+    const user = userEvent.setup();
+    const secondItem = {
+      ...mockItem,
+      id: 'item-2',
+      itemName: 'Second Item',
+      locationId: 201,
+      locationName: 'Alpha Base',
+    };
+    mockGetInventory.mockResolvedValue({
+      items: [mockItem, secondItem],
+      total: 2,
+      limit: 25,
+      offset: 0,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const locationInput = await screen.findByTestId('inline-location-item-1');
+    await user.click(locationInput);
+    await user.keyboard('{Enter}');
+
+    const quantityInput = await screen.findByTestId('inline-quantity-item-1');
+    await waitFor(() => expect(document.activeElement).toBe(quantityInput));
+
+    await user.keyboard('{Enter}');
+    const saveButton = await screen.findByTestId('inline-save-item-1');
+    await waitFor(() => expect(document.activeElement).toBe(saveButton));
+
+    await user.keyboard('{Enter}');
+    const nextLocationInput = await screen.findByTestId('inline-location-item-2');
+    await waitFor(() => expect(document.activeElement).toBe(nextLocationInput));
+  });
+
+  it('moves focus to the next page after saving the last row', async () => {
+    const user = userEvent.setup();
+    const pageTwoItem = {
+      ...mockItem,
+      id: 'item-2',
+      itemName: 'Page Two Item',
+      locationId: 201,
+      locationName: 'Alpha Base',
+    };
+    mockGetInventory.mockImplementation((params?: { offset?: number; limit?: number }) => {
+      if (params?.offset === 25) {
+        return Promise.resolve({
+          items: [pageTwoItem],
+          total: 26,
+          limit: 25,
+          offset: 25,
+        });
+      }
+      return Promise.resolve({
+        items: [mockItem],
+        total: 26,
+        limit: 25,
+        offset: 0,
+      });
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const saveButton = await screen.findByTestId('inline-save-item-1');
+    await user.click(saveButton);
+
+    const nextLocationInput = await screen.findByTestId('inline-location-item-2');
+    await waitFor(() => expect(document.activeElement).toBe(nextLocationInput));
+  });
+
+  it('keeps editor mode inputs labeled with combobox and tab order intact', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const comboboxes = screen.getAllByRole('combobox', { name: /location/i });
+    expect(comboboxes.length).toBeGreaterThanOrEqual(2);
+
+    const itemInput = await screen.findByTestId('new-row-item-input');
+    itemInput.focus();
+
+    await user.tab();
+    expect(document.activeElement).toBe(await screen.findByTestId('new-row-location-input'));
+
+    await user.tab();
+    expect(document.activeElement).toBe(await screen.findByTestId('new-row-quantity'));
+
+    await user.tab();
+    expect(document.activeElement).toBe(await screen.findByTestId('new-row-save'));
   });
 
   it('memoizes location filtering for inline rows', () => {

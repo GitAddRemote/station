@@ -15,6 +15,8 @@ import type { InventoryItem, OrgInventoryItem } from '../../services/inventory.s
 import type { FocusController } from '../../utils/focusController';
 import { useMemoizedLocations } from '../../hooks/useMemoizedLocations';
 
+const EDITOR_MODE_QUANTITY_MAX = 100000;
+
 export type InventoryRecord = InventoryItem | OrgInventoryItem;
 
 interface LocationOption {
@@ -234,7 +236,11 @@ export const InventoryInlineRow = ({
                 return;
               }
               const numeric = Number(raw);
-              onDraftChange({ quantity: Number.isNaN(numeric) ? '' : numeric });
+              if (Number.isNaN(numeric)) {
+                onDraftChange({ quantity: '' });
+              } else {
+                onDraftChange({ quantity: Math.min(numeric, EDITOR_MODE_QUANTITY_MAX) });
+              }
               if (!Number.isInteger(numeric) || numeric <= 0) {
                 onErrorChange('Quantity must be an integer greater than 0');
               } else {
@@ -276,7 +282,7 @@ export const InventoryInlineRow = ({
         <Typography variant="body2">
           {new Date(item.dateModified || item.dateAdded || '').toLocaleDateString()}
         </Typography>
-        {Number.isFinite(draftQuantityNumber) && draftQuantityNumber > 100000 && (
+        {Number.isFinite(draftQuantityNumber) && draftQuantityNumber >= EDITOR_MODE_QUANTITY_MAX && (
           <Typography variant="caption" sx={{ color: 'warning.main' }}>
             Large quantity entered - verify value.
           </Typography>
