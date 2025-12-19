@@ -3,7 +3,6 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import InventoryPage from './Inventory';
 import { locationCache } from '../services/locationCache';
 import type { LocationRecord } from '../services/location.service';
-import { useMemoizedLocations } from '../hooks/useMemoizedLocations';
 
 const mockUpdateItem = jest.fn();
 const mockGetInventory = jest.fn();
