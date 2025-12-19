@@ -16,9 +16,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Switch,
-  FormControlLabel,
-  Slider,
   Chip,
   Button,
   Divider,
@@ -36,31 +33,27 @@ import {
   ListItemButton,
   Radio,
   TablePagination,
-  Tooltip,
-  LinearProgress, Autocomplete,
+  LinearProgress,
   Alert,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import FilterAltIcon from '@mui/icons-material/FilterAlt';
-import SortIcon from '@mui/icons-material/Sort';
-import GroupWorkIcon from '@mui/icons-material/GroupWork';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import EditIcon from '@mui/icons-material/Edit';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
 import ShareIcon from '@mui/icons-material/Share';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
-import ApartmentIcon from '@mui/icons-material/Apartment';
-import CheckIcon from '@mui/icons-material/Check';
 import { inventoryService, InventoryCategory, InventoryItem, OrgInventoryItem } from '../services/inventory.service';
 import { uexService, CatalogItem } from '../services/uex.service';
 import { locationCache } from '../services/locationCache';
 import type { SystemLocationValue } from '../components/location/SystemLocationSelector';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
+import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
+import InventoryNewRow from '../components/inventory/InventoryNewRow';
+import InventoryFiltersPanel from '../components/inventory/InventoryFiltersPanel';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
@@ -1429,309 +1422,6 @@ const InventoryPage = () => {
     }
   };
 
-  const renderNewItemRow = () => {
-    if (!isEditorMode) return null;
-    const showQuantityWarning =
-      Number.isFinite(newRowQuantityNumber) && newRowQuantityNumber > 100000;
-    return (
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: itemGridTemplate,
-          gap: 0.75,
-          alignItems: 'flex-start',
-          px: 1,
-          py: 0.75,
-          border: '1px dashed rgba(255,255,255,0.15)',
-          borderRadius: 2,
-          backgroundColor: 'rgba(255,255,255,0.02)',
-          mb: 1.5,
-        }}
-      >
-        <Stack spacing={0.5}>
-          <Autocomplete
-            size="small"
-            fullWidth
-            options={newRowItemOptions}
-            value={newRowSelectedItem}
-            inputValue={newRowItemInput}
-            loading={newRowItemLoading}
-            autoHighlight
-            openOnFocus
-            filterOptions={(options) => options}
-            getOptionLabel={(option) => option?.name ?? ''}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            onChange={(_, value) => {
-              setNewRowSelectedItem(value);
-              setNewRowDraft((prev) => ({
-                ...prev,
-                itemId: value ? value.uexId : '',
-              }));
-              setNewRowItemInput(value?.name ?? newRowItemInput);
-              setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
-              if (value) {
-                newRowFocusController.focus('new-row', 'location');
-              }
-            }}
-            onInputChange={(_, value, reason) => {
-              setNewRowItemInput(value);
-              if (reason === 'clear') {
-                setNewRowSelectedItem(null);
-                setNewRowDraft((prev) => ({ ...prev, itemId: '' }));
-              }
-              setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
-            }}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id}>
-                <Stack spacing={0.25}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {option.name}
-                  </Typography>
-                  {option.categoryName && (
-                    <Typography variant="caption" color="text.secondary">
-                      {option.categoryName}
-                    </Typography>
-                  )}
-                </Stack>
-              </li>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="New item"
-                data-testid="new-row-item-input"
-                inputRef={(el) => {
-                  newRowItemRef.current = el;
-                }}
-                error={Boolean(newRowErrors.item)}
-                helperText={newRowErrors.item || newRowItemError || undefined}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    if (!newRowSelectedItem && newRowItemOptions.length > 0) {
-                      const first = newRowItemOptions[0];
-                      setNewRowSelectedItem(first);
-                      setNewRowDraft((prev) => ({ ...prev, itemId: first.uexId }));
-                      setNewRowItemInput(first.name);
-                    }
-                    newRowFocusController.focus('new-row', 'location');
-                  }
-                }}
-              />
-            )}
-          />
-        </Stack>
-        <Stack spacing={0.5}>
-          <Autocomplete
-            size="small"
-            fullWidth
-            options={newRowFilteredLocations}
-            autoHighlight
-            openOnFocus
-            filterOptions={(options) => options}
-            value={newRowLocationEditing ? null : newRowSelectedLocation}
-            inputValue={
-              newRowLocationEditing
-                ? newRowLocationInput
-                : newRowSelectedLocation?.name ?? newRowLocationInput
-            }
-            getOptionLabel={(option) => option?.name ?? ''}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            onChange={(_, value) => {
-              setNewRowDraft((prev) => ({
-                ...prev,
-                locationId: value ? value.id : '',
-              }));
-              setNewRowLocationEditing(false);
-              setNewRowLocationInput(value?.name ?? '');
-              setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
-              if (value) {
-                newRowFocusController.focus('new-row', 'quantity');
-              }
-            }}
-            onInputChange={(_, value) => {
-              setNewRowLocationInput(value);
-              setNewRowLocationEditing(true);
-              setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
-            }}
-            onFocus={() => {
-              setNewRowLocationEditing(true);
-              setNewRowLocationInput('');
-            }}
-            onBlur={() => {
-              setNewRowLocationEditing(false);
-              setNewRowLocationInput(newRowSelectedLocation?.name ?? '');
-              setNewRowErrors((prev) => ({ ...prev, location: null }));
-            }}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id}>
-                {option.name}
-              </li>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Location"
-                data-testid="new-row-location-input"
-                inputRef={(el) => {
-                  newRowLocationRef.current = el;
-                }}
-                error={Boolean(newRowErrors.location)}
-                helperText={newRowErrors.location || undefined}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const bestMatch = newRowFilteredLocations[0];
-                    if (bestMatch) {
-                      setNewRowDraft((prev) => ({ ...prev, locationId: bestMatch.id }));
-                      setNewRowLocationInput(bestMatch.name);
-                      setNewRowLocationEditing(false);
-                      setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
-                      newRowFocusController.focus('new-row', 'quantity');
-                    } else {
-                      setNewRowErrors((prev) => ({
-                        ...prev,
-                        location: 'No matches found',
-                      }));
-                    }
-                  }
-                }}
-              />
-            )}
-          />
-        </Stack>
-        <Stack spacing={0.5}>
-          <TextField
-            type="text"
-            size="small"
-            label="Quantity"
-            data-testid="new-row-quantity"
-            value={newRowDraft.quantity}
-            onChange={(e) => {
-              const raw = e.target.value.trim();
-              if (raw === '') {
-                setNewRowDraft((prev) => ({ ...prev, quantity: '' }));
-                setNewRowErrors((prev) => ({
-                  ...prev,
-                  quantity: 'Quantity is required',
-                  api: null,
-                }));
-                return;
-              }
-              const numeric = Number(raw);
-              setNewRowDraft((prev) => ({
-                ...prev,
-                quantity: Number.isNaN(numeric) ? '' : numeric,
-              }));
-              if (!Number.isInteger(numeric) || numeric <= 0) {
-                setNewRowErrors((prev) => ({
-                  ...prev,
-                  quantity: 'Quantity must be an integer greater than 0',
-                  api: null,
-                }));
-              } else {
-                setNewRowErrors((prev) => ({ ...prev, quantity: null, api: null }));
-              }
-            }}
-            inputProps={{
-              inputMode: 'numeric',
-              pattern: '[0-9]*',
-            }}
-            inputRef={(el) => {
-              newRowQuantityRef.current = el;
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                newRowFocusController.focus('new-row', 'save');
-              }
-            }}
-            error={Boolean(newRowErrors.quantity)}
-            helperText={newRowErrors.quantity || undefined}
-          />
-          {showQuantityWarning && (
-            <Typography variant="caption" sx={{ color: 'warning.main' }}>
-              Large quantity entered - verify value.
-            </Typography>
-          )}
-        </Stack>
-        <Stack spacing={0.5}>
-          <Typography variant="body2" color="text.secondary">
-            New entry
-          </Typography>
-          {newRowErrors.org && (
-            <Typography variant="caption" color="error">
-              {newRowErrors.org}
-            </Typography>
-          )}
-          {newRowErrors.api && (
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="caption" color="error">
-                {newRowErrors.api}
-              </Typography>
-              <Button
-                size="small"
-                color="inherit"
-                variant="text"
-                onClick={() => handleNewRowSave()}
-                data-testid="new-row-retry"
-              >
-                Retry
-              </Button>
-            </Stack>
-          )}
-        </Stack>
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent="flex-end"
-          alignItems="center"
-          sx={{ minWidth: 140 }}
-        >
-          {newRowDirty && (
-            <Chip
-              label={newRowSaving ? 'Saving...' : 'Unsaved'}
-              size="small"
-              color={newRowSaving ? 'primary' : 'warning'}
-              variant="outlined"
-              sx={{ height: 22, fontSize: 12 }}
-            />
-          )}
-          <Tooltip
-            title={
-              newRowOrgBlocked
-                ? 'Select an organization to save items in org view.'
-                : ''
-            }
-            disableHoverListener={!newRowOrgBlocked}
-          >
-            <span>
-              <Button
-                size="small"
-                variant="contained"
-                color="primary"
-                onClick={() => handleNewRowSave()}
-                disabled={newRowSaving || newRowOrgBlocked}
-                data-testid="new-row-save"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    handleNewRowSave();
-                  }
-                }}
-                ref={(el) => {
-                  newRowSaveRef.current = el;
-                }}
-              >
-                Save
-              </Button>
-            </span>
-          </Tooltip>
-        </Stack>
-      </Box>
-    );
-  };
-
   if (!user || initialLoading) {
     return (
       <Box
@@ -1798,241 +1488,32 @@ const InventoryPage = () => {
               }}
             >
               <CardContent>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item xs={12} md={4} lg={3}>
-                    <TextField
-                      fullWidth
-                      label="Search by name, note, or location"
-                      placeholder="Prospector, Lorville, armors..."
-                      value={filters.search}
-                      onChange={(e) =>
-                        setFilters((prev) => ({ ...prev, search: e.target.value }))
-                      }
-                    />
-                  </Grid>
-                  <Grid item xs={6} md={2}>
-                    <FormControl fullWidth>
-                      <InputLabel id="category-filter-label">Category</InputLabel>
-                      <Select
-                        labelId="category-filter-label"
-                        label="Category"
-                        value={filters.categoryId}
-                        onChange={(e) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            categoryId:
-                              e.target.value === '' ? '' : Number(e.target.value),
-                          }))
-                        }
-                      >
-                        <MenuItem value="">
-                          <em>All</em>
-                        </MenuItem>
-                        {categories.map((category) => (
-                          <MenuItem key={category.id} value={category.id}>
-                            {category.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={6} md={2}>
-                    <FormControl fullWidth>
-                      <InputLabel id="location-filter-label">Location</InputLabel>
-                      <Select
-                        labelId="location-filter-label"
-                        label="Location"
-                        value={filters.locationId}
-                        onChange={(e) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            locationId:
-                              e.target.value === '' ? '' : Number(e.target.value),
-                          }))
-                        }
-                      >
-                        <MenuItem value="">
-                          <em>All</em>
-                        </MenuItem>
-                        {locationOptions.map((loc) => (
-                          <MenuItem key={loc.id} value={loc.id}>
-                            {loc.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item xs={12} md={4} lg={3}>
-                    <Box sx={{ px: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Value (quantity) range
-                      </Typography>
-                      <Slider
-                        value={filters.valueRange}
-                        min={0}
-                        max={Math.max(filters.valueRange[1], maxQuantity || 1000)}
-                        onChange={(_, value) =>
-                          setFilters((prev) => ({
-                            ...prev,
-                            valueRange: value as [number, number],
-                          }))
-                        }
-                        valueLabelDisplay="auto"
-                        getAriaValueText={valueText}
-                      />
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md={2} lg={2}>
-                    <FormControl fullWidth>
-                      <InputLabel id="org-selector-label">View</InputLabel>
-                      <Select
-                        labelId="org-selector-label"
-                        label="View"
-                        value={viewMode === 'personal' ? 'personal' : selectedOrgId ?? ''}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value === 'personal') {
-                            setViewMode('personal');
-                            setSelectedOrgId(null);
-                          } else {
-                            setViewMode('org');
-                            setSelectedOrgId(Number(value));
-                          }
-                        }}
-                      >
-                        <MenuItem value="personal">
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Avatar sx={{ width: 24, height: 24 }}>
-                              {user.username.charAt(0).toUpperCase()}
-                            </Avatar>
-                            <ListItemText primary="My Inventory" />
-                          </Stack>
-                        </MenuItem>
-                        {orgOptions.map((org) => (
-                          <MenuItem key={org.id} value={org.id}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <ApartmentIcon fontSize="small" />
-                              <ListItemText primary={org.name} />
-                            </Stack>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                </Grid>
-
-                <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.06)' }} />
-
-                <Grid container spacing={2} alignItems="center">
-                  <Grid item>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={filters.sharedOnly}
-                          onChange={(e) =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              sharedOnly: e.target.checked,
-                            }))
-                          }
-                          size="small"
-                          disabled={viewMode === 'org'}
-                        />
-                      }
-                      label="Shared only"
-                    />
-                  </Grid>
-                  <Grid item>
-                    <Button
-                      startIcon={<SortIcon />}
-                      variant="outlined"
-                      color="inherit"
-                      onClick={() =>
-                        setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
-                      }
-                    >
-                      Sort: {sortBy} ({sortDir})
-                    </Button>
-                  </Grid>
-                  <Grid item>
-                    <FormControl size="small" sx={{ minWidth: 160 }}>
-                      <InputLabel id="sort-by-label">Sort By</InputLabel>
-                      <Select
-                        labelId="sort-by-label"
-                        label="Sort By"
-                        value={sortBy}
-                        onChange={(e) =>
-                          setSortBy(e.target.value as 'name' | 'quantity' | 'location' | 'date')
-                        }
-                      >
-                        <MenuItem value="date">Last updated</MenuItem>
-                        <MenuItem value="name">Name</MenuItem>
-                        <MenuItem value="quantity">Quantity</MenuItem>
-                        <MenuItem value="location">Location</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item>
-                    <FormControl size="small" sx={{ minWidth: 180 }}>
-                      <InputLabel id="group-by-label">Group By</InputLabel>
-                      <Select
-                        labelId="group-by-label"
-                        label="Group By"
-                        value={groupBy}
-                        onChange={(e) =>
-                          setGroupBy(e.target.value as 'none' | 'category' | 'location' | 'share')
-                        }
-                        startAdornment={<GroupWorkIcon sx={{ mr: 1 }} />}
-                      >
-                        <MenuItem value="none">No grouping</MenuItem>
-                        <MenuItem value="category">Category</MenuItem>
-                        <MenuItem value="location">Location</MenuItem>
-                        <MenuItem value="share">Share status</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid item>
-                    <Button
-                      variant="outlined"
-                      color="inherit"
-                      startIcon={<FilterAltIcon />}
-                      onClick={() =>
-                        setFilters({
-                          search: '',
-                          categoryId: '',
-                          locationId: '',
-                          sharedOnly: false,
-                          valueRange: [0, maxQuantity || 100000],
-                        })
-                      }
-                    >
-                      Clear filters
-                    </Button>
-                  </Grid>
-                  <Grid item>
-                    <FormControl size="small" sx={{ minWidth: 160 }}>
-                      <InputLabel id="density-select-label">View mode</InputLabel>
-                      <Select
-                        labelId="density-select-label"
-                        label="View mode"
-                        value={density}
-                        onChange={(e) =>
-                          setDensity(e.target.value as 'standard' | 'compact')
-                        }
-                      >
-                        <MenuItem value="standard">Standard</MenuItem>
-                      <MenuItem value="compact">Editor Mode</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  {viewMode === 'personal' && (
-                    <Grid item>
-                      <Button variant="contained" onClick={openAddDialog}>
-                        Add item
-                      </Button>
-                    </Grid>
-                  )}
-                </Grid>
+                <InventoryFiltersPanel
+                  filters={filters}
+                  setFilters={setFilters}
+                  categories={categories}
+                  locationOptions={locationOptions}
+                  valueText={valueText}
+                  maxQuantity={maxQuantity}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  setSortBy={(value) => setSortBy(value)}
+                  setSortDir={(updater) => setSortDir(updater)}
+                  groupBy={groupBy}
+                  setGroupBy={(value) => setGroupBy(value)}
+                  density={density}
+                  setDensity={(value) => setDensity(value)}
+                  viewMode={viewMode}
+                  setViewMode={(mode) => setViewMode(mode)}
+                  selectedOrgId={selectedOrgId}
+                  setSelectedOrgId={(value) => setSelectedOrgId(value)}
+                  orgOptions={orgOptions}
+                  userInitial={user?.username?.charAt(0).toUpperCase() || 'U'}
+                  onOpenAddDialog={openAddDialog}
+                  showAddButton={viewMode === 'personal'}
+                  totalCount={totalCount}
+                  itemCount={items.length}
+                />
               </CardContent>
             </Card>
           </Grid>
@@ -2103,7 +1584,119 @@ const InventoryPage = () => {
                         </Typography>
                       </Box>
                     </Box>
-                    {renderNewItemRow()}
+                    <InventoryNewRow
+                      isEditorMode={isEditorMode}
+                      itemOptions={newRowItemOptions}
+                      itemInput={newRowItemInput}
+                      selectedItem={newRowSelectedItem}
+                      itemLoading={newRowItemLoading}
+                      itemError={newRowItemError}
+                      locationInput={newRowLocationInput}
+                      locationEditing={newRowLocationEditing}
+                      selectedLocation={newRowSelectedLocation}
+                      filteredLocations={newRowFilteredLocations}
+                      draft={newRowDraft}
+                      errors={newRowErrors}
+                      dirty={newRowDirty}
+                      saving={newRowSaving}
+                      orgBlocked={newRowOrgBlocked}
+                      showQuantityWarning={
+                        Number.isFinite(newRowQuantityNumber) && newRowQuantityNumber > 100000
+                      }
+                      onItemInputChange={(value, reason) => {
+                        setNewRowItemInput(value);
+                        if (reason === 'clear') {
+                          setNewRowSelectedItem(null);
+                          setNewRowDraft((prev) => ({ ...prev, itemId: '' }));
+                        }
+                        setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
+                      }}
+                      onItemSelect={(value) => {
+                        setNewRowSelectedItem(value);
+                        setNewRowDraft((prev) => ({
+                          ...prev,
+                          itemId: value ? value.uexId : '',
+                        }));
+                        setNewRowItemInput(value?.name ?? newRowItemInput);
+                        setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
+                        if (value) {
+                          newRowFocusController.focus('new-row', 'location');
+                        }
+                      }}
+                      onLocationInputChange={(value) => {
+                        setNewRowLocationInput(value);
+                        setNewRowLocationEditing(true);
+                        setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
+                      }}
+                      onLocationSelect={(value) => {
+                        setNewRowDraft((prev) => ({
+                          ...prev,
+                          locationId: value ? value.id : '',
+                        }));
+                        setNewRowLocationEditing(false);
+                        setNewRowLocationInput(value?.name ?? '');
+                        setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
+                        if (value) {
+                          newRowFocusController.focus('new-row', 'quantity');
+                        }
+                      }}
+                      onLocationEnter={(bestMatch) => {
+                        if (bestMatch) {
+                          setNewRowDraft((prev) => ({ ...prev, locationId: bestMatch.id }));
+                          setNewRowLocationInput(bestMatch.name);
+                          setNewRowLocationEditing(false);
+                          setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
+                          newRowFocusController.focus('new-row', 'quantity');
+                        } else {
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            location: 'No matches found',
+                          }));
+                        }
+                      }}
+                      onLocationFocus={() => {
+                        setNewRowLocationEditing(true);
+                        setNewRowLocationInput('');
+                      }}
+                      onLocationBlur={(value) => {
+                        setNewRowLocationEditing(false);
+                        setNewRowLocationInput(value);
+                        setNewRowErrors((prev) => ({ ...prev, location: null }));
+                      }}
+                      onQuantityChange={(value) => {
+                        const raw = value.trim();
+                        if (raw === '') {
+                          setNewRowDraft((prev) => ({ ...prev, quantity: '' }));
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            quantity: 'Quantity is required',
+                            api: null,
+                          }));
+                          return;
+                        }
+                        const numeric = Number(raw);
+                        setNewRowDraft((prev) => ({
+                          ...prev,
+                          quantity: Number.isNaN(numeric) ? '' : numeric,
+                        }));
+                        if (!Number.isInteger(numeric) || numeric <= 0) {
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            quantity: 'Quantity must be an integer greater than 0',
+                            api: null,
+                          }));
+                        } else {
+                          setNewRowErrors((prev) => ({ ...prev, quantity: null, api: null }));
+                        }
+                      }}
+                      onQuantityEnter={() => newRowFocusController.focus('new-row', 'save')}
+                      onSave={handleNewRowSave}
+                      onRetry={handleNewRowSave}
+                      itemRef={newRowItemRef}
+                      locationRef={newRowLocationRef}
+                      quantityRef={newRowQuantityRef}
+                      saveRef={newRowSaveRef}
+                    />
                   </>
                 )}
                 {showEmptyState ? (
@@ -2164,32 +1757,6 @@ const InventoryPage = () => {
                                 typeof draft.locationId === 'string'
                                   ? Number(draft.locationId)
                                   : draft.locationId;
-                              const selectedLocation =
-                                allLocations.find((loc) => loc.id === draftLocationId) ||
-                                (typeof draftLocationId === 'number'
-                                  ? {
-                                      id: draftLocationId,
-                                      name:
-                                        item.locationName || `Location #${draftLocationId}`,
-                                    }
-                                  : null);
-                              const inputValue =
-                                inlineLocationInputs[rowKey] ??
-                                (locationEditing[rowKey] ? '' : selectedLocation?.name ?? '');
-                              const filterTerm = inputValue.trim().toLowerCase();
-                              const filteredOptions = allLocations
-                                .filter((opt) => opt.name.toLowerCase().includes(filterTerm))
-                                .sort((a, b) => {
-                                  const aName = a.name.toLowerCase();
-                                  const bName = b.name.toLowerCase();
-                                  const aStarts = aName.startsWith(filterTerm);
-                                  const bStarts = bName.startsWith(filterTerm);
-                                  if (aStarts !== bStarts) return aStarts ? -1 : 1;
-                                  const aIndex = aName.indexOf(filterTerm);
-                                  const bIndex = bName.indexOf(filterTerm);
-                                  if (aIndex !== bIndex) return aIndex - bIndex;
-                                  return a.name.localeCompare(b.name);
-                                });
                               const saving = inlineSaving.has(item.id);
                               const errorText = inlineError[item.id];
                               const draftQuantityNumber = Number(draft.quantity);
@@ -2197,288 +1764,63 @@ const InventoryPage = () => {
                                 draftLocationId !== originalLocationId ||
                                 draftQuantityNumber !== originalQuantity;
                               return (
-                                <Box
+                                <InventoryInlineRow
                                   key={item.id}
-                                  sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: {
-                                      xs: '1fr',
-                                      md: density === 'compact' ? '2fr 1fr 1fr 1fr auto' : '2fr 1fr 1fr 1fr auto',
-                                    },
-                                    gap: density === 'compact' ? 0.75 : 2,
-                                    alignItems: 'center',
-                                    px: density === 'compact' ? 1 : 2,
-                                    py: density === 'compact' ? 0.45 : 1.5,
-                                    '&:hover': {
-                                      backgroundColor: 'rgba(255,255,255,0.02)',
-                                    },
+                                  item={item}
+                                  density={density}
+                                  allLocations={allLocations}
+                                  inlineDraft={draft}
+                                  inlineLocationInput={
+                                    inlineLocationInputs[rowKey] ??
+                                    (locationEditing[rowKey] ? '' : item.locationName || '')
+                                  }
+                                  locationEditing={Boolean(locationEditing[rowKey])}
+                                  inlineSaving={saving}
+                                  inlineError={errorText}
+                                  isDirty={isDirty}
+                                  focusController={focusController}
+                                  rowKey={rowKey}
+                                  onDraftChange={(changes) => setInlineDraft(item.id, changes)}
+                                  onErrorChange={(message) =>
+                                    setInlineError((prev) => ({ ...prev, [item.id]: message }))
+                                  }
+                                  onLocationInputChange={(value) =>
+                                    setInlineLocationInputs((prev) => ({
+                                      ...prev,
+                                      [rowKey]: value,
+                                    }))
+                                  }
+                                  onLocationFocus={() => {
+                                    setInlineLocationInputs((prev) => ({
+                                      ...prev,
+                                      [rowKey]: '',
+                                    }));
+                                    setLocationEditing((prev) => ({ ...prev, [rowKey]: true }));
+                                    setInlineError((prev) => ({ ...prev, [item.id]: null }));
                                   }}
-                                >
-                                  <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-                                    <Stack
-                                      direction="row"
-                                      spacing={density === 'compact' ? 0.5 : 1}
-                                      alignItems="center"
-                                      flexWrap="wrap"
-                                      columnGap={density === 'compact' ? 0.75 : 1}
-                                      rowGap={density === 'compact' ? 0.25 : 0.5}
-                                    >
-                                      <Typography
-                                        variant={density === 'compact' ? 'body2' : 'subtitle1'}
-                                        sx={{ fontWeight: 600 }}
-                                        noWrap
-                                        title={item.itemName || `Item #${item.uexItemId}`}
-                                      >
-                                        {item.itemName || `Item #${item.uexItemId}`}
-                                      </Typography>
-                                      <Chip
-                                        label={item.categoryName || 'General'}
-                                        size={density === 'compact' ? 'small' : 'medium'}
-                                        variant="outlined"
-                                      />
-                                      {item.sharedOrgId && (
-                                        <Chip
-                                          size={density === 'compact' ? 'small' : 'medium'}
-                                          color="primary"
-                                          variant="outlined"
-                                          label={item.sharedOrgName || 'Shared'}
-                                        />
-                                      )}
-                                    </Stack>
-                                  </Stack>
-                                  <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-                                    {density !== 'compact' ? (
-                                      <>
-                                        <Typography variant="body2" color="text.secondary">
-                                          Location
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                          {item.locationName || 'Unknown'}
-                                        </Typography>
-                                      </>
-                                    ) : (
-                                      <Autocomplete
-                                        size="small"
-                                        fullWidth
-                                        options={filteredOptions}
-                                        autoHighlight
-                                        openOnFocus
-                                        filterOptions={(options) => options}
-                                        value={locationEditing[rowKey] ? null : selectedLocation}
-                                        inputValue={inputValue}
-                                        getOptionLabel={(option) => option?.name ?? ''}
-                                        isOptionEqualToValue={(option, value) => option.id === value.id}
-                                        onChange={(_, value) => {
-                                          setInlineDraft(item.id, {
-                                            locationId: value ? value.id : '',
-                                          });
-                                          setInlineLocationInputs((prev) => ({
-                                            ...prev,
-                                            [rowKey]: value?.name ?? '',
-                                          }));
-                                          setLocationEditing((prev) => ({ ...prev, [rowKey]: false }));
-                                          setInlineError((prev) => ({ ...prev, [item.id]: null }));
-                                        }}
-                                        onInputChange={(_, value) => {
-                                          setInlineLocationInputs((prev) => ({
-                                            ...prev,
-                                            [rowKey]: value,
-                                          }));
-                                        }}
-                                        onFocus={() => {
-                                          setInlineLocationInputs((prev) => ({
-                                            ...prev,
-                                            [rowKey]: '',
-                                          }));
-                                          setLocationEditing((prev) => ({ ...prev, [rowKey]: true }));
-                                          setInlineError((prev) => ({ ...prev, [item.id]: null }));
-                                        }}
-                                        onBlur={() => {
-                                          setInlineLocationInputs((prev) => ({
-                                            ...prev,
-                                            [rowKey]: selectedLocation?.name ?? '',
-                                          }));
-                                          setLocationEditing((prev) => ({ ...prev, [rowKey]: false }));
-                                          setInlineError((prev) => ({ ...prev, [item.id]: null }));
-                                        }}
-                                        renderOption={(props, option) => (
-                                          <li {...props} key={option.id}>
-                                            {option.name}
-                                          </li>
-                                        )}
-                                        renderInput={(params) => (
-                                          <TextField
-                                            {...params}
-                                            label="Location"
-                                            data-testid={`inline-location-${item.id}`}
-                                            inputRef={(el) => {
-                                              locationRefs.current[rowKey] = el;
-                                            }}
-                                            onKeyDown={(event) => {
-                                              if (event.key === 'Enter') {
-                                                event.preventDefault();
-                                                const bestMatch = filteredOptions[0];
-                                                if (bestMatch) {
-                                                  setInlineDraft(item.id, { locationId: bestMatch.id });
-                                                  setInlineLocationInputs((prev) => ({
-                                                    ...prev,
-                                                    [rowKey]: bestMatch.name,
-                                                  }));
-                                                  setLocationEditing((prev) => ({
-                                                    ...prev,
-                                                    [rowKey]: false,
-                                                  }));
-                                                  setInlineError((prev) => ({ ...prev, [item.id]: null }));
-                                                  focusController.focus(rowKey, 'quantity');
-                                                } else {
-                                                  setInlineError((prev) => ({
-                                                    ...prev,
-                                                    [item.id]: 'No matches found',
-                                                  }));
-                                                }
-                                              }
-                                            }}
-                                          />
-                                        )}
-                                      />
-                                    )}
-                                  </Stack>
-                                  <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-                                    {density !== 'compact' ? (
-                                      <>
-                                        <Typography variant="body2" color="text.secondary">
-                                          Quantity
-                                        </Typography>
-                                        <Typography
-                                          variant="body2"
-                                          sx={{ fontWeight: 700, letterSpacing: 0.1 }}
-                                        >
-                                          {Number(item.quantity).toLocaleString()}
-                                        </Typography>
-                                      </>
-                                    ) : (
-                                      <TextField
-                                        type="text"
-                                        size="small"
-                                        data-testid={`inline-quantity-${item.id}`}
-                                        value={draft.quantity}
-                                        onChange={(e) => {
-                                          const raw = e.target.value.trim();
-                                          if (raw === '') {
-                                            setInlineDraft(item.id, { quantity: '' });
-                                            setInlineError((prev) => ({
-                                              ...prev,
-                                              [item.id]: 'Quantity is required',
-                                            }));
-                                            return;
-                                          }
-                                          const numeric = Number(raw);
-                                          setInlineDraft(item.id, {
-                                            quantity: numeric,
-                                          });
-                                          if (!Number.isInteger(numeric) || numeric <= 0) {
-                                            setInlineError((prev) => ({
-                                              ...prev,
-                                              [item.id]: 'Quantity must be an integer greater than 0',
-                                            }));
-                                          } else {
-                                            setInlineError((prev) => ({ ...prev, [item.id]: null }));
-                                          }
-                                        }}
-                                        inputProps={{
-                                          inputMode: 'numeric',
-                                          pattern: '[0-9]*',
-                                        }}
-                                        inputRef={(el) => {
-                                          quantityRefs.current[rowKey] = el;
-                                        }}
-                                        onKeyDown={(event) => {
-                                          if (event.key === 'Enter') {
-                                            event.preventDefault();
-                                            focusController.focus(rowKey, 'save');
-                                          }
-                                        }}
-                                        sx={{
-                                          maxWidth: 120,
-                                          '& input': {
-                                            MozAppearance: 'textfield',
-                                          },
-                                          '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button':
-                                            {
-                                              WebkitAppearance: 'none',
-                                              margin: 0,
-                                            },
-                                        }}
-                                      />
-                                    )}
-                                  </Stack>
-                                  <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-                                    {density !== 'compact' && (
-                                      <Typography variant="body2" color="text.secondary">
-                                        Updated
-                                      </Typography>
-                                    )}
-                                      <Typography variant="body2">
-                                        {new Date(item.dateModified || item.dateAdded || '').toLocaleDateString()}
-                                      </Typography>
-                                    {Number.isFinite(draftQuantityNumber) && draftQuantityNumber > 100000 && (
-                                      <Typography variant="caption" sx={{ color: 'warning.main' }}>
-                                        Large quantity entered &mdash; verify value.
-                                      </Typography>
-                                    )}
-                                    {errorText && (
-                                      <Typography variant="caption" color="error">
-                                        {errorText}
-                                      </Typography>
-                                    )}
-                                  </Stack>
-                                  <Stack
-                                    direction="row"
-                                    spacing={density === 'compact' ? 0.5 : 1}
-                                    justifyContent="flex-end"
-                                    alignItems="center"
-                                    sx={{
-                                      minWidth: density === 'compact' ? 140 : undefined,
-                                      flexWrap: 'nowrap',
-                                    }}
-                                  >
-                                    {density === 'compact' && isDirty && (
-                                      <Chip
-                                        label="Unsaved"
-                                        size="small"
-                                        color="warning"
-                                        variant="outlined"
-                                        sx={{ height: 22, fontSize: 12, flexShrink: 0 }}
-                                      />
-                                    )}
-                                    {density === 'compact' ? (
-                                      <IconButton
-                                        color="primary"
-                                        size="small"
-                                        onClick={() => handleInlineSaveAndAdvance(item)}
-                                        disabled={saving}
-                                        data-testid={`inline-save-${item.id}`}
-                                        onKeyDown={(event) => {
-                                          if (event.key === 'Enter') {
-                                            event.preventDefault();
-                                            handleInlineSaveAndAdvance(item);
-                                          }
-                                        }}
-                                        ref={(el: HTMLButtonElement | null) => {
-                                          saveRefs.current[rowKey] = el;
-                                        }}
-                                      >
-                                        <CheckIcon fontSize="small" />
-                                      </IconButton>
-                                    ) : (
-                                      <Tooltip title="Actions">
-                                        <IconButton onClick={(e) => handleActionOpen(e, item)}>
-                                          <MoreVertIcon />
-                                        </IconButton>
-                                      </Tooltip>
-                                    )}
-                                  </Stack>
-                                </Box>
+                                  onLocationBlur={(selectedName) => {
+                                    setInlineLocationInputs((prev) => ({
+                                      ...prev,
+                                      [rowKey]:
+                                        selectedName ??
+                                        allLocations.find((loc) => loc.id === draftLocationId)?.name ??
+                                        '',
+                                    }));
+                                    setLocationEditing((prev) => ({ ...prev, [rowKey]: false }));
+                                    setInlineError((prev) => ({ ...prev, [item.id]: null }));
+                                  }}
+                                  onSave={() => handleInlineSaveAndAdvance(item)}
+                                  onOpenActions={(e) => handleActionOpen(e, item)}
+                                  setLocationRef={(ref, key) => {
+                                    locationRefs.current[key] = ref;
+                                  }}
+                                  setQuantityRef={(ref, key) => {
+                                    quantityRefs.current[key] = ref;
+                                  }}
+                                  setSaveRef={(ref, key) => {
+                                    saveRefs.current[key] = ref;
+                                  }}
+                                />
                               );
                             })}
                           </Stack>
