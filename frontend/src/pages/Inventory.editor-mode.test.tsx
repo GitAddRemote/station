@@ -393,4 +393,57 @@ describe('Inventory editor mode inline controls', () => {
     );
     await waitFor(() => expect(document.activeElement).toBe(saveButton));
   });
+
+  it('resets the new row and returns focus to item after successful save', async () => {
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const itemInput = await screen.findByTestId('new-row-item-input');
+    fireEvent.change(itemInput, { target: { value: 'New' } });
+    fireEvent.click(await screen.findByText('New Catalog Item'));
+
+    const locationInput = await screen.findByTestId('new-row-location-input');
+    fireEvent.change(locationInput, { target: { value: 'Test' } });
+    fireEvent.click(await screen.findByText('Test Location'));
+
+    const quantityInput = screen.getByTestId('new-row-quantity');
+    fireEvent.change(quantityInput, { target: { value: '11' } });
+
+    fireEvent.click(screen.getByTestId('new-row-save'));
+
+    await waitFor(() => expect(mockCreateItem).toHaveBeenCalled());
+    const refreshedItemInput = await screen.findByTestId('new-row-item-input');
+    expect((refreshedItemInput as HTMLInputElement).value).toBe('');
+    await waitFor(() => expect(document.activeElement).toBe(refreshedItemInput));
+  });
+
+  it('moves focus to save when pressing Enter on quantity', async () => {
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const quantityInput = await screen.findByTestId('inline-quantity-item-1');
+    fireEvent.keyDown(quantityInput, { key: 'Enter', code: 'Enter' });
+
+    const saveButton = await screen.findByTestId('inline-save-item-1');
+    await waitFor(() => expect(document.activeElement).toBe(saveButton));
+  });
 });
