@@ -990,6 +990,7 @@ const InventoryPage = () => {
         ...prev,
         [item.id]: 'Unable to save. Please try again.',
       }));
+      focusController.focus(item.id.toString(), 'save');
       return false;
     } finally {
       const updated = new Set(inlineSaving);
@@ -1664,9 +1665,20 @@ const InventoryPage = () => {
             </Typography>
           )}
           {newRowErrors.api && (
-            <Typography variant="caption" color="error">
-              {newRowErrors.api}
-            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography variant="caption" color="error">
+                {newRowErrors.api}
+              </Typography>
+              <Button
+                size="small"
+                color="inherit"
+                variant="text"
+                onClick={() => handleNewRowSave()}
+                data-testid="new-row-retry"
+              >
+                Retry
+              </Button>
+            </Stack>
           )}
         </Stack>
         <Stack

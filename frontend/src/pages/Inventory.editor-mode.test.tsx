@@ -312,6 +312,7 @@ describe('Inventory editor mode inline controls', () => {
 
   it('keeps the row dirty and shows retry on API failure', async () => {
     mockCreateItem.mockRejectedValueOnce(new Error('fail'));
+    mockCreateItem.mockResolvedValueOnce({});
     render(
       <MemoryRouter initialEntries={['/inventory']}>
         <InventoryPage />
@@ -340,6 +341,9 @@ describe('Inventory editor mode inline controls', () => {
       expect(screen.getByText('Unable to add item. Please try again.')).toBeInTheDocument(),
     );
     expect((screen.getByTestId('new-row-quantity') as HTMLInputElement).value).toBe('7');
+    const retryButton = screen.getByTestId('new-row-retry');
+    fireEvent.click(retryButton);
+    await waitFor(() => expect(mockCreateItem).toHaveBeenCalledTimes(2));
   });
 
   it('shows inline quantity validation error for non-integer input and focuses the field', async () => {
@@ -364,5 +368,29 @@ describe('Inventory editor mode inline controls', () => {
     );
     await waitFor(() => expect(document.activeElement).toBe(quantityInput));
     expect(mockUpdateItem).not.toHaveBeenCalled();
+  });
+
+  it('focuses inline save on API failure', async () => {
+    mockUpdateItem.mockRejectedValueOnce(new Error('fail'));
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const saveButton = await screen.findByTestId('inline-save-item-1');
+    fireEvent.click(saveButton);
+
+    await waitFor(() =>
+      expect(screen.getByText('Unable to save. Please try again.')).toBeInTheDocument(),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(saveButton));
   });
 });
