@@ -6,6 +6,7 @@ import type { LocationRecord } from '../services/location.service';
 
 const mockUpdateItem = jest.fn();
 const mockGetInventory = jest.fn();
+const mockGetUserOrganizations = jest.fn();
 const mockCreateItem = jest.fn();
 const mockCreateOrgItem = jest.fn();
 const mockSearchItems = jest.fn();
@@ -13,7 +14,7 @@ const mockSearchItems = jest.fn();
 jest.mock('../services/inventory.service', () => ({
   inventoryService: {
     getCategories: jest.fn().mockResolvedValue([]),
-    getUserOrganizations: jest.fn().mockResolvedValue([]),
+    getUserOrganizations: (...args: unknown[]) => mockGetUserOrganizations(...args),
     getInventory: (...args: unknown[]) => mockGetInventory(...args),
     getOrgInventory: jest.fn(),
     updateItem: (...args: unknown[]) => mockUpdateItem(...args),
@@ -60,6 +61,7 @@ describe('Inventory editor mode inline controls', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     mockGetInventory.mockResolvedValue({ items: [mockItem], total: 1, limit: 25, offset: 0 });
+    mockGetUserOrganizations.mockResolvedValue([]);
     mockUpdateItem.mockResolvedValue({});
     mockCreateItem.mockResolvedValue({});
     mockSearchItems.mockResolvedValue({
@@ -161,6 +163,99 @@ describe('Inventory editor mode inline controls', () => {
       locationId: 200,
       quantity: 7,
     });
+  });
+
+  it('creates org inventory when an organization is selected', async () => {
+    mockGetUserOrganizations.mockResolvedValue([
+      {
+        id: 1,
+        userId: 1,
+        organizationId: 42,
+        roleId: 1,
+        organization: { id: 42, name: 'Test Org' },
+      },
+    ]);
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+
+    const viewSelect = screen.getByLabelText('View');
+    fireEvent.mouseDown(viewSelect);
+    const orgOption = await screen.findByText('Test Org');
+    fireEvent.click(orgOption);
+
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    const itemInput = await screen.findByTestId('new-row-item-input');
+    fireEvent.change(itemInput, { target: { value: 'New' } });
+    fireEvent.click(await screen.findByText('New Catalog Item'));
+
+    const locationInput = await screen.findByTestId('new-row-location-input');
+    fireEvent.change(locationInput, { target: { value: 'Test' } });
+    fireEvent.click(await screen.findByText('Test Location'));
+
+    const quantityInput = screen.getByTestId('new-row-quantity');
+    fireEvent.change(quantityInput, { target: { value: '9' } });
+
+    const saveButton = screen.getByTestId('new-row-save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(mockCreateOrgItem).toHaveBeenCalled());
+    expect(mockCreateOrgItem).toHaveBeenCalledWith(42, {
+      gameId: 1,
+      uexItemId: 300,
+      locationId: 200,
+      quantity: 9,
+    });
+    expect(mockCreateItem).not.toHaveBeenCalled();
+  });
+
+  it('shows org error and blocks save when in org view without selection', async () => {
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+
+    const viewSelect = screen.getByLabelText('View');
+    fireEvent.mouseDown(viewSelect);
+    const personalOption = await screen.findByText('My Inventory');
+    fireEvent.click(personalOption);
+
+    const viewModeSelect = screen.getByLabelText('View mode');
+    fireEvent.mouseDown(viewModeSelect);
+    const editorOption = await screen.findByText('Editor Mode');
+    fireEvent.click(editorOption);
+
+    // Switch to org view without choosing an org
+    fireEvent.mouseDown(viewSelect);
+    const listbox = await screen.findByRole('presentation');
+    const options = Array.from(listbox.querySelectorAll('[role=\"option\"]'));
+    const maybeOrgOption = options.find((opt) => opt.textContent && opt.textContent !== 'My Inventory');
+    if (maybeOrgOption) {
+      fireEvent.click(maybeOrgOption);
+    }
+
+    const saveButton = await screen.findByTestId('new-row-save');
+    fireEvent.click(saveButton);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Select an organization to add items in org view.'),
+      ).toBeInTheDocument(),
+    );
+    expect(saveButton).toBeDisabled();
+    expect(mockCreateItem).not.toHaveBeenCalled();
+    expect(mockCreateOrgItem).not.toHaveBeenCalled();
   });
 
   it('surfaces validation errors and focuses the first invalid field for new row', async () => {
