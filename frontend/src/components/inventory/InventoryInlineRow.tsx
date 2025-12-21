@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import type { MouseEvent } from 'react';
 import {
   Autocomplete,
@@ -11,6 +12,7 @@ import {
 } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import EditIcon from '@mui/icons-material/Edit';
 import type { InventoryItem, OrgInventoryItem } from '../../services/inventory.service';
 import type { FocusController } from '../../utils/focusController';
 import { useMemoizedLocations } from '../../hooks/useMemoizedLocations';
@@ -28,38 +30,54 @@ interface InventoryInlineRowProps {
   item: InventoryRecord;
   density: 'standard' | 'compact';
   allLocations: LocationOption[];
+  locationNameById: Map<number, string>;
   inlineDraft: { locationId: number | ''; quantity: number | '' };
   inlineLocationInput: string;
   locationEditing: boolean;
+  quantityEditing: boolean;
   inlineSaving: boolean;
   inlineSaved?: boolean;
   inlineError?: string | null;
   isDirty: boolean;
+  isRowActive: boolean;
   focusController: FocusController<string, 'location' | 'quantity' | 'save'>;
   rowKey: string;
-  onDraftChange: (changes: Partial<{ locationId: number | ''; quantity: number | '' }>) => void;
-  onErrorChange: (message: string | null) => void;
-  onLocationInputChange: (value: string) => void;
-  onLocationFocus: () => void;
-  onLocationBlur: (selectedName?: string) => void;
-  onSave: () => void;
-  onOpenActions?: (event: MouseEvent<HTMLButtonElement>) => void;
+  onDraftChange: (
+    itemId: string,
+    changes: Partial<{ locationId: number | ''; quantity: number | '' }>,
+  ) => void;
+  onErrorChange: (itemId: string, message: string | null) => void;
+  onLocationInputChange: (rowKey: string, value: string) => void;
+  onLocationFocus: (itemId: string) => void;
+  onLocationBlur: (
+    rowKey: string,
+    itemId: string,
+    draftLocationId: number | '',
+    selectedName?: string,
+  ) => void;
+  onQuantityBlur: (rowKey: string) => void;
+  onActivateField: (rowKey: string, field: 'location' | 'quantity', initialInput?: string) => void;
+  onSave: (item: InventoryRecord) => void;
+  onOpenActions?: (event: MouseEvent<HTMLElement>, item: InventoryRecord) => void;
   setLocationRef: (ref: HTMLInputElement | null, key: string) => void;
   setQuantityRef: (ref: HTMLInputElement | null, key: string) => void;
   setSaveRef: (ref: HTMLButtonElement | null, key: string) => void;
 }
 
-export const InventoryInlineRow = ({
+const InventoryInlineRow = ({
   item,
   density,
   allLocations,
+  locationNameById,
   inlineDraft,
   inlineLocationInput,
   locationEditing,
+  quantityEditing,
   inlineSaving,
   inlineSaved,
   inlineError,
   isDirty,
+  isRowActive,
   focusController,
   rowKey,
   onDraftChange,
@@ -67,6 +85,8 @@ export const InventoryInlineRow = ({
   onLocationInputChange,
   onLocationFocus,
   onLocationBlur,
+  onQuantityBlur,
+  onActivateField,
   onSave,
   onOpenActions,
   setLocationRef,
@@ -78,19 +98,22 @@ export const InventoryInlineRow = ({
       ? Number(inlineDraft.locationId)
       : inlineDraft.locationId;
 
-  const { filtered: filteredOptions, getSelected } = useMemoizedLocations(
+  const { filtered: filteredOptions } = useMemoizedLocations(
     allLocations,
     inlineLocationInput,
+    locationEditing,
   );
-  const selectedLocation =
-    typeof draftLocationId === 'number'
-      ? getSelected(draftLocationId) ||
-        (item.locationName
-          ? { id: draftLocationId, name: item.locationName }
-          : null)
-      : null;
+  const selectedLocation = useMemo(() => {
+    if (typeof draftLocationId !== 'number') return null;
+    const name = locationNameById.get(draftLocationId) ?? item.locationName;
+    return name ? { id: draftLocationId, name } : null;
+  }, [draftLocationId, locationNameById, item.locationName]);
 
   const draftQuantityNumber = Number(inlineDraft.quantity);
+  const displayQuantity =
+    Number.isFinite(draftQuantityNumber) && draftQuantityNumber > 0
+      ? draftQuantityNumber
+      : Number(item.quantity);
 
   return (
     <Box
@@ -104,8 +127,11 @@ export const InventoryInlineRow = ({
         alignItems: 'center',
         px: density === 'compact' ? 1 : 2,
         py: density === 'compact' ? 0.45 : 1.5,
+        backgroundColor: isRowActive ? 'rgba(74, 158, 255, 0.08)' : 'transparent',
         '&:hover': {
-          backgroundColor: 'rgba(255,255,255,0.02)',
+          backgroundColor: isRowActive
+            ? 'rgba(74, 158, 255, 0.12)'
+            : 'rgba(255,255,255,0.02)',
         },
       }}
     >
@@ -152,64 +178,133 @@ export const InventoryInlineRow = ({
             </Typography>
           </>
         ) : (
-          <Autocomplete
-            size="small"
-            fullWidth
-            options={filteredOptions}
-            autoHighlight
-            openOnFocus
-            filterOptions={(options) => options}
-            value={locationEditing ? null : selectedLocation}
-            inputValue={inlineLocationInput}
-            getOptionLabel={(option) => option?.name ?? ''}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            onChange={(_, value) => {
-              onDraftChange({ locationId: value ? value.id : '' });
-              onLocationInputChange(value?.name ?? '');
-              onLocationBlur(value?.name ?? '');
-              onErrorChange(null);
-            }}
-            onInputChange={(_, value) => {
-              onLocationInputChange(value);
-            }}
-            onFocus={() => {
-              onLocationFocus();
-              onLocationInputChange('');
-            }}
-            onBlur={() => {
-              onLocationBlur(selectedLocation?.name ?? '');
-            }}
-            renderOption={(props, option) => (
-              <li {...props} key={option.id}>
-                {option.name}
-              </li>
-            )}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Location"
-                data-testid={`inline-location-${item.id}`}
-                inputRef={(el) => {
-                  setLocationRef(el, rowKey);
+          <>
+            {locationEditing ? (
+              <Autocomplete
+                size="small"
+                fullWidth
+                options={filteredOptions}
+                autoHighlight
+                openOnFocus
+                filterOptions={(options) => options}
+                value={locationEditing ? null : selectedLocation}
+                inputValue={inlineLocationInput}
+                getOptionLabel={(option) => option?.name ?? ''}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                onChange={(_, value) => {
+                  onDraftChange(item.id, { locationId: value ? value.id : '' });
+                  onLocationInputChange(rowKey, value?.name ?? '');
+                  onLocationBlur(rowKey, item.id, draftLocationId, value?.name ?? '');
+                  onErrorChange(item.id, null);
                 }}
+                onInputChange={(_, value) => {
+                  onLocationInputChange(rowKey, value);
+                }}
+                onFocus={() => {
+                  onLocationFocus(item.id);
+                }}
+                onBlur={() => {
+                  onLocationBlur(rowKey, item.id, draftLocationId, selectedLocation?.name ?? '');
+                }}
+                renderOption={(props, option) => (
+                  <li {...props} key={option.id}>
+                    {option.name}
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Location"
+                    data-testid={`inline-location-${item.id}`}
+                    inputRef={(el) => {
+                      setLocationRef(el, rowKey);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        const bestMatch = filteredOptions[0];
+                        if (bestMatch) {
+                          onDraftChange(item.id, { locationId: bestMatch.id });
+                          onLocationInputChange(rowKey, bestMatch.name);
+                          onLocationBlur(rowKey, item.id, draftLocationId, bestMatch.name);
+                          onErrorChange(item.id, null);
+                          focusController.focus(rowKey, 'quantity');
+                        } else {
+                          onErrorChange(item.id, 'No matches found');
+                        }
+                      } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        onLocationInputChange(rowKey, selectedLocation?.name ?? '');
+                        onLocationBlur(
+                          rowKey,
+                          item.id,
+                          draftLocationId,
+                          selectedLocation?.name ?? '',
+                        );
+                      }
+                    }}
+                  />
+                )}
+              />
+            ) : (
+              <Box
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  onActivateField(
+                    rowKey,
+                    'location',
+                    selectedLocation?.name ?? item.locationName ?? '',
+                  )
+                }
+                onFocus={() =>
+                  onActivateField(
+                    rowKey,
+                    'location',
+                    selectedLocation?.name ?? item.locationName ?? '',
+                  )
+                }
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
+                  if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    const bestMatch = filteredOptions[0];
-                    if (bestMatch) {
-                      onDraftChange({ locationId: bestMatch.id });
-                      onLocationInputChange(bestMatch.name);
-                      onLocationBlur(bestMatch.name);
-                      onErrorChange(null);
-                      focusController.focus(rowKey, 'quantity');
-                    } else {
-                      onErrorChange('No matches found');
-                    }
+                    onActivateField(
+                      rowKey,
+                      'location',
+                      selectedLocation?.name ?? item.locationName ?? '',
+                    );
                   }
                 }}
-              />
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  cursor: 'text',
+                  color: 'text.primary',
+                  textDecoration: 'underline dotted',
+                  textUnderlineOffset: '4px',
+                  textDecorationColor: 'rgba(255,255,255,0.35)',
+                  '&:hover .inline-edit-icon': {
+                    opacity: 0.75,
+                  },
+                  '&:focus-visible': {
+                    outline: '1px solid rgba(74, 158, 255, 0.6)',
+                    borderRadius: 1,
+                    outlineOffset: 2,
+                  },
+                }}
+                aria-label={`Edit location for ${item.itemName ?? `Item ${item.uexItemId}`}`}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {selectedLocation?.name || item.locationName || 'Select location'}
+                </Typography>
+                <EditIcon
+                  className="inline-edit-icon"
+                  fontSize="inherit"
+                  sx={{ opacity: 0, transition: 'opacity 0.2s ease' }}
+                />
+              </Box>
             )}
-          />
+          </>
         )}
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
@@ -223,54 +318,107 @@ export const InventoryInlineRow = ({
             </Typography>
           </>
         ) : (
-          <TextField
-            type="text"
-            size="small"
-            data-testid={`inline-quantity-${item.id}`}
-            value={inlineDraft.quantity}
-            onChange={(e) => {
-              const raw = e.target.value.trim();
-              if (raw === '') {
-                onDraftChange({ quantity: '' });
-                onErrorChange('Quantity is required');
-                return;
-              }
-              const numeric = Number(raw);
-              if (Number.isNaN(numeric)) {
-                onDraftChange({ quantity: '' });
-              } else {
-                onDraftChange({ quantity: Math.min(numeric, EDITOR_MODE_QUANTITY_MAX) });
-              }
-              if (!Number.isInteger(numeric) || numeric <= 0) {
-                onErrorChange('Quantity must be an integer greater than 0');
-              } else {
-                onErrorChange(null);
-              }
-            }}
-            inputProps={{
-              inputMode: 'numeric',
-              pattern: '[0-9]*',
-            }}
-            inputRef={(el) => {
-              setQuantityRef(el, rowKey);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                focusController.focus(rowKey, 'save');
-              }
-            }}
-            sx={{
-              maxWidth: 120,
-              '& input': {
-                MozAppearance: 'textfield',
-              },
-              '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-                WebkitAppearance: 'none',
-                margin: 0,
-              },
-            }}
-          />
+          <>
+            {quantityEditing ? (
+              <TextField
+                type="text"
+                size="small"
+                data-testid={`inline-quantity-${item.id}`}
+                value={inlineDraft.quantity}
+                onChange={(e) => {
+                  const raw = e.target.value.trim();
+                  if (raw === '') {
+                    onDraftChange(item.id, { quantity: '' });
+                    onErrorChange(item.id, 'Quantity is required');
+                    return;
+                  }
+                  const numeric = Number(raw);
+                  if (Number.isNaN(numeric)) {
+                    onDraftChange(item.id, { quantity: '' });
+                  } else {
+                    onDraftChange(item.id, {
+                      quantity: Math.min(numeric, EDITOR_MODE_QUANTITY_MAX),
+                    });
+                  }
+                  if (!Number.isInteger(numeric) || numeric <= 0) {
+                    onErrorChange(item.id, 'Quantity must be an integer greater than 0');
+                  } else {
+                    onErrorChange(item.id, null);
+                  }
+                }}
+                onBlur={() => onQuantityBlur(rowKey)}
+                inputProps={{
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*',
+                }}
+                inputRef={(el) => {
+                  setQuantityRef(el, rowKey);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    focusController.focus(rowKey, 'save');
+                  } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    onDraftChange(item.id, { quantity: Number(item.quantity) || 0 });
+                    onErrorChange(item.id, null);
+                    onQuantityBlur(rowKey);
+                  }
+                }}
+                sx={{
+                  maxWidth: 120,
+                  '& input': {
+                    MozAppearance: 'textfield',
+                  },
+                  '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
+                    WebkitAppearance: 'none',
+                    margin: 0,
+                  },
+                }}
+              />
+            ) : (
+              <Box
+                role="button"
+                tabIndex={0}
+                onClick={() => onActivateField(rowKey, 'quantity')}
+                onFocus={() => onActivateField(rowKey, 'quantity')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onActivateField(rowKey, 'quantity');
+                  }
+                }}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  cursor: 'text',
+                  color: 'text.primary',
+                  textDecoration: 'underline dotted',
+                  textUnderlineOffset: '4px',
+                  textDecorationColor: 'rgba(255,255,255,0.35)',
+                  '&:hover .inline-edit-icon': {
+                    opacity: 0.75,
+                  },
+                  '&:focus-visible': {
+                    outline: '1px solid rgba(74, 158, 255, 0.6)',
+                    borderRadius: 1,
+                    outlineOffset: 2,
+                  },
+                }}
+                aria-label={`Edit quantity for ${item.itemName ?? `Item ${item.uexItemId}`}`}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 700, letterSpacing: 0.1 }}>
+                  {displayQuantity.toLocaleString()}
+                </Typography>
+                <EditIcon
+                  className="inline-edit-icon"
+                  fontSize="inherit"
+                  sx={{ opacity: 0, transition: 'opacity 0.2s ease' }}
+                />
+              </Box>
+            )}
+          </>
         )}
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
@@ -327,13 +475,13 @@ export const InventoryInlineRow = ({
           <IconButton
             color="primary"
             size="small"
-            onClick={onSave}
+            onClick={() => onSave(item)}
             disabled={inlineSaving}
             data-testid={`inline-save-${item.id}`}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
-                onSave();
+                onSave(item);
               }
             }}
             ref={(el: HTMLButtonElement | null) => {
@@ -344,7 +492,7 @@ export const InventoryInlineRow = ({
           </IconButton>
         ) : (
           <Tooltip title="Actions">
-            <IconButton onClick={onOpenActions}>
+            <IconButton onClick={(event) => onOpenActions?.(event, item)}>
               <MoreVertIcon />
             </IconButton>
           </Tooltip>
@@ -354,4 +502,34 @@ export const InventoryInlineRow = ({
   );
 };
 
-export default InventoryInlineRow;
+const areEqual = (prev: InventoryInlineRowProps, next: InventoryInlineRowProps) =>
+  prev.item === next.item &&
+  prev.density === next.density &&
+  prev.allLocations === next.allLocations &&
+  prev.locationNameById === next.locationNameById &&
+  prev.inlineDraft === next.inlineDraft &&
+  prev.inlineLocationInput === next.inlineLocationInput &&
+  prev.locationEditing === next.locationEditing &&
+  prev.quantityEditing === next.quantityEditing &&
+  prev.inlineSaving === next.inlineSaving &&
+  prev.inlineSaved === next.inlineSaved &&
+  prev.inlineError === next.inlineError &&
+  prev.isDirty === next.isDirty &&
+  prev.isRowActive === next.isRowActive &&
+  prev.focusController === next.focusController &&
+  prev.rowKey === next.rowKey &&
+  prev.onDraftChange === next.onDraftChange &&
+  prev.onErrorChange === next.onErrorChange &&
+  prev.onLocationInputChange === next.onLocationInputChange &&
+  prev.onLocationFocus === next.onLocationFocus &&
+  prev.onLocationBlur === next.onLocationBlur &&
+  prev.onQuantityBlur === next.onQuantityBlur &&
+  prev.onActivateField === next.onActivateField &&
+  prev.onSave === next.onSave &&
+  prev.onOpenActions === next.onOpenActions &&
+  prev.setLocationRef === next.setLocationRef &&
+  prev.setQuantityRef === next.setQuantityRef &&
+  prev.setSaveRef === next.setSaveRef;
+
+export { InventoryInlineRow };
+export default memo(InventoryInlineRow, areEqual);

@@ -69,13 +69,13 @@ const DENSITY_STORAGE_KEY = 'inventory:density';
 
 const readStoredViewMode = (): 'personal' | 'org' => {
   if (typeof window === 'undefined') return 'personal';
-  const stored = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+  const stored = window.sessionStorage.getItem(VIEW_MODE_STORAGE_KEY);
   return stored === 'org' ? 'org' : 'personal';
 };
 
 const readStoredOrgId = (): number | null => {
   if (typeof window === 'undefined') return null;
-  const stored = window.localStorage.getItem(ORG_ID_STORAGE_KEY);
+  const stored = window.sessionStorage.getItem(ORG_ID_STORAGE_KEY);
   if (!stored) return null;
   const parsed = Number.parseInt(stored, 10);
   return Number.isNaN(parsed) ? null : parsed;
@@ -83,7 +83,7 @@ const readStoredOrgId = (): number | null => {
 
 const readStoredDensity = (): 'standard' | 'compact' => {
   if (typeof window === 'undefined') return 'standard';
-  const stored = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+  const stored = window.sessionStorage.getItem(DENSITY_STORAGE_KEY);
   return stored === 'compact' ? 'compact' : 'standard';
 };
 
@@ -154,8 +154,15 @@ const InventoryPage = () => {
   const [inlineSaved, setInlineSaved] = useState<Set<string>>(new Set());
   const [inlineError, setInlineError] = useState<Record<string, string | null>>({});
   const [allLocations, setAllLocations] = useState<{ id: number; name: string }[]>([]);
+  const locationNameById = useMemo(
+    () => new Map(allLocations.map((loc) => [loc.id, loc.name])),
+    [allLocations],
+  );
   const [inlineLocationInputs, setInlineLocationInputs] = useState<Record<string, string>>({});
-  const [locationEditing, setLocationEditing] = useState<Record<string, boolean>>({});
+  const [inlineActiveField, setInlineActiveField] = useState<{
+    rowKey: string;
+    field: 'location' | 'quantity';
+  } | null>(null);
   const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] = useState(false);
   const [newRowDraft, setNewRowDraft] = useState<{
     itemId: number | '';
@@ -186,19 +193,19 @@ const InventoryPage = () => {
   const isOrgMode = viewMode === 'org';
 
   useEffect(() => {
-    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    window.sessionStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
   }, [viewMode]);
 
   useEffect(() => {
     if (selectedOrgId === null) {
-      window.localStorage.removeItem(ORG_ID_STORAGE_KEY);
+      window.sessionStorage.removeItem(ORG_ID_STORAGE_KEY);
       return;
     }
-    window.localStorage.setItem(ORG_ID_STORAGE_KEY, selectedOrgId.toString());
+    window.sessionStorage.setItem(ORG_ID_STORAGE_KEY, selectedOrgId.toString());
   }, [selectedOrgId]);
 
   useEffect(() => {
-    window.localStorage.setItem(DENSITY_STORAGE_KEY, density);
+    window.sessionStorage.setItem(DENSITY_STORAGE_KEY, density);
   }, [density]);
 
   useEffect(() => {
@@ -244,6 +251,107 @@ const InventoryPage = () => {
   const newRowSaveRef = useRef<HTMLButtonElement | null>(null);
   const newRowItemCache = useRef<Map<string, CatalogItem[]>>(new Map());
 
+  const activateInlineField = useCallback(
+    (
+      rowKey: string,
+      field: 'location' | 'quantity',
+      initialInput?: string,
+    ) => {
+      setInlineActiveField({ rowKey, field });
+      if (field === 'location') {
+        setInlineLocationInputs((prev) => ({
+          ...prev,
+          [rowKey]: initialInput ?? prev[rowKey] ?? '',
+        }));
+      }
+      const parsedId = Number(rowKey);
+      if (!Number.isNaN(parsedId)) {
+        setInlineError((prev) => ({ ...prev, [parsedId]: null }));
+      }
+    },
+    [],
+  );
+  const handleInlineDraftChange = useCallback(
+    (itemId: string, changes: Partial<{ locationId: number | ''; quantity: number | '' }>) => {
+      setInlineDrafts((prev) => {
+        const nextLocation =
+          changes.locationId === undefined
+            ? prev[itemId]?.locationId ?? ''
+            : Number.isNaN(Number(changes.locationId))
+            ? ''
+            : (Number(changes.locationId) as number);
+        return {
+          ...prev,
+          [itemId]: {
+            locationId: nextLocation,
+            quantity:
+              changes.quantity === undefined
+                ? prev[itemId]?.quantity ?? 0
+                : (changes.quantity as number | ''),
+          },
+        };
+      });
+      setInlineError((prev) => ({ ...prev, [itemId]: null }));
+    },
+    [],
+  );
+  const handleInlineErrorChange = useCallback((itemId: string, message: string | null) => {
+    setInlineError((prev) => ({
+      ...prev,
+      [itemId]: message,
+    }));
+  }, []);
+  const handleInlineLocationInputChange = useCallback((rowKey: string, value: string) => {
+    setInlineLocationInputs((prev) => ({
+      ...prev,
+      [rowKey]: value,
+    }));
+  }, []);
+  const handleInlineLocationFocus = useCallback((itemId: string) => {
+    setInlineError((prev) => ({ ...prev, [itemId]: null }));
+  }, []);
+  const handleInlineLocationBlur = useCallback(
+    (
+      rowKey: string,
+      itemId: string,
+      draftLocationId: number | '',
+      selectedName?: string,
+    ) => {
+      setInlineLocationInputs((prev) => ({
+        ...prev,
+        [rowKey]:
+          selectedName ??
+          (Number.isFinite(draftLocationId)
+            ? locationNameById.get(draftLocationId as number)
+            : undefined) ??
+          '',
+      }));
+      setInlineError((prev) => ({ ...prev, [itemId]: null }));
+      setInlineActiveField((prev) => {
+        if (!prev || prev.rowKey !== rowKey) return prev;
+        if (prev.field !== 'location') return prev;
+        return null;
+      });
+    },
+    [locationNameById],
+  );
+  const handleInlineQuantityBlur = useCallback((rowKey: string) => {
+    setInlineActiveField((prev) => {
+      if (!prev || prev.rowKey !== rowKey) return prev;
+      if (prev.field !== 'quantity') return prev;
+      return null;
+    });
+  }, []);
+  const handleLocationRef = useCallback((ref: HTMLInputElement | null, key: string) => {
+    locationRefs.current[key] = ref;
+  }, []);
+  const handleQuantityRef = useCallback((ref: HTMLInputElement | null, key: string) => {
+    quantityRefs.current[key] = ref;
+  }, []);
+  const handleSaveRef = useCallback((ref: HTMLButtonElement | null, key: string) => {
+    saveRefs.current[key] = ref;
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
@@ -256,10 +364,13 @@ const InventoryPage = () => {
     setActionMode(null);
   };
 
-  const handleActionOpen = (event: React.MouseEvent<HTMLElement>, item: InventoryRecord) => {
-    setActionAnchor(event.currentTarget);
-    setActionItem(item);
-  };
+  const handleActionOpen = useCallback(
+    (event: React.MouseEvent<HTMLElement>, item: InventoryRecord) => {
+      setActionAnchor(event.currentTarget);
+      setActionItem(item);
+    },
+    [],
+  );
 
   const canManageOrgInventory = useMemo(
     () =>
@@ -383,7 +494,7 @@ const InventoryPage = () => {
       const limit = rowsPerPage;
       const offset = page * rowsPerPage;
 
-      if (viewMode === 'org' && selectedOrgId) {
+      if (isOrgMode && selectedOrgId) {
         const data = await inventoryService.getOrgInventory(selectedOrgId, {
           gameId: GAME_ID,
           search: debouncedSearch || undefined,
@@ -834,29 +945,6 @@ const InventoryPage = () => {
   const isEditorMode = density === 'compact';
   const newRowOrgBlocked = viewMode === 'org' && !selectedOrgId;
 
-  const setInlineDraft = (
-    id: string,
-    changes: Partial<{ locationId: number | ''; quantity: number | '' }>,
-  ) => {
-    setInlineDrafts((prev) => {
-      const nextLocation =
-        changes.locationId === undefined
-          ? prev[id]?.locationId ?? ''
-          : Number.isNaN(Number(changes.locationId))
-          ? ''
-          : (Number(changes.locationId) as number);
-      return {
-        ...prev,
-        [id]: {
-          locationId: nextLocation,
-          quantity:
-            changes.quantity === undefined ? prev[id]?.quantity ?? 0 : (changes.quantity as number | ''),
-        },
-      };
-    });
-    setInlineError((prev) => ({ ...prev, [id]: null }));
-  };
-
   const resetNewRowDraft = () => {
     setNewRowDraft({
       itemId: '',
@@ -939,25 +1027,17 @@ const InventoryPage = () => {
     const unregisters: Array<() => void> = [];
     items.forEach((item) => {
       const key = item.id.toString();
-      const locationRef = locationRefs.current[key];
-      const quantityRef = quantityRefs.current[key];
+      unregisters.push(
+        focusController.register(key, 'location', () => {
+          activateInlineField(key, 'location');
+        }),
+      );
+      unregisters.push(
+        focusController.register(key, 'quantity', () => {
+          activateInlineField(key, 'quantity');
+        }),
+      );
       const saveRef = saveRefs.current[key];
-      if (locationRef) {
-        unregisters.push(
-          focusController.register(key, 'location', () => {
-            locationRef.focus();
-            locationRef.select?.();
-          }),
-        );
-      }
-      if (quantityRef) {
-        unregisters.push(
-          focusController.register(key, 'quantity', () => {
-            quantityRef.focus();
-            quantityRef.select?.();
-          }),
-        );
-      }
       if (saveRef) {
         unregisters.push(
           focusController.register(key, 'save', () => {
@@ -969,7 +1049,22 @@ const InventoryPage = () => {
     return () => {
       unregisters.forEach((fn) => fn());
     };
-  }, [items, focusController]);
+  }, [items, focusController, activateInlineField]);
+
+  useEffect(() => {
+    if (!inlineActiveField) return;
+    const { rowKey, field } = inlineActiveField;
+    const ref =
+      field === 'location'
+        ? locationRefs.current[rowKey]
+        : quantityRefs.current[rowKey];
+    if (!ref) return;
+    const handle = window.requestAnimationFrame(() => {
+      ref.focus();
+      ref.select?.();
+    });
+    return () => window.cancelAnimationFrame(handle);
+  }, [inlineActiveField]);
 
   useEffect(() => {
     const unregisters: Array<() => void> = [];
@@ -1026,6 +1121,7 @@ const InventoryPage = () => {
   useEffect(() => {
     if (!isEditorMode) {
       resetNewRowDraft();
+      setInlineActiveField(null);
     }
   }, [isEditorMode]);
 
@@ -1112,7 +1208,7 @@ const InventoryPage = () => {
     };
   }, [debouncedNewItemSearch, isEditorMode]);
 
-  const handleInlineSave = async (item: InventoryRecord) => {
+  const handleInlineSave = useCallback(async (item: InventoryRecord) => {
     const draft = inlineDrafts[item.id] ?? {
       locationId: item.locationId ?? '',
       quantity: Number(item.quantity) || 0,
@@ -1149,8 +1245,7 @@ const InventoryPage = () => {
       ...item,
       locationId: parsedLocationId,
       quantity: parsedQuantity,
-      locationName:
-        allLocations.find((loc) => loc.id === parsedLocationId)?.name || item.locationName,
+      locationName: locationNameById.get(parsedLocationId) || item.locationName,
     };
     setItems((prev) =>
       prev.map((entry) => (entry.id === item.id ? updatedItem : entry)),
@@ -1197,9 +1292,18 @@ const InventoryPage = () => {
       updated.delete(item.id);
       setInlineSaving(updated);
     }
-  };
+  }, [
+    focusController,
+    inlineDrafts,
+    inlineSaving,
+    inventoryService,
+    isOrgMode,
+    items,
+    locationNameById,
+    selectedOrgId,
+  ]);
 
-  const handleInlineSaveAndAdvance = async (item: InventoryRecord) => {
+  const handleInlineSaveAndAdvance = useCallback(async (item: InventoryRecord) => {
     const saved = await handleInlineSave(item);
     if (saved) {
       const advanced = await focusController.focusNext(item.id.toString(), 'save');
@@ -1207,7 +1311,7 @@ const InventoryPage = () => {
         focusController.focus(items[0].id.toString(), 'location');
       }
     }
-  };
+  }, [focusController, handleInlineSave, items]);
 
   const openActionDialog = (mode: ActionMode) => {
     setActionMode(mode);
@@ -1645,6 +1749,7 @@ const InventoryPage = () => {
     );
   }
 
+  const inventoryBusy = refreshing;
   const showEmptyState = filteredItems.length === 0 && !refreshing;
   const renderInlineRow = (item: InventoryRecord) => {
     const rowKey = item.id.toString();
@@ -1659,13 +1764,17 @@ const InventoryPage = () => {
     const draftQuantityNumber = Number(draft.quantity);
     const isDirty =
       draftLocationId !== originalLocationId || draftQuantityNumber !== originalQuantity;
+    const isRowActive = inlineActiveField?.rowKey === rowKey;
+    const isLocationActive = isRowActive && inlineActiveField?.field === 'location';
+    const isQuantityActive = isRowActive && inlineActiveField?.field === 'quantity';
+    const resolvedLocationName = Number.isFinite(draftLocationId)
+      ? locationNameById.get(draftLocationId as number)
+      : undefined;
     const inlineLocationValue =
       inlineLocationInputs[rowKey] ??
-      (locationEditing[rowKey]
+      (isLocationActive
         ? ''
-        : allLocations.find((loc) => loc.id === (typeof draft.locationId === 'number' ? draft.locationId : Number(draft.locationId)))?.name ??
-          item.locationName ??
-          '');
+        : resolvedLocationName ?? item.locationName ?? '');
     const saving = inlineSaving.has(item.id);
     const errorText = inlineError[item.id];
     const saved = inlineSaved.has(item.id.toString());
@@ -1676,58 +1785,30 @@ const InventoryPage = () => {
         item={item}
         density={density}
         allLocations={allLocations}
+        locationNameById={locationNameById}
         inlineDraft={draft}
         inlineLocationInput={inlineLocationValue}
-        locationEditing={Boolean(locationEditing[rowKey])}
+        locationEditing={isLocationActive}
+        quantityEditing={isQuantityActive}
         inlineSaving={saving}
         inlineSaved={saved}
         inlineError={errorText}
         isDirty={isDirty}
+        isRowActive={isRowActive}
         focusController={focusController}
         rowKey={rowKey}
-        onDraftChange={(changes) => setInlineDraft(item.id, changes)}
-        onErrorChange={(message) =>
-          setInlineError((prev) => ({
-            ...prev,
-            [item.id]: message,
-          }))
-        }
-        onLocationInputChange={(value) =>
-          setInlineLocationInputs((prev) => ({
-            ...prev,
-            [rowKey]: value,
-          }))
-        }
-        onLocationFocus={() => {
-          setInlineLocationInputs((prev) => ({
-            ...prev,
-            [rowKey]: '',
-          }));
-          setLocationEditing((prev) => ({ ...prev, [rowKey]: true }));
-          setInlineError((prev) => ({ ...prev, [item.id]: null }));
-        }}
-        onLocationBlur={(selectedName) => {
-          setInlineLocationInputs((prev) => ({
-            ...prev,
-            [rowKey]:
-              selectedName ??
-              allLocations.find((loc) => loc.id === draftLocationId)?.name ??
-              '',
-          }));
-          setLocationEditing((prev) => ({ ...prev, [rowKey]: false }));
-          setInlineError((prev) => ({ ...prev, [item.id]: null }));
-        }}
-        onSave={() => handleInlineSaveAndAdvance(item)}
-        onOpenActions={(e) => handleActionOpen(e, item)}
-        setLocationRef={(ref, key) => {
-          locationRefs.current[key] = ref;
-        }}
-        setQuantityRef={(ref, key) => {
-          quantityRefs.current[key] = ref;
-        }}
-        setSaveRef={(ref, key) => {
-          saveRefs.current[key] = ref;
-        }}
+        onDraftChange={handleInlineDraftChange}
+        onErrorChange={handleInlineErrorChange}
+        onLocationInputChange={handleInlineLocationInputChange}
+        onLocationFocus={handleInlineLocationFocus}
+        onLocationBlur={handleInlineLocationBlur}
+        onQuantityBlur={handleInlineQuantityBlur}
+        onActivateField={activateInlineField}
+        onSave={handleInlineSaveAndAdvance}
+        onOpenActions={handleActionOpen}
+        setLocationRef={handleLocationRef}
+        setQuantityRef={handleQuantityRef}
+        setSaveRef={handleSaveRef}
       />
     );
   };
@@ -1808,9 +1889,37 @@ const InventoryPage = () => {
           boxShadow: isOrgMode
             ? '0 0 0 1px rgba(242, 162, 85, 0.08), 0 0 24px rgba(242, 162, 85, 0.08)'
             : 'none',
+          position: 'relative',
         }}
+        aria-busy={inventoryBusy}
       >
-        <Grid container spacing={3}>
+        {inventoryBusy && (
+          <Box
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 5,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(11, 17, 24, 0.65)',
+              backdropFilter: 'blur(2px)',
+              borderRadius: isOrgMode ? 3 : 0,
+            }}
+          >
+            <Stack spacing={1} alignItems="center">
+              <CircularProgress color="inherit" size={28} />
+              <Typography variant="body2" color="text.secondary">
+                Loading inventory...
+              </Typography>
+            </Stack>
+          </Box>
+        )}
+        <Box sx={{ pointerEvents: inventoryBusy ? 'none' : 'auto' }}>
+          <Grid container spacing={3}>
           <Grid item xs={12}>
             <Card
               sx={{
@@ -1846,6 +1955,7 @@ const InventoryPage = () => {
                   totalCount={totalCount}
                   itemCount={items.length}
                   autoFocusSearch
+                  disabled={inventoryBusy}
                 />
                 {viewMode === 'org' && selectedOrgId && !canManageOrgInventory && !orgPermissionsLoading && (
                   <Alert severity="info" sx={{ mt: 2 }}>
@@ -2107,13 +2217,20 @@ const InventoryPage = () => {
                       component="div"
                       count={totalCount}
                       page={page}
-                      onPageChange={(_, newPage) => setPage(newPage)}
+                      onPageChange={(_, newPage) => {
+                        if (inventoryBusy) return;
+                        setPage(newPage);
+                      }}
                       rowsPerPage={rowsPerPage}
                       onRowsPerPageChange={(event) => {
+                        if (inventoryBusy) return;
                         setRowsPerPage(parseInt(event.target.value, 10));
                         setPage(0);
                       }}
                       rowsPerPageOptions={[10, 25, 50, 100, 250]}
+                      backIconButtonProps={{ disabled: inventoryBusy }}
+                      nextIconButtonProps={{ disabled: inventoryBusy }}
+                      SelectProps={{ disabled: inventoryBusy }}
                       sx={{ mt: 2 }}
                     />
                   </>
@@ -2122,6 +2239,7 @@ const InventoryPage = () => {
             </Card>
           </Grid>
         </Grid>
+        </Box>
       </Container>
 
       <Dialog
