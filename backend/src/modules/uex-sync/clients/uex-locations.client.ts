@@ -18,6 +18,24 @@ export interface UEXStarSystemResponse {
   date_modified?: string;
 }
 
+export interface UEXOrbitResponse {
+  id: number;
+  id_star_system: number;
+  name: string;
+  code?: string;
+  is_available?: boolean;
+  is_visible?: boolean;
+  is_default?: boolean;
+  is_lagrange?: boolean;
+  is_man_made?: boolean;
+  is_asteroid?: boolean;
+  is_planet?: boolean;
+  is_star?: boolean;
+  is_jump_point?: boolean;
+  date_added?: string;
+  date_modified?: string;
+}
+
 export interface UEXPlanetResponse {
   id: number;
   id_star_system: number;
@@ -102,6 +120,7 @@ export class UEXLocationsClient {
 
   private readonly endpoints = {
     star_systems: '/star_systems',
+    orbits: '/orbits',
     planets: '/planets',
     moons: '/moons',
     cities: '/cities',
@@ -125,6 +144,10 @@ export class UEXLocationsClient {
     filters?: UEXLocationFilters,
   ): Promise<UEXStarSystemResponse[]> {
     return this.fetchLocations<UEXStarSystemResponse>('star_systems', filters);
+  }
+
+  async fetchOrbits(filters?: UEXLocationFilters): Promise<UEXOrbitResponse[]> {
+    return this.fetchLocations<UEXOrbitResponse>('orbits', filters);
   }
 
   async fetchPlanets(

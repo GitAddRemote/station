@@ -45,6 +45,7 @@ import CallSplitIcon from '@mui/icons-material/CallSplit';
 import ShareIcon from '@mui/icons-material/Share';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
+import BusinessIcon from '@mui/icons-material/Business';
 import { inventoryService, InventoryCategory, InventoryItem, OrgInventoryItem } from '../services/inventory.service';
 import { uexService, CatalogItem } from '../services/uex.service';
 import { locationCache } from '../services/locationCache';
@@ -54,12 +55,37 @@ import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
 import InventoryNewRow from '../components/inventory/InventoryNewRow';
 import InventoryFiltersPanel from '../components/inventory/InventoryFiltersPanel';
+import { OrgPermission, permissionsService } from '../services/permissions.service';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
 
 const GAME_ID = 1;
 const EDITOR_MODE_QUANTITY_MAX = 100000;
+const ORG_ACCENT = '#f2a255';
+const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
+const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
+const DENSITY_STORAGE_KEY = 'inventory:density';
+
+const readStoredViewMode = (): 'personal' | 'org' => {
+  if (typeof window === 'undefined') return 'personal';
+  const stored = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+  return stored === 'org' ? 'org' : 'personal';
+};
+
+const readStoredOrgId = (): number | null => {
+  if (typeof window === 'undefined') return null;
+  const stored = window.localStorage.getItem(ORG_ID_STORAGE_KEY);
+  if (!stored) return null;
+  const parsed = Number.parseInt(stored, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const readStoredDensity = (): 'standard' | 'compact' => {
+  if (typeof window === 'undefined') return 'standard';
+  const stored = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+  return stored === 'compact' ? 'compact' : 'standard';
+};
 
 const valueText = (value: number) => `${value.toLocaleString()} qty`;
 
@@ -73,8 +99,8 @@ const InventoryPage = () => {
   const systemSelectRef = useRef<HTMLInputElement | null>(null);
   const [user, setUser] = useState<{ userId: number; username: string } | null>(null);
   const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'personal' | 'org'>('personal');
+  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(() => readStoredOrgId());
+  const [viewMode, setViewMode] = useState<'personal' | 'org'>(() => readStoredViewMode());
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [items, setItems] = useState<InventoryRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -93,7 +119,7 @@ const InventoryPage = () => {
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
   const [catalogPage, setCatalogPage] = useState(0);
-  const [catalogRowsPerPage, setCatalogRowsPerPage] = useState(10);
+  const [catalogRowsPerPage, setCatalogRowsPerPage] = useState(25);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
@@ -104,6 +130,9 @@ const InventoryPage = () => {
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemNotes, setNewItemNotes] = useState('');
   const [addSubmitting, setAddSubmitting] = useState(false);
+  const [orgPermissions, setOrgPermissions] = useState<OrgPermission[]>([]);
+  const [orgPermissionsLoading, setOrgPermissionsLoading] = useState(false);
+  const [orgPermissionsError, setOrgPermissionsError] = useState<string | null>(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -117,7 +146,7 @@ const InventoryPage = () => {
   const [groupBy, setGroupBy] = useState<'none' | 'category' | 'location' | 'share'>('none');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [density, setDensity] = useState<'standard' | 'compact'>('standard');
+  const [density, setDensity] = useState<'standard' | 'compact'>(() => readStoredDensity());
   const [inlineDrafts, setInlineDrafts] = useState<
     Record<string, { locationId: number | ''; quantity: number | '' }>
   >({});
@@ -154,6 +183,34 @@ const InventoryPage = () => {
   const [newRowSaving, setNewRowSaving] = useState(false);
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
+  const isOrgMode = viewMode === 'org';
+
+  useEffect(() => {
+    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (selectedOrgId === null) {
+      window.localStorage.removeItem(ORG_ID_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(ORG_ID_STORAGE_KEY, selectedOrgId.toString());
+  }, [selectedOrgId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DENSITY_STORAGE_KEY, density);
+  }, [density]);
+
+  useEffect(() => {
+    if (orgOptions.length === 0 || selectedOrgId === null) return;
+    const isValidOrg = orgOptions.some((org) => org.id === selectedOrgId);
+    if (!isValidOrg) {
+      setSelectedOrgId(null);
+      if (viewMode === 'org') {
+        setViewMode('personal');
+      }
+    }
+  }, [orgOptions, selectedOrgId, viewMode]);
   const debouncedNewItemSearch = useDebounce(newRowItemInput, 300);
   const debouncedNewLocationSearch = useDebounce(newRowLocationInput, 200);
   const getRowOrder = useCallback(
@@ -203,6 +260,21 @@ const InventoryPage = () => {
     setActionAnchor(event.currentTarget);
     setActionItem(item);
   };
+
+  const canManageOrgInventory = useMemo(
+    () =>
+      orgPermissions.includes(OrgPermission.CAN_EDIT_ORG_INVENTORY) ||
+      orgPermissions.includes(OrgPermission.CAN_ADMIN_ORG_INVENTORY),
+    [orgPermissions],
+  );
+  const showAddButton =
+    viewMode === 'personal' ||
+    (viewMode === 'org' && Boolean(selectedOrgId) && canManageOrgInventory);
+  const addButtonLabel = viewMode === 'org' ? 'Add org item' : 'Add item';
+  const selectedOrgName = useMemo(
+    () => orgOptions.find((org) => org.id === selectedOrgId)?.name ?? 'Organization',
+    [orgOptions, selectedOrgId],
+  );
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -384,6 +456,10 @@ const InventoryPage = () => {
   ]);
 
   const openAddDialog = () => {
+    if (viewMode === 'org' && !canManageOrgInventory) {
+      setCatalogError('You do not have permission to add items to this organization.');
+      return;
+    }
     setAddDialogOpen(true);
     setSelectedCatalogItem(null);
     setCatalogSearch('');
@@ -401,8 +477,17 @@ const InventoryPage = () => {
   };
 
   const handleCreateInventoryItem = async (options?: { stayOpen?: boolean }) => {
+    const isOrgView = viewMode === 'org' && selectedOrgId !== null;
     if (!selectedCatalogItem) {
       setCatalogError('Select an item to add.');
+      return;
+    }
+    if (viewMode === 'org' && !selectedOrgId) {
+      setCatalogError('Select an organization.');
+      return;
+    }
+    if (viewMode === 'org' && !canManageOrgInventory) {
+      setCatalogError('You do not have permission to add items to this organization.');
       return;
     }
     if (destinationSelection.locationId === '') {
@@ -426,15 +511,27 @@ const InventoryPage = () => {
 
       if (existing) {
         const shouldMerge = window.confirm(
-          'An item with this location already exists. Merge quantities?',
+          isOrgView
+            ? 'This org already has this item at the selected location. Merge quantities?'
+            : 'An item with this location already exists. Merge quantities?',
         );
         if (shouldMerge) {
           const newQuantity =
             (Number(existing.quantity) || 0) + Number(newItemQuantity);
-          await inventoryService.updateItem(existing.id, {
-            quantity: newQuantity,
-            locationId: numericLocationId,
-          });
+          if (isOrgView && selectedOrgId !== null) {
+            await inventoryService.updateOrgItem(selectedOrgId, existing.id, {
+              quantity: newQuantity,
+              locationId: numericLocationId,
+            });
+          } else {
+            await inventoryService.updateItem(existing.id, {
+              quantity: newQuantity,
+              locationId: numericLocationId,
+            });
+          }
+        } else if (isOrgView) {
+          setCatalogError('This item already exists for the selected location.');
+          return;
         } else {
           await inventoryService.createItem({
             gameId: GAME_ID,
@@ -445,13 +542,23 @@ const InventoryPage = () => {
           });
         }
       } else {
-        await inventoryService.createItem({
-          gameId: GAME_ID,
-          uexItemId: selectedCatalogItem.uexId,
-          locationId: numericLocationId,
-          quantity: newItemQuantity,
-          notes: newItemNotes || undefined,
-        });
+        if (isOrgView && selectedOrgId !== null) {
+          await inventoryService.createOrgItem(selectedOrgId, {
+            gameId: GAME_ID,
+            uexItemId: selectedCatalogItem.uexId,
+            locationId: numericLocationId,
+            quantity: newItemQuantity,
+            notes: newItemNotes || undefined,
+          });
+        } else {
+          await inventoryService.createItem({
+            gameId: GAME_ID,
+            uexItemId: selectedCatalogItem.uexId,
+            locationId: numericLocationId,
+            quantity: newItemQuantity,
+            notes: newItemNotes || undefined,
+          });
+        }
       }
 
       await fetchInventory();
@@ -464,7 +571,45 @@ const InventoryPage = () => {
       }
     } catch (err) {
       console.error('Error adding inventory item', err);
-      setCatalogError('Unable to add item right now.');
+      const status = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { status?: number } }).response?.status
+        : undefined;
+      if (status === 403) {
+        setCatalogError('You do not have permission to add items to this organization.');
+      } else if (status === 409 && viewMode === 'org' && selectedOrgId) {
+        const numericLocationId = Number(destinationSelection.locationId);
+        const existing = items.find(
+          (item) =>
+            item.uexItemId === selectedCatalogItem?.uexId &&
+            item.locationId === numericLocationId,
+        );
+        if (existing) {
+          const shouldMerge = window.confirm(
+            'This org already has this item at the selected location. Merge quantities?',
+          );
+          if (shouldMerge) {
+            const newQuantity =
+              (Number(existing.quantity) || 0) + Number(newItemQuantity);
+            await inventoryService.updateOrgItem(selectedOrgId, existing.id, {
+              quantity: newQuantity,
+              locationId: numericLocationId,
+            });
+            await fetchInventory();
+            if (options?.stayOpen) {
+              setNewItemQuantity(1);
+              setNewItemNotes('');
+              setCatalogError(null);
+            } else {
+              closeAddDialog();
+            }
+            setAddSubmitting(false);
+            return;
+          }
+        }
+        setCatalogError('This item already exists for the selected location.');
+      } else {
+        setCatalogError('Unable to add item right now.');
+      }
     } finally {
       setAddSubmitting(false);
     }
@@ -488,6 +633,39 @@ const InventoryPage = () => {
   }, [user, fetchOrganizations]);
 
   useEffect(() => {
+    if (viewMode !== 'org' || !user?.userId || !selectedOrgId) {
+      setOrgPermissions([]);
+      setOrgPermissionsError(null);
+      return;
+    }
+    let isMounted = true;
+    setOrgPermissionsLoading(true);
+    permissionsService
+      .getUserPermissions(user.userId, selectedOrgId)
+      .then((permissions) => {
+        if (isMounted) {
+          setOrgPermissions(permissions);
+          setOrgPermissionsError(null);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load org permissions', err);
+        if (isMounted) {
+          setOrgPermissions([]);
+          setOrgPermissionsError('Unable to load organization permissions.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setOrgPermissionsLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [viewMode, user?.userId, selectedOrgId]);
+
+  useEffect(() => {
     if (user) {
       fetchInventory();
     }
@@ -506,6 +684,12 @@ const InventoryPage = () => {
       fetchCatalog();
     }
   }, [addDialogOpen, fetchCatalog]);
+
+  useEffect(() => {
+    if (addDialogOpen && viewMode === 'org' && !canManageOrgInventory) {
+      setAddDialogOpen(false);
+    }
+  }, [addDialogOpen, viewMode, canManageOrgInventory]);
 
   useEffect(() => {
     if (!addDialogOpen) return;
@@ -1586,7 +1770,46 @@ const InventoryPage = () => {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      {isOrgMode && (
+        <Box
+          sx={{
+            background: 'rgba(242, 162, 85, 0.12)',
+            borderBottom: '1px solid rgba(242, 162, 85, 0.35)',
+            boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
+          }}
+        >
+          <Container maxWidth="xl" sx={{ py: 1.5 }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <BusinessIcon sx={{ color: ORG_ACCENT }} fontSize="small" />
+              <Typography variant="subtitle2" sx={{ color: '#f7f1e8', fontWeight: 600 }}>
+                Organization mode
+              </Typography>
+              <Divider
+                orientation="vertical"
+                flexItem
+                sx={{ borderColor: 'rgba(242, 162, 85, 0.35)' }}
+              />
+              <Typography variant="body2" sx={{ color: '#f0d9c0' }}>
+                {selectedOrgId ? `Working in ${selectedOrgName}` : 'Select an organization to continue.'}
+              </Typography>
+            </Stack>
+          </Container>
+        </Box>
+      )}
+
+      <Container
+        maxWidth="xl"
+        sx={{
+          py: 4,
+          mt: isOrgMode ? 2 : 0,
+          outline: isOrgMode ? '1px solid rgba(242, 162, 85, 0.35)' : 'none',
+          outlineOffset: isOrgMode ? 0 : undefined,
+          borderRadius: isOrgMode ? 3 : undefined,
+          boxShadow: isOrgMode
+            ? '0 0 0 1px rgba(242, 162, 85, 0.08), 0 0 24px rgba(242, 162, 85, 0.08)'
+            : 'none',
+        }}
+      >
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Card
@@ -1618,11 +1841,22 @@ const InventoryPage = () => {
                   orgOptions={orgOptions}
                   userInitial={user?.username?.charAt(0).toUpperCase() || 'U'}
                   onOpenAddDialog={openAddDialog}
-                  showAddButton={viewMode === 'personal'}
+                  showAddButton={showAddButton}
+                  addButtonLabel={addButtonLabel}
                   totalCount={totalCount}
                   itemCount={items.length}
                   autoFocusSearch
                 />
+                {viewMode === 'org' && selectedOrgId && !canManageOrgInventory && !orgPermissionsLoading && (
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    You do not have permission to add items to this organization.
+                  </Alert>
+                )}
+                {orgPermissionsError && (
+                  <Alert severity="warning" sx={{ mt: 2 }}>
+                    {orgPermissionsError}
+                  </Alert>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -1896,7 +2130,11 @@ const InventoryPage = () => {
         fullWidth
         maxWidth="lg"
       >
-        <DialogTitle>Quick add inventory item</DialogTitle>
+        <DialogTitle>
+          {viewMode === 'org'
+            ? `Add org inventory item · ${selectedOrgName}`
+            : 'Quick add inventory item'}
+        </DialogTitle>
         <DialogContent dividers onKeyDown={handleAddKeyDown}>
           <Stack spacing={2} sx={{ mt: 1 }}>
             {catalogError && <Alert severity="error">{catalogError}</Alert>}
@@ -2075,7 +2313,7 @@ const InventoryPage = () => {
                       setCatalogRowsPerPage(parseInt(event.target.value, 10));
                       setCatalogPage(0);
                     }}
-                    rowsPerPageOptions={[10, 25, 50]}
+                    rowsPerPageOptions={[25, 50]}
                   />
                 </Box>
               </Grid>

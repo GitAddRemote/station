@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { LocationsSyncService } from './locations-sync.service';
 import { UexStarSystem } from '../../uex/entities/uex-star-system.entity';
+import { UexOrbit } from '../../uex/entities/uex-orbit.entity';
 import { UexPlanet } from '../../uex/entities/uex-planet.entity';
 import { UexMoon } from '../../uex/entities/uex-moon.entity';
 import { UexCity } from '../../uex/entities/uex-city.entity';
@@ -16,6 +17,7 @@ import { UEXLocationsClient } from '../clients/uex-locations.client';
 describe('LocationsSyncService', () => {
   let service: LocationsSyncService;
   let mockStarSystemRepository: any;
+  let mockOrbitRepository: any;
   let mockPlanetRepository: any;
   let mockMoonRepository: any;
   let mockCityRepository: any;
@@ -34,6 +36,7 @@ describe('LocationsSyncService', () => {
     });
 
     mockStarSystemRepository = createMockRepository();
+    mockOrbitRepository = createMockRepository();
     mockPlanetRepository = createMockRepository();
     mockMoonRepository = createMockRepository();
     mockCityRepository = createMockRepository();
@@ -43,6 +46,7 @@ describe('LocationsSyncService', () => {
 
     mockUexClient = {
       fetchStarSystems: jest.fn(),
+      fetchOrbits: jest.fn(),
       fetchPlanets: jest.fn(),
       fetchMoons: jest.fn(),
       fetchCities: jest.fn(),
@@ -69,6 +73,10 @@ describe('LocationsSyncService', () => {
         {
           provide: getRepositoryToken(UexStarSystem),
           useValue: mockStarSystemRepository,
+        },
+        {
+          provide: getRepositoryToken(UexOrbit),
+          useValue: mockOrbitRepository,
         },
         {
           provide: getRepositoryToken(UexPlanet),
@@ -130,6 +138,7 @@ describe('LocationsSyncService', () => {
     it('should sync all location types in hierarchical order', async () => {
       // Mock all fetch methods to return empty arrays
       mockUexClient.fetchStarSystems.mockResolvedValue([]);
+      mockUexClient.fetchOrbits.mockResolvedValue([]);
       mockUexClient.fetchPlanets.mockResolvedValue([]);
       mockUexClient.fetchMoons.mockResolvedValue([]);
       mockUexClient.fetchCities.mockResolvedValue([]);
@@ -149,8 +158,8 @@ describe('LocationsSyncService', () => {
       expect(result.totalDeleted).toBe(0);
 
       // Verify all endpoints were synced
-      expect(mockSyncService.acquireSyncLock).toHaveBeenCalledTimes(7);
-      expect(mockSyncService.releaseSyncLock).toHaveBeenCalledTimes(7);
+      expect(mockSyncService.acquireSyncLock).toHaveBeenCalledTimes(8);
+      expect(mockSyncService.releaseSyncLock).toHaveBeenCalledTimes(8);
     }, 20000);
 
     it('should create new star systems', async () => {
@@ -164,6 +173,7 @@ describe('LocationsSyncService', () => {
       ];
 
       mockUexClient.fetchStarSystems.mockResolvedValue(mockSystems);
+      mockUexClient.fetchOrbits.mockResolvedValue([]);
       mockStarSystemRepository.findOne.mockResolvedValue(null);
       mockStarSystemRepository.save.mockResolvedValue({ id: 1 });
 
@@ -204,6 +214,7 @@ describe('LocationsSyncService', () => {
       ];
 
       mockUexClient.fetchStarSystems.mockResolvedValue(mockSystems);
+      mockUexClient.fetchOrbits.mockResolvedValue([]);
       mockStarSystemRepository.findOne.mockResolvedValue(null);
       mockStarSystemRepository.save.mockResolvedValue({ id: 2 });
 
@@ -243,6 +254,7 @@ describe('LocationsSyncService', () => {
       ];
 
       mockUexClient.fetchStarSystems.mockResolvedValue([]);
+      mockUexClient.fetchOrbits.mockResolvedValue([]);
       mockUexClient.fetchPlanets.mockResolvedValue(mockPlanets);
       mockPlanetRepository.findOne.mockResolvedValue({ id: 5, uexId: 10 });
       mockPlanetRepository.update.mockResolvedValue({ affected: 1 });
@@ -279,6 +291,10 @@ describe('LocationsSyncService', () => {
         callOrder.push('star_systems');
         return [];
       });
+      mockUexClient.fetchOrbits.mockImplementation(async () => {
+        callOrder.push('orbits');
+        return [];
+      });
       mockUexClient.fetchPlanets.mockImplementation(async () => {
         callOrder.push('planets');
         return [];
@@ -313,6 +329,7 @@ describe('LocationsSyncService', () => {
 
       expect(callOrder).toEqual([
         'star_systems',
+        'orbits',
         'planets',
         'moons',
         'cities',

@@ -55,6 +55,7 @@ interface FiltersPanelProps {
   userInitial: string;
   onOpenAddDialog: () => void;
   showAddButton: boolean;
+  addButtonLabel?: string;
   totalCount: number;
   itemCount: number;
   autoFocusSearch?: boolean;
@@ -83,6 +84,7 @@ export const InventoryFiltersPanel = ({
   userInitial,
   onOpenAddDialog,
   showAddButton,
+  addButtonLabel = 'Add item',
   totalCount,
   itemCount,
   autoFocusSearch = false,
@@ -309,7 +311,7 @@ export const InventoryFiltersPanel = ({
         {showAddButton && (
           <Grid item>
             <Button variant="contained" onClick={onOpenAddDialog}>
-              Add item
+              {addButtonLabel}
             </Button>
           </Grid>
         )}

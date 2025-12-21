@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { OrgInventoryRepository } from './org-inventory.repository';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -87,6 +88,19 @@ export class OrgInventoryService {
     }
 
     await this.verifyInventoryPermission(userId, dto.orgId, 'manage');
+
+    const existing = await this.orgInventoryRepository.findExistingItem({
+      orgId: dto.orgId,
+      gameId: dto.gameId,
+      uexItemId: dto.uexItemId,
+      locationId: dto.locationId,
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        'Inventory item already exists for this organization and location',
+      );
+    }
 
     const item = this.orgInventoryRepository.create({
       ...dto,

@@ -175,6 +175,40 @@ cd frontend && pnpm dev   # Frontend only
 
 **Note**: Redis is optional. The application will fall back to in-memory caching if Redis is unavailable.
 
+### Dependency Health Check
+
+If TypeScript suddenly cannot resolve NestJS/TypeORM/Node types (missing modules, missing `lib.es6.d.ts`, or "Cannot find global type"), re-install dependencies:
+
+```bash
+pnpm install
+pnpm -C backend install
+```
+
+### Clean Reset (Local Dev)
+
+If you want a full clean reset of dependencies and data:
+
+```bash
+# Stop containers and drop volumes
+docker-compose down -v
+
+# Reinstall dependencies
+pnpm install
+
+# Rebuild packages
+pnpm build
+
+# Start infrastructure services
+docker-compose up -d
+
+# Run migrations and seed data
+pnpm --filter backend migration:run
+pnpm --filter backend seed
+
+# Start apps
+pnpm dev
+```
+
 ### Building for Production
 
 ```bash

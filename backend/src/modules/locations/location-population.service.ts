@@ -212,16 +212,10 @@ export class LocationPopulationService {
 
     const moons = await this.moonRepository.find({
       where: { deleted: false, active: true },
-      relations: ['planet', 'planet.starSystem'],
+      relations: ['planet', 'planet.starSystem', 'starSystem'],
     });
 
     for (const moon of moons) {
-      if (!moon.planet || !moon.planet.starSystem) {
-        this.logger.warn(`Moon ${moon.name} has no planet/system, skipping`);
-        skipped++;
-        continue;
-      }
-
       const existing = await this.locationRepository.findOne({
         where: {
           moonId: moon.uexId,
@@ -229,12 +223,27 @@ export class LocationPopulationService {
         },
       });
 
-      const displayName = `${moon.planet.starSystem.code} / ${moon.planet.name} / ${moon.name}`;
-      const hierarchyPath = JSON.stringify({
-        system: moon.planet.starSystem.name,
-        planet: moon.planet.name,
-        moon: moon.name,
-      });
+      let displayName: string;
+      let hierarchyPath: string;
+
+      if (moon.planet && moon.planet.starSystem) {
+        displayName = `${moon.planet.starSystem.code} / ${moon.planet.name} / ${moon.name}`;
+        hierarchyPath = JSON.stringify({
+          system: moon.planet.starSystem.name,
+          planet: moon.planet.name,
+          moon: moon.name,
+        });
+      } else if (moon.starSystem) {
+        displayName = `${moon.starSystem.code} / ${moon.name}`;
+        hierarchyPath = JSON.stringify({
+          system: moon.starSystem.name,
+          moon: moon.name,
+        });
+      } else {
+        this.logger.warn(`Moon ${moon.name} has no planet/system, skipping`);
+        skipped++;
+        continue;
+      }
 
       if (existing) {
         existing.displayName = displayName;
@@ -283,6 +292,7 @@ export class LocationPopulationService {
         'moon',
         'moon.planet',
         'moon.planet.starSystem',
+        'moon.starSystem',
       ],
     });
 
@@ -302,6 +312,13 @@ export class LocationPopulationService {
         hierarchyPath = JSON.stringify({
           system: city.moon.planet.starSystem.name,
           planet: city.moon.planet.name,
+          moon: city.moon.name,
+          city: city.name,
+        });
+      } else if (city.moon && city.moon.starSystem) {
+        displayName = `${city.moon.starSystem.code} / ${city.moon.name} / ${city.name}`;
+        hierarchyPath = JSON.stringify({
+          system: city.moon.starSystem.name,
           moon: city.moon.name,
           city: city.name,
         });
@@ -364,11 +381,14 @@ export class LocationPopulationService {
       where: { deleted: false, active: true },
       relations: [
         'starSystem',
+        'orbit',
+        'orbit.starSystem',
         'planet',
         'planet.starSystem',
         'moon',
         'moon.planet',
         'moon.planet.starSystem',
+        'moon.starSystem',
       ],
     });
 
@@ -393,6 +413,20 @@ export class LocationPopulationService {
           system: station.moon.planet.starSystem.name,
           planet: station.moon.planet.name,
           moon: station.moon.name,
+          space_station: station.name,
+        });
+      } else if (station.moon && station.moon.starSystem) {
+        displayName = `${station.moon.starSystem.code} / ${station.moon.name} / ${station.name}`;
+        hierarchyPath = JSON.stringify({
+          system: station.moon.starSystem.name,
+          moon: station.moon.name,
+          space_station: station.name,
+        });
+      } else if (station.orbit && station.orbit.starSystem) {
+        displayName = `${station.orbit.starSystem.code} / ${station.orbit.name} / ${station.name}`;
+        hierarchyPath = JSON.stringify({
+          system: station.orbit.starSystem.name,
+          orbit: station.orbit.name,
           space_station: station.name,
         });
       } else if (station.starSystem) {
@@ -462,6 +496,7 @@ export class LocationPopulationService {
         'moon',
         'moon.planet',
         'moon.planet.starSystem',
+        'moon.starSystem',
       ],
     });
 
@@ -485,6 +520,13 @@ export class LocationPopulationService {
         hierarchyPath = JSON.stringify({
           system: outpost.moon.planet.starSystem.name,
           planet: outpost.moon.planet.name,
+          moon: outpost.moon.name,
+          outpost: outpost.name,
+        });
+      } else if (outpost.moon && outpost.moon.starSystem) {
+        displayName = `${outpost.moon.starSystem.code} / ${outpost.moon.name} / ${outpost.name}`;
+        hierarchyPath = JSON.stringify({
+          system: outpost.moon.starSystem.name,
           moon: outpost.moon.name,
           outpost: outpost.name,
         });
@@ -544,11 +586,38 @@ export class LocationPopulationService {
       where: { deleted: false, active: true },
       relations: [
         'starSystem',
+        'orbit',
+        'orbit.starSystem',
         'planet',
         'planet.starSystem',
         'moon',
         'moon.planet',
         'moon.planet.starSystem',
+        'moon.starSystem',
+        'spaceStation',
+        'spaceStation.starSystem',
+        'spaceStation.orbit',
+        'spaceStation.orbit.starSystem',
+        'spaceStation.planet',
+        'spaceStation.planet.starSystem',
+        'spaceStation.moon',
+        'spaceStation.moon.planet',
+        'spaceStation.moon.planet.starSystem',
+        'spaceStation.moon.starSystem',
+        'city',
+        'city.planet',
+        'city.planet.starSystem',
+        'city.moon',
+        'city.moon.planet',
+        'city.moon.planet.starSystem',
+        'city.moon.starSystem',
+        'outpost',
+        'outpost.planet',
+        'outpost.planet.starSystem',
+        'outpost.moon',
+        'outpost.moon.planet',
+        'outpost.moon.planet.starSystem',
+        'outpost.moon.starSystem',
       ],
     });
 
@@ -556,7 +625,109 @@ export class LocationPopulationService {
       let displayName: string;
       let hierarchyPath: string;
 
-      if (poi.planet && poi.planet.starSystem) {
+      if (poi.spaceStation?.planet && poi.spaceStation.planet.starSystem) {
+        displayName = `${poi.spaceStation.planet.starSystem.code} / ${poi.spaceStation.planet.name} / ${poi.spaceStation.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.spaceStation.planet.starSystem.name,
+          planet: poi.spaceStation.planet.name,
+          space_station: poi.spaceStation.name,
+          poi: poi.name,
+        });
+      } else if (
+        poi.spaceStation?.moon &&
+        poi.spaceStation.moon.planet &&
+        poi.spaceStation.moon.planet.starSystem
+      ) {
+        displayName = `${poi.spaceStation.moon.planet.starSystem.code} / ${poi.spaceStation.moon.planet.name} / ${poi.spaceStation.moon.name} / ${poi.spaceStation.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.spaceStation.moon.planet.starSystem.name,
+          planet: poi.spaceStation.moon.planet.name,
+          moon: poi.spaceStation.moon.name,
+          space_station: poi.spaceStation.name,
+          poi: poi.name,
+        });
+      } else if (poi.spaceStation?.moon && poi.spaceStation.moon.starSystem) {
+        displayName = `${poi.spaceStation.moon.starSystem.code} / ${poi.spaceStation.moon.name} / ${poi.spaceStation.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.spaceStation.moon.starSystem.name,
+          moon: poi.spaceStation.moon.name,
+          space_station: poi.spaceStation.name,
+          poi: poi.name,
+        });
+      } else if (poi.spaceStation?.orbit?.starSystem) {
+        displayName = `${poi.spaceStation.orbit.starSystem.code} / ${poi.spaceStation.orbit.name} / ${poi.spaceStation.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.spaceStation.orbit.starSystem.name,
+          orbit: poi.spaceStation.orbit.name,
+          space_station: poi.spaceStation.name,
+          poi: poi.name,
+        });
+      } else if (poi.spaceStation?.starSystem) {
+        displayName = `${poi.spaceStation.starSystem.code} / ${poi.spaceStation.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.spaceStation.starSystem.name,
+          space_station: poi.spaceStation.name,
+          poi: poi.name,
+        });
+      } else if (poi.city?.planet && poi.city.planet.starSystem) {
+        displayName = `${poi.city.planet.starSystem.code} / ${poi.city.planet.name} / ${poi.city.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.city.planet.starSystem.name,
+          planet: poi.city.planet.name,
+          city: poi.city.name,
+          poi: poi.name,
+        });
+      } else if (
+        poi.city?.moon &&
+        poi.city.moon.planet &&
+        poi.city.moon.planet.starSystem
+      ) {
+        displayName = `${poi.city.moon.planet.starSystem.code} / ${poi.city.moon.planet.name} / ${poi.city.moon.name} / ${poi.city.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.city.moon.planet.starSystem.name,
+          planet: poi.city.moon.planet.name,
+          moon: poi.city.moon.name,
+          city: poi.city.name,
+          poi: poi.name,
+        });
+      } else if (poi.city?.moon && poi.city.moon.starSystem) {
+        displayName = `${poi.city.moon.starSystem.code} / ${poi.city.moon.name} / ${poi.city.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.city.moon.starSystem.name,
+          moon: poi.city.moon.name,
+          city: poi.city.name,
+          poi: poi.name,
+        });
+      } else if (poi.outpost?.planet && poi.outpost.planet.starSystem) {
+        displayName = `${poi.outpost.planet.starSystem.code} / ${poi.outpost.planet.name} / ${poi.outpost.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.outpost.planet.starSystem.name,
+          planet: poi.outpost.planet.name,
+          outpost: poi.outpost.name,
+          poi: poi.name,
+        });
+      } else if (
+        poi.outpost?.moon &&
+        poi.outpost.moon.planet &&
+        poi.outpost.moon.planet.starSystem
+      ) {
+        displayName = `${poi.outpost.moon.planet.starSystem.code} / ${poi.outpost.moon.planet.name} / ${poi.outpost.moon.name} / ${poi.outpost.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.outpost.moon.planet.starSystem.name,
+          planet: poi.outpost.moon.planet.name,
+          moon: poi.outpost.moon.name,
+          outpost: poi.outpost.name,
+          poi: poi.name,
+        });
+      } else if (poi.outpost?.moon && poi.outpost.moon.starSystem) {
+        displayName = `${poi.outpost.moon.starSystem.code} / ${poi.outpost.moon.name} / ${poi.outpost.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.outpost.moon.starSystem.name,
+          moon: poi.outpost.moon.name,
+          outpost: poi.outpost.name,
+          poi: poi.name,
+        });
+      } else if (poi.planet && poi.planet.starSystem) {
         displayName = `${poi.planet.starSystem.code} / ${poi.planet.name} / ${poi.name}`;
         hierarchyPath = JSON.stringify({
           system: poi.planet.starSystem.name,
@@ -569,6 +740,20 @@ export class LocationPopulationService {
           system: poi.moon.planet.starSystem.name,
           planet: poi.moon.planet.name,
           moon: poi.moon.name,
+          poi: poi.name,
+        });
+      } else if (poi.moon && poi.moon.starSystem) {
+        displayName = `${poi.moon.starSystem.code} / ${poi.moon.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.moon.starSystem.name,
+          moon: poi.moon.name,
+          poi: poi.name,
+        });
+      } else if (poi.orbit && poi.orbit.starSystem) {
+        displayName = `${poi.orbit.starSystem.code} / ${poi.orbit.name} / ${poi.name}`;
+        hierarchyPath = JSON.stringify({
+          system: poi.orbit.starSystem.name,
+          orbit: poi.orbit.name,
           poi: poi.name,
         });
       } else if (poi.starSystem) {

@@ -1,3 +1,4 @@
+import { OrgPermission } from '../../modules/permissions/permissions.constants';
 import { Role } from '../../modules/roles/role.entity';
 
 export const defaultRoles: Partial<Role>[] = [
@@ -26,6 +27,12 @@ export const defaultRoles: Partial<Role>[] = [
       // Settings
       canManageSettings: true,
       canViewSettings: true,
+
+      // Inventory
+      [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
+      [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
+      [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
+      [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     },
   },
   {
@@ -48,6 +55,12 @@ export const defaultRoles: Partial<Role>[] = [
       // Settings
       canManageSettings: true,
       canViewSettings: true,
+
+      // Inventory
+      [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
+      [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
+      [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
+      [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     },
   },
   {
@@ -65,6 +78,10 @@ export const defaultRoles: Partial<Role>[] = [
 
       // Settings
       canViewSettings: true,
+
+      // Inventory
+      [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
+      [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     },
   },
   {
@@ -79,6 +96,10 @@ export const defaultRoles: Partial<Role>[] = [
 
       // Settings
       canViewSettings: true,
+
+      // Inventory
+      [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
+      [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     },
   },
 ];

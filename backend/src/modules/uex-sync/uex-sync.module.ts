@@ -8,6 +8,7 @@ import { UexSyncConfig } from './uex-sync-config.entity';
 import { UexCategory } from '../uex/entities/uex-category.entity';
 import { UexItem } from '../uex/entities/uex-item.entity';
 import { UexStarSystem } from '../uex/entities/uex-star-system.entity';
+import { UexOrbit } from '../uex/entities/uex-orbit.entity';
 import { UexPlanet } from '../uex/entities/uex-planet.entity';
 import { UexMoon } from '../uex/entities/uex-moon.entity';
 import { UexCity } from '../uex/entities/uex-city.entity';
@@ -25,6 +26,7 @@ import { LocationsSyncService } from './services/locations-sync.service';
 import { CompaniesSyncService } from './services/companies-sync.service';
 import { UEXSyncScheduler } from './schedulers/uex-sync.scheduler';
 import { UsersModule } from '../users/users.module';
+import { LocationsModule } from '../locations/locations.module';
 
 @Module({
   imports: [
@@ -34,6 +36,7 @@ import { UsersModule } from '../users/users.module';
       UexCategory,
       UexItem,
       UexStarSystem,
+      UexOrbit,
       UexPlanet,
       UexMoon,
       UexCity,
@@ -44,6 +47,7 @@ import { UsersModule } from '../users/users.module';
     ]),
     HttpModule,
     UsersModule,
+    LocationsModule,
   ],
   controllers: [UexSyncController],
   providers: [

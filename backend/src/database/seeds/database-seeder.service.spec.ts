@@ -25,11 +25,18 @@ describe('DatabaseSeederService', () => {
   let loggerWarnSpy: jest.SpyInstance;
   let loggerErrorSpy: jest.SpyInstance;
 
-  const mockGame = {
+  const mockGameSc = {
     id: 1,
     name: 'Star Citizen',
     code: 'sc',
     description: 'Star Citizen MMO',
+    active: true,
+  };
+  const mockGameSq42 = {
+    id: 2,
+    name: 'Squadron 42',
+    code: 'sq42',
+    description: 'Squadron 42',
     active: true,
   };
 
@@ -47,11 +54,39 @@ describe('DatabaseSeederService', () => {
     isActive: true,
     gameId: 1,
   };
+  const mockOrgTwo = {
+    id: 2,
+    name: 'Dreadnought Industries',
+    description: 'Test org',
+    isActive: true,
+    gameId: 1,
+  };
+  const mockOrgThree = {
+    id: 3,
+    name: 'Frontier Syndicate',
+    description: 'Test org',
+    isActive: true,
+    gameId: 2,
+  };
 
   const mockUser = {
     id: 1,
     username: 'demo',
     email: 'demo@example.com',
+    password: 'hashed',
+    isActive: true,
+  };
+  const mockOrgAdmin = {
+    id: 2,
+    username: 'orgadmin',
+    email: 'orgadmin@example.com',
+    password: 'hashed',
+    isActive: true,
+  };
+  const mockMember = {
+    id: 3,
+    username: 'member1',
+    email: 'member1@example.com',
     password: 'hashed',
     isActive: true,
   };
@@ -101,6 +136,7 @@ describe('DatabaseSeederService', () => {
           provide: getRepositoryToken(Organization),
           useValue: {
             findOne: jest.fn(),
+            find: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
           },
@@ -109,6 +145,7 @@ describe('DatabaseSeederService', () => {
           provide: getRepositoryToken(User),
           useValue: {
             findOne: jest.fn(),
+            find: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
           },
@@ -150,20 +187,19 @@ describe('DatabaseSeederService', () => {
 
   describe('seedAll', () => {
     it('should seed all data successfully', async () => {
-      // Mock games seeding - first call returns null (new game), second call returns the game for org creation
       jest
         .spyOn(gamesRepository, 'findOne')
-        .mockResolvedValueOnce(null) // First game check (sc)
-        .mockResolvedValueOnce(null) // Second game check (sq42)
-        .mockResolvedValueOnce(mockGame as any) // Get sc game for org creation
-        .mockResolvedValueOnce(null); // Org check
+        .mockImplementation((query: any) => {
+          if (query?.where?.code === 'sc') {
+            return Promise.resolve(mockGameSc as any);
+          }
+          if (query?.where?.code === 'sq42') {
+            return Promise.resolve(mockGameSq42 as any);
+          }
+          return Promise.resolve(null);
+        });
 
-      jest.spyOn(gamesRepository, 'create').mockReturnValue(mockGame as any);
-      jest.spyOn(gamesRepository, 'save').mockResolvedValue(mockGame as any);
-
-      jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(rolesRepository, 'create').mockReturnValue(mockRole as any);
-      jest.spyOn(rolesRepository, 'save').mockResolvedValue(mockRole as any);
+      jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(mockRole as any);
 
       jest.spyOn(organizationsRepository, 'findOne').mockResolvedValue(null);
       jest
@@ -172,10 +208,16 @@ describe('DatabaseSeederService', () => {
       jest
         .spyOn(organizationsRepository, 'save')
         .mockResolvedValue(mockOrganization as any);
+      jest
+        .spyOn(organizationsRepository, 'find')
+        .mockResolvedValue([mockOrganization, mockOrgTwo, mockOrgThree] as any);
 
       jest.spyOn(usersRepository, 'findOne').mockResolvedValue(null);
       jest.spyOn(usersRepository, 'create').mockReturnValue(mockUser as any);
       jest.spyOn(usersRepository, 'save').mockResolvedValue(mockUser as any);
+      jest
+        .spyOn(usersRepository, 'find')
+        .mockResolvedValue([mockUser, mockOrgAdmin, mockMember] as any);
 
       jest.spyOn(userOrgRolesRepository, 'findOne').mockResolvedValue(null);
       jest
@@ -189,12 +231,18 @@ describe('DatabaseSeederService', () => {
     });
 
     it('should handle existing data gracefully', async () => {
-      jest.spyOn(gamesRepository, 'findOne').mockResolvedValue(mockGame as any);
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGameSc as any);
       jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(mockRole as any);
       jest
         .spyOn(organizationsRepository, 'findOne')
         .mockResolvedValue(mockOrganization as any);
+      jest
+        .spyOn(organizationsRepository, 'find')
+        .mockResolvedValue([mockOrganization] as any);
       jest.spyOn(usersRepository, 'findOne').mockResolvedValue(mockUser as any);
+      jest.spyOn(usersRepository, 'find').mockResolvedValue([mockUser] as any);
       jest
         .spyOn(userOrgRolesRepository, 'findOne')
         .mockResolvedValue(mockUserOrgRole as any);

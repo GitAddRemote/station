@@ -3,6 +3,7 @@ export { UexCategory } from './uex-category.entity';
 export { UexCompany } from './uex-company.entity';
 export { UexItem } from './uex-item.entity';
 export { UexStarSystem } from './uex-star-system.entity';
+export { UexOrbit } from './uex-orbit.entity';
 export { UexPlanet } from './uex-planet.entity';
 export { UexMoon } from './uex-moon.entity';
 export { UexCity } from './uex-city.entity';

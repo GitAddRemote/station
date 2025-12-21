@@ -6,6 +6,7 @@ import {
   UexCompany,
   UexItem,
   UexStarSystem,
+  UexOrbit,
   UexPlanet,
   UexMoon,
   UexCity,
@@ -38,6 +39,8 @@ describe('UexModule', () => {
       .overrideProvider(getRepositoryToken(UexItem))
       .useValue(mockRepository)
       .overrideProvider(getRepositoryToken(UexStarSystem))
+      .useValue(mockRepository)
+      .overrideProvider(getRepositoryToken(UexOrbit))
       .useValue(mockRepository)
       .overrideProvider(getRepositoryToken(UexPlanet))
       .useValue(mockRepository)

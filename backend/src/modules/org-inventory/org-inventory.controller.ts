@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Delete,
+  BadRequestException,
   Body,
   Param,
   Query,
@@ -53,7 +54,7 @@ export class OrgInventoryController {
   async list(
     @Request() req: any,
     @Param('orgId', ParseIntPipe) orgId: number,
-    @Query() searchDto: OrgInventorySearchDto,
+    @Query() query: Record<string, any>,
   ): Promise<{
     items: OrgInventoryItemDto[];
     total: number;
@@ -61,11 +62,43 @@ export class OrgInventoryController {
     offset: number;
   }> {
     const userId = req.user.userId;
-    // Extract gameId from query params and use search
-    return this.orgInventoryService.search(userId, {
-      ...searchDto,
+    const parsedMinQuantity = Number(
+      query.min_quantity ?? query.minQuantity ?? Number.NaN,
+    );
+    const parsedMaxQuantity = Number(
+      query.max_quantity ?? query.maxQuantity ?? Number.NaN,
+    );
+
+    const searchDto: OrgInventorySearchDto = {
       orgId,
-    });
+      gameId: Number(query.game_id ?? query.gameId),
+      categoryId: query.category_id ? Number(query.category_id) : undefined,
+      uexItemId: query.uex_item_id ? Number(query.uex_item_id) : undefined,
+      locationId: query.location_id ? Number(query.location_id) : undefined,
+      search: query.search,
+      limit: query.limit ? Number(query.limit) : undefined,
+      offset: query.offset ? Number(query.offset) : undefined,
+      sort: query.sort,
+      order: query.order,
+      activeOnly:
+        query.active_only !== undefined
+          ? query.active_only === 'true' || query.active_only === true
+          : query.activeOnly !== undefined
+            ? query.activeOnly === 'true' || query.activeOnly === true
+            : undefined,
+      minQuantity: Number.isNaN(parsedMinQuantity)
+        ? undefined
+        : parsedMinQuantity,
+      maxQuantity: Number.isNaN(parsedMaxQuantity)
+        ? undefined
+        : parsedMaxQuantity,
+    };
+
+    if (!searchDto.gameId) {
+      throw new BadRequestException('game_id is required');
+    }
+
+    return this.orgInventoryService.search(userId, searchDto);
   }
 
   /**
@@ -83,6 +116,7 @@ export class OrgInventoryController {
   })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiResponse({ status: 403, description: 'Permission denied' })
+  @ApiResponse({ status: 409, description: 'Inventory item already exists' })
   async create(
     @Request() req: any,
     @Param('orgId', ParseIntPipe) orgId: number,

@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { BaseUexEntity } from './base-uex.entity';
 import { UexStarSystem } from './uex-star-system.entity';
+import { UexOrbit } from './uex-orbit.entity';
 import { UexPlanet } from './uex-planet.entity';
 import { UexMoon } from './uex-moon.entity';
 
@@ -16,6 +17,9 @@ import { UexMoon } from './uex-moon.entity';
   where: 'deleted = FALSE AND active = TRUE',
 })
 @Index('idx_uex_space_stations_system', ['starSystemId'], {
+  where: 'deleted = FALSE',
+})
+@Index('idx_uex_space_stations_orbit', ['orbitId'], {
   where: 'deleted = FALSE',
 })
 export class UexSpaceStation extends BaseUexEntity {
@@ -42,6 +46,13 @@ export class UexSpaceStation extends BaseUexEntity {
   @ManyToOne(() => UexMoon, { nullable: true })
   @JoinColumn({ name: 'moon_id', referencedColumnName: 'uexId' })
   moon?: UexMoon;
+
+  @Column({ name: 'orbit_id', type: 'integer', nullable: true })
+  orbitId?: number;
+
+  @ManyToOne(() => UexOrbit, { nullable: true })
+  @JoinColumn({ name: 'orbit_id', referencedColumnName: 'uexId' })
+  orbit?: UexOrbit;
 
   @Column({ length: 255 })
   name!: string;

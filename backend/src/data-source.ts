@@ -17,6 +17,7 @@ import { UexItem } from './modules/uex/entities/uex-item.entity';
 import { UexCategory } from './modules/uex/entities/uex-category.entity';
 import { UexCompany } from './modules/uex/entities/uex-company.entity';
 import { UexStarSystem } from './modules/uex/entities/uex-star-system.entity';
+import { UexOrbit } from './modules/uex/entities/uex-orbit.entity';
 import { UexPlanet } from './modules/uex/entities/uex-planet.entity';
 import { UexMoon } from './modules/uex/entities/uex-moon.entity';
 import { UexSpaceStation } from './modules/uex/entities/uex-space-station.entity';
@@ -39,6 +40,8 @@ import { SeedSystemUser1764791795973 } from './migrations/1764791795973-SeedSyst
 import { CreateUexBaseTables1764802822073 } from './migrations/1764802822073-CreateUexBaseTables';
 import { CreateUexItemsTable1764802975691 } from './migrations/1764802975691-CreateUexItemsTable';
 import { CreateUexLocationTables1764803020274 } from './migrations/1764803020274-CreateUexLocationTables';
+import { CreateUexOrbitsTable1767050000000 } from './migrations/1767050000000-CreateUexOrbitsTable';
+import { AddOrbitRelationsToUexLocations1767051000000 } from './migrations/1767051000000-AddOrbitRelationsToUexLocations';
 import { AddUexSyncStateTables1764812815840 } from './migrations/1764812815840-AddUexSyncStateTables';
 import { CreateLocationsTable1764949892544 } from './migrations/1764949892544-CreateLocationsTable';
 import { CreateUserInventoryItemsTable1764950546163 } from './migrations/1764950546163-CreateUserInventoryItemsTable';
@@ -73,6 +76,7 @@ export const AppDataSource = new DataSource({
     UexCategory,
     UexCompany,
     UexStarSystem,
+    UexOrbit,
     UexPlanet,
     UexMoon,
     UexSpaceStation,
@@ -101,6 +105,8 @@ export const AppDataSource = new DataSource({
     CreateUexBaseTables1764802822073,
     CreateUexItemsTable1764802975691,
     CreateUexLocationTables1764803020274,
+    CreateUexOrbitsTable1767050000000,
+    AddOrbitRelationsToUexLocations1767051000000,
     AddUexSyncStateTables1764812815840,
 
     // Locations (depends on games + UEX tables)

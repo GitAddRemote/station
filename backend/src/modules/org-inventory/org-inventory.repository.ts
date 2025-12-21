@@ -90,6 +90,26 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   }
 
   /**
+   * Find an existing org inventory item with matching composite keys
+   */
+  async findExistingItem(params: {
+    orgId: number;
+    gameId: number;
+    uexItemId: number;
+    locationId: number;
+  }): Promise<OrgInventoryItem | null> {
+    return this.findOne({
+      where: {
+        orgId: params.orgId,
+        gameId: params.gameId,
+        uexItemId: params.uexItemId,
+        locationId: params.locationId,
+        deleted: false,
+      },
+    });
+  }
+
+  /**
    * Soft delete an inventory item
    */
   async softDeleteItem(id: string, modifiedBy: number): Promise<boolean> {
@@ -227,10 +247,10 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
       case 'location':
         return 'location.displayName';
       case 'date_added':
-        return 'oii.date_added';
+        return 'oii.dateAdded';
       case 'date_modified':
       default:
-        return 'oii.date_modified';
+        return 'oii.dateModified';
     }
   }
 }

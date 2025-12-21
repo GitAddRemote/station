@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { UexStarSystem } from '../../uex/entities/uex-star-system.entity';
+import { UexOrbit } from '../../uex/entities/uex-orbit.entity';
 import { UexPlanet } from '../../uex/entities/uex-planet.entity';
 import { UexMoon } from '../../uex/entities/uex-moon.entity';
 import { UexCity } from '../../uex/entities/uex-city.entity';
@@ -11,9 +12,11 @@ import { UexOutpost } from '../../uex/entities/uex-outpost.entity';
 import { UexPoi } from '../../uex/entities/uex-poi.entity';
 import { UexSyncService } from '../uex-sync.service';
 import { SystemUserService } from '../../users/system-user.service';
+import { LocationPopulationService } from '../../locations/location-population.service';
 import {
   UEXLocationsClient,
   UEXStarSystemResponse,
+  UEXOrbitResponse,
   UEXPlanetResponse,
   UEXMoonResponse,
   UEXCityResponse,
@@ -51,6 +54,7 @@ export class LocationsSyncService {
   // Hierarchical sync order: parents before children
   private readonly syncOrder = [
     'star_systems',
+    'orbits',
     'planets',
     'moons',
     'cities',
@@ -62,6 +66,8 @@ export class LocationsSyncService {
   constructor(
     @InjectRepository(UexStarSystem)
     private readonly starSystemRepository: Repository<UexStarSystem>,
+    @InjectRepository(UexOrbit)
+    private readonly orbitRepository: Repository<UexOrbit>,
     @InjectRepository(UexPlanet)
     private readonly planetRepository: Repository<UexPlanet>,
     @InjectRepository(UexMoon)
@@ -78,6 +84,7 @@ export class LocationsSyncService {
     private readonly syncService: UexSyncService,
     private readonly systemUserService: SystemUserService,
     private readonly configService: ConfigService,
+    private readonly locationPopulationService: LocationPopulationService,
   ) {
     this.maxRetries = this.configService.get<number>('UEX_RETRY_ATTEMPTS', 3);
     this.backoffBase = this.configService.get<number>(
@@ -142,6 +149,10 @@ export class LocationsSyncService {
         `total created: ${totalCreated}, updated: ${totalUpdated}, ` +
         `deleted: ${totalDeleted}, duration: ${totalDurationMs}ms`,
     );
+
+    this.logger.log('Populating locations table from UEX data');
+    await this.locationPopulationService.populateAllLocations();
+    this.logger.log('Location population completed');
 
     return {
       totalCreated,
@@ -216,6 +227,8 @@ export class LocationsSyncService {
         switch (endpoint) {
           case 'star_systems':
             return await this.uexClient.fetchStarSystems(filters);
+          case 'orbits':
+            return await this.uexClient.fetchOrbits(filters);
           case 'planets':
             return await this.uexClient.fetchPlanets(filters);
           case 'moons':
@@ -269,6 +282,8 @@ export class LocationsSyncService {
     switch (endpoint) {
       case 'star_systems':
         return this.syncStarSystems(locations, syncMode);
+      case 'orbits':
+        return this.syncOrbits(locations, syncMode);
       case 'planets':
         return this.syncPlanets(locations, syncMode);
       case 'moons':
@@ -342,6 +357,81 @@ export class LocationsSyncService {
     return { created, updated, deleted: 0 };
   }
 
+  private async syncOrbits(
+    orbits: UEXOrbitResponse[],
+    _syncMode: 'delta' | 'full',
+  ): Promise<Omit<SyncResult, 'durationMs'>> {
+    const systemUserId = this.systemUserService.getSystemUserId();
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const orbit of orbits) {
+      const starSystemId = orbit.id_star_system;
+      const parentStarSystem = await this.starSystemRepository.findOne({
+        where: { uexId: starSystemId },
+        select: ['id'],
+      });
+
+      if (!parentStarSystem) {
+        skipped++;
+        this.logger.warn(
+          `Skipping orbit ${orbit.name} (${orbit.id}) because parent star system ${starSystemId} is missing`,
+        );
+        continue;
+      }
+
+      const existing = await this.orbitRepository.findOne({
+        where: { uexId: orbit.id },
+      });
+
+      const isAvailable = this.toBooleanFlag(orbit.is_available, true);
+      const isVisible = this.toBooleanFlag(orbit.is_visible, true);
+
+      const updates = {
+        starSystemId,
+        name: orbit.name,
+        code: orbit.code,
+        isAvailable,
+        isVisible,
+        isDefault: this.toBooleanFlag(orbit.is_default, false),
+        isLagrange: this.toBooleanFlag(orbit.is_lagrange, false),
+        isManMade: this.toBooleanFlag(orbit.is_man_made, false),
+        isAsteroid: this.toBooleanFlag(orbit.is_asteroid, false),
+        isPlanet: this.toBooleanFlag(orbit.is_planet, false),
+        isStar: this.toBooleanFlag(orbit.is_star, false),
+        isJumpPoint: this.toBooleanFlag(orbit.is_jump_point, false),
+        active: isVisible,
+        deleted: false,
+        uexDateModified: orbit.date_modified
+          ? new Date(orbit.date_modified)
+          : undefined,
+        modifiedById: systemUserId,
+      };
+
+      if (existing) {
+        await this.orbitRepository.update({ uexId: orbit.id }, updates);
+        updated++;
+      } else {
+        await this.orbitRepository.save({
+          uexId: orbit.id,
+          ...updates,
+          uexDateAdded: orbit.date_added
+            ? new Date(orbit.date_added)
+            : undefined,
+          addedById: systemUserId,
+        });
+        created++;
+      }
+    }
+
+    if (skipped > 0) {
+      this.logger.warn(`Skipped ${skipped} orbits due to missing star systems`);
+    }
+
+    return { created, updated, deleted: 0 };
+  }
+
   private async syncPlanets(
     planets: UEXPlanetResponse[],
     _syncMode: 'delta' | 'full',
@@ -408,16 +498,63 @@ export class LocationsSyncService {
     let skipped = 0;
 
     for (const moon of moons) {
-      // Ensure parent planet exists; if not, skip to avoid FK error
-      const parentPlanet = await this.planetRepository.findOne({
-        where: { uexId: moon.id_planet },
+      const planetId =
+        moon.id_planet !== null &&
+        moon.id_planet !== undefined &&
+        moon.id_planet > 0
+          ? moon.id_planet
+          : undefined;
+      let starSystemId =
+        moon.id_star_system !== null &&
+        moon.id_star_system !== undefined &&
+        moon.id_star_system > 0
+          ? moon.id_star_system
+          : undefined;
+
+      if (!planetId && !starSystemId) {
+        skipped++;
+        this.logger.warn(
+          `Skipping moon ${moon.name} (${moon.id}) because no parent planet or star system was provided`,
+        );
+        continue;
+      }
+
+      if (planetId) {
+        const parentPlanet = await this.planetRepository.findOne({
+          where: { uexId: planetId },
+          select: ['id', 'starSystemId'],
+        });
+
+        if (!parentPlanet) {
+          skipped++;
+          this.logger.warn(
+            `Skipping moon ${moon.name} (${moon.id}) because parent planet ${planetId} is missing`,
+          );
+          continue;
+        }
+
+        if (!starSystemId) {
+          starSystemId = parentPlanet.starSystemId;
+        }
+      }
+
+      if (!starSystemId) {
+        skipped++;
+        this.logger.warn(
+          `Skipping moon ${moon.name} (${moon.id}) because no star system was provided or derived`,
+        );
+        continue;
+      }
+
+      const parentStarSystem = await this.starSystemRepository.findOne({
+        where: { uexId: starSystemId },
         select: ['id'],
       });
 
-      if (!parentPlanet) {
+      if (!parentStarSystem) {
         skipped++;
         this.logger.warn(
-          `Skipping moon ${moon.name} (${moon.id}) because parent planet ${moon.id_planet} is missing`,
+          `Skipping moon ${moon.name} (${moon.id}) because parent star system ${starSystemId} is missing`,
         );
         continue;
       }
@@ -430,7 +567,8 @@ export class LocationsSyncService {
         await this.moonRepository.update(
           { uexId: moon.id },
           {
-            planetId: moon.id_planet,
+            starSystemId,
+            planetId,
             name: moon.name,
             code: moon.code,
             isAvailable: this.toBooleanFlag(moon.is_available, true),
@@ -446,7 +584,8 @@ export class LocationsSyncService {
       } else {
         await this.moonRepository.save({
           uexId: moon.id,
-          planetId: moon.id_planet,
+          starSystemId,
+          planetId,
           name: moon.name,
           code: moon.code,
           isAvailable: this.toBooleanFlag(moon.is_available, true),
@@ -607,8 +746,13 @@ export class LocationsSyncService {
         station.id_moon > 0
           ? station.id_moon
           : undefined;
-      let starSystemUexId =
-        station.id_orbit && station.id_orbit > 0 ? station.id_orbit : undefined;
+      const orbitId =
+        station.id_orbit !== null &&
+        station.id_orbit !== undefined &&
+        station.id_orbit > 0
+          ? station.id_orbit
+          : undefined;
+      let starSystemUexId: number | undefined;
 
       if (planetId) {
         const parentPlanet = await this.planetRepository.findOne({
@@ -670,10 +814,23 @@ export class LocationsSyncService {
 
           starSystemUexId = parentPlanet.starSystemId;
         }
+      } else if (orbitId) {
+        const orbit = await this.orbitRepository.findOne({
+          where: { uexId: orbitId },
+          select: ['starSystemId'],
+        });
+        if (!orbit) {
+          skipped++;
+          this.logger.warn(
+            `Skipping space station ${station.name} (${station.id}) because orbit ${orbitId} is missing`,
+          );
+          continue;
+        }
+        starSystemUexId = orbit.starSystemId;
       } else {
         skipped++;
         this.logger.warn(
-          `Skipping space station ${station.name} (${station.id}) because no parent planet/moon provided`,
+          `Skipping space station ${station.name} (${station.id}) because no parent planet/moon/orbit provided`,
         );
         continue;
       }
@@ -710,6 +867,7 @@ export class LocationsSyncService {
             starSystemId: starSystemUexId,
             planetId,
             moonId,
+            orbitId,
             name: station.name,
             code: station.code,
             isAvailable: this.toBooleanFlag(station.is_available, true),
@@ -727,6 +885,7 @@ export class LocationsSyncService {
           starSystemId: starSystemUexId,
           planetId,
           moonId,
+          orbitId,
           name: station.name,
           code: station.code,
           isAvailable: this.toBooleanFlag(station.is_available, true),
@@ -893,13 +1052,14 @@ export class LocationsSyncService {
       const outpostId =
         poi.id_outpost && poi.id_outpost > 0 ? poi.id_outpost : undefined;
 
-      let resolvedStarSystemId = starSystemId ?? orbitId;
+      let resolvedStarSystemId = starSystemId;
 
       // Ensure we have at least one parent
       if (
         !resolvedStarSystemId &&
         !planetId &&
         !moonId &&
+        !orbitId &&
         !spaceStationId &&
         !cityId &&
         !outpostId
@@ -956,6 +1116,21 @@ export class LocationsSyncService {
             resolvedStarSystemId = parentPlanet.starSystemId;
           }
         }
+      }
+
+      if (!resolvedStarSystemId && orbitId) {
+        const orbit = await this.orbitRepository.findOne({
+          where: { uexId: orbitId },
+          select: ['starSystemId'],
+        });
+        if (!orbit) {
+          skipped++;
+          this.logger.warn(
+            `Skipping POI ${poi.name} (${poi.id}) because parent orbit ${orbitId} is missing`,
+          );
+          continue;
+        }
+        resolvedStarSystemId = orbit.starSystemId;
       }
 
       if (spaceStationId) {
@@ -1112,6 +1287,10 @@ export class LocationsSyncService {
             starSystemId: resolvedStarSystemId,
             planetId,
             moonId,
+            orbitId,
+            spaceStationId,
+            cityId,
+            outpostId,
             name: poi.name,
             code: undefined,
             type: poi.type,
@@ -1130,6 +1309,10 @@ export class LocationsSyncService {
           starSystemId: resolvedStarSystemId,
           planetId,
           moonId,
+          orbitId,
+          spaceStationId,
+          cityId,
+          outpostId,
           name: poi.name,
           code: undefined,
           type: poi.type,
