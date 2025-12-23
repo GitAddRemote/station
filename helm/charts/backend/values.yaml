@@ -1,0 +1,41 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/replace/me/station-backend
+  tag: latest
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 3001
+
+envFrom:
+  secretName: station-backend-env
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+readinessProbe:
+  tcpSocket:
+    port: 3001
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+livenessProbe:
+  tcpSocket:
+    port: 3001
+  initialDelaySeconds: 30
+  periodSeconds: 20
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.station.local
+  path: /
+  pathType: Prefix

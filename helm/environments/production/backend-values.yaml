@@ -1,0 +1,6 @@
+replicaCount: 3
+image:
+  repository: ghcr.io/gitaddremote/station/station-backend
+  tag: production
+ingress:
+  host: api.station.local

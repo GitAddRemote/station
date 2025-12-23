@@ -1,15 +1,21 @@
-FROM node:14
+FROM node:20-alpine AS base
+WORKDIR /app
+RUN corepack enable
 
-# Create app directory
-WORKDIR /usr/src/app
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY frontend/package.json frontend/
+RUN pnpm install --filter frontend... --frozen-lockfile
 
-# Install app dependencies
-COPY package*.json ./
-
-RUN npm install
-
-# Bundle app source
+FROM base AS build
 COPY . .
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
+WORKDIR /app/frontend
+RUN pnpm run build
 
-EXPOSE 3000
-CMD [ "npm", "start" ]
+FROM nginx:1.27-alpine
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

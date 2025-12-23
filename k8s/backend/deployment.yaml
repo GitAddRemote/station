@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: station-backend
+  labels:
+    app: station-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: station-backend
+  template:
+    metadata:
+      labels:
+        app: station-backend
+    spec:
+      containers:
+        - name: station-backend
+          image: ghcr.io/gitaddremote/station/station-backend:latest
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - secretRef:
+                name: station-backend-env
+          readinessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

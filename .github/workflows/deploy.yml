@@ -1,31 +1,29 @@
-name: Deploy
+name: CI/CD
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: true
-        type: choice
-        options:
-          - staging
-          - production
-      skip_tests:
-        description: 'Skip tests (not recommended for production)'
-        required: false
-        type: boolean
-        default: false
-
   push:
     branches:
       - main
-    paths:
-      - 'backend/**'
+  workflow_dispatch: {}
+
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '10'
+  REGISTRY: ghcr.io
+  IMAGE_BACKEND: ghcr.io/${{ github.repository }}/station-backend
+  IMAGE_FRONTEND: ghcr.io/${{ github.repository }}/station-frontend
 
 jobs:
-  test:
-    name: Run Tests
-    if: ${{ !inputs.skip_tests }}
+  backend:
+    name: Backend CI
     runs-on: ubuntu-latest
 
     services:
@@ -50,22 +48,18 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run unit tests
-        working-directory: backend
-        run: pnpm test
-
-      - name: Run E2E tests
+      - name: Lint
         working-directory: backend
         env:
           DATABASE_HOST: localhost
@@ -73,14 +67,47 @@ jobs:
           DATABASE_USER: test
           DATABASE_PASSWORD: test
           DATABASE_NAME: station_test
-          JWT_SECRET: test-secret-key
+          JWT_SECRET: test-secret-key-for-ci
+        run: pnpm run lint
+
+      - name: Unit tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci
+        run: pnpm test --coverage --passWithNoTests
+
+      - name: E2E tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci
         run: pnpm run test:e2e
 
-  build:
-    name: Build Application
+      - name: Build
+        working-directory: backend
+        env:
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci
+        run: pnpm run build
+
+  frontend:
+    name: Frontend CI
     runs-on: ubuntu-latest
-    needs: [test]
-    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
 
     steps:
       - name: Checkout code
@@ -89,90 +116,127 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 10
+          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build application
-        working-directory: backend
+      - name: Lint
+        working-directory: frontend
+        run: pnpm run lint
+
+      - name: Typecheck
+        working-directory: frontend
+        run: pnpm run typecheck
+
+      - name: Build
+        working-directory: frontend
         run: pnpm run build
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-build
-          path: |
-            backend/dist
-            backend/package.json
-          retention-days: 7
-
-  deploy:
-    name: Deploy to ${{ inputs.environment || 'staging' }}
+  build-images:
+    name: Build and Publish Images
     runs-on: ubuntu-latest
-    needs: [build]
-    environment: ${{ inputs.environment || 'staging' }}
+    needs: [backend, frontend]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          name: backend-build
-          path: backend
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy (Placeholder)
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+            ${{ env.IMAGE_BACKEND }}:main
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+            ${{ env.IMAGE_FRONTEND }}:main
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-images]
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.15.2'
+
+      - name: Configure kubeconfig
         run: |
-          echo "🚀 Deploying to ${{ inputs.environment || 'staging' }} environment"
-          echo "ℹ️  Configure deployment steps based on your platform:"
-          echo ""
-          echo "Options:"
-          echo "  - Docker: Build and push image, deploy to container service"
-          echo "  - AWS: Deploy to Elastic Beanstalk, ECS, or Lambda"
-          echo "  - Heroku: Use heroku/deploy-via-git action"
-          echo "  - Azure: Use azure/webapps-deploy action"
-          echo "  - GCP: Use google-github-actions/deploy-cloudrun"
-          echo ""
-          echo "📝 Update this workflow with your deployment strategy"
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" > ~/.kube/config
 
-      # Example Docker deployment (uncomment and configure)
-      # - name: Set up Docker Buildx
-      #   uses: docker/setup-buildx-action@v3
-      #
-      # - name: Login to Container Registry
-      #   uses: docker/login-action@v3
-      #   with:
-      #     registry: ${{ secrets.REGISTRY_URL }}
-      #     username: ${{ secrets.REGISTRY_USERNAME }}
-      #     password: ${{ secrets.REGISTRY_PASSWORD }}
-      #
-      # - name: Build and push Docker image
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: ./backend
-      #     push: true
-      #     tags: ${{ secrets.REGISTRY_URL }}/station-backend:${{ github.sha }}
+      - name: Deploy to staging
+        env:
+          BACKEND_IMAGE: ${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+          FRONTEND_IMAGE: ${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+        run: ./scripts/deploy/helm-deploy.sh staging "$BACKEND_IMAGE" "$FRONTEND_IMAGE"
 
-      # Example Heroku deployment (uncomment and configure)
-      # - name: Deploy to Heroku
-      #   uses: akhileshns/heroku-deploy@v3.12.14
-      #   with:
-      #     heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-      #     heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
-      #     heroku_email: ${{ secrets.HEROKU_EMAIL }}
-      #     appdir: backend
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    environment: production
+    if: github.ref == 'refs/heads/main'
 
-      - name: Deployment summary
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.15.2'
+
+      - name: Configure kubeconfig
         run: |
-          echo "✅ Deployment workflow completed"
-          echo "Environment: ${{ inputs.environment || 'staging' }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Actor: ${{ github.actor }}"
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" > ~/.kube/config
+
+      - name: Deploy to production
+        env:
+          BACKEND_IMAGE: ${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+          FRONTEND_IMAGE: ${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+        run: ./scripts/deploy/helm-deploy.sh production "$BACKEND_IMAGE" "$FRONTEND_IMAGE"

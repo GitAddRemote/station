@@ -1,0 +1,40 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/replace/me/station-frontend
+  tag: latest
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "128Mi"
+  limits:
+    cpu: "250m"
+    memory: "256Mi"
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 15
+  periodSeconds: 20
+
+ingress:
+  enabled: true
+  className: nginx
+  host: station.local
+  path: /
+  pathType: Prefix

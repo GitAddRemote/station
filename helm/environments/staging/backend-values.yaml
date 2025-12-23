@@ -1,0 +1,6 @@
+replicaCount: 2
+image:
+  repository: ghcr.io/gitaddremote/station/station-backend
+  tag: staging
+ingress:
+  host: api.staging.station.local

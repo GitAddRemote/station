@@ -5,10 +5,10 @@ metadata:
   labels:
     app: station-backend
 spec:
-  type: ClusterIP
+  type: {{ .Values.service.type }}
   selector:
     app: station-backend
   ports:
     - name: http
-      port: 3001
+      port: {{ .Values.service.port }}
       targetPort: 3001

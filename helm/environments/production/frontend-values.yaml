@@ -1,0 +1,6 @@
+replicaCount: 3
+image:
+  repository: ghcr.io/gitaddremote/station/station-frontend
+  tag: production
+ingress:
+  host: station.local
