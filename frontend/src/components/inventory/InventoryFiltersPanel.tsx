@@ -55,9 +55,11 @@ interface FiltersPanelProps {
   userInitial: string;
   onOpenAddDialog: () => void;
   showAddButton: boolean;
+  addButtonLabel?: string;
   totalCount: number;
   itemCount: number;
   autoFocusSearch?: boolean;
+  disabled?: boolean;
 }
 
 export const InventoryFiltersPanel = ({
@@ -83,9 +85,11 @@ export const InventoryFiltersPanel = ({
   userInitial,
   onOpenAddDialog,
   showAddButton,
+  addButtonLabel = 'Add item',
   totalCount,
   itemCount,
   autoFocusSearch = false,
+  disabled = false,
 }: FiltersPanelProps) => {
   return (
     <>
@@ -97,6 +101,7 @@ export const InventoryFiltersPanel = ({
             placeholder="Prospector, Lorville, armors..."
             value={filters.search}
             autoFocus={autoFocusSearch}
+            disabled={disabled}
             onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
           />
         </Grid>
@@ -107,6 +112,7 @@ export const InventoryFiltersPanel = ({
               labelId="category-filter-label"
               label="Category"
               value={filters.categoryId}
+              disabled={disabled}
               onChange={(e) =>
                 setFilters((prev) => ({
                   ...prev,
@@ -132,6 +138,7 @@ export const InventoryFiltersPanel = ({
               labelId="location-filter-label"
               label="Location"
               value={filters.locationId}
+              disabled={disabled}
               onChange={(e) =>
                 setFilters((prev) => ({
                   ...prev,
@@ -159,6 +166,7 @@ export const InventoryFiltersPanel = ({
               value={filters.valueRange}
               min={0}
               max={Math.max(filters.valueRange[1], maxQuantity || 1000)}
+              disabled={disabled}
               onChange={(_, value) =>
                 setFilters((prev) => ({
                   ...prev,
@@ -177,6 +185,7 @@ export const InventoryFiltersPanel = ({
               labelId="org-selector-label"
               label="View"
               value={viewMode === 'personal' ? 'personal' : selectedOrgId ?? ''}
+              disabled={disabled}
               onChange={(e) => {
                 const value = e.target.value;
                 if (value === 'personal') {
@@ -214,28 +223,29 @@ export const InventoryFiltersPanel = ({
 
       <Grid container spacing={2} alignItems="center">
         <Grid item>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={filters.sharedOnly}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    sharedOnly: e.target.checked,
-                  }))
-                }
-                size="small"
-                disabled={viewMode === 'org'}
-              />
-            }
-            label="Shared only"
-          />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={filters.sharedOnly}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      sharedOnly: e.target.checked,
+                    }))
+                  }
+                  size="small"
+                  disabled={disabled || viewMode === 'org'}
+                />
+              }
+              label="Shared only"
+            />
         </Grid>
         <Grid item>
           <Button
             startIcon={<SortIcon />}
             variant="outlined"
             color="inherit"
+            disabled={disabled}
             onClick={() => setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))}
           >
             Sort: {sortBy} ({sortDir})
@@ -248,6 +258,7 @@ export const InventoryFiltersPanel = ({
               labelId="sort-by-label"
               label="Sort By"
               value={sortBy}
+              disabled={disabled}
               onChange={(e) => setSortBy(e.target.value as 'name' | 'quantity' | 'location' | 'date')}
             >
               <MenuItem value="date">Last updated</MenuItem>
@@ -264,6 +275,7 @@ export const InventoryFiltersPanel = ({
               labelId="group-by-label"
               label="Group By"
               value={groupBy}
+              disabled={disabled}
               onChange={(e) => setGroupBy(e.target.value as 'none' | 'category' | 'location' | 'share')}
               startAdornment={<GroupWorkIcon sx={{ mr: 1 }} />}
             >
@@ -279,6 +291,7 @@ export const InventoryFiltersPanel = ({
             variant="outlined"
             color="inherit"
             startIcon={<FilterAltIcon />}
+            disabled={disabled}
             onClick={() =>
               setFilters({
                 search: '',
@@ -299,6 +312,7 @@ export const InventoryFiltersPanel = ({
               labelId="density-select-label"
               label="View mode"
               value={density}
+              disabled={disabled}
               onChange={(e) => setDensity(e.target.value as 'standard' | 'compact')}
             >
               <MenuItem value="standard">Standard</MenuItem>
@@ -308,8 +322,8 @@ export const InventoryFiltersPanel = ({
         </Grid>
         {showAddButton && (
           <Grid item>
-            <Button variant="contained" onClick={onOpenAddDialog}>
-              Add item
+            <Button variant="contained" onClick={onOpenAddDialog} disabled={disabled}>
+              {addButtonLabel}
             </Button>
           </Grid>
         )}

@@ -5,8 +5,13 @@ interface LocationOption {
   name: string;
 }
 
-export const useMemoizedLocations = (allLocations: LocationOption[], input: string) => {
+export const useMemoizedLocations = (
+  allLocations: LocationOption[],
+  input: string,
+  isActive: boolean,
+) => {
   const filtered = useMemo(() => {
+    if (!isActive) return [];
     const term = input.trim().toLowerCase();
     return allLocations
       .filter((opt) => opt.name.toLowerCase().includes(term))
@@ -21,11 +26,7 @@ export const useMemoizedLocations = (allLocations: LocationOption[], input: stri
         if (aIndex !== bIndex) return aIndex - bIndex;
         return a.name.localeCompare(b.name);
       });
-  }, [allLocations, input]);
+  }, [allLocations, input, isActive]);
 
-  const getSelected = (id: number | '') =>
-    typeof id === 'number' ? allLocations.find((loc) => loc.id === id) ?? null : null;
-
-  return { filtered, getSelected };
+  return { filtered };
 };
-
