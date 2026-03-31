@@ -43,6 +43,10 @@ export class OrgInventoryController {
     query: Record<string, any>,
     keys: string[],
     fieldName: string,
+    options?: {
+      integer?: boolean;
+      min?: number;
+    },
   ): number | undefined {
     const rawValue = keys
       .map((key) => query[key])
@@ -55,6 +59,16 @@ export class OrgInventoryController {
     const parsedValue = Number(rawValue);
     if (Number.isNaN(parsedValue)) {
       throw new BadRequestException(`${fieldName} must be a number`);
+    }
+
+    if (options?.integer && !Number.isInteger(parsedValue)) {
+      throw new BadRequestException(`${fieldName} must be an integer`);
+    }
+
+    if (options?.min !== undefined && parsedValue < options.min) {
+      throw new BadRequestException(
+        `${fieldName} must be greater than or equal to ${options.min}`,
+      );
     }
 
     return parsedValue;
@@ -108,8 +122,14 @@ export class OrgInventoryController {
         'location_id',
       ),
       search: query.search,
-      limit: this.readOptionalNumber(query, ['limit'], 'limit'),
-      offset: this.readOptionalNumber(query, ['offset'], 'offset'),
+      limit: this.readOptionalNumber(query, ['limit'], 'limit', {
+        integer: true,
+        min: 1,
+      }),
+      offset: this.readOptionalNumber(query, ['offset'], 'offset', {
+        integer: true,
+        min: 0,
+      }),
       sort: query.sort,
       order: query.order,
       activeOnly:

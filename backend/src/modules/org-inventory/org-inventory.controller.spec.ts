@@ -58,4 +58,22 @@ describe('OrgInventoryController', () => {
       }),
     ).rejects.toThrow(new BadRequestException('limit must be a number'));
   });
+
+  it('throws a bad request for non-integer or out-of-range pagination params', async () => {
+    await expect(
+      controller.list({ user: { userId: 7 } }, 42, {
+        gameId: '1',
+        limit: '10.5',
+      }),
+    ).rejects.toThrow(new BadRequestException('limit must be an integer'));
+
+    await expect(
+      controller.list({ user: { userId: 7 } }, 42, {
+        gameId: '1',
+        offset: '-1',
+      }),
+    ).rejects.toThrow(
+      new BadRequestException('offset must be greater than or equal to 0'),
+    );
+  });
 });

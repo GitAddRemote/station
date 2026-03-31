@@ -275,6 +275,8 @@ const InventoryPage = () => {
         const nextLocation =
           changes.locationId === undefined
             ? prev[itemId]?.locationId ?? ''
+            : changes.locationId === ''
+            ? ''
             : Number.isNaN(Number(changes.locationId))
             ? ''
             : (Number(changes.locationId) as number);
@@ -1217,17 +1219,18 @@ const InventoryPage = () => {
 
     if (
       !Number.isInteger(parsedLocationId) ||
+      parsedLocationId <= 0 ||
       !Number.isFinite(parsedQuantity) ||
       parsedQuantity < MIN_INVENTORY_QUANTITY
     ) {
       setInlineError((prev) => ({
         ...prev,
         [item.id]:
-          !Number.isInteger(parsedLocationId)
+          !Number.isInteger(parsedLocationId) || parsedLocationId <= 0
             ? 'Select a valid location'
             : 'Quantity must be at least 0.01',
       }));
-      if (!Number.isInteger(parsedLocationId)) {
+      if (!Number.isInteger(parsedLocationId) || parsedLocationId <= 0) {
         focusController.focus(item.id.toString(), 'location');
       } else {
         focusController.focus(item.id.toString(), 'quantity');
