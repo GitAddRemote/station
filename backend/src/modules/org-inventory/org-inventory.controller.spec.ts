@@ -76,4 +76,21 @@ describe('OrgInventoryController', () => {
       new BadRequestException('offset must be greater than or equal to 0'),
     );
   });
+
+  it('throws a bad request for non-integer id-like filters', async () => {
+    await expect(
+      controller.list({ user: { userId: 7 } }, 42, {
+        gameId: '1.5',
+      }),
+    ).rejects.toThrow(new BadRequestException('game_id must be an integer'));
+
+    await expect(
+      controller.list({ user: { userId: 7 } }, 42, {
+        gameId: '1',
+        locationId: '2.5',
+      }),
+    ).rejects.toThrow(
+      new BadRequestException('location_id must be an integer'),
+    );
+  });
 });

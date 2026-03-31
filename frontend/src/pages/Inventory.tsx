@@ -605,8 +605,8 @@ const InventoryPage = () => {
       setCatalogError('Select a location.');
       return;
     }
-    if (newItemQuantity <= 0) {
-      setCatalogError('Quantity must be greater than 0.');
+    if (newItemQuantity < MIN_INVENTORY_QUANTITY) {
+      setCatalogError('Quantity must be at least 0.01.');
       return;
     }
 
@@ -689,11 +689,27 @@ const InventoryPage = () => {
         setCatalogError('You do not have permission to add items to this organization.');
       } else if (status === 409 && viewMode === 'org' && selectedOrgId) {
         const numericLocationId = Number(destinationSelection.locationId);
-        const existing = items.find(
+        let existing = items.find(
           (item) =>
             item.uexItemId === selectedCatalogItem?.uexId &&
             item.locationId === numericLocationId,
         );
+        if (!existing && selectedCatalogItem) {
+          try {
+            const lookupResult = await inventoryService.getOrgInventory(selectedOrgId, {
+              gameId: GAME_ID,
+              uexItemId: selectedCatalogItem.uexId,
+              locationId: numericLocationId,
+              limit: 1,
+              offset: 0,
+            });
+            if (lookupResult.items.length > 0) {
+              existing = lookupResult.items[0];
+            }
+          } catch (lookupErr) {
+            console.error('Error looking up conflicting org inventory item', lookupErr);
+          }
+        }
         if (existing) {
           const shouldMerge = window.confirm(
             'This org already has this item at the selected location. Merge quantities?',
@@ -797,10 +813,15 @@ const InventoryPage = () => {
   }, [addDialogOpen, fetchCatalog]);
 
   useEffect(() => {
-    if (addDialogOpen && viewMode === 'org' && !canManageOrgInventory) {
+    if (
+      addDialogOpen &&
+      viewMode === 'org' &&
+      !orgPermissionsLoading &&
+      !canManageOrgInventory
+    ) {
       setAddDialogOpen(false);
     }
-  }, [addDialogOpen, viewMode, canManageOrgInventory]);
+  }, [addDialogOpen, viewMode, orgPermissionsLoading, canManageOrgInventory]);
 
   useEffect(() => {
     if (!addDialogOpen) return;

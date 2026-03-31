@@ -101,6 +101,10 @@ export class OrgInventoryController {
       query,
       ['game_id', 'gameId'],
       'game_id',
+      {
+        integer: true,
+        min: 1,
+      },
     );
 
     const searchDto: OrgInventorySearchDto = {
@@ -110,16 +114,28 @@ export class OrgInventoryController {
         query,
         ['category_id', 'categoryId'],
         'category_id',
+        {
+          integer: true,
+          min: 1,
+        },
       ),
       uexItemId: this.readOptionalNumber(
         query,
         ['uex_item_id', 'uexItemId'],
         'uex_item_id',
+        {
+          integer: true,
+          min: 1,
+        },
       ),
       locationId: this.readOptionalNumber(
         query,
         ['location_id', 'locationId'],
         'location_id',
+        {
+          integer: true,
+          min: 1,
+        },
       ),
       search: query.search,
       limit: this.readOptionalNumber(query, ['limit'], 'limit', {
