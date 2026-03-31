@@ -20,6 +20,13 @@ import { useMemoizedLocations } from '../../hooks/useMemoizedLocations';
 const EDITOR_MODE_QUANTITY_MAX = 100000;
 const MIN_INVENTORY_QUANTITY = 0.01;
 
+const normalizeDraftLocationId = (locationId: number | ''): number | '' =>
+  typeof locationId === 'string'
+    ? locationId === ''
+      ? ''
+      : Number(locationId)
+    : locationId;
+
 export type InventoryRecord = InventoryItem | OrgInventoryItem;
 
 interface LocationOption {
@@ -94,10 +101,7 @@ const InventoryInlineRow = ({
   setQuantityRef,
   setSaveRef,
 }: InventoryInlineRowProps) => {
-  const draftLocationId =
-    typeof inlineDraft.locationId === 'string'
-      ? Number(inlineDraft.locationId)
-      : inlineDraft.locationId;
+  const draftLocationId = normalizeDraftLocationId(inlineDraft.locationId);
 
   const { filtered: filteredOptions } = useMemoizedLocations(
     allLocations,
@@ -112,7 +116,7 @@ const InventoryInlineRow = ({
 
   const draftQuantityNumber = Number(inlineDraft.quantity);
   const displayQuantity =
-    Number.isFinite(draftQuantityNumber) && draftQuantityNumber > 0
+    Number.isFinite(draftQuantityNumber)
       ? draftQuantityNumber
       : Number(item.quantity);
 

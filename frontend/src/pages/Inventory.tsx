@@ -68,6 +68,13 @@ const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
 const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
 const DENSITY_STORAGE_KEY = 'inventory:density';
 
+const normalizeDraftLocationId = (locationId: number | ''): number | '' =>
+  typeof locationId === 'string'
+    ? locationId === ''
+      ? ''
+      : Number(locationId)
+    : locationId;
+
 const readStoredViewMode = (): 'personal' | 'org' => {
   if (typeof window === 'undefined') return 'personal';
   const stored = window.sessionStorage.getItem(VIEW_MODE_STORAGE_KEY);
@@ -1783,8 +1790,7 @@ const InventoryPage = () => {
       quantity: Number(item.quantity) || 0,
     };
     const originalLocationId = Number(item.locationId) || '';
-    const draftLocationId =
-      typeof draft.locationId === 'string' ? Number(draft.locationId) : draft.locationId;
+    const draftLocationId = normalizeDraftLocationId(draft.locationId);
     const originalQuantity = Number(item.quantity) || 0;
     const draftQuantityNumber = Number(draft.quantity);
     const isDirty =
