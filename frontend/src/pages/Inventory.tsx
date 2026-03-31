@@ -552,7 +552,7 @@ const InventoryPage = () => {
     }
   }, [
     user,
-    viewMode,
+    isOrgMode,
     selectedOrgId,
     filters.categoryId,
     filters.locationId,
@@ -1296,11 +1296,10 @@ const InventoryPage = () => {
     focusController,
     inlineDrafts,
     inlineSaving,
-    inventoryService,
-    isOrgMode,
     items,
     locationNameById,
     selectedOrgId,
+    viewMode,
   ]);
 
   const handleInlineSaveAndAdvance = useCallback(async (item: InventoryRecord) => {
