@@ -7,19 +7,22 @@ import type { LocationRecord } from '../services/location.service';
 
 const mockUpdateItem = jest.fn();
 const mockGetInventory = jest.fn();
+const mockGetOrgInventory = jest.fn();
 const mockGetUserOrganizations = jest.fn();
 const mockCreateItem = jest.fn();
 const mockCreateOrgItem = jest.fn();
+const mockUpdateOrgItem = jest.fn();
 const mockSearchItems = jest.fn();
+const mockGetUserPermissions = jest.fn();
 
 jest.mock('../services/inventory.service', () => ({
   inventoryService: {
     getCategories: jest.fn().mockResolvedValue([]),
     getUserOrganizations: (...args: unknown[]) => mockGetUserOrganizations(...args),
     getInventory: (...args: unknown[]) => mockGetInventory(...args),
-    getOrgInventory: jest.fn(),
+    getOrgInventory: (...args: unknown[]) => mockGetOrgInventory(...args),
     updateItem: (...args: unknown[]) => mockUpdateItem(...args),
-    updateOrgItem: jest.fn(),
+    updateOrgItem: (...args: unknown[]) => mockUpdateOrgItem(...args),
     createItem: (...args: unknown[]) => mockCreateItem(...args),
     createOrgItem: (...args: unknown[]) => mockCreateOrgItem(...args),
     shareItem: jest.fn(),
@@ -40,6 +43,33 @@ jest.mock('../services/uex.service', () => ({
     searchItems: (...args: unknown[]) => mockSearchItems(...args),
     getStarSystems: jest.fn(),
   },
+}));
+jest.mock('../services/permissions.service', () => ({
+  OrgPermission: {
+    CAN_VIEW_ORG_INVENTORY: 'can_view_org_inventory',
+    CAN_EDIT_ORG_INVENTORY: 'can_edit_org_inventory',
+    CAN_ADMIN_ORG_INVENTORY: 'can_admin_org_inventory',
+    CAN_VIEW_MEMBER_SHARED_ITEMS: 'can_view_member_shared_items',
+  },
+  permissionsService: {
+    getUserPermissions: (...args: unknown[]) => mockGetUserPermissions(...args),
+  },
+}));
+jest.mock('../components/location/SystemLocationSelector', () => ({
+  __esModule: true,
+  default: ({
+    onChange,
+  }: {
+    onChange: (value: { systemId: string; locationId: string }) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid="mock-system-location-selector"
+      onClick={() => onChange({ systemId: '1', locationId: '200' })}
+    >
+      Select Test Location
+    </button>
+  ),
 }));
 jest.mock('../hooks/useMemoizedLocations', () => {
   const original = jest.requireActual('../hooks/useMemoizedLocations');
@@ -69,8 +99,10 @@ describe('Inventory editor mode inline controls', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     mockGetInventory.mockResolvedValue({ items: [mockItem], total: 1, limit: 25, offset: 0 });
+    mockGetOrgInventory.mockResolvedValue({ items: [mockItem], total: 1, limit: 25, offset: 0 });
     mockGetUserOrganizations.mockResolvedValue([]);
     mockUpdateItem.mockResolvedValue({});
+    mockUpdateOrgItem.mockResolvedValue({});
     mockCreateItem.mockResolvedValue({});
     mockSearchItems.mockResolvedValue({
       items: [
@@ -85,6 +117,7 @@ describe('Inventory editor mode inline controls', () => {
       limit: 20,
       offset: 0,
     });
+    mockGetUserPermissions.mockResolvedValue(['can_edit_org_inventory']);
     const mockedLocationCache = locationCache as jest.Mocked<typeof locationCache>;
     const mockLocations: LocationRecord[] = [
       {
@@ -308,7 +341,7 @@ describe('Inventory editor mode inline controls', () => {
     await waitFor(() => expect(document.activeElement).toBe(itemInput));
   });
 
-  it('prevents non-integer quantities and shows error', async () => {
+  it('prevents quantities below the minimum and shows error', async () => {
     render(
       <MemoryRouter initialEntries={['/inventory']}>
         <InventoryPage />
@@ -330,12 +363,12 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.click(await screen.findByText('Test Location'));
 
     const quantityInput = screen.getByTestId('new-row-quantity');
-    fireEvent.change(quantityInput, { target: { value: '7.5' } });
+    fireEvent.change(quantityInput, { target: { value: '0' } });
     const saveButton = screen.getByTestId('new-row-save');
     fireEvent.click(saveButton);
 
     expect(mockCreateItem).not.toHaveBeenCalled();
-    expect(screen.getByText('Quantity must be an integer greater than 0')).toBeInTheDocument();
+    expect(screen.getByText('Quantity must be at least 0.01')).toBeInTheDocument();
   });
 
   it('keeps the row dirty and shows retry on API failure', async () => {
@@ -374,7 +407,7 @@ describe('Inventory editor mode inline controls', () => {
     await waitFor(() => expect(mockCreateItem).toHaveBeenCalledTimes(2));
   });
 
-  it('shows inline quantity validation error for non-integer input and focuses the field', async () => {
+  it('allows decimal inline quantities and saves them', async () => {
     render(
       <MemoryRouter initialEntries={['/inventory']}>
         <InventoryPage />
@@ -392,10 +425,110 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.click(screen.getByTestId('inline-save-item-1'));
 
     await waitFor(() =>
-      expect(screen.getByText('Quantity must be an integer greater than 0')).toBeInTheDocument(),
+      expect(mockUpdateItem).toHaveBeenCalledWith('item-1', {
+        locationId: 200,
+        quantity: 3.5,
+      }),
     );
-    await waitFor(() => expect(document.activeElement).toBe(quantityInput));
-    expect(mockUpdateItem).not.toHaveBeenCalled();
+  });
+
+  it('hides the org add flow when org permissions do not include edit/admin', async () => {
+    mockGetUserOrganizations.mockResolvedValue([
+      {
+        id: 1,
+        userId: 1,
+        organizationId: 42,
+        roleId: 1,
+        organization: { id: 42, name: 'Test Org' },
+      },
+    ]);
+    mockGetUserPermissions.mockResolvedValue(['can_view_org_inventory']);
+
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+
+    const viewSelect = screen.getByLabelText('View');
+    fireEvent.mouseDown(viewSelect);
+    fireEvent.click(await screen.findByText('Test Org'));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('You do not have permission to add items to this organization.'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('button', { name: 'Add org item' })).not.toBeInTheDocument();
+  });
+
+  it('handles org add conflicts by loading the existing item and merging quantities', async () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    mockGetUserOrganizations.mockResolvedValue([
+      {
+        id: 1,
+        userId: 1,
+        organizationId: 42,
+        roleId: 1,
+        organization: { id: 42, name: 'Test Org' },
+      },
+    ]);
+    mockGetUserPermissions.mockResolvedValue(['can_edit_org_inventory']);
+    mockGetOrgInventory
+      .mockResolvedValueOnce({ items: [mockItem], total: 1, limit: 25, offset: 0 })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 'org-item-1',
+            orgId: 42,
+            gameId: 1,
+            uexItemId: 300,
+            locationId: 200,
+            quantity: 4,
+            notes: '',
+            active: true,
+            dateAdded: new Date().toISOString(),
+            dateModified: new Date().toISOString(),
+            itemName: 'New Catalog Item',
+            locationName: 'Test Location',
+          },
+        ],
+        total: 1,
+        limit: 1,
+        offset: 0,
+      })
+      .mockResolvedValue({ items: [mockItem], total: 1, limit: 25, offset: 0 });
+    mockCreateOrgItem.mockRejectedValueOnce({ response: { status: 409 } });
+
+    render(
+      <MemoryRouter initialEntries={['/inventory']}>
+        <InventoryPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+
+    const viewSelect = screen.getByLabelText('View');
+    fireEvent.mouseDown(viewSelect);
+    fireEvent.click(await screen.findByText('Test Org'));
+
+    const addButton = await screen.findByRole('button', { name: 'Add org item' });
+    fireEvent.click(addButton);
+
+    fireEvent.click(await screen.findByText('New Catalog Item'));
+    fireEvent.click(screen.getByTestId('mock-system-location-selector'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add & close' }));
+
+    await waitFor(() =>
+      expect(mockUpdateOrgItem).toHaveBeenCalledWith(42, 'org-item-1', {
+        quantity: 5,
+        locationId: 200,
+      }),
+    );
+
+    confirmSpy.mockRestore();
   });
 
   it('focuses inline save on API failure', async () => {

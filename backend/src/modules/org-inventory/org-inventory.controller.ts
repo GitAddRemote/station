@@ -39,6 +39,27 @@ import {
 export class OrgInventoryController {
   constructor(private readonly orgInventoryService: OrgInventoryService) {}
 
+  private readOptionalNumber(
+    query: Record<string, any>,
+    keys: string[],
+    fieldName: string,
+  ): number | undefined {
+    const rawValue = keys
+      .map((key) => query[key])
+      .find((value) => value !== undefined);
+
+    if (rawValue === undefined || rawValue === '') {
+      return undefined;
+    }
+
+    const parsedValue = Number(rawValue);
+    if (Number.isNaN(parsedValue)) {
+      throw new BadRequestException(`${fieldName} must be a number`);
+    }
+
+    return parsedValue;
+  }
+
   /**
    * List org inventory items with filtering
    * GET /api/orgs/:orgId/inventory
@@ -62,22 +83,33 @@ export class OrgInventoryController {
     offset: number;
   }> {
     const userId = req.user.userId;
-    const parsedMinQuantity = Number(
-      query.min_quantity ?? query.minQuantity ?? Number.NaN,
-    );
-    const parsedMaxQuantity = Number(
-      query.max_quantity ?? query.maxQuantity ?? Number.NaN,
+    const gameId = this.readOptionalNumber(
+      query,
+      ['game_id', 'gameId'],
+      'game_id',
     );
 
     const searchDto: OrgInventorySearchDto = {
       orgId,
-      gameId: Number(query.game_id ?? query.gameId),
-      categoryId: query.category_id ? Number(query.category_id) : undefined,
-      uexItemId: query.uex_item_id ? Number(query.uex_item_id) : undefined,
-      locationId: query.location_id ? Number(query.location_id) : undefined,
+      gameId: gameId ?? 0,
+      categoryId: this.readOptionalNumber(
+        query,
+        ['category_id', 'categoryId'],
+        'category_id',
+      ),
+      uexItemId: this.readOptionalNumber(
+        query,
+        ['uex_item_id', 'uexItemId'],
+        'uex_item_id',
+      ),
+      locationId: this.readOptionalNumber(
+        query,
+        ['location_id', 'locationId'],
+        'location_id',
+      ),
       search: query.search,
-      limit: query.limit ? Number(query.limit) : undefined,
-      offset: query.offset ? Number(query.offset) : undefined,
+      limit: this.readOptionalNumber(query, ['limit'], 'limit'),
+      offset: this.readOptionalNumber(query, ['offset'], 'offset'),
       sort: query.sort,
       order: query.order,
       activeOnly:
@@ -86,12 +118,16 @@ export class OrgInventoryController {
           : query.activeOnly !== undefined
             ? query.activeOnly === 'true' || query.activeOnly === true
             : undefined,
-      minQuantity: Number.isNaN(parsedMinQuantity)
-        ? undefined
-        : parsedMinQuantity,
-      maxQuantity: Number.isNaN(parsedMaxQuantity)
-        ? undefined
-        : parsedMaxQuantity,
+      minQuantity: this.readOptionalNumber(
+        query,
+        ['min_quantity', 'minQuantity'],
+        'min_quantity',
+      ),
+      maxQuantity: this.readOptionalNumber(
+        query,
+        ['max_quantity', 'maxQuantity'],
+        'max_quantity',
+      ),
     };
 
     if (!searchDto.gameId) {

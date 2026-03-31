@@ -18,6 +18,7 @@ import type { FocusController } from '../../utils/focusController';
 import { useMemoizedLocations } from '../../hooks/useMemoizedLocations';
 
 const EDITOR_MODE_QUANTITY_MAX = 100000;
+const MIN_INVENTORY_QUANTITY = 0.01;
 
 export type InventoryRecord = InventoryItem | OrgInventoryItem;
 
@@ -340,16 +341,16 @@ const InventoryInlineRow = ({
                       quantity: Math.min(numeric, EDITOR_MODE_QUANTITY_MAX),
                     });
                   }
-                  if (!Number.isInteger(numeric) || numeric <= 0) {
-                    onErrorChange(item.id, 'Quantity must be an integer greater than 0');
+                  if (!Number.isFinite(numeric) || numeric < MIN_INVENTORY_QUANTITY) {
+                    onErrorChange(item.id, 'Quantity must be at least 0.01');
                   } else {
                     onErrorChange(item.id, null);
                   }
                 }}
                 onBlur={() => onQuantityBlur(rowKey)}
                 inputProps={{
-                  inputMode: 'numeric',
-                  pattern: '[0-9]*',
+                  inputMode: 'decimal',
+                  pattern: '[0-9]*\\.?[0-9]*',
                 }}
                 inputRef={(el) => {
                   setQuantityRef(el, rowKey);

@@ -62,6 +62,7 @@ type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
 
 const GAME_ID = 1;
 const EDITOR_MODE_QUANTITY_MAX = 100000;
+const MIN_INVENTORY_QUANTITY = 0.01;
 const ORG_ACCENT = '#f2a255';
 const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
 const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
@@ -264,10 +265,7 @@ const InventoryPage = () => {
           [rowKey]: initialInput ?? prev[rowKey] ?? '',
         }));
       }
-      const parsedId = Number(rowKey);
-      if (!Number.isNaN(parsedId)) {
-        setInlineError((prev) => ({ ...prev, [parsedId]: null }));
-      }
+      setInlineError((prev) => ({ ...prev, [rowKey]: null }));
     },
     [],
   );
@@ -980,8 +978,8 @@ const InventoryPage = () => {
     if (!Number.isInteger(parsedLocationId) || parsedLocationId <= 0) {
       errors.location = 'Select a valid location';
     }
-    if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
-      errors.quantity = 'Quantity must be an integer greater than 0';
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity < MIN_INVENTORY_QUANTITY) {
+      errors.quantity = 'Quantity must be at least 0.01';
     }
 
     if (errors.item || errors.location || errors.quantity) {
@@ -1217,13 +1215,17 @@ const InventoryPage = () => {
       draft.locationId === '' ? NaN : Number(draft.locationId);
     const parsedQuantity = Number(draft.quantity);
 
-    if (!Number.isInteger(parsedLocationId) || !Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+    if (
+      !Number.isInteger(parsedLocationId) ||
+      !Number.isFinite(parsedQuantity) ||
+      parsedQuantity < MIN_INVENTORY_QUANTITY
+    ) {
       setInlineError((prev) => ({
         ...prev,
         [item.id]:
           !Number.isInteger(parsedLocationId)
             ? 'Select a valid location'
-            : 'Quantity must be an integer greater than 0',
+            : 'Quantity must be at least 0.01',
       }));
       if (!Number.isInteger(parsedLocationId)) {
         focusController.focus(item.id.toString(), 'location');
@@ -2141,10 +2143,10 @@ const InventoryPage = () => {
                           ...prev,
                           quantity: nextQuantity,
                         }));
-                        if (!Number.isInteger(numeric) || numeric <= 0) {
+                        if (!Number.isFinite(numeric) || numeric < MIN_INVENTORY_QUANTITY) {
                           setNewRowErrors((prev) => ({
                             ...prev,
-                            quantity: 'Quantity must be an integer greater than 0',
+                            quantity: 'Quantity must be at least 0.01',
                             api: null,
                           }));
                         } else {
