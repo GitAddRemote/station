@@ -4,6 +4,7 @@ import {
   Post,
   Put,
   Delete,
+  BadRequestException,
   Body,
   Param,
   Query,
@@ -38,6 +39,41 @@ import {
 export class OrgInventoryController {
   constructor(private readonly orgInventoryService: OrgInventoryService) {}
 
+  private readOptionalNumber(
+    query: Record<string, any>,
+    keys: string[],
+    fieldName: string,
+    options?: {
+      integer?: boolean;
+      min?: number;
+    },
+  ): number | undefined {
+    const rawValue = keys
+      .map((key) => query[key])
+      .find((value) => value !== undefined);
+
+    if (rawValue === undefined || rawValue === '') {
+      return undefined;
+    }
+
+    const parsedValue = Number(rawValue);
+    if (Number.isNaN(parsedValue)) {
+      throw new BadRequestException(`${fieldName} must be a number`);
+    }
+
+    if (options?.integer && !Number.isInteger(parsedValue)) {
+      throw new BadRequestException(`${fieldName} must be an integer`);
+    }
+
+    if (options?.min !== undefined && parsedValue < options.min) {
+      throw new BadRequestException(
+        `${fieldName} must be greater than or equal to ${options.min}`,
+      );
+    }
+
+    return parsedValue;
+  }
+
   /**
    * List org inventory items with filtering
    * GET /api/orgs/:orgId/inventory
@@ -53,7 +89,7 @@ export class OrgInventoryController {
   async list(
     @Request() req: any,
     @Param('orgId', ParseIntPipe) orgId: number,
-    @Query() searchDto: OrgInventorySearchDto,
+    @Query() query: Record<string, any>,
   ): Promise<{
     items: OrgInventoryItemDto[];
     total: number;
@@ -61,11 +97,80 @@ export class OrgInventoryController {
     offset: number;
   }> {
     const userId = req.user.userId;
-    // Extract gameId from query params and use search
-    return this.orgInventoryService.search(userId, {
-      ...searchDto,
+    const gameId = this.readOptionalNumber(
+      query,
+      ['game_id', 'gameId'],
+      'game_id',
+      {
+        integer: true,
+        min: 1,
+      },
+    );
+
+    const searchDto: OrgInventorySearchDto = {
       orgId,
-    });
+      gameId: gameId ?? 0,
+      categoryId: this.readOptionalNumber(
+        query,
+        ['category_id', 'categoryId'],
+        'category_id',
+        {
+          integer: true,
+          min: 1,
+        },
+      ),
+      uexItemId: this.readOptionalNumber(
+        query,
+        ['uex_item_id', 'uexItemId'],
+        'uex_item_id',
+        {
+          integer: true,
+          min: 1,
+        },
+      ),
+      locationId: this.readOptionalNumber(
+        query,
+        ['location_id', 'locationId'],
+        'location_id',
+        {
+          integer: true,
+          min: 1,
+        },
+      ),
+      search: query.search,
+      limit: this.readOptionalNumber(query, ['limit'], 'limit', {
+        integer: true,
+        min: 1,
+      }),
+      offset: this.readOptionalNumber(query, ['offset'], 'offset', {
+        integer: true,
+        min: 0,
+      }),
+      sort: query.sort,
+      order: query.order,
+      activeOnly:
+        query.active_only !== undefined
+          ? query.active_only === 'true' || query.active_only === true
+          : query.activeOnly !== undefined
+            ? query.activeOnly === 'true' || query.activeOnly === true
+            : undefined,
+      minQuantity: this.readOptionalNumber(
+        query,
+        ['min_quantity', 'minQuantity'],
+        'min_quantity',
+      ),
+      maxQuantity: this.readOptionalNumber(
+        query,
+        ['max_quantity', 'maxQuantity'],
+        'max_quantity',
+      ),
+    };
+
+    if (!searchDto.gameId) {
+      throw new BadRequestException('game_id is required');
+    }
+
+    return this.orgInventoryService.search(userId, searchDto);
   }
 
   /**
@@ -83,6 +188,7 @@ export class OrgInventoryController {
   })
   @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiResponse({ status: 403, description: 'Permission denied' })
+  @ApiResponse({ status: 409, description: 'Inventory item already exists' })
   async create(
     @Request() req: any,
     @Param('orgId', ParseIntPipe) orgId: number,
