@@ -158,11 +158,17 @@ export class OrgInventoryController {
         query,
         ['min_quantity', 'minQuantity'],
         'min_quantity',
+        {
+          min: 0,
+        },
       ),
       maxQuantity: this.readOptionalNumber(
         query,
         ['max_quantity', 'maxQuantity'],
         'max_quantity',
+        {
+          min: 0,
+        },
       ),
     };
 

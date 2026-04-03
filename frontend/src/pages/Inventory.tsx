@@ -59,6 +59,7 @@ import { OrgPermission, permissionsService } from '../services/permissions.servi
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
+type InlineDraft = { locationId: number | ''; quantity: number | '' };
 
 const GAME_ID = 1;
 const EDITOR_MODE_QUANTITY_MAX = 100000;
@@ -155,9 +156,9 @@ const InventoryPage = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [density, setDensity] = useState<'standard' | 'compact'>(() => readStoredDensity());
-  const [inlineDrafts, setInlineDrafts] = useState<
-    Record<string, { locationId: number | ''; quantity: number | '' }>
-  >({});
+  const [inlineDrafts, setInlineDrafts] = useState<Record<string, InlineDraft>>(
+    {},
+  );
   const [inlineSaving, setInlineSaving] = useState<Set<string>>(new Set());
   const [inlineSaved, setInlineSaved] = useState<Set<string>>(new Set());
   const [inlineError, setInlineError] = useState<Record<string, string | null>>({});
@@ -226,6 +227,16 @@ const InventoryPage = () => {
       }
     }
   }, [orgOptions, selectedOrgId, viewMode]);
+
+  useEffect(() => {
+    const itemIds = new Set(items.map((item) => item.id.toString()));
+    inlineDraftFallbacks.current.forEach((_, key) => {
+      if (!itemIds.has(key)) {
+        inlineDraftFallbacks.current.delete(key);
+      }
+    });
+  }, [items]);
+
   const debouncedNewItemSearch = useDebounce(newRowItemInput, 300);
   const debouncedNewLocationSearch = useDebounce(newRowLocationInput, 200);
   const getRowOrder = useCallback(
@@ -253,6 +264,7 @@ const InventoryPage = () => {
   const locationRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const saveRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const inlineDraftFallbacks = useRef<Map<string, InlineDraft>>(new Map());
   const newRowItemRef = useRef<HTMLInputElement | null>(null);
   const newRowLocationRef = useRef<HTMLInputElement | null>(null);
   const newRowQuantityRef = useRef<HTMLInputElement | null>(null);
@@ -1236,11 +1248,36 @@ const InventoryPage = () => {
     };
   }, [debouncedNewItemSearch, isEditorMode]);
 
+  const getInlineDraft = useCallback(
+    (item: InventoryRecord): InlineDraft => {
+      const existingDraft = inlineDrafts[item.id];
+      if (existingDraft) {
+        return existingDraft;
+      }
+
+      const rowKey = item.id.toString();
+      const nextFallback: InlineDraft = {
+        locationId: Number(item.locationId) || '',
+        quantity: Number(item.quantity) || 0,
+      };
+      const cachedFallback = inlineDraftFallbacks.current.get(rowKey);
+
+      if (
+        cachedFallback &&
+        cachedFallback.locationId === nextFallback.locationId &&
+        cachedFallback.quantity === nextFallback.quantity
+      ) {
+        return cachedFallback;
+      }
+
+      inlineDraftFallbacks.current.set(rowKey, nextFallback);
+      return nextFallback;
+    },
+    [inlineDrafts],
+  );
+
   const handleInlineSave = useCallback(async (item: InventoryRecord) => {
-    const draft = inlineDrafts[item.id] ?? {
-      locationId: item.locationId ?? '',
-      quantity: Number(item.quantity) || 0,
-    };
+    const draft = getInlineDraft(item);
     const parsedLocationId =
       draft.locationId === '' ? NaN : Number(draft.locationId);
     const parsedQuantity = Number(draft.quantity);
@@ -1327,7 +1364,7 @@ const InventoryPage = () => {
     }
   }, [
     focusController,
-    inlineDrafts,
+    getInlineDraft,
     inlineSaving,
     items,
     locationNameById,
@@ -1785,10 +1822,7 @@ const InventoryPage = () => {
   const showEmptyState = filteredItems.length === 0 && !refreshing;
   const renderInlineRow = (item: InventoryRecord) => {
     const rowKey = item.id.toString();
-    const draft = inlineDrafts[item.id] ?? {
-      locationId: Number(item.locationId) || '',
-      quantity: Number(item.quantity) || 0,
-    };
+    const draft = getInlineDraft(item);
     const originalLocationId = Number(item.locationId) || '';
     const draftLocationId = normalizeDraftLocationId(draft.locationId);
     const originalQuantity = Number(item.quantity) || 0;
