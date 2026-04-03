@@ -93,4 +93,28 @@ describe('OrgInventoryController', () => {
       new BadRequestException('location_id must be an integer'),
     );
   });
+
+  it('throws a bad request for negative quantity filters', async () => {
+    await expect(
+      controller.list({ user: { userId: 7 } }, 42, {
+        gameId: '1',
+        minQuantity: '-0.25',
+      }),
+    ).rejects.toThrow(
+      new BadRequestException(
+        'min_quantity must be greater than or equal to 0',
+      ),
+    );
+
+    await expect(
+      controller.list({ user: { userId: 7 } }, 42, {
+        gameId: '1',
+        maxQuantity: '-1',
+      }),
+    ).rejects.toThrow(
+      new BadRequestException(
+        'max_quantity must be greater than or equal to 0',
+      ),
+    );
+  });
 });
