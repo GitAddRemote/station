@@ -1270,6 +1270,10 @@ const InventoryPage = () => {
         return cachedFallback;
       }
 
+      // Writing to a ref during render is intentional here. nextFallback is
+      // derived deterministically from item data, so concurrent/aborted renders
+      // always write the same value for a given key — no stale state is possible.
+      // Stale entries for removed items are pruned by the [items] effect above.
       inlineDraftFallbacks.current.set(rowKey, nextFallback);
       return nextFallback;
     },
