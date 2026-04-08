@@ -228,6 +228,8 @@ const InventoryPage = () => {
     }
   }, [orgOptions, selectedOrgId, viewMode]);
 
+  const inlineDraftFallbacks = useRef<Map<string, InlineDraft>>(new Map());
+
   useEffect(() => {
     const itemIds = new Set(items.map((item) => item.id.toString()));
     inlineDraftFallbacks.current.forEach((_, key) => {
@@ -264,7 +266,6 @@ const InventoryPage = () => {
   const locationRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const saveRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const inlineDraftFallbacks = useRef<Map<string, InlineDraft>>(new Map());
   const newRowItemRef = useRef<HTMLInputElement | null>(null);
   const newRowLocationRef = useRef<HTMLInputElement | null>(null);
   const newRowQuantityRef = useRef<HTMLInputElement | null>(null);
