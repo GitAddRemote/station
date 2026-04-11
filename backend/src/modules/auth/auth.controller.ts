@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Post,
-  UseGuards,
-  Request,
-  Body,
-  Get,
-} from '@nestjs/common';
+import { Controller, Post, UseGuards, Request, Body } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -19,7 +12,6 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 import { UserDto } from '../users/dto/user.dto';
 import { Request as ExpressRequest } from 'express';
-import * as bcrypt from 'bcrypt';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
@@ -122,23 +114,5 @@ export class AuthController {
       currentPassword,
       newPassword,
     );
-  }
-
-  @Get('test')
-  async testBCrypt() {
-    (async () => {
-      const plainPassword = 'securePassword123';
-      const saltRounds = 10;
-
-      // Simulate Registration
-      const hashedPassword = await bcrypt.hash(plainPassword, saltRounds);
-      console.log('Plain password:', plainPassword);
-      console.log('Hashed password:', hashedPassword);
-
-      // Simulate Login
-      const isMatch = await bcrypt.compare(plainPassword, hashedPassword);
-      console.log('Passwords match:', isMatch);
-      return isMatch;
-    })();
   }
 }
