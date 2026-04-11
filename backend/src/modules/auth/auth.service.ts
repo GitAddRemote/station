@@ -60,16 +60,13 @@ export class AuthService {
   }
 
   async login(
-    user: any,
-  ): Promise<{ access_token: string; refresh_token: string }> {
+    user: Omit<User, 'password'>,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const payload = { username: user.username, sub: user.id };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = await this.generateRefreshToken(user.id);
 
-    return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    };
+    return { accessToken, refreshToken };
   }
 
   async register(userDto: UserDto): Promise<Omit<User, 'password'>> {
@@ -100,7 +97,7 @@ export class AuthService {
 
   async refreshAccessToken(
     refreshToken: string,
-  ): Promise<{ access_token: string; refresh_token: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     // Find the refresh token
     const storedToken = await this.refreshTokenRepository.findOne({
       where: { token: refreshToken },
@@ -132,8 +129,8 @@ export class AuthService {
     );
 
     return {
-      access_token: newAccessToken,
-      refresh_token: newRefreshToken,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
     };
   }
 

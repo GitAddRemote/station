@@ -2,9 +2,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as figlet from 'figlet';
 import * as dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 dotenv.config();
@@ -13,14 +15,23 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Application configuration
-  const port = process.env.PORT || 3001;
-  const appName = process.env.APP_NAME || 'STATION BACKEND';
+  const configService = app.get(ConfigService);
+  const port = configService.get<string>('PORT') || 3001;
+  const appName = configService.get<string>('APP_NAME') || 'STATION BACKEND';
 
   // ASCII Art for Application Name
   console.log(figlet.textSync(appName, { horizontalLayout: 'full' }));
 
-  // Enable CORS (if needed for APIs)
-  app.enableCors();
+  // Cookie parser — must be registered before guards that read cookies
+  app.use(cookieParser());
+
+  // CORS — allow credentials so httpOnly cookies are sent cross-origin
+  app.enableCors({
+    origin:
+      configService.get<string>('ALLOWED_ORIGIN') || 'http://localhost:5173',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
 
   // Global Validation Pipe
   app.useGlobalPipes(
@@ -62,16 +73,6 @@ async function bootstrap() {
         },
         'access-token',
       )
-      .addBearerAuth(
-        {
-          type: 'http',
-          scheme: 'bearer',
-          name: 'Refresh Token',
-          description: 'Enter refresh token',
-          in: 'header',
-        },
-        'refresh-token',
-      )
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
@@ -81,7 +82,7 @@ async function bootstrap() {
   // Log application startup information
   await app.listen(port);
   Logger.log(
-    `🚀 Application '${appName}' is running on: http://localhost:${port}`,
+    `Application '${appName}' is running on: http://localhost:${port}`,
     'Bootstrap',
   );
   if (process.env.NODE_ENV !== 'production') {
