@@ -1,8 +1,10 @@
 import { Module, DynamicModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { redisStore } from 'cache-manager-redis-yet';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -35,6 +37,17 @@ if (!isTest) {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => [
+        {
+          name: 'default',
+          ttl: configService.get<number>('THROTTLE_TTL', 60000),
+          limit: configService.get<number>('THROTTLE_LIMIT', 100),
+        },
+      ],
     }),
     ...conditionalImports,
     CacheModule.registerAsync({
@@ -118,6 +131,12 @@ if (!isTest) {
     OrgInventoryModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

@@ -6,6 +6,7 @@ import {
   ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -35,6 +36,12 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @Throttle({
+    default: {
+      ttl: parseInt(process.env['AUTH_LOGIN_THROTTLE_TTL'] ?? '60000'),
+      limit: parseInt(process.env['AUTH_LOGIN_THROTTLE_LIMIT'] ?? '10'),
+    },
+  })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   async login(@Request() req: ExpressRequest) {
@@ -44,7 +51,12 @@ export class AuthController {
   @ApiOperation({ summary: 'Register new user' })
   @ApiResponse({ status: 201, description: 'User successfully registered' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
-  // Registration Route: No guards required
+  @Throttle({
+    default: {
+      ttl: parseInt(process.env['AUTH_REGISTER_THROTTLE_TTL'] ?? '60000'),
+      limit: parseInt(process.env['AUTH_REGISTER_THROTTLE_LIMIT'] ?? '5'),
+    },
+  })
   @Post('register')
   async register(@Body() userDto: UserDto) {
     return this.authService.register(userDto);
@@ -79,6 +91,12 @@ export class AuthController {
     status: 200,
     description:
       'If an account with that email exists, a password reset link has been sent',
+  })
+  @Throttle({
+    default: {
+      ttl: parseInt(process.env['AUTH_FORGOT_THROTTLE_TTL'] ?? '60000'),
+      limit: parseInt(process.env['AUTH_FORGOT_THROTTLE_LIMIT'] ?? '5'),
+    },
   })
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
