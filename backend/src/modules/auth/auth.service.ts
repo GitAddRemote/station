@@ -174,13 +174,7 @@ export class AuthService {
     });
 
     // TODO: Send email with reset link
-    // For now, just log the token (in production, send via email service)
-    this.logger.log(
-      `Password reset token for ${email}: ${token} (expires at ${expiresAt})`,
-    );
-    this.logger.log(
-      `Reset link would be: ${this.configService.get('FRONTEND_URL') || 'http://localhost:5173'}/reset-password?token=${token}`,
-    );
+    this.logger.log(`Password reset requested for user ID: ${user.id}`);
 
     return successMessage;
   }

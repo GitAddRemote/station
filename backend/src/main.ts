@@ -34,51 +34,49 @@ async function bootstrap() {
   // Global Exception Filter for standardized error responses
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Swagger/OpenAPI Documentation Setup
-  const config = new DocumentBuilder()
-    .setTitle('Station API')
-    .setDescription(
-      'API documentation for Station - Gaming guild and organization management portal',
-    )
-    .setVersion('1.0')
-    .addTag('auth', 'Authentication endpoints')
-    .addTag('users', 'User management endpoints')
-    .addTag('organizations', 'Organization management endpoints')
-    .addTag('roles', 'Role management endpoints')
-    .addTag(
-      'user-organization-roles',
-      'User-Organization-Role assignment endpoints',
-    )
-    .addTag('permissions', 'Permission aggregation endpoints')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Enter JWT token',
-        in: 'header',
-      },
-      'access-token',
-    )
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        name: 'Refresh Token',
-        description: 'Enter refresh token',
-        in: 'header',
-      },
-      'refresh-token',
-    )
-    .build();
+  // Swagger/OpenAPI Documentation — development only
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Station API')
+      .setDescription(
+        'API documentation for Station - Gaming guild and organization management portal',
+      )
+      .setVersion('1.0')
+      .addTag('auth', 'Authentication endpoints')
+      .addTag('users', 'User management endpoints')
+      .addTag('organizations', 'Organization management endpoints')
+      .addTag('roles', 'Role management endpoints')
+      .addTag(
+        'user-organization-roles',
+        'User-Organization-Role assignment endpoints',
+      )
+      .addTag('permissions', 'Permission aggregation endpoints')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          name: 'JWT',
+          description: 'Enter JWT token',
+          in: 'header',
+        },
+        'access-token',
+      )
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          name: 'Refresh Token',
+          description: 'Enter refresh token',
+          in: 'header',
+        },
+        'refresh-token',
+      )
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  });
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   // Log application startup information
   await app.listen(port);
