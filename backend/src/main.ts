@@ -84,10 +84,12 @@ async function bootstrap() {
     `🚀 Application '${appName}' is running on: http://localhost:${port}`,
     'Bootstrap',
   );
-  Logger.log(
-    `📚 Swagger documentation available at: http://localhost:${port}/api/docs`,
-    'Bootstrap',
-  );
+  if (process.env.NODE_ENV !== 'production') {
+    Logger.log(
+      `📚 Swagger documentation available at: http://localhost:${port}/api/docs`,
+      'Bootstrap',
+    );
+  }
 }
 
 bootstrap();
