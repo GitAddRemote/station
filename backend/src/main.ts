@@ -2,9 +2,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as figlet from 'figlet';
 import * as dotenv from 'dotenv';
+import helmet from 'helmet';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 dotenv.config();
@@ -13,14 +15,22 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Application configuration
-  const port = process.env.PORT || 3001;
-  const appName = process.env.APP_NAME || 'STATION BACKEND';
+  const configService = app.get(ConfigService);
+  const port = configService.get<string>('PORT') || 3001;
+  const appName = configService.get<string>('APP_NAME') || 'STATION BACKEND';
 
   // ASCII Art for Application Name
   console.log(figlet.textSync(appName, { horizontalLayout: 'full' }));
 
-  // Enable CORS (if needed for APIs)
-  app.enableCors();
+  // Security headers — must be registered before other middleware
+  app.use(helmet());
+
+  // CORS — restrict to known origin
+  app.enableCors({
+    origin: configService.get<string>('ALLOWED_ORIGIN'),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
 
   // Global Validation Pipe
   app.useGlobalPipes(
