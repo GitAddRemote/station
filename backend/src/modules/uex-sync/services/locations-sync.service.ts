@@ -129,8 +129,10 @@ export class LocationsSyncService {
         if (i < this.syncOrder.length - 1) {
           await this.sleep(this.pauseBetweenEndpointsMs);
         }
-      } catch (error: any) {
-        this.logger.error(`Failed to sync ${endpoint}: ${error.message}`);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.error(`Failed to sync ${endpoint}: ${errorMessage}`);
         throw error;
       }
     }
@@ -164,7 +166,7 @@ export class LocationsSyncService {
 
       const syncDecision = await this.syncService.shouldUseDeltaSync(endpoint);
       const useDelta = !forceFull && syncDecision.useDelta;
-      const filters: any = {};
+      const filters: Record<string, Date | string | number> = {};
 
       if (useDelta && syncDecision.lastSyncAt) {
         filters.date_modified = syncDecision.lastSyncAt;
@@ -199,16 +201,23 @@ export class LocationsSyncService {
       });
 
       return { ...result, durationMs };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const durationMs = Date.now() - startTime;
-      await this.syncService.recordSyncFailure(endpoint, error, durationMs);
+      await this.syncService.recordSyncFailure(
+        endpoint,
+        error as Error,
+        durationMs,
+      );
       throw error;
     } finally {
       await this.syncService.releaseSyncLock(endpoint);
     }
   }
 
-  private async fetchWithRetry(endpoint: string, filters: any): Promise<any[]> {
+  private async fetchWithRetry(
+    endpoint: string,
+    filters: Record<string, Date | string | number>,
+  ): Promise<unknown[]> {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
@@ -231,8 +240,8 @@ export class LocationsSyncService {
           default:
             throw new Error(`Unknown endpoint: ${endpoint}`);
         }
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
 
         // Don't retry rate limits
         if (error instanceof RateLimitException) {
@@ -263,24 +272,30 @@ export class LocationsSyncService {
 
   private async processLocations(
     endpoint: string,
-    locations: any[],
+    locations: unknown[],
     syncMode: 'delta' | 'full',
   ): Promise<Omit<SyncResult, 'durationMs'>> {
     switch (endpoint) {
       case 'star_systems':
-        return this.syncStarSystems(locations, syncMode);
+        return this.syncStarSystems(
+          locations as UEXStarSystemResponse[],
+          syncMode,
+        );
       case 'planets':
-        return this.syncPlanets(locations, syncMode);
+        return this.syncPlanets(locations as UEXPlanetResponse[], syncMode);
       case 'moons':
-        return this.syncMoons(locations, syncMode);
+        return this.syncMoons(locations as UEXMoonResponse[], syncMode);
       case 'cities':
-        return this.syncCities(locations, syncMode);
+        return this.syncCities(locations as UEXCityResponse[], syncMode);
       case 'space_stations':
-        return this.syncSpaceStations(locations, syncMode);
+        return this.syncSpaceStations(
+          locations as UEXSpaceStationResponse[],
+          syncMode,
+        );
       case 'outposts':
-        return this.syncOutposts(locations, syncMode);
+        return this.syncOutposts(locations as UEXOutpostResponse[], syncMode);
       case 'poi':
-        return this.syncPOI(locations, syncMode);
+        return this.syncPOI(locations as UEXPOIResponse[], syncMode);
       default:
         throw new Error(`Unknown endpoint: ${endpoint}`);
     }
