@@ -53,7 +53,7 @@ export class InventoryAuditLog {
   reason?: string;
 
   @Column({ type: 'jsonb', nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   @CreateDateColumn({ name: 'date_created', type: 'timestamptz' })
   dateCreated!: Date;

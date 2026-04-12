@@ -9,9 +9,9 @@ export interface CreateAuditLogDto {
   action: AuditAction;
   entityType: AuditEntityType;
   entityId?: number;
-  metadata?: Record<string, any>;
-  oldValues?: Record<string, any>;
-  newValues?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
 }
