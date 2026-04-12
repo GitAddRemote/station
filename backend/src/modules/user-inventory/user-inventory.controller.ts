@@ -27,6 +27,11 @@ import {
   UpdateUserInventoryItemDto,
   UserInventorySearchDto,
 } from './dto/user-inventory-item.dto';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
+
+interface QueryParams {
+  [key: string]: string | undefined;
+}
 
 @Controller('api/inventory')
 @UseGuards(JwtAuthGuard)
@@ -37,7 +42,10 @@ export class UserInventoryController {
   ) {}
 
   @Get()
-  async list(@Query() query: Record<string, any>, @Request() req: any) {
+  async list(
+    @Query() query: QueryParams,
+    @Request() req: AuthenticatedRequest,
+  ) {
     const userId = req.user.userId;
     const parsedMinQuantity = Number(
       query.min_quantity ?? query.minQuantity ?? Number.NaN,
@@ -57,11 +65,17 @@ export class UserInventoryController {
       search: query.search,
       limit: query.limit ? Number(query.limit) : undefined,
       offset: query.offset ? Number(query.offset) : undefined,
-      sort: query.sort,
-      order: query.order,
+      sort: query.sort as
+        | 'name'
+        | 'quantity'
+        | 'location'
+        | 'date_added'
+        | 'date_modified'
+        | undefined,
+      order: query.order as 'asc' | 'desc' | undefined,
       sharedOnly:
         query.shared_only !== undefined
-          ? query.shared_only === 'true' || query.shared_only === true
+          ? query.shared_only === 'true'
           : undefined,
       minQuantity: Number.isNaN(parsedMinQuantity)
         ? undefined
@@ -82,7 +96,7 @@ export class UserInventoryController {
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body() createDto: CreateUserInventoryItemDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const userId = req.user.userId;
     return this.userInventoryService.create(userId, createDto);
@@ -92,7 +106,7 @@ export class UserInventoryController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateUserInventoryItemDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const userId = req.user.userId;
     return this.userInventoryService.update(id, userId, updateDto);
@@ -100,7 +114,10 @@ export class UserInventoryController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+  async delete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
     const userId = req.user.userId;
     await this.userInventoryService.delete(id, userId);
   }
@@ -109,7 +126,7 @@ export class UserInventoryController {
   async shareItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
     @Body() shareDto: ShareItemDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     const userId = req.user.userId;
     await this.inventorySharingService.shareItemWithOrg(
@@ -123,7 +140,7 @@ export class UserInventoryController {
   @Delete(':itemId/share')
   async unshareItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     const userId = req.user.userId;
     await this.inventorySharingService.unshareItemFromOrg(userId, itemId);
@@ -135,7 +152,7 @@ export class UserInventoryController {
   @RequirePermission(OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS)
   async getSharedItems(
     @Query('orgId', ParseIntPipe) orgId: number,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const userId = req.user.userId;
     return this.inventorySharingService.findUserSharedItems(userId, orgId);
@@ -145,7 +162,7 @@ export class UserInventoryController {
   @UseGuards(PermissionsGuard)
   @RequirePermission(OrgPermission.CAN_ADMIN_ORG_INVENTORY)
   async getAuditLog(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query('userId') userId?: number,
     @Query('orgId') orgId?: number,
     @Query('limit') limit?: number,

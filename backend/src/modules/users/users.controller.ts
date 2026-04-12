@@ -17,6 +17,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UserDto } from './dto/user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 
 @Controller('users')
 export class UsersController {
@@ -31,10 +32,10 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'))
   @Patch('profile')
   async updateProfile(
-    @Req() req: Request,
+    @Req() req: AuthenticatedRequest,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    const userId = (req.user as any).userId;
+    const userId = req.user.userId;
     return await this.usersService.updateProfile(userId, updateProfileDto);
   }
 
