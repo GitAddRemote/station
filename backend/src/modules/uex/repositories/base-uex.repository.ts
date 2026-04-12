@@ -1,5 +1,27 @@
-import { FindManyOptions, FindOneOptions, Repository } from 'typeorm';
+import {
+  FindManyOptions,
+  FindOneOptions,
+  FindOptionsWhere,
+  Repository,
+} from 'typeorm';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { BaseUexEntity } from '../entities/base-uex.entity';
+
+/**
+ * Update DTO for soft-delete operations
+ */
+interface SoftDeleteUpdate {
+  deleted: true;
+  modifiedById: number;
+}
+
+/**
+ * Update DTO for activation operations
+ */
+interface ActivationUpdate {
+  active: boolean;
+  modifiedById: number;
+}
 
 /**
  * Base repository class for UEX entities
@@ -15,7 +37,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
       where: {
         ...(options?.where || {}),
         deleted: false,
-      } as any,
+      } as FindOptionsWhere<T>,
     });
   }
 
@@ -29,7 +51,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
         ...(options?.where || {}),
         deleted: false,
         active: true,
-      } as any,
+      } as FindOptionsWhere<T>,
     });
   }
 
@@ -42,7 +64,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
       where: {
         ...(options.where || {}),
         deleted: false,
-      } as any,
+      } as FindOptionsWhere<T>,
     });
   }
 
@@ -56,7 +78,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
         ...(options.where || {}),
         deleted: false,
         active: true,
-      } as any,
+      } as FindOptionsWhere<T>,
     });
   }
 
@@ -65,7 +87,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
    */
   async findByUexId(uexId: number): Promise<T | null> {
     return this.findOneActive({
-      where: { uexId } as any,
+      where: { uexId } as FindOptionsWhere<T>,
     });
   }
 
@@ -73,22 +95,24 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
    * Mark record as soft deleted
    */
   async markAsDeleted(id: number, modifiedBy: number): Promise<void> {
-    await this.update(id, {
+    const updateData: SoftDeleteUpdate = {
       deleted: true,
       modifiedById: modifiedBy,
-    } as any);
+    };
+    await this.update(id, updateData as unknown as QueryDeepPartialEntity<T>);
   }
 
   /**
    * Mark record as soft deleted by UEX ID
    */
   async markAsDeletedByUexId(uexId: number, modifiedBy: number): Promise<void> {
+    const updateData: SoftDeleteUpdate = {
+      deleted: true,
+      modifiedById: modifiedBy,
+    };
     await this.update(
-      { uexId } as any,
-      {
-        deleted: true,
-        modifiedById: modifiedBy,
-      } as any,
+      { uexId } as FindOptionsWhere<T>,
+      updateData as unknown as QueryDeepPartialEntity<T>,
     );
   }
 
@@ -96,19 +120,21 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
    * Mark record as inactive
    */
   async deactivate(id: number, modifiedBy: number): Promise<void> {
-    await this.update(id, {
+    const updateData: ActivationUpdate = {
       active: false,
       modifiedById: modifiedBy,
-    } as any);
+    };
+    await this.update(id, updateData as unknown as QueryDeepPartialEntity<T>);
   }
 
   /**
    * Mark record as active
    */
   async activate(id: number, modifiedBy: number): Promise<void> {
-    await this.update(id, {
+    const updateData: ActivationUpdate = {
       active: true,
       modifiedById: modifiedBy,
-    } as any);
+    };
+    await this.update(id, updateData as unknown as QueryDeepPartialEntity<T>);
   }
 }
