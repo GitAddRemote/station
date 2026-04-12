@@ -25,6 +25,9 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/password-reset.dto';
+import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
+import { RefreshTokenRequest } from './interfaces/refresh-token-request.interface';
+import { ValidatedUser } from './interfaces/validated-user.interface';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -45,7 +48,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Request() req: ExpressRequest) {
+  async login(@Request() req: ExpressRequest & { user: ValidatedUser }) {
     return this.authService.login(req.user);
   }
 
@@ -64,7 +67,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   @UseGuards(RefreshTokenAuthGuard)
   @Post('refresh')
-  async refresh(@Request() req: any) {
+  async refresh(@Request() req: RefreshTokenRequest) {
     const refreshToken = req.user.refreshToken;
     return this.authService.refreshAccessToken(refreshToken);
   }
@@ -75,7 +78,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   @UseGuards(RefreshTokenAuthGuard)
   @Post('logout')
-  async logout(@Request() req: any) {
+  async logout(@Request() req: RefreshTokenRequest) {
     const refreshToken = req.user.refreshToken;
     await this.authService.revokeRefreshToken(refreshToken);
     return { message: 'Logged out successfully' };
@@ -112,7 +115,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   async changePassword(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     const userId = req.user.userId;
