@@ -7,8 +7,13 @@ import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 describe('AuthService - Password Reset', () => {
   let service: AuthService;
@@ -340,6 +345,110 @@ describe('AuthService - Password Reset', () => {
       // Verify the hash matches the password
       const matches = await bcrypt.compare('newPassword123', hashedPassword);
       expect(matches).toBe(true);
+    });
+  });
+
+  describe('refresh token hashing', () => {
+    function sha256(raw: string): string {
+      return crypto.createHash('sha256').update(raw).digest('hex');
+    }
+
+    describe('generateRefreshToken', () => {
+      it('should return the raw token, not the hash', async () => {
+        mockRefreshTokenRepository.save.mockResolvedValue({});
+
+        const raw = await service.generateRefreshToken(mockUser.id);
+
+        // 32 random bytes encoded as hex = 64 chars
+        expect(raw).toMatch(/^[0-9a-f]{64}$/);
+      });
+
+      it('should persist the SHA-256 hash, not the raw token', async () => {
+        let savedData: any;
+        mockRefreshTokenRepository.save.mockImplementation((data) => {
+          savedData = data;
+          return Promise.resolve(data);
+        });
+
+        const raw = await service.generateRefreshToken(mockUser.id);
+
+        expect(savedData.token).toBe(sha256(raw));
+        expect(savedData.token).not.toBe(raw);
+      });
+
+      it('should set expiry 7 days from now', async () => {
+        const now = Date.now();
+        let savedData: any;
+        mockRefreshTokenRepository.save.mockImplementation((data) => {
+          savedData = data;
+          return Promise.resolve(data);
+        });
+
+        await service.generateRefreshToken(mockUser.id);
+
+        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+        expect(
+          Math.abs(savedData.expiresAt.getTime() - (now + sevenDaysMs)),
+        ).toBeLessThan(1000);
+      });
+    });
+
+    describe('refreshAccessToken', () => {
+      it('should query the repository using the SHA-256 hash of the presented token', async () => {
+        const rawToken = 'a'.repeat(64);
+        const storedToken = {
+          id: 1,
+          token: sha256(rawToken),
+          revoked: false,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          user: mockUser,
+          userId: mockUser.id,
+        };
+
+        mockRefreshTokenRepository.findOne.mockResolvedValue(storedToken);
+        mockRefreshTokenRepository.update.mockResolvedValue({ affected: 1 });
+        mockRefreshTokenRepository.save.mockResolvedValue({});
+        mockJwtService.sign.mockReturnValue('new-access-token');
+
+        await service.refreshAccessToken(rawToken);
+
+        expect(mockRefreshTokenRepository.findOne).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { token: sha256(rawToken) } }),
+        );
+      });
+
+      it('should reject a token that has no matching hash in the database', async () => {
+        mockRefreshTokenRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.refreshAccessToken('plaintext-token'),
+        ).rejects.toThrow(UnauthorizedException);
+      });
+    });
+
+    describe('revokeRefreshToken', () => {
+      it('should update using the SHA-256 hash of the presented token', async () => {
+        const rawToken = 'b'.repeat(64);
+        mockRefreshTokenRepository.update.mockResolvedValue({ affected: 1 });
+
+        await service.revokeRefreshToken(rawToken);
+
+        expect(mockRefreshTokenRepository.update).toHaveBeenCalledWith(
+          { token: sha256(rawToken) },
+          { revoked: true },
+        );
+      });
+
+      it('should not pass the raw token to the repository', async () => {
+        const rawToken = 'plaintext-token';
+        mockRefreshTokenRepository.update.mockResolvedValue({ affected: 0 });
+
+        await service.revokeRefreshToken(rawToken);
+
+        const callArg = mockRefreshTokenRepository.update.mock.calls[0][0];
+        expect(callArg.token).toBe(sha256(rawToken));
+        expect(callArg.token).not.toBe(rawToken);
+      });
     });
   });
 });
