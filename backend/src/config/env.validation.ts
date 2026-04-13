@@ -29,14 +29,12 @@ export const envValidationSchema = Joi.object({
   FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
 
   // UEX Sync (all optional — service degrades gracefully when disabled)
-  UEX_SYNC_ENABLED: Joi.string().valid('true', 'false').default('false'),
-  UEX_CATEGORIES_SYNC_ENABLED: Joi.string()
-    .valid('true', 'false')
-    .default('false'),
-  UEX_ITEMS_SYNC_ENABLED: Joi.string().valid('true', 'false').default('false'),
-  UEX_LOCATIONS_SYNC_ENABLED: Joi.string()
-    .valid('true', 'false')
-    .default('false'),
+  // Use Joi.boolean() so env strings like 'false' are coerced to actual
+  // booleans; configService.get<boolean>(...) in the scheduler relies on this.
+  UEX_SYNC_ENABLED: Joi.boolean().default(false),
+  UEX_CATEGORIES_SYNC_ENABLED: Joi.boolean().default(false),
+  UEX_ITEMS_SYNC_ENABLED: Joi.boolean().default(false),
+  UEX_LOCATIONS_SYNC_ENABLED: Joi.boolean().default(false),
   UEX_API_BASE_URL: Joi.string().uri().default('https://uexcorp.space/api/2.0'),
   UEX_TIMEOUT_MS: Joi.number().default(60000),
   UEX_BATCH_SIZE: Joi.number().default(100),
