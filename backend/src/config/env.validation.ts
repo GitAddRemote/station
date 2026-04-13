@@ -23,9 +23,21 @@ export const envValidationSchema = Joi.object({
   REDIS_PORT: Joi.number().default(6379),
   USE_REDIS_CACHE: Joi.string().valid('true', 'false').default('true'),
 
-  // CORS / Frontend
-  ALLOWED_ORIGIN: Joi.string().uri().default('http://localhost:5173'),
-  FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
+  // CORS / Frontend — required in production; default to localhost in dev/test
+  ALLOWED_ORIGIN: Joi.string()
+    .uri()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.default('http://localhost:5173'),
+    }),
+  FRONTEND_URL: Joi.string()
+    .uri()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.default('http://localhost:5173'),
+    }),
 
   // UEX Sync (all optional — service degrades gracefully when disabled)
   // Use Joi.boolean() so env strings like 'false' are coerced to actual

@@ -15,11 +15,13 @@ import {
   ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 import { UserDto } from '../users/dto/user.dto';
+import { User } from '../users/user.entity';
 import { Request as ExpressRequest, Response } from 'express';
 import {
   ChangePasswordDto,
@@ -30,12 +32,15 @@ import {
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+  ) {}
 
   private cookieOptions(maxAge: number) {
     return {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
       sameSite: 'strict' as const,
       path: '/',
       maxAge,
@@ -61,7 +66,7 @@ export class AuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const user = req.user as Parameters<typeof this.authService.login>[0];
+    const user = req.user as Omit<User, 'password'>;
     const tokens = await this.authService.login(user);
     res.cookie(
       'access_token',
