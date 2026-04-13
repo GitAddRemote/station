@@ -50,6 +50,7 @@
     "cache-manager-redis-yet": "^5.1.5",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "cron": "^4.3.3",
     "dotenv": "^16.4.5",
     "figlet": "^1.8.0",
     "passport": "^0.7.0",
