@@ -16,7 +16,7 @@ async function bootstrap() {
 
   // Application configuration
   const configService = app.get(ConfigService);
-  const port = configService.get<string>('PORT') || 3001;
+  const port = configService.get<number>('PORT') ?? 3001;
   const appName = configService.get<string>('APP_NAME') || 'STATION BACKEND';
 
   // ASCII Art for Application Name

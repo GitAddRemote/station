@@ -37,7 +37,8 @@ describe('Roles (e2e)', () => {
       .send({
         username: 'testuser',
         password: 'password123',
-      });
+      })
+      .expect(201);
 
     const setCookies = loginResponse.headers[
       'set-cookie'

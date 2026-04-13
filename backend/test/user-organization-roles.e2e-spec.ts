@@ -41,8 +41,10 @@ describe('UserOrganizationRoles (e2e)', () => {
         username: 'roleuser',
         email: 'roleuser@example.com',
         password: 'password123',
-      });
+      })
+      .expect(201);
 
+    expect(registerResponse.body.id).toBeDefined();
     userId = registerResponse.body.id;
 
     const loginResponse = await request(app.getHttpServer())
@@ -66,7 +68,8 @@ describe('UserOrganizationRoles (e2e)', () => {
       .send({
         name: 'Test Organization',
         description: 'For role testing',
-      });
+      })
+      .expect(201);
 
     organizationId = orgResponse.body.id;
 
@@ -80,7 +83,8 @@ describe('UserOrganizationRoles (e2e)', () => {
           canEdit: true,
           canDelete: false,
         },
-      });
+      })
+      .expect(201);
 
     roleId = roleResponse.body.id;
   });
