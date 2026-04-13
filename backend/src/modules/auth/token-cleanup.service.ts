@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
 
@@ -15,7 +14,6 @@ export class TokenCleanupService {
     private readonly refreshTokenRepository: Repository<RefreshToken>,
     @InjectRepository(PasswordReset)
     private readonly passwordResetRepository: Repository<PasswordReset>,
-    private readonly configService: ConfigService,
   ) {}
 
   @Cron(
@@ -36,7 +34,7 @@ export class TokenCleanupService {
       const { affected: refreshDeleted } = await this.refreshTokenRepository
         .createQueryBuilder()
         .delete()
-        .where('revoked = :revoked OR expires_at < :now', {
+        .where('revoked = :revoked OR "expiresAt" < :now', {
           revoked: true,
           now,
         })
@@ -45,7 +43,7 @@ export class TokenCleanupService {
       const { affected: resetDeleted } = await this.passwordResetRepository
         .createQueryBuilder()
         .delete()
-        .where('used = :used OR expires_at < :now', { used: true, now })
+        .where('used = :used OR "expiresAt" < :now', { used: true, now })
         .execute();
 
       const duration = Date.now() - start;
