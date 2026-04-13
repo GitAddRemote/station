@@ -18,7 +18,18 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') ?? 3001;
   const appName = configService.get<string>('APP_NAME') ?? 'STATION BACKEND';
-  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+
+  const nodeEnv = configService.get<string>('NODE_ENV');
+  const validNodeEnvs = ['production', 'development', 'test'] as const;
+  if (
+    !nodeEnv ||
+    !validNodeEnvs.includes(nodeEnv as (typeof validNodeEnvs)[number])
+  ) {
+    throw new Error(
+      `Invalid NODE_ENV value: ${nodeEnv ?? 'undefined'}. Expected one of: ${validNodeEnvs.join(', ')}`,
+    );
+  }
+  const isProduction = nodeEnv === 'production';
 
   // ASCII Art for Application Name
   console.log(figlet.textSync(appName, { horizontalLayout: 'full' }));
