@@ -15,7 +15,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
-describe('AuthService - Password Reset', () => {
+describe('AuthService', () => {
   let service: AuthService;
 
   const mockUser = {
