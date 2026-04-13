@@ -16,15 +16,16 @@ async function bootstrap() {
 
   // Application configuration
   const configService = app.get(ConfigService);
-  const port = configService.get<string>('PORT') || 3001;
-  const appName = configService.get<string>('APP_NAME') || 'STATION BACKEND';
-  const isProduction = process.env.NODE_ENV === 'production';
+  const port = configService.get<number>('PORT') ?? 3001;
+  const appName = configService.get<string>('APP_NAME') ?? 'STATION BACKEND';
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
 
   // ASCII Art for Application Name
   console.log(figlet.textSync(appName, { horizontalLayout: 'full' }));
 
   // Security headers — Swagger UI requires 'unsafe-inline' for scripts/styles,
   // but Swagger is disabled in production so production uses a strict CSP.
+  // frameguard and hsts are set explicitly to meet security requirements.
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -38,11 +39,17 @@ async function bootstrap() {
           fontSrc: [`'self'`, 'https:', 'data:'],
         },
       },
+      frameguard: { action: 'deny' },
+      hsts: isProduction
+        ? { maxAge: 31536000, includeSubDomains: true }
+        : false,
     }),
   );
 
-  // CORS — require ALLOWED_ORIGIN in production; fall back to localhost in dev
-  const allowedOrigin = configService.get<string>('ALLOWED_ORIGIN')?.trim();
+  // CORS — require ALLOWED_ORIGIN in production; fall back to localhost in dev.
+  // Use || (not ??) so a whitespace-only value is treated the same as unset.
+  const allowedOrigin =
+    configService.get<string>('ALLOWED_ORIGIN')?.trim() || undefined;
   if (!allowedOrigin && isProduction) {
     throw new Error('Missing required environment variable: ALLOWED_ORIGIN');
   }
@@ -65,7 +72,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   // Swagger/OpenAPI Documentation — development only
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProduction) {
     const config = new DocumentBuilder()
       .setTitle('Station API')
       .setDescription(
@@ -114,7 +121,7 @@ async function bootstrap() {
     `🚀 Application '${appName}' is running on: http://localhost:${port}`,
     'Bootstrap',
   );
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProduction) {
     Logger.log(
       `📚 Swagger documentation available at: http://localhost:${port}/api/docs`,
       'Bootstrap',
