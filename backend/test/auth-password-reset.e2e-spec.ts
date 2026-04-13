@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
 import { User } from '../src/modules/users/user.entity';
@@ -12,7 +13,7 @@ describe('Auth - Password Reset (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let testUser: User;
-  let accessToken: string;
+  let authCookie: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -20,6 +21,7 @@ describe('Auth - Password Reset (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -44,7 +46,7 @@ describe('Auth - Password Reset (e2e)', () => {
       isActive: true,
     });
 
-    // Login to get access token
+    // Login to get access token cookie
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({
@@ -53,7 +55,12 @@ describe('Auth - Password Reset (e2e)', () => {
       })
       .expect(201);
 
-    accessToken = loginResponse.body.access_token;
+    const setCookies = loginResponse.headers[
+      'set-cookie'
+    ] as unknown as string[];
+    authCookie =
+      setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
+      '';
   });
 
   afterAll(async () => {
@@ -252,7 +259,7 @@ describe('Auth - Password Reset (e2e)', () => {
 
       const response = await request(app.getHttpServer())
         .post('/auth/change-password')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Cookie', authCookie)
         .send({
           currentPassword,
           newPassword,
@@ -279,7 +286,7 @@ describe('Auth - Password Reset (e2e)', () => {
     it('should reject incorrect current password', async () => {
       await request(app.getHttpServer())
         .post('/auth/change-password')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Cookie', authCookie)
         .send({
           currentPassword: 'wrongPassword',
           newPassword: 'newPassword789',
@@ -300,7 +307,7 @@ describe('Auth - Password Reset (e2e)', () => {
     it('should reject invalid access token', async () => {
       await request(app.getHttpServer())
         .post('/auth/change-password')
-        .set('Authorization', 'Bearer invalid-token')
+        .set('Cookie', 'access_token=invalid-token')
         .send({
           currentPassword: 'password123',
           newPassword: 'newPassword789',
@@ -311,7 +318,7 @@ describe('Auth - Password Reset (e2e)', () => {
     it('should reject missing currentPassword', async () => {
       await request(app.getHttpServer())
         .post('/auth/change-password')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Cookie', authCookie)
         .send({
           newPassword: 'newPassword789',
         })
@@ -321,7 +328,7 @@ describe('Auth - Password Reset (e2e)', () => {
     it('should reject missing newPassword', async () => {
       await request(app.getHttpServer())
         .post('/auth/change-password')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Cookie', authCookie)
         .send({
           currentPassword: 'password123',
         })
@@ -331,7 +338,7 @@ describe('Auth - Password Reset (e2e)', () => {
     it('should reject newPassword shorter than 6 characters', async () => {
       await request(app.getHttpServer())
         .post('/auth/change-password')
-        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Cookie', authCookie)
         .send({
           currentPassword: 'password123',
           newPassword: '12345',

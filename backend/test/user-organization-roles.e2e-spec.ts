@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { DatabaseSeederService } from '../src/database/seeds/database-seeder.service';
 import { DataSource } from 'typeorm';
@@ -8,7 +9,7 @@ import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('UserOrganizationRoles (e2e)', () => {
   let app: INestApplication;
-  let authToken: string;
+  let authCookie: string;
   let userId: number;
   let organizationId: number;
   let roleId: number;
@@ -19,6 +20,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
 
@@ -46,13 +48,18 @@ describe('UserOrganizationRoles (e2e)', () => {
         password: 'password123',
       });
 
-    authToken = loginResponse.body.access_token;
+    const setCookies = loginResponse.headers[
+      'set-cookie'
+    ] as unknown as string[];
+    authCookie =
+      setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
+      '';
     userId = loginResponse.body.userId || 1;
 
     // Create a test organization
     const orgResponse = await request(app.getHttpServer())
       .post('/organizations')
-      .set('Authorization', `Bearer ${authToken}`)
+      .set('Cookie', authCookie)
       .send({
         name: 'Test Organization',
         description: 'For role testing',
@@ -63,7 +70,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     // Create a test role
     const roleResponse = await request(app.getHttpServer())
       .post('/roles')
-      .set('Authorization', `Bearer ${authToken}`)
+      .set('Cookie', authCookie)
       .send({
         name: 'Test Role',
         permissions: {
@@ -83,7 +90,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     it('should assign a role to a user in an organization', () => {
       return request(app.getHttpServer())
         .post('/user-organization-roles/assign')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           userId,
           organizationId,
@@ -101,7 +108,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     it('should fail to assign duplicate role', () => {
       return request(app.getHttpServer())
         .post('/user-organization-roles/assign')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           userId,
           organizationId,
@@ -113,7 +120,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     it('should fail with invalid user', () => {
       return request(app.getHttpServer())
         .post('/user-organization-roles/assign')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           userId: 99999,
           organizationId,
@@ -128,7 +135,7 @@ describe('UserOrganizationRoles (e2e)', () => {
       // Create additional roles
       const role2Response = await request(app.getHttpServer())
         .post('/roles')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           name: 'Developer Role',
           permissions: { canDeploy: true },
@@ -136,7 +143,7 @@ describe('UserOrganizationRoles (e2e)', () => {
 
       const role3Response = await request(app.getHttpServer())
         .post('/roles')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           name: 'Viewer Role',
           permissions: { canView: true },
@@ -144,7 +151,7 @@ describe('UserOrganizationRoles (e2e)', () => {
 
       return request(app.getHttpServer())
         .post('/user-organization-roles/assign-multiple')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           userId,
           organizationId,
@@ -164,7 +171,7 @@ describe('UserOrganizationRoles (e2e)', () => {
         .get(
           `/user-organization-roles/user/${userId}/organization/${organizationId}`,
         )
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(Array.isArray(response.body)).toBe(true);
@@ -178,7 +185,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     it('should get all organizations for a user', () => {
       return request(app.getHttpServer())
         .get(`/user-organization-roles/user/${userId}/organizations`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(Array.isArray(response.body)).toBe(true);
@@ -193,7 +200,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     it('should get all members of an organization', () => {
       return request(app.getHttpServer())
         .get(`/user-organization-roles/organization/${organizationId}/members`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(Array.isArray(response.body)).toBe(true);
@@ -210,7 +217,7 @@ describe('UserOrganizationRoles (e2e)', () => {
         .get(
           `/user-organization-roles/organization/${organizationId}/role/${roleId}/users`,
         )
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(Array.isArray(response.body)).toBe(true);
@@ -226,7 +233,7 @@ describe('UserOrganizationRoles (e2e)', () => {
         .delete(
           `/user-organization-roles/user/${userId}/organization/${organizationId}/role/${roleId}`,
         )
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(204);
     });
 
@@ -235,7 +242,7 @@ describe('UserOrganizationRoles (e2e)', () => {
         .delete(
           `/user-organization-roles/user/${userId}/organization/${organizationId}/role/99999`,
         )
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(404);
     });
   });
@@ -245,7 +252,7 @@ describe('UserOrganizationRoles (e2e)', () => {
       // First assign a role
       await request(app.getHttpServer())
         .post('/user-organization-roles/assign')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           userId,
           organizationId,
@@ -254,7 +261,7 @@ describe('UserOrganizationRoles (e2e)', () => {
 
       return request(app.getHttpServer())
         .get(`/permissions/user/${userId}/organization/${organizationId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(response.body).toHaveProperty('permissions');
