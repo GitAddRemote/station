@@ -190,14 +190,40 @@ describe('TokenCleanupService', () => {
       ).not.toHaveBeenCalled();
     });
 
+    it('should return early when JEST_WORKER_ID is set without touching the database', async () => {
+      const originalWorker = process.env['JEST_WORKER_ID'];
+      process.env['JEST_WORKER_ID'] = '1';
+      mockConfigService.get.mockImplementation((key: string) =>
+        key === 'NODE_ENV' ? 'development' : undefined,
+      );
+
+      await service.cleanupExpiredTokens();
+
+      expect(
+        mockRefreshTokenRepository.createQueryBuilder,
+      ).not.toHaveBeenCalled();
+      expect(
+        mockPasswordResetRepository.createQueryBuilder,
+      ).not.toHaveBeenCalled();
+      process.env['JEST_WORKER_ID'] = originalWorker;
+    });
+
     describe('in a non-test environment', () => {
+      let originalWorker: string | undefined;
+
       beforeEach(() => {
+        originalWorker = process.env['JEST_WORKER_ID'];
+        delete process.env['JEST_WORKER_ID'];
         mockConfigService.get.mockImplementation((key: string) =>
           key === 'NODE_ENV' ? 'development' : undefined,
         );
         mockQueryBuilder.execute
           .mockResolvedValueOnce({ affected: 3 })
           .mockResolvedValueOnce({ affected: 1 });
+      });
+
+      afterEach(() => {
+        process.env['JEST_WORKER_ID'] = originalWorker;
       });
 
       it('should delete revoked and expired refresh tokens', async () => {

@@ -45,6 +45,8 @@ export class TokenCleanupService implements OnApplicationBootstrap {
       ?.trim();
     const cronExpression = rawExpression || '0 3 * * *';
 
+    const defaultExpression = '0 3 * * *';
+    let effectiveExpression = cronExpression;
     let job: CronJob;
     try {
       job = new CronJob(cronExpression, () => {
@@ -53,20 +55,24 @@ export class TokenCleanupService implements OnApplicationBootstrap {
     } catch {
       this.logger.warn(
         `Invalid REFRESH_TOKEN_CLEANUP_CRON value "${cronExpression}", ` +
-          `falling back to default "0 3 * * *"`,
+          `falling back to default "${defaultExpression}"`,
       );
-      job = new CronJob('0 3 * * *', () => {
+      effectiveExpression = defaultExpression;
+      job = new CronJob(defaultExpression, () => {
         void this.cleanupExpiredTokens();
       });
     }
 
     this.schedulerRegistry.addCronJob('tokenCleanup', job);
     job.start();
-    this.logger.log(`Token cleanup cron registered: ${cronExpression}`);
+    this.logger.log(`Token cleanup cron registered: ${effectiveExpression}`);
   }
 
   async cleanupExpiredTokens(): Promise<void> {
-    if (this.configService.get<string>('NODE_ENV') === 'test') {
+    if (
+      this.configService.get<string>('NODE_ENV') === 'test' ||
+      process.env['JEST_WORKER_ID'] !== undefined
+    ) {
       return;
     }
 
