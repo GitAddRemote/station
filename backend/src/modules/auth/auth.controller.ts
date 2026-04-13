@@ -114,12 +114,7 @@ export class AuthController {
   @Post('logout')
   async logout(@Request() req: any, @Res({ passthrough: true }) res: Response) {
     await this.authService.revokeRefreshToken(req.user.refreshToken);
-    const clearOpts = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
-      path: '/',
-    };
+    const { maxAge: _maxAge, ...clearOpts } = this.cookieOptions(0);
     res.clearCookie('access_token', clearOpts);
     res.clearCookie('refresh_token', clearOpts);
     return { message: 'Logged out successfully' };
@@ -148,7 +143,7 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Change password (requires authentication)' })
-  @ApiBearerAuth()
+  @ApiBearerAuth('access-token')
   @ApiBody({ type: ChangePasswordDto })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 400, description: 'Current password is incorrect' })

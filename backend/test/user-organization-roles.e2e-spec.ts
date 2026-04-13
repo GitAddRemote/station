@@ -35,11 +35,15 @@ describe('UserOrganizationRoles (e2e)', () => {
     await seeder.seedAll();
 
     // Register and login a test user
-    await request(app.getHttpServer()).post('/auth/register').send({
-      username: 'roleuser',
-      email: 'roleuser@example.com',
-      password: 'password123',
-    });
+    const registerResponse = await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        username: 'roleuser',
+        email: 'roleuser@example.com',
+        password: 'password123',
+      });
+
+    userId = registerResponse.body.id;
 
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
@@ -54,7 +58,6 @@ describe('UserOrganizationRoles (e2e)', () => {
     authCookie =
       setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
       '';
-    userId = loginResponse.body.userId || 1;
 
     // Create a test organization
     const orgResponse = await request(app.getHttpServer())
