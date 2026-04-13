@@ -55,7 +55,9 @@ describe('Auth - Password Reset (e2e)', () => {
       })
       .expect(201);
 
-    const setCookies = loginResponse.headers['set-cookie'] as string[];
+    const setCookies = loginResponse.headers[
+      'set-cookie'
+    ] as unknown as string[];
     authCookie =
       setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
       '';

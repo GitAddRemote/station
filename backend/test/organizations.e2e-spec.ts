@@ -46,7 +46,9 @@ describe('Organizations (e2e)', () => {
         password: 'password123',
       });
 
-    const setCookies = loginResponse.headers['set-cookie'] as string[];
+    const setCookies = loginResponse.headers[
+      'set-cookie'
+    ] as unknown as string[];
     authCookie =
       setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
       '';
