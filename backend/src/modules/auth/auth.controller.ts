@@ -5,6 +5,8 @@ import {
   Request,
   Body,
   Res,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -53,6 +55,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @UseGuards(LocalAuthGuard)
+  @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(
     @Request() req: ExpressRequest,
@@ -86,6 +89,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Tokens refreshed successfully' })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   @UseGuards(RefreshTokenAuthGuard)
+  @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(
     @Request() req: any,
@@ -111,6 +115,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Successfully logged out' })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   @UseGuards(RefreshTokenAuthGuard)
+  @HttpCode(HttpStatus.OK)
   @Post('logout')
   async logout(@Request() req: any, @Res({ passthrough: true }) res: Response) {
     await this.authService.revokeRefreshToken(req.user.refreshToken);
@@ -127,6 +132,7 @@ export class AuthController {
     description:
       'If an account with that email exists, a password reset link has been sent',
   })
+  @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.requestPasswordReset(forgotPasswordDto.email);
@@ -136,6 +142,7 @@ export class AuthController {
   @ApiBody({ type: ResetPasswordDto })
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @HttpCode(HttpStatus.OK)
   @Post('reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     const { token, newPassword } = resetPasswordDto;
@@ -149,6 +156,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Current password is incorrect' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
   @Post('change-password')
   async changePassword(
     @Request() req: any,

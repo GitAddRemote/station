@@ -53,14 +53,17 @@ describe('Auth - Password Reset (e2e)', () => {
         username: 'testuser',
         password: 'password123',
       })
-      .expect(201);
+      .expect(200);
 
     const setCookies = loginResponse.headers[
       'set-cookie'
     ] as unknown as string[];
-    authCookie =
-      setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
-      '';
+    expect(Array.isArray(setCookies)).toBe(true);
+    const accessTokenCookie = setCookies.find((c) =>
+      c.startsWith('access_token='),
+    );
+    expect(accessTokenCookie).toBeDefined();
+    authCookie = accessTokenCookie!.split(';')[0];
   });
 
   afterAll(async () => {
@@ -79,7 +82,7 @@ describe('Auth - Password Reset (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/auth/forgot-password')
         .send({ email: 'test@example.com' })
-        .expect(201);
+        .expect(200);
 
       expect(response.body).toHaveProperty('message');
       expect(response.body.message).toContain(
@@ -102,7 +105,7 @@ describe('Auth - Password Reset (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post('/auth/forgot-password')
         .send({ email: 'nonexistent@example.com' })
-        .expect(201);
+        .expect(200);
 
       expect(response.body.message).toContain(
         'If an account with that email exists',
@@ -148,7 +151,7 @@ describe('Auth - Password Reset (e2e)', () => {
           token: validToken,
           newPassword,
         })
-        .expect(201);
+        .expect(200);
 
       expect(response.body.message).toContain('reset successfully');
 
@@ -167,7 +170,7 @@ describe('Auth - Password Reset (e2e)', () => {
           username: 'testuser',
           password: newPassword,
         })
-        .expect(201);
+        .expect(200);
 
       // Reset password back for other tests
       const hashedPassword = await bcrypt.hash('password123', 10);
@@ -264,7 +267,7 @@ describe('Auth - Password Reset (e2e)', () => {
           currentPassword,
           newPassword,
         })
-        .expect(201);
+        .expect(200);
 
       expect(response.body.message).toContain('changed successfully');
 
@@ -275,7 +278,7 @@ describe('Auth - Password Reset (e2e)', () => {
           username: 'testuser',
           password: newPassword,
         })
-        .expect(201);
+        .expect(200);
 
       // Reset password back for other tests
       const hashedPassword = await bcrypt.hash('password123', 10);

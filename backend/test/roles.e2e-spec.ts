@@ -38,14 +38,17 @@ describe('Roles (e2e)', () => {
         username: 'testuser',
         password: 'password123',
       })
-      .expect(201);
+      .expect(200);
 
     const setCookies = loginResponse.headers[
       'set-cookie'
     ] as unknown as string[];
-    authCookie =
-      setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
-      '';
+    expect(Array.isArray(setCookies)).toBe(true);
+    const accessTokenCookie = setCookies.find((c) =>
+      c.startsWith('access_token='),
+    );
+    expect(accessTokenCookie).toBeDefined();
+    authCookie = accessTokenCookie!.split(';')[0];
   });
 
   afterAll(async () => {
