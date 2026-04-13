@@ -30,6 +30,16 @@ import {
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  private cookieOptions(maxAge: number) {
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      path: '/',
+      maxAge,
+    };
+  }
+
   @ApiOperation({ summary: 'Login user' })
   @ApiBody({
     schema: {
@@ -48,25 +58,19 @@ export class AuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const tokens = await this.authService.login(
-      req.user as Parameters<typeof this.authService.login>[0],
+    const user = req.user as Parameters<typeof this.authService.login>[0];
+    const tokens = await this.authService.login(user);
+    res.cookie(
+      'access_token',
+      tokens.accessToken,
+      this.cookieOptions(15 * 60 * 1000),
     );
-    const isProduction = process.env.NODE_ENV === 'production';
-    const cookieBase = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax' as const,
-      path: '/',
-    };
-    res.cookie('access_token', tokens.accessToken, {
-      ...cookieBase,
-      maxAge: 15 * 60 * 1000,
-    });
-    res.cookie('refresh_token', tokens.refreshToken, {
-      ...cookieBase,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-    return { message: 'Login successful' };
+    res.cookie(
+      'refresh_token',
+      tokens.refreshToken,
+      this.cookieOptions(7 * 24 * 60 * 60 * 1000),
+    );
+    return { message: 'Login successful', username: user.username };
   }
 
   @ApiOperation({ summary: 'Register new user' })
@@ -90,21 +94,16 @@ export class AuthController {
     const tokens = await this.authService.refreshAccessToken(
       req.user.refreshToken,
     );
-    const isProduction = process.env.NODE_ENV === 'production';
-    const cookieBase = {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax' as const,
-      path: '/',
-    };
-    res.cookie('access_token', tokens.accessToken, {
-      ...cookieBase,
-      maxAge: 15 * 60 * 1000,
-    });
-    res.cookie('refresh_token', tokens.refreshToken, {
-      ...cookieBase,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie(
+      'access_token',
+      tokens.accessToken,
+      this.cookieOptions(15 * 60 * 1000),
+    );
+    res.cookie(
+      'refresh_token',
+      tokens.refreshToken,
+      this.cookieOptions(7 * 24 * 60 * 60 * 1000),
+    );
     return { message: 'Tokens refreshed successfully' };
   }
 
@@ -115,8 +114,14 @@ export class AuthController {
   @Post('logout')
   async logout(@Request() req: any, @Res({ passthrough: true }) res: Response) {
     await this.authService.revokeRefreshToken(req.user.refreshToken);
-    res.clearCookie('access_token', { path: '/' });
-    res.clearCookie('refresh_token', { path: '/' });
+    const clearOpts = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      path: '/',
+    };
+    res.clearCookie('access_token', clearOpts);
+    res.clearCookie('refresh_token', clearOpts);
     return { message: 'Logged out successfully' };
   }
 

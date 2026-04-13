@@ -1,13 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
 import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('Roles (e2e)', () => {
   let app: INestApplication;
-  let authToken: string;
+  let authCookie: string;
   let createdRoleId: number;
 
   beforeAll(async () => {
@@ -16,6 +17,7 @@ describe('Roles (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
 
@@ -37,7 +39,10 @@ describe('Roles (e2e)', () => {
         password: 'password123',
       });
 
-    authToken = loginResponse.body.access_token;
+    const setCookies = loginResponse.headers['set-cookie'] as string[];
+    authCookie =
+      setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
+      '';
   });
 
   afterAll(async () => {
@@ -48,7 +53,7 @@ describe('Roles (e2e)', () => {
     it('should create a new role', () => {
       return request(app.getHttpServer())
         .post('/roles')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           name: 'Test Admin',
           description: 'Test administrator role',
@@ -73,7 +78,7 @@ describe('Roles (e2e)', () => {
     it('should fail to create role with duplicate name', () => {
       return request(app.getHttpServer())
         .post('/roles')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           name: 'Test Admin',
           description: 'Duplicate role',
@@ -95,7 +100,7 @@ describe('Roles (e2e)', () => {
     it('should return all roles', () => {
       return request(app.getHttpServer())
         .get('/roles')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(Array.isArray(response.body)).toBe(true);
@@ -108,7 +113,7 @@ describe('Roles (e2e)', () => {
     it('should return a specific role', () => {
       return request(app.getHttpServer())
         .get(`/roles/${createdRoleId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(response.body.id).toBe(createdRoleId);
@@ -119,7 +124,7 @@ describe('Roles (e2e)', () => {
     it('should return 404 for non-existent role', () => {
       return request(app.getHttpServer())
         .get('/roles/99999')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(404);
     });
   });
@@ -128,7 +133,7 @@ describe('Roles (e2e)', () => {
     it('should update a role', () => {
       return request(app.getHttpServer())
         .put(`/roles/${createdRoleId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           description: 'Updated description',
           permissions: {
@@ -149,14 +154,14 @@ describe('Roles (e2e)', () => {
     it('should delete a role', () => {
       return request(app.getHttpServer())
         .delete(`/roles/${createdRoleId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(204);
     });
 
     it('should return 404 when deleting non-existent role', () => {
       return request(app.getHttpServer())
         .delete('/roles/99999')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(404);
     });
   });
