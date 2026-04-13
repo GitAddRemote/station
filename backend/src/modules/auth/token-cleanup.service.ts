@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  Optional,
+} from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,29 +22,44 @@ export class TokenCleanupService implements OnApplicationBootstrap {
     @InjectRepository(PasswordReset)
     private readonly passwordResetRepository: Repository<PasswordReset>,
     private readonly configService: ConfigService,
-    private readonly schedulerRegistry: SchedulerRegistry,
+    // Optional: ScheduleModule is intentionally excluded in test environments.
+    // @Optional() allows the service to be instantiated without it and
+    // onApplicationBootstrap() guards against a missing registry.
+    @Optional() private readonly schedulerRegistry?: SchedulerRegistry,
   ) {}
 
   onApplicationBootstrap(): void {
-    // Skip cron registration in test environments. JEST_WORKER_ID is set by
-    // Jest's worker processes even when NODE_ENV is not explicitly 'test'.
     if (
       this.configService.get<string>('NODE_ENV') === 'test' ||
-      process.env['JEST_WORKER_ID'] !== undefined
+      process.env['JEST_WORKER_ID'] !== undefined ||
+      !this.schedulerRegistry
     ) {
       return;
     }
 
-    // Read the cron expression here via ConfigService so that .env values
-    // loaded by ConfigModule.forRoot() are available — unlike @Cron() which
-    // evaluates at module-load time before dotenv runs.
-    const cronExpression =
-      this.configService.get<string>('REFRESH_TOKEN_CLEANUP_CRON') ??
-      '0 3 * * *';
+    // Read via ConfigService so .env values loaded by ConfigModule.forRoot()
+    // are honoured — unlike @Cron() which evaluates before dotenv runs.
+    // Use || so a blank/whitespace-only value is treated the same as unset.
+    const rawExpression = this.configService
+      .get<string>('REFRESH_TOKEN_CLEANUP_CRON')
+      ?.trim();
+    const cronExpression = rawExpression || '0 3 * * *';
 
-    const job = new CronJob(cronExpression, () => {
-      void this.cleanupExpiredTokens();
-    });
+    let job: CronJob;
+    try {
+      job = new CronJob(cronExpression, () => {
+        void this.cleanupExpiredTokens();
+      });
+    } catch {
+      this.logger.warn(
+        `Invalid REFRESH_TOKEN_CLEANUP_CRON value "${cronExpression}", ` +
+          `falling back to default "0 3 * * *"`,
+      );
+      job = new CronJob('0 3 * * *', () => {
+        void this.cleanupExpiredTokens();
+      });
+    }
+
     this.schedulerRegistry.addCronJob('tokenCleanup', job);
     job.start();
     this.logger.log(`Token cleanup cron registered: ${cronExpression}`);

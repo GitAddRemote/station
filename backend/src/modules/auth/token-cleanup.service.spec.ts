@@ -80,6 +80,27 @@ describe('TokenCleanupService', () => {
       process.env['JEST_WORKER_ID'] = originalWorker;
     });
 
+    it('should not register cron when schedulerRegistry is absent', () => {
+      // Simulate the @Optional() case: schedulerRegistry is undefined
+      const serviceWithoutRegistry = new TokenCleanupService(
+        mockRefreshTokenRepository as any,
+        mockPasswordResetRepository as any,
+        mockConfigService as any,
+        undefined,
+      );
+
+      const originalWorker = process.env['JEST_WORKER_ID'];
+      delete process.env['JEST_WORKER_ID'];
+      mockConfigService.get.mockImplementation((key: string) =>
+        key === 'NODE_ENV' ? 'production' : undefined,
+      );
+
+      serviceWithoutRegistry.onApplicationBootstrap();
+
+      expect(mockSchedulerRegistry.addCronJob).not.toHaveBeenCalled();
+      process.env['JEST_WORKER_ID'] = originalWorker;
+    });
+
     it('should register cron with default expression in non-test env', () => {
       const originalWorker = process.env['JEST_WORKER_ID'];
       delete process.env['JEST_WORKER_ID'];
@@ -103,6 +124,42 @@ describe('TokenCleanupService', () => {
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production';
         if (key === 'REFRESH_TOKEN_CLEANUP_CRON') return '0 2 * * *';
+        return undefined;
+      });
+
+      service.onApplicationBootstrap();
+
+      expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledWith(
+        'tokenCleanup',
+        expect.any(Object),
+      );
+      process.env['JEST_WORKER_ID'] = originalWorker;
+    });
+
+    it('should fall back to default cron expression when config value is invalid', () => {
+      const originalWorker = process.env['JEST_WORKER_ID'];
+      delete process.env['JEST_WORKER_ID'];
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'NODE_ENV') return 'production';
+        if (key === 'REFRESH_TOKEN_CLEANUP_CRON') return 'not-a-valid-cron';
+        return undefined;
+      });
+
+      // Should not throw, and should still register the job with the fallback
+      expect(() => service.onApplicationBootstrap()).not.toThrow();
+      expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledWith(
+        'tokenCleanup',
+        expect.any(Object),
+      );
+      process.env['JEST_WORKER_ID'] = originalWorker;
+    });
+
+    it('should treat blank REFRESH_TOKEN_CLEANUP_CRON as unset and use default', () => {
+      const originalWorker = process.env['JEST_WORKER_ID'];
+      delete process.env['JEST_WORKER_ID'];
+      mockConfigService.get.mockImplementation((key: string) => {
+        if (key === 'NODE_ENV') return 'production';
+        if (key === 'REFRESH_TOKEN_CLEANUP_CRON') return '   '; // blank/whitespace
         return undefined;
       });
 
