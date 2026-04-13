@@ -76,31 +76,31 @@ export class AuthService {
     return result;
   }
 
-  async generateRefreshToken(userId: number): Promise<string> {
-    // Generate a random token
-    const token = crypto.randomBytes(32).toString('hex');
+  private hashToken(raw: string): string {
+    return crypto.createHash('sha256').update(raw).digest('hex');
+  }
 
-    // Calculate expiry (7 days from now)
+  async generateRefreshToken(userId: number): Promise<string> {
+    const raw = crypto.randomBytes(32).toString('hex');
+
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    // Save to database
     await this.refreshTokenRepository.save({
-      token,
+      token: this.hashToken(raw),
       userId,
       expiresAt,
       revoked: false,
     });
 
-    return token;
+    return raw;
   }
 
   async refreshAccessToken(
     refreshToken: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    // Find the refresh token
     const storedToken = await this.refreshTokenRepository.findOne({
-      where: { token: refreshToken },
+      where: { token: this.hashToken(refreshToken) },
       relations: ['user'],
     });
 
@@ -108,7 +108,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // Check if token is expired or revoked
     if (storedToken.revoked || new Date() > storedToken.expiresAt) {
       throw new UnauthorizedException('Refresh token expired or revoked');
     }
@@ -118,7 +117,6 @@ export class AuthService {
       revoked: true,
     });
 
-    // Generate new tokens
     const payload = {
       username: storedToken.user.username,
       sub: storedToken.user.id,
@@ -135,7 +133,10 @@ export class AuthService {
   }
 
   async revokeRefreshToken(token: string): Promise<void> {
-    await this.refreshTokenRepository.update({ token }, { revoked: true });
+    await this.refreshTokenRepository.update(
+      { token: this.hashToken(token) },
+      { revoked: true },
+    );
   }
 
   async requestPasswordReset(email: string): Promise<{ message: string }> {

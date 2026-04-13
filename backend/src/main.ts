@@ -7,6 +7,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as figlet from 'figlet';
 import * as dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 dotenv.config();
@@ -17,7 +18,19 @@ async function bootstrap() {
   // Application configuration
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') ?? 3001;
-  const appName = configService.get<string>('APP_NAME') || 'STATION BACKEND';
+  const appName = configService.get<string>('APP_NAME') ?? 'STATION BACKEND';
+
+  const nodeEnv = configService.get<string>('NODE_ENV');
+  const validNodeEnvs = ['production', 'development', 'test'] as const;
+  if (
+    !nodeEnv ||
+    !validNodeEnvs.includes(nodeEnv as (typeof validNodeEnvs)[number])
+  ) {
+    throw new Error(
+      `Invalid NODE_ENV value: ${nodeEnv ?? 'undefined'}. Expected one of: ${validNodeEnvs.join(', ')}`,
+    );
+  }
+  const isProduction = nodeEnv === 'production';
 
   // ASCII Art for Application Name
   console.log(figlet.textSync(appName, { horizontalLayout: 'full' }));
@@ -25,10 +38,38 @@ async function bootstrap() {
   // Cookie parser — must be registered before guards that read cookies
   app.use(cookieParser());
 
-  // CORS — allow credentials so httpOnly cookies are sent cross-origin
+  // Security headers — Swagger UI requires 'unsafe-inline' for scripts/styles,
+  // but Swagger is disabled in production so production uses a strict CSP.
+  // frameguard and hsts are set explicitly to meet security requirements.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: [`'self'`],
+          baseUri: [`'self'`],
+          objectSrc: [`'none'`],
+          scriptSrc: isProduction ? [`'self'`] : [`'self'`, `'unsafe-inline'`],
+          styleSrc: isProduction ? [`'self'`] : [`'self'`, `'unsafe-inline'`],
+          imgSrc: [`'self'`, 'data:', 'https:'],
+          fontSrc: [`'self'`, 'https:', 'data:'],
+        },
+      },
+      frameguard: { action: 'deny' },
+      hsts: isProduction
+        ? { maxAge: 31536000, includeSubDomains: true }
+        : false,
+    }),
+  );
+
+  // CORS — require ALLOWED_ORIGIN in production; fall back to localhost in dev.
+  // Use || (not ??) so a whitespace-only value is treated the same as unset.
+  const allowedOrigin =
+    configService.get<string>('ALLOWED_ORIGIN')?.trim() || undefined;
+  if (!allowedOrigin && isProduction) {
+    throw new Error('Missing required environment variable: ALLOWED_ORIGIN');
+  }
   app.enableCors({
-    origin:
-      configService.get<string>('ALLOWED_ORIGIN') || 'http://localhost:5173',
+    origin: allowedOrigin ?? 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
@@ -46,7 +87,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   // Swagger/OpenAPI Documentation — development only
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProduction) {
     const config = new DocumentBuilder()
       .setTitle('Station API')
       .setDescription(
@@ -85,7 +126,7 @@ async function bootstrap() {
     `Application '${appName}' is running on: http://localhost:${port}`,
     'Bootstrap',
   );
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProduction) {
     Logger.log(
       `📚 Swagger documentation available at: http://localhost:${port}/api/docs`,
       'Bootstrap',
