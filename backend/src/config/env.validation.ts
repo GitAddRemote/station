@@ -29,14 +29,14 @@ export const envValidationSchema = Joi.object({
     .when('NODE_ENV', {
       is: 'production',
       then: Joi.required(),
-      otherwise: Joi.default('http://localhost:5173'),
+      otherwise: Joi.string().uri().default('http://localhost:5173'),
     }),
   FRONTEND_URL: Joi.string()
     .uri()
     .when('NODE_ENV', {
       is: 'production',
       then: Joi.required(),
-      otherwise: Joi.default('http://localhost:5173'),
+      otherwise: Joi.string().uri().default('http://localhost:5173'),
     }),
 
   // UEX Sync (all optional — service degrades gracefully when disabled)
