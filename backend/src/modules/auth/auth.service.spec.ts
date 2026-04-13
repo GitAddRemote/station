@@ -376,8 +376,8 @@ describe('AuthService - Password Reset', () => {
         expect(savedData.token).not.toBe(raw);
       });
 
-      it('should set expiry 7 days from now', async () => {
-        const now = Date.now();
+      it('should set expiry 7 calendar days from now', async () => {
+        const now = new Date();
         let savedData: any;
         mockRefreshTokenRepository.save.mockImplementation((data) => {
           savedData = data;
@@ -386,9 +386,12 @@ describe('AuthService - Password Reset', () => {
 
         await service.generateRefreshToken(mockUser.id);
 
-        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+        // Mirror the implementation's setDate(+7) so the assertion is
+        // DST-safe (calendar days ≠ exactly 7 * 24h across DST boundaries).
+        const expected = new Date(now);
+        expected.setDate(expected.getDate() + 7);
         expect(
-          Math.abs(savedData.expiresAt.getTime() - (now + sevenDaysMs)),
+          Math.abs(savedData.expiresAt.getTime() - expected.getTime()),
         ).toBeLessThan(1000);
       });
     });
