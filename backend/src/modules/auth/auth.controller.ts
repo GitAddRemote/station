@@ -20,6 +20,7 @@ import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 import { UserDto } from '../users/dto/user.dto';
+import { User } from '../users/user.entity';
 import { Request as ExpressRequest, Response } from 'express';
 import {
   ChangePasswordDto,
@@ -61,7 +62,7 @@ export class AuthController {
     @Request() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const user = req.user as Parameters<typeof this.authService.login>[0];
+    const user = req.user as Omit<User, 'password'>;
     const tokens = await this.authService.login(user);
     res.cookie(
       'access_token',

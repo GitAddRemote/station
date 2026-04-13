@@ -52,14 +52,18 @@ describe('UserOrganizationRoles (e2e)', () => {
       .send({
         username: 'roleuser',
         password: 'password123',
-      });
+      })
+      .expect(200);
 
     const setCookies = loginResponse.headers[
       'set-cookie'
     ] as unknown as string[];
-    authCookie =
-      setCookies.find((c) => c.startsWith('access_token='))?.split(';')[0] ??
-      '';
+    expect(Array.isArray(setCookies)).toBe(true);
+    const accessTokenCookie = setCookies.find((c) =>
+      c.startsWith('access_token='),
+    );
+    expect(accessTokenCookie).toBeDefined();
+    authCookie = accessTokenCookie!.split(';')[0];
 
     // Create a test organization
     const orgResponse = await request(app.getHttpServer())
@@ -264,7 +268,8 @@ describe('UserOrganizationRoles (e2e)', () => {
           userId,
           organizationId,
           roleId,
-        });
+        })
+        .expect(201);
 
       return request(app.getHttpServer())
         .get(`/permissions/user/${userId}/organization/${organizationId}`)
