@@ -17,6 +17,18 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { AuthService } from './auth.service';
+import { LocalAuthGuard } from './local-auth.guard';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
+import { UserDto } from '../users/dto/user.dto';
+import { User } from '../users/user.entity';
+import { Request as ExpressRequest, Response } from 'express';
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto/password-reset.dto';
 
 // Parse throttle config once at module load time.
 // Number() handles numeric strings and NaN from non-numeric input; the
@@ -48,18 +60,6 @@ const FORGOT_LIMIT = toThrottleInt(
   process.env['AUTH_FORGOT_THROTTLE_LIMIT'],
   5,
 );
-import { AuthService } from './auth.service';
-import { LocalAuthGuard } from './local-auth.guard';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
-import { UserDto } from '../users/dto/user.dto';
-import { User } from '../users/user.entity';
-import { Request as ExpressRequest, Response } from 'express';
-import {
-  ChangePasswordDto,
-  ForgotPasswordDto,
-  ResetPasswordDto,
-} from './dto/password-reset.dto';
 
 @ApiTags('auth')
 @Controller('auth')
