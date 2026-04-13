@@ -4,7 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { CustomThrottlerGuard } from './common/guards/throttler.guard';
 import { redisStore } from 'cache-manager-redis-yet';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -41,13 +42,23 @@ if (!isTest) {
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => [
-        {
-          name: 'default',
-          ttl: configService.get<number>('THROTTLE_TTL', 60000),
-          limit: configService.get<number>('THROTTLE_LIMIT', 100),
-        },
-      ],
+      useFactory: (configService: ConfigService) => {
+        // ConfigService may return a string when the value comes from an env
+        // file; Number() handles both string and numeric inputs, and
+        // isFinite guards against NaN / Infinity from invalid entries.
+        const toInt = (val: string | number | undefined, fallback: number) => {
+          const n = Number(val);
+          return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+        };
+
+        return [
+          {
+            name: 'default',
+            ttl: toInt(configService.get('THROTTLE_TTL_MS'), 60_000),
+            limit: toInt(configService.get('THROTTLE_LIMIT'), 100),
+          },
+        ];
+      },
     }),
     ...conditionalImports,
     CacheModule.registerAsync({
@@ -135,7 +146,7 @@ if (!isTest) {
     AppService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: CustomThrottlerGuard,
     },
   ],
 })
