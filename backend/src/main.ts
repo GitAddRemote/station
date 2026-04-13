@@ -22,12 +22,28 @@ async function bootstrap() {
   // ASCII Art for Application Name
   console.log(figlet.textSync(appName, { horizontalLayout: 'full' }));
 
-  // Security headers — must be registered before other middleware
-  app.use(helmet());
+  // Security headers — configure CSP to allow Swagger UI inline scripts/styles
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: [`'self'`],
+          baseUri: [`'self'`],
+          objectSrc: [`'none'`],
+          scriptSrc: [`'self'`, `'unsafe-inline'`],
+          styleSrc: [`'self'`, `'unsafe-inline'`],
+          imgSrc: [`'self'`, 'data:', 'https:'],
+          fontSrc: [`'self'`, 'https:', 'data:'],
+        },
+      },
+    }),
+  );
 
-  // CORS — restrict to known origin
+  // CORS — restrict to known origin; fallback keeps local dev working if unset
+  const allowedOrigin =
+    configService.get<string>('ALLOWED_ORIGIN') ?? 'http://localhost:5173';
   app.enableCors({
-    origin: configService.get<string>('ALLOWED_ORIGIN'),
+    origin: allowedOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
