@@ -400,7 +400,7 @@ describe('AuthService', () => {
       it('should query the repository using the SHA-256 hash of the presented token', async () => {
         const rawToken = 'a'.repeat(64);
         const storedToken = {
-          id: 1,
+          id: '550e8400-e29b-41d4-a716-446655440001',
           token: sha256(rawToken),
           revoked: false,
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
