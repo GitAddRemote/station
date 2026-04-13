@@ -18,11 +18,13 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<string>('PORT') || 3001;
   const appName = configService.get<string>('APP_NAME') || 'STATION BACKEND';
+  const isProduction = process.env.NODE_ENV === 'production';
 
   // ASCII Art for Application Name
   console.log(figlet.textSync(appName, { horizontalLayout: 'full' }));
 
-  // Security headers — configure CSP to allow Swagger UI inline scripts/styles
+  // Security headers — Swagger UI requires 'unsafe-inline' for scripts/styles,
+  // but Swagger is disabled in production so production uses a strict CSP.
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -30,8 +32,8 @@ async function bootstrap() {
           defaultSrc: [`'self'`],
           baseUri: [`'self'`],
           objectSrc: [`'none'`],
-          scriptSrc: [`'self'`, `'unsafe-inline'`],
-          styleSrc: [`'self'`, `'unsafe-inline'`],
+          scriptSrc: isProduction ? [`'self'`] : [`'self'`, `'unsafe-inline'`],
+          styleSrc: isProduction ? [`'self'`] : [`'self'`, `'unsafe-inline'`],
           imgSrc: [`'self'`, 'data:', 'https:'],
           fontSrc: [`'self'`, 'https:', 'data:'],
         },
@@ -39,11 +41,13 @@ async function bootstrap() {
     }),
   );
 
-  // CORS — restrict to known origin; fallback keeps local dev working if unset
-  const allowedOrigin =
-    configService.get<string>('ALLOWED_ORIGIN') ?? 'http://localhost:5173';
+  // CORS — require ALLOWED_ORIGIN in production; fall back to localhost in dev
+  const allowedOrigin = configService.get<string>('ALLOWED_ORIGIN')?.trim();
+  if (!allowedOrigin && isProduction) {
+    throw new Error('Missing required environment variable: ALLOWED_ORIGIN');
+  }
   app.enableCors({
-    origin: allowedOrigin,
+    origin: allowedOrigin ?? 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
