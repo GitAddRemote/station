@@ -14,7 +14,9 @@ export class AddTokenCleanupIndexes1765038000000 implements MigrationInterface {
   name = 'AddTokenCleanupIndexes1765038000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Partial index on revoked refresh tokens (WHERE clause mirrors cleanup query)
+    // Partial index on revoked refresh tokens — covers the `revoked = true`
+    // predicate of the cleanup DELETE's OR condition, keeping the index small
+    // by only including rows that will eventually be deleted.
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "IDX_refresh_tokens_revoked"
       ON "refresh_tokens" ("revoked")
@@ -27,7 +29,9 @@ export class AddTokenCleanupIndexes1765038000000 implements MigrationInterface {
       ON "refresh_tokens" ("expiresAt")
     `);
 
-    // Partial index on used password resets (WHERE clause mirrors cleanup query)
+    // Partial index on used password resets — covers the `used = true`
+    // predicate of the cleanup DELETE's OR condition, keeping the index small
+    // by only including rows that will eventually be deleted.
     await queryRunner.query(`
       CREATE INDEX IF NOT EXISTS "IDX_password_resets_used"
       ON "password_resets" ("used")
