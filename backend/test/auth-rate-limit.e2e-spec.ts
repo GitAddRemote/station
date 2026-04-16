@@ -15,13 +15,31 @@ import { seedSystemUser } from './helpers/seed-system-user';
  * spins up its own application instance the throttle state is isolated and
  * will not bleed into other e2e suites.
  */
+
+// Mirror the same parsing logic used by auth.controller.ts so the test stays
+// in sync with production behaviour (floats are floored, non-finite values
+// fall back to the default, matching toThrottleInt in the controller).
+const toThrottleInt = (value: string | undefined, fallback: number): number => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+};
+
 describe('Auth - Rate Limiting (e2e)', () => {
   let app: INestApplication;
 
-  // LOGIN_LIMIT must match the AUTH_LOGIN_THROTTLE_LIMIT default (10) or the
-  // env var set in the test environment.  We read it here so the assertion
-  // stays in sync with the controller's actual config.
-  const loginLimit = Number(process.env['AUTH_LOGIN_THROTTLE_LIMIT']) || 10;
+  // LOGIN_LIMIT and LOGIN_TTL_MS must match the AUTH_LOGIN_THROTTLE_* defaults
+  // (10 requests / 60 s) or the env vars set in the test environment.  Using
+  // toThrottleInt() ensures we mirror the exact same rounding/validation as the
+  // production controller, so a misconfigured env value (e.g. 'Infinity') will
+  // produce the same safe fallback in both places rather than hanging the loop.
+  const loginLimit = toThrottleInt(
+    process.env['AUTH_LOGIN_THROTTLE_LIMIT'],
+    10,
+  );
+  const loginTtlMs = toThrottleInt(
+    process.env['AUTH_LOGIN_THROTTLE_TTL_MS'],
+    60_000,
+  );
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -68,5 +86,11 @@ describe('Auth - Rate Limiting (e2e)', () => {
     const retryAfter = Number(response.headers['retry-after']);
     expect(Number.isInteger(retryAfter)).toBe(true);
     expect(retryAfter).toBeGreaterThan(0);
+
+    // Retry-After must not exceed the configured TTL window.  A value larger
+    // than the window indicates a misconfiguration or unit mismatch (e.g. ms
+    // instead of seconds) in the throttler setup.
+    const loginTtlSeconds = Math.ceil(loginTtlMs / 1000);
+    expect(retryAfter).toBeLessThanOrEqual(loginTtlSeconds);
   });
 });
