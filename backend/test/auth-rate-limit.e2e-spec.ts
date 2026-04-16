@@ -62,5 +62,11 @@ describe('Auth - Rate Limiting (e2e)', () => {
       .send(payload);
 
     expect(response.status).toBe(429);
+
+    // Throttler must include a Retry-After header so clients know when to retry.
+    expect(response.headers['retry-after']).toBeDefined();
+    const retryAfter = Number(response.headers['retry-after']);
+    expect(Number.isInteger(retryAfter)).toBe(true);
+    expect(retryAfter).toBeGreaterThan(0);
   });
 });
