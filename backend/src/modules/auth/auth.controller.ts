@@ -16,6 +16,7 @@ import {
   ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
@@ -29,6 +30,37 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/password-reset.dto';
+
+// Parse throttle config once at module load time.
+// Number() handles numeric strings and NaN from non-numeric input; the
+// isFinite guard ensures an invalid env var falls back to the safe default
+// rather than silently producing 0 or NaN-driven throttle windows.
+const toThrottleInt = (value: string | undefined, fallback: number): number => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+};
+
+const LOGIN_TTL = toThrottleInt(
+  process.env['AUTH_LOGIN_THROTTLE_TTL_MS'],
+  60_000,
+);
+const LOGIN_LIMIT = toThrottleInt(process.env['AUTH_LOGIN_THROTTLE_LIMIT'], 10);
+const REGISTER_TTL = toThrottleInt(
+  process.env['AUTH_REGISTER_THROTTLE_TTL_MS'],
+  60_000,
+);
+const REGISTER_LIMIT = toThrottleInt(
+  process.env['AUTH_REGISTER_THROTTLE_LIMIT'],
+  5,
+);
+const FORGOT_TTL = toThrottleInt(
+  process.env['AUTH_FORGOT_THROTTLE_TTL_MS'],
+  60_000,
+);
+const FORGOT_LIMIT = toThrottleInt(
+  process.env['AUTH_FORGOT_THROTTLE_LIMIT'],
+  5,
+);
 
 @ApiTags('auth')
 @Controller('auth')
@@ -60,6 +92,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @Throttle({ default: { ttl: LOGIN_TTL, limit: LOGIN_LIMIT } })
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('login')
@@ -85,7 +118,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Register new user' })
   @ApiResponse({ status: 201, description: 'User successfully registered' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
-  // Registration Route: No guards required
+  @Throttle({ default: { ttl: REGISTER_TTL, limit: REGISTER_LIMIT } })
   @Post('register')
   async register(@Body() userDto: UserDto) {
     return this.authService.register(userDto);
@@ -148,6 +181,7 @@ export class AuthController {
     description:
       'If an account with that email exists, a password reset link has been sent',
   })
+  @Throttle({ default: { ttl: FORGOT_TTL, limit: FORGOT_LIMIT } })
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
