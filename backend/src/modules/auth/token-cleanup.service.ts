@@ -44,15 +44,17 @@ export class TokenCleanupService implements OnApplicationBootstrap {
       return;
     }
 
-    // Read via ConfigService so .env values loaded by ConfigModule.forRoot()
-    // are honoured — unlike @Cron() which evaluates before dotenv runs.
+    // Use ConfigService rather than @Cron() because decorator arguments are
+    // evaluated at class-definition time (before DI runs), so there is no way
+    // to inject ConfigService into a @Cron() expression.  Reading from
+    // ConfigService here gives us the fully-loaded, validated config value.
     // Use || so a blank/whitespace-only value is treated the same as unset.
+    const DEFAULT_CRON = '0 3 * * *';
     const rawExpression = this.configService
       .get<string>('REFRESH_TOKEN_CLEANUP_CRON')
       ?.trim();
-    const cronExpression = rawExpression || '0 3 * * *';
+    const cronExpression = rawExpression || DEFAULT_CRON;
 
-    const defaultExpression = '0 3 * * *';
     let effectiveExpression = cronExpression;
     let job: CronJob;
     try {
@@ -62,10 +64,10 @@ export class TokenCleanupService implements OnApplicationBootstrap {
     } catch {
       this.logger.warn(
         `Invalid REFRESH_TOKEN_CLEANUP_CRON value "${cronExpression}", ` +
-          `falling back to default "${defaultExpression}"`,
+          `falling back to default "${DEFAULT_CRON}"`,
       );
-      effectiveExpression = defaultExpression;
-      job = new CronJob(defaultExpression, () => {
+      effectiveExpression = DEFAULT_CRON;
+      job = new CronJob(DEFAULT_CRON, () => {
         void this.cleanupExpiredTokens();
       });
     }
