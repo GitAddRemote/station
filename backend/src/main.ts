@@ -1,3 +1,9 @@
+// dotenv/config must be the very first import so that process.env is populated
+// before any other module is evaluated.  Module-level code (e.g. decorator
+// arguments and top-level constants) in NestJS modules runs at require() time,
+// which is before bootstrap() — moving the load here ensures .env values are
+// visible to those expressions during local development.
+import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -5,12 +11,9 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as figlet from 'figlet';
-import * as dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-
-dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

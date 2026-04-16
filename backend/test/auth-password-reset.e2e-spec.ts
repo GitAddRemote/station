@@ -46,7 +46,7 @@ describe('Auth - Password Reset (e2e)', () => {
       isActive: true,
     });
 
-    // Login to get access token
+    // Login to get access token cookie
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
       .send({

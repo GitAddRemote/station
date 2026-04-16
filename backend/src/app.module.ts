@@ -12,6 +12,7 @@ import { UserOrganizationRolesModule } from './modules/user-organization-roles/u
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { AppService } from './app.service';
 import { AppController } from './app.controller';
+import { envValidationSchema } from './config/env.validation';
 import { DatabaseSeederModule } from './database/seeds/database-seeder.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { GamesModule } from './modules/games/games.module';
@@ -35,6 +36,8 @@ if (!isTest) {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validationSchema: envValidationSchema,
+      validationOptions: { abortEarly: false },
     }),
     ...conditionalImports,
     CacheModule.registerAsync({
