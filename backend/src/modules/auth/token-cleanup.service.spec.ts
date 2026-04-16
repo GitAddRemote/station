@@ -6,6 +6,18 @@ import { PasswordReset } from './password-reset.entity';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 
+// Helper that mirrors the safe JEST_WORKER_ID restore pattern used throughout
+// this file: deletes the variable when the original value was undefined rather
+// than assigning the string 'undefined' (Node coerces undefined to 'undefined'
+// in process.env, which would leave the guard permanently set).
+function restoreWorker(original: string | undefined): void {
+  if (original === undefined) {
+    delete process.env['JEST_WORKER_ID'];
+  } else {
+    process.env['JEST_WORKER_ID'] = original;
+  }
+}
+
 describe('TokenCleanupService', () => {
   let service: TokenCleanupService;
 
@@ -77,7 +89,7 @@ describe('TokenCleanupService', () => {
       service.onApplicationBootstrap();
 
       expect(mockSchedulerRegistry.addCronJob).not.toHaveBeenCalled();
-      process.env['JEST_WORKER_ID'] = originalWorker;
+      restoreWorker(originalWorker);
     });
 
     it('should not register cron when schedulerRegistry is absent', () => {
@@ -98,7 +110,7 @@ describe('TokenCleanupService', () => {
       serviceWithoutRegistry.onApplicationBootstrap();
 
       expect(mockSchedulerRegistry.addCronJob).not.toHaveBeenCalled();
-      process.env['JEST_WORKER_ID'] = originalWorker;
+      restoreWorker(originalWorker);
     });
 
     it('should register cron with default expression in non-test env', () => {
@@ -115,7 +127,7 @@ describe('TokenCleanupService', () => {
         'tokenCleanup',
         expect.any(Object),
       );
-      process.env['JEST_WORKER_ID'] = originalWorker;
+      restoreWorker(originalWorker);
     });
 
     it('should register cron with custom expression from config', () => {
@@ -133,7 +145,7 @@ describe('TokenCleanupService', () => {
         'tokenCleanup',
         expect.any(Object),
       );
-      process.env['JEST_WORKER_ID'] = originalWorker;
+      restoreWorker(originalWorker);
     });
 
     it('should fall back to default cron expression when config value is invalid', () => {
@@ -151,7 +163,7 @@ describe('TokenCleanupService', () => {
         'tokenCleanup',
         expect.any(Object),
       );
-      process.env['JEST_WORKER_ID'] = originalWorker;
+      restoreWorker(originalWorker);
     });
 
     it('should treat blank REFRESH_TOKEN_CLEANUP_CRON as unset and use default', () => {
@@ -169,7 +181,7 @@ describe('TokenCleanupService', () => {
         'tokenCleanup',
         expect.any(Object),
       );
-      process.env['JEST_WORKER_ID'] = originalWorker;
+      restoreWorker(originalWorker);
     });
   });
 
@@ -205,7 +217,7 @@ describe('TokenCleanupService', () => {
       expect(
         mockPasswordResetRepository.createQueryBuilder,
       ).not.toHaveBeenCalled();
-      process.env['JEST_WORKER_ID'] = originalWorker;
+      restoreWorker(originalWorker);
     });
 
     describe('in a non-test environment', () => {
@@ -223,7 +235,7 @@ describe('TokenCleanupService', () => {
       });
 
       afterEach(() => {
-        process.env['JEST_WORKER_ID'] = originalWorker;
+        restoreWorker(originalWorker);
       });
 
       it('should delete revoked and expired refresh tokens', async () => {
@@ -255,6 +267,22 @@ describe('TokenCleanupService', () => {
         mockQueryBuilder.execute.mockRejectedValueOnce(new Error('DB failure'));
 
         await expect(service.cleanupExpiredTokens()).resolves.toBeUndefined();
+      });
+
+      it('should still clean up password resets when refresh token cleanup fails', async () => {
+        mockQueryBuilder.execute.mockReset();
+        mockQueryBuilder.execute
+          .mockRejectedValueOnce(new Error('refresh token DB failure'))
+          .mockResolvedValueOnce({ affected: 2 });
+
+        await expect(service.cleanupExpiredTokens()).resolves.toBeUndefined();
+        // Both query builders should have been invoked despite the first failure
+        expect(
+          mockRefreshTokenRepository.createQueryBuilder,
+        ).toHaveBeenCalled();
+        expect(
+          mockPasswordResetRepository.createQueryBuilder,
+        ).toHaveBeenCalled();
       });
     });
   });

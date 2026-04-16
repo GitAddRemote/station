@@ -31,9 +31,16 @@ export class TokenCleanupService implements OnApplicationBootstrap {
   onApplicationBootstrap(): void {
     if (
       this.configService.get<string>('NODE_ENV') === 'test' ||
-      process.env['JEST_WORKER_ID'] !== undefined ||
-      !this.schedulerRegistry
+      process.env['JEST_WORKER_ID'] !== undefined
     ) {
+      return;
+    }
+
+    if (!this.schedulerRegistry) {
+      this.logger.warn(
+        'SchedulerRegistry is not available — token cleanup cron will not run. ' +
+          'Ensure ScheduleModule is imported in AppModule.',
+      );
       return;
     }
 
@@ -78,11 +85,13 @@ export class TokenCleanupService implements OnApplicationBootstrap {
 
     const start = Date.now();
     this.logger.log('Starting expired/revoked token cleanup');
+    const now = new Date();
 
+    // Each table is cleaned independently so a failure in one does not prevent
+    // the other from running — both errors are logged separately.
+    let refreshDeleted = 0;
     try {
-      const now = new Date();
-
-      const { affected: refreshDeleted } = await this.refreshTokenRepository
+      const { affected } = await this.refreshTokenRepository
         .createQueryBuilder()
         .delete()
         .where('revoked = :revoked OR "expiresAt" < :now', {
@@ -90,24 +99,34 @@ export class TokenCleanupService implements OnApplicationBootstrap {
           now,
         })
         .execute();
+      refreshDeleted = affected ?? 0;
+    } catch (error) {
+      this.logger.error(
+        'Refresh token cleanup failed',
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
 
-      const { affected: resetDeleted } = await this.passwordResetRepository
+    let resetDeleted = 0;
+    try {
+      const { affected } = await this.passwordResetRepository
         .createQueryBuilder()
         .delete()
         .where('used = :used OR "expiresAt" < :now', { used: true, now })
         .execute();
-
-      const duration = Date.now() - start;
-      this.logger.log(
-        `Token cleanup complete in ${duration}ms — ` +
-          `deleted ${refreshDeleted ?? 0} refresh token(s), ` +
-          `${resetDeleted ?? 0} password reset(s)`,
-      );
+      resetDeleted = affected ?? 0;
     } catch (error) {
       this.logger.error(
-        'Token cleanup job failed',
+        'Password reset cleanup failed',
         error instanceof Error ? error.stack : String(error),
       );
     }
+
+    const duration = Date.now() - start;
+    this.logger.log(
+      `Token cleanup complete in ${duration}ms — ` +
+        `deleted ${refreshDeleted} refresh token(s), ` +
+        `${resetDeleted} password reset(s)`,
+    );
   }
 }
