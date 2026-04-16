@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   UseGuards,
   Request,
@@ -88,6 +89,16 @@ export class AuthController {
   @Post('register')
   async register(@Body() userDto: UserDto) {
     return this.authService.register(userDto);
+  }
+
+  @ApiOperation({ summary: 'Get current authenticated user' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Current user info' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  me(@Request() req: any) {
+    return { id: req.user.userId, username: req.user.username };
   }
 
   @ApiOperation({ summary: 'Refresh access token using refresh token cookie' })

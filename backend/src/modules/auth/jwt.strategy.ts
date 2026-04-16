@@ -9,7 +9,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
+        // Prefer httpOnly cookie (browser clients)
         (req: Request) => req?.cookies?.access_token ?? null,
+        // Fallback to Authorization: Bearer header (Swagger / API clients)
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
