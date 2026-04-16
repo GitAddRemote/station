@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 describe('AuthController - Password Reset', () => {
   let controller: AuthController;
@@ -24,6 +25,12 @@ describe('AuthController - Password Reset', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue('test'),
+          },
         },
       ],
     }).compile();
