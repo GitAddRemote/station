@@ -132,7 +132,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@Request() req: AuthenticatedRequest) {
-    return { id: req.user.userId, username: req.user.username };
+    return { userId: req.user.userId, username: req.user.username };
   }
 
   @ApiOperation({ summary: 'Refresh access token using refresh token cookie' })

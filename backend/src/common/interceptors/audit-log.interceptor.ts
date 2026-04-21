@@ -54,7 +54,13 @@ export class AuditLogInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap((response: unknown) => {
-        const typedResponse = response as AuditLogResponse | undefined;
+        const isPlainObject =
+          typeof response === 'object' &&
+          response !== null &&
+          !Array.isArray(response);
+        const typedResponse = isPlainObject
+          ? (response as AuditLogResponse)
+          : undefined;
 
         // Extract entity ID from response or params
         let entityId: number | undefined;
@@ -90,7 +96,7 @@ export class AuditLogInterceptor implements NestInterceptor {
               params: request.params,
               query: request.query,
             },
-            newValues: typedResponse as Record<string, unknown> | undefined,
+            newValues: typedResponse,
             ipAddress: request.ip,
             userAgent:
               typeof request.headers['user-agent'] === 'string'
