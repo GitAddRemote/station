@@ -35,7 +35,9 @@ export class UsersController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     const userId = req.user.userId;
-    return await this.usersService.updateProfile(userId, updateProfileDto);
+    const { password: _password, ...safeUser } =
+      await this.usersService.updateProfile(userId, updateProfileDto);
+    return safeUser;
   }
 
   @UseGuards(AuthGuard('jwt'))

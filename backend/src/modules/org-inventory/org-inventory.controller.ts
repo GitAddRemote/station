@@ -32,7 +32,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
-import { QueryParams } from '../../common/types/query-params.type';
+import { QueryParams, asString } from '../../common/types/query-params.type';
 
 @ApiTags('Organization Inventory')
 @ApiBearerAuth()
@@ -139,7 +139,7 @@ export class OrgInventoryController {
           min: 1,
         },
       ),
-      search: query.search,
+      search: asString(query.search),
       limit: this.readOptionalNumber(query, ['limit'], 'limit', {
         integer: true,
         min: 1,
@@ -148,14 +148,14 @@ export class OrgInventoryController {
         integer: true,
         min: 0,
       }),
-      sort: query.sort as
+      sort: asString(query.sort) as
         | 'name'
         | 'quantity'
         | 'location'
         | 'date_added'
         | 'date_modified'
         | undefined,
-      order: query.order as 'asc' | 'desc' | undefined,
+      order: asString(query.order) as 'asc' | 'desc' | undefined,
       activeOnly:
         query.active_only !== undefined
           ? query.active_only === 'true'

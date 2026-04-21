@@ -28,7 +28,7 @@ import {
   UserInventorySearchDto,
 } from './dto/user-inventory-item.dto';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
-import { QueryParams } from '../../common/types/query-params.type';
+import { QueryParams, asString } from '../../common/types/query-params.type';
 
 @Controller('api/inventory')
 @UseGuards(JwtAuthGuard)
@@ -59,17 +59,17 @@ export class UserInventoryController {
       sharedOrgId: query.shared_org_id
         ? Number(query.shared_org_id)
         : undefined,
-      search: query.search,
+      search: asString(query.search),
       limit: query.limit ? Number(query.limit) : undefined,
       offset: query.offset ? Number(query.offset) : undefined,
-      sort: query.sort as
+      sort: asString(query.sort) as
         | 'name'
         | 'quantity'
         | 'location'
         | 'date_added'
         | 'date_modified'
         | undefined,
-      order: query.order as 'asc' | 'desc' | undefined,
+      order: asString(query.order) as 'asc' | 'desc' | undefined,
       sharedOnly:
         query.shared_only !== undefined
           ? query.shared_only === 'true'
