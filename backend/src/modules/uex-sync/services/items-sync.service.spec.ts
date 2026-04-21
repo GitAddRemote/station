@@ -15,7 +15,12 @@ import {
 
 describe('ItemsSyncService', () => {
   let service: ItemsSyncService;
-  let mockItemRepository: Record<string, jest.Mock>;
+  let mockItemRepository: {
+    findOne: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
   let mockCategoryRepository: Record<string, jest.Mock>;
   let mockCompanyRepository: Record<string, jest.Mock>;
   let mockUexClient: Record<string, jest.Mock>;

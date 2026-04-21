@@ -1,3 +1,4 @@
+import { FindOptionsWhere, UpdateResult } from 'typeorm';
 import { BaseUexRepository } from './base-uex.repository';
 import { BaseUexEntity } from '../entities/base-uex.entity';
 
@@ -58,9 +59,7 @@ describe('BaseUexRepository', () => {
       const findSpy = jest.spyOn(repository, 'find').mockResolvedValue([]);
 
       await repository.findAllActive({
-        where: { type: 'item' } as unknown as Parameters<
-          typeof repository.findAllActive
-        >[0],
+        where: { type: 'item' } as unknown as FindOptionsWhere<BaseUexEntity>,
       });
 
       expect(findSpy).toHaveBeenCalledWith(
@@ -95,9 +94,7 @@ describe('BaseUexRepository', () => {
         .mockResolvedValue(mockCategory as unknown as BaseUexEntity);
 
       const result = await repository.findOneActive({
-        where: { uexId: 100 } as unknown as Parameters<
-          typeof repository.findOneActive
-        >[0],
+        where: { uexId: 100 } as unknown as FindOptionsWhere<BaseUexEntity>,
       });
 
       expect(findOneSpy).toHaveBeenCalledWith(
@@ -113,9 +110,7 @@ describe('BaseUexRepository', () => {
       jest.spyOn(repository, 'findOne').mockResolvedValue(null);
 
       const result = await repository.findOneActive({
-        where: { uexId: 999 } as unknown as Parameters<
-          typeof repository.findOneActive
-        >[0],
+        where: { uexId: 999 } as unknown as FindOptionsWhere<BaseUexEntity>,
       });
 
       expect(result).toBeNull();
@@ -129,9 +124,7 @@ describe('BaseUexRepository', () => {
         .mockResolvedValue(mockCategory as unknown as BaseUexEntity);
 
       const result = await repository.findOneActiveOnly({
-        where: { uexId: 100 } as unknown as Parameters<
-          typeof repository.findOneActive
-        >[0],
+        where: { uexId: 100 } as unknown as FindOptionsWhere<BaseUexEntity>,
       });
 
       expect(findOneSpy).toHaveBeenCalledWith(
@@ -159,7 +152,9 @@ describe('BaseUexRepository', () => {
 
   describe('markAsDeleted', () => {
     it('should soft delete a record by id', async () => {
-      const updateSpy = jest.spyOn(repository, 'update').mockResolvedValue({});
+      const updateSpy = jest
+        .spyOn(repository, 'update')
+        .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
       await repository.markAsDeleted(1, 999);
 
@@ -172,7 +167,9 @@ describe('BaseUexRepository', () => {
 
   describe('markAsDeletedByUexId', () => {
     it('should soft delete a record by uexId', async () => {
-      const updateSpy = jest.spyOn(repository, 'update').mockResolvedValue({});
+      const updateSpy = jest
+        .spyOn(repository, 'update')
+        .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
       await repository.markAsDeletedByUexId(100, 999);
 
@@ -188,7 +185,9 @@ describe('BaseUexRepository', () => {
 
   describe('deactivate', () => {
     it('should mark a record as inactive', async () => {
-      const updateSpy = jest.spyOn(repository, 'update').mockResolvedValue({});
+      const updateSpy = jest
+        .spyOn(repository, 'update')
+        .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
       await repository.deactivate(1, 999);
 
@@ -201,7 +200,9 @@ describe('BaseUexRepository', () => {
 
   describe('activate', () => {
     it('should mark a record as active', async () => {
-      const updateSpy = jest.spyOn(repository, 'update').mockResolvedValue({});
+      const updateSpy = jest
+        .spyOn(repository, 'update')
+        .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
       await repository.activate(1, 999);
 

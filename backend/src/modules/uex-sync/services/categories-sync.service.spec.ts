@@ -13,7 +13,12 @@ import {
 
 describe('CategoriesSyncService', () => {
   let service: CategoriesSyncService;
-  let mockCategoryRepository: Record<string, jest.Mock>;
+  let mockCategoryRepository: {
+    findOne: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
   let mockUexClient: Record<string, jest.Mock>;
   let mockSyncService: Record<string, jest.Mock>;
   let mockSystemUserService: Record<string, jest.Mock>;
