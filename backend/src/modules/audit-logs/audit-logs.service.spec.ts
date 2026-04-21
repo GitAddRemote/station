@@ -72,8 +72,8 @@ describe('AuditLogsService', () => {
         metadata: { test: 'data' },
       };
 
-      jest.spyOn(repository, 'create').mockReturnValue(mockAuditLog as any);
-      jest.spyOn(repository, 'save').mockResolvedValue(mockAuditLog as any);
+      jest.spyOn(repository, 'create').mockReturnValue(mockAuditLog);
+      jest.spyOn(repository, 'save').mockResolvedValue(mockAuditLog);
 
       const result = await service.log(dto);
 

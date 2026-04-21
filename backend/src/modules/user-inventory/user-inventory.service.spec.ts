@@ -40,16 +40,18 @@ describe('UserInventoryService', () => {
     dateModified: new Date(),
     addedBy: 1,
     modifiedBy: 1,
-    user: undefined as any,
-    game: undefined as any,
-    item: { name: 'Test Item' } as any,
-    location: { displayName: 'Test Location' } as any,
+    user: undefined as unknown as UserInventoryItem['user'],
+    game: undefined as unknown as UserInventoryItem['game'],
+    item: { name: 'Test Item' } as unknown as UserInventoryItem['item'],
+    location: {
+      displayName: 'Test Location',
+    } as unknown as UserInventoryItem['location'],
     sharedOrg: undefined,
-    addedByUser: undefined as any,
-    modifiedByUser: undefined as any,
+    addedByUser: undefined as unknown as UserInventoryItem['addedByUser'],
+    modifiedByUser: undefined as unknown as UserInventoryItem['modifiedByUser'],
   };
 
-  const mockQueryBuilder: any = {
+  const mockQueryBuilder: Record<string, jest.Mock> = {
     createQueryBuilder: jest.fn().mockReturnThis(),
     leftJoinAndSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
@@ -74,9 +76,7 @@ describe('UserInventoryService', () => {
     transactionRepository = {
       create: jest.fn(),
       save: jest.fn(),
-      createQueryBuilder: jest
-        .fn()
-        .mockReturnValue(transactionQueryBuilder as any),
+      createQueryBuilder: jest.fn().mockReturnValue(transactionQueryBuilder),
     };
 
     const module: TestingModule = await Test.createTestingModule({

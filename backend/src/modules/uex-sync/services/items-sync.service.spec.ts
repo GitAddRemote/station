@@ -15,12 +15,12 @@ import {
 
 describe('ItemsSyncService', () => {
   let service: ItemsSyncService;
-  let mockItemRepository: any;
-  let mockCategoryRepository: any;
-  let mockCompanyRepository: any;
-  let mockUexClient: any;
-  let mockSyncService: any;
-  let mockSystemUserService: any;
+  let mockItemRepository: Record<string, jest.Mock>;
+  let mockCategoryRepository: Record<string, jest.Mock>;
+  let mockCompanyRepository: Record<string, jest.Mock>;
+  let mockUexClient: Record<string, jest.Mock>;
+  let mockSyncService: Record<string, jest.Mock>;
+  let mockSystemUserService: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     mockItemRepository = {
@@ -88,7 +88,7 @@ describe('ItemsSyncService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string, defaultValue: any) => defaultValue),
+            get: jest.fn((key: string, defaultValue: unknown) => defaultValue),
           },
         },
       ],
@@ -141,7 +141,9 @@ describe('ItemsSyncService', () => {
       mockUexClient.fetchItemsByCategory.mockResolvedValue(mockItems);
 
       mockItemRepository.manager.transaction.mockImplementation(
-        async (callback: any) => {
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
           const mockManager = {
             findOne: jest.fn().mockResolvedValue(null),
             save: jest.fn().mockResolvedValue({ id: 1 }),
@@ -182,7 +184,9 @@ describe('ItemsSyncService', () => {
       mockUexClient.fetchItemsByCategory.mockResolvedValue(mockItems);
 
       mockItemRepository.manager.transaction.mockImplementation(
-        async (callback: any) => {
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
           const mockManager = {
             findOne: jest.fn().mockResolvedValue({ id: 1, uexId: 100 }),
             save: jest.fn(),
@@ -266,7 +270,9 @@ describe('ItemsSyncService', () => {
         .mockResolvedValueOnce(mockItems);
 
       mockItemRepository.manager.transaction.mockImplementation(
-        async (callback: any) => {
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
           const mockManager = {
             findOne: jest.fn().mockResolvedValue(null),
             save: jest.fn().mockResolvedValue({ id: 1 }),
@@ -303,7 +309,9 @@ describe('ItemsSyncService', () => {
       let transactionCallCount = 0;
 
       mockItemRepository.manager.transaction.mockImplementation(
-        async (callback: any) => {
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
           transactionCallCount++;
           const mockManager = {
             findOne: jest.fn().mockResolvedValue(null),
@@ -347,7 +355,9 @@ describe('ItemsSyncService', () => {
       mockUexClient.fetchItemsByCategory.mockResolvedValue(mockItems);
 
       mockItemRepository.manager.transaction.mockImplementation(
-        async (callback: any) => {
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
           const mockManager = {
             findOne: jest.fn().mockResolvedValue(null),
             save: jest.fn().mockResolvedValue({ id: 1 }),
@@ -392,7 +402,9 @@ describe('ItemsSyncService', () => {
         .mockResolvedValueOnce(mockItems); // Category 3
 
       mockItemRepository.manager.transaction.mockImplementation(
-        async (callback: any) => {
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
           const mockManager = {
             findOne: jest.fn().mockResolvedValue(null),
             save: jest.fn().mockResolvedValue({ id: 1 }),
@@ -434,16 +446,22 @@ describe('ItemsSyncService', () => {
       mockCategoryRepository.find.mockResolvedValue(mockCategories);
       mockUexClient.fetchItemsByCategory.mockResolvedValue(mockItems);
 
-      const savedItems: any[] = [];
+      const savedItems: Record<string, unknown>[] = [];
 
       mockItemRepository.manager.transaction.mockImplementation(
-        async (callback: any) => {
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
           const mockManager = {
             findOne: jest.fn().mockResolvedValue(null),
-            save: jest.fn().mockImplementation((entity: any, data: any) => {
-              savedItems.push(data);
-              return { id: 1 };
-            }),
+            save: jest
+              .fn()
+              .mockImplementation(
+                (_entity: unknown, data: Record<string, unknown>) => {
+                  savedItems.push(data);
+                  return { id: 1 };
+                },
+              ),
             update: jest.fn(),
           };
           return await callback(mockManager);
@@ -482,16 +500,22 @@ describe('ItemsSyncService', () => {
       mockCategoryRepository.find.mockResolvedValue(mockCategories);
       mockUexClient.fetchItemsByCategory.mockResolvedValue(mockItems);
 
-      const savedItems: any[] = [];
+      const savedItems: Record<string, unknown>[] = [];
 
       mockItemRepository.manager.transaction.mockImplementation(
-        async (callback: any) => {
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
           const mockManager = {
             findOne: jest.fn().mockResolvedValue(null),
-            save: jest.fn().mockImplementation((entity: any, data: any) => {
-              savedItems.push(data);
-              return { id: 1 };
-            }),
+            save: jest
+              .fn()
+              .mockImplementation(
+                (_entity: unknown, data: Record<string, unknown>) => {
+                  savedItems.push(data);
+                  return { id: 1 };
+                },
+              ),
             update: jest.fn(),
           };
           return await callback(mockManager);

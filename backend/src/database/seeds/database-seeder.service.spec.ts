@@ -155,49 +155,67 @@ describe('DatabaseSeederService', () => {
         .spyOn(gamesRepository, 'findOne')
         .mockResolvedValueOnce(null) // First game check (sc)
         .mockResolvedValueOnce(null) // Second game check (sq42)
-        .mockResolvedValueOnce(mockGame as any) // Get sc game for org creation
+        .mockResolvedValueOnce(mockGame as unknown as Game) // Get sc game for org creation
         .mockResolvedValueOnce(null); // Org check
 
-      jest.spyOn(gamesRepository, 'create').mockReturnValue(mockGame as any);
-      jest.spyOn(gamesRepository, 'save').mockResolvedValue(mockGame as any);
+      jest
+        .spyOn(gamesRepository, 'create')
+        .mockReturnValue(mockGame as unknown as Game);
+      jest
+        .spyOn(gamesRepository, 'save')
+        .mockResolvedValue(mockGame as unknown as Game);
 
       jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(rolesRepository, 'create').mockReturnValue(mockRole as any);
-      jest.spyOn(rolesRepository, 'save').mockResolvedValue(mockRole as any);
+      jest
+        .spyOn(rolesRepository, 'create')
+        .mockReturnValue(mockRole as unknown as Role);
+      jest
+        .spyOn(rolesRepository, 'save')
+        .mockResolvedValue(mockRole as unknown as Role);
 
       jest.spyOn(organizationsRepository, 'findOne').mockResolvedValue(null);
       jest
         .spyOn(organizationsRepository, 'create')
-        .mockReturnValue(mockOrganization as any);
+        .mockReturnValue(mockOrganization as unknown as Organization);
       jest
         .spyOn(organizationsRepository, 'save')
-        .mockResolvedValue(mockOrganization as any);
+        .mockResolvedValue(mockOrganization as unknown as Organization);
 
       jest.spyOn(usersRepository, 'findOne').mockResolvedValue(null);
-      jest.spyOn(usersRepository, 'create').mockReturnValue(mockUser as any);
-      jest.spyOn(usersRepository, 'save').mockResolvedValue(mockUser as any);
+      jest
+        .spyOn(usersRepository, 'create')
+        .mockReturnValue(mockUser as unknown as User);
+      jest
+        .spyOn(usersRepository, 'save')
+        .mockResolvedValue(mockUser as unknown as User);
 
       jest.spyOn(userOrgRolesRepository, 'findOne').mockResolvedValue(null);
       jest
         .spyOn(userOrgRolesRepository, 'create')
-        .mockReturnValue(mockUserOrgRole as any);
+        .mockReturnValue(mockUserOrgRole as unknown as UserOrganizationRole);
       jest
         .spyOn(userOrgRolesRepository, 'save')
-        .mockResolvedValue(mockUserOrgRole as any);
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
 
       await expect(service.seedAll()).resolves.toBeUndefined();
     });
 
     it('should handle existing data gracefully', async () => {
-      jest.spyOn(gamesRepository, 'findOne').mockResolvedValue(mockGame as any);
-      jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(mockRole as any);
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGame as unknown as Game);
+      jest
+        .spyOn(rolesRepository, 'findOne')
+        .mockResolvedValue(mockRole as unknown as Role);
       jest
         .spyOn(organizationsRepository, 'findOne')
-        .mockResolvedValue(mockOrganization as any);
-      jest.spyOn(usersRepository, 'findOne').mockResolvedValue(mockUser as any);
+        .mockResolvedValue(mockOrganization as unknown as Organization);
+      jest
+        .spyOn(usersRepository, 'findOne')
+        .mockResolvedValue(mockUser as unknown as User);
       jest
         .spyOn(userOrgRolesRepository, 'findOne')
-        .mockResolvedValue(mockUserOrgRole as any);
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
 
       await expect(service.seedAll()).resolves.toBeUndefined();
 

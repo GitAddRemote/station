@@ -27,7 +27,7 @@ describe('UexService', () => {
   } as unknown as UexItem;
 
   const createQueryBuilder = () => {
-    const qb: any = {
+    const qb: Record<string, jest.Mock> = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -123,7 +123,7 @@ describe('UexService', () => {
   });
 
   it('should return active star systems by default', async () => {
-    const mockQueryBuilder: any = {
+    const mockQueryBuilder: Record<string, jest.Mock> = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -138,14 +138,15 @@ describe('UexService', () => {
       ]),
     };
 
-    (mockStarSystemRepository as any).createQueryBuilder = jest
-      .fn()
-      .mockReturnValue(mockQueryBuilder);
+    (
+      mockStarSystemRepository as unknown as Record<string, jest.Mock>
+    ).createQueryBuilder = jest.fn().mockReturnValue(mockQueryBuilder);
 
     const systems = await service.getStarSystems({});
 
     expect(
-      (mockStarSystemRepository as any).createQueryBuilder,
+      (mockStarSystemRepository as unknown as Record<string, jest.Mock>)
+        .createQueryBuilder,
     ).toHaveBeenCalledWith('system');
     expect(mockQueryBuilder.where).toHaveBeenCalledWith(
       'system.deleted = FALSE',
@@ -164,7 +165,7 @@ describe('UexService', () => {
   });
 
   it('should allow including inactive systems when filters disable flags', async () => {
-    const mockQueryBuilder: any = {
+    const mockQueryBuilder: Record<string, jest.Mock> = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -179,9 +180,9 @@ describe('UexService', () => {
       ]),
     };
 
-    (mockStarSystemRepository as any).createQueryBuilder = jest
-      .fn()
-      .mockReturnValue(mockQueryBuilder);
+    (
+      mockStarSystemRepository as unknown as Record<string, jest.Mock>
+    ).createQueryBuilder = jest.fn().mockReturnValue(mockQueryBuilder);
 
     const systems = await service.getStarSystems({
       activeOnly: false,
