@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { DatabaseSeederService } from '../src/database/seeds/database-seeder.service';
 import { DataSource } from 'typeorm';
@@ -8,7 +9,7 @@ import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('Organizations (e2e)', () => {
   let app: INestApplication;
-  let authToken: string;
+  let authCookie: string;
   let createdOrgId: number;
 
   beforeAll(async () => {
@@ -17,6 +18,7 @@ describe('Organizations (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
 
@@ -42,9 +44,18 @@ describe('Organizations (e2e)', () => {
       .send({
         username: 'orguser',
         password: 'password123',
-      });
+      })
+      .expect(200);
 
-    authToken = loginResponse.body.access_token;
+    const setCookies = loginResponse.headers[
+      'set-cookie'
+    ] as unknown as string[];
+    expect(Array.isArray(setCookies)).toBe(true);
+    const accessTokenCookie = setCookies.find((c) =>
+      c.startsWith('access_token='),
+    );
+    expect(accessTokenCookie).toBeDefined();
+    authCookie = accessTokenCookie!.split(';')[0];
   });
 
   afterAll(async () => {
@@ -55,7 +66,7 @@ describe('Organizations (e2e)', () => {
     it('should create a new organization', () => {
       return request(app.getHttpServer())
         .post('/organizations')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           name: 'Test Corp',
           description: 'A test organization',
@@ -83,7 +94,7 @@ describe('Organizations (e2e)', () => {
     it('should create organization with minimal data', () => {
       return request(app.getHttpServer())
         .post('/organizations')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           name: 'Minimal Org',
         })
@@ -99,7 +110,7 @@ describe('Organizations (e2e)', () => {
     it('should return all active organizations', () => {
       return request(app.getHttpServer())
         .get('/organizations')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(Array.isArray(response.body)).toBe(true);
@@ -112,7 +123,7 @@ describe('Organizations (e2e)', () => {
     it('should return a specific organization', () => {
       return request(app.getHttpServer())
         .get(`/organizations/${createdOrgId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(response.body.id).toBe(createdOrgId);
@@ -123,7 +134,7 @@ describe('Organizations (e2e)', () => {
     it('should return 404 for non-existent organization', () => {
       return request(app.getHttpServer())
         .get('/organizations/99999')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(404);
     });
   });
@@ -132,7 +143,7 @@ describe('Organizations (e2e)', () => {
     it('should return organization with members', () => {
       return request(app.getHttpServer())
         .get(`/organizations/${createdOrgId}/members`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(200)
         .then((response) => {
           expect(response.body).toHaveProperty('id');
@@ -146,7 +157,7 @@ describe('Organizations (e2e)', () => {
     it('should update an organization', () => {
       return request(app.getHttpServer())
         .put(`/organizations/${createdOrgId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           description: 'Updated organization description',
           isActive: true,
@@ -162,7 +173,7 @@ describe('Organizations (e2e)', () => {
     it('should deactivate an organization', () => {
       return request(app.getHttpServer())
         .put(`/organizations/${createdOrgId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .send({
           isActive: false,
         })
@@ -177,14 +188,14 @@ describe('Organizations (e2e)', () => {
     it('should delete an organization', () => {
       return request(app.getHttpServer())
         .delete(`/organizations/${createdOrgId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(204);
     });
 
     it('should return 404 when deleting non-existent organization', () => {
       return request(app.getHttpServer())
         .delete('/organizations/99999')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authCookie)
         .expect(404);
     });
   });
