@@ -28,10 +28,7 @@ import {
   UserInventorySearchDto,
 } from './dto/user-inventory-item.dto';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
-
-interface QueryParams {
-  [key: string]: string | undefined;
-}
+import { QueryParams } from '../../common/types/query-params.type';
 
 @Controller('api/inventory')
 @UseGuards(JwtAuthGuard)

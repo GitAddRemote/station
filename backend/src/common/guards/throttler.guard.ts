@@ -16,8 +16,7 @@ import { Request } from 'express';
  */
 @Injectable()
 export class CustomThrottlerGuard extends ThrottlerGuard {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected async getTracker(req: Record<string, any>): Promise<string> {
+  protected async getTracker(req: Record<string, unknown>): Promise<string> {
     const request = req as unknown as Request;
     // req.ips is populated by Express only when trust proxy is configured;
     // it contains the full chain of forwarded IPs with spoofed entries stripped.

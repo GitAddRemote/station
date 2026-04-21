@@ -32,10 +32,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
-
-interface QueryParams {
-  [key: string]: string | undefined;
-}
+import { QueryParams } from '../../common/types/query-params.type';
 
 @ApiTags('Organization Inventory')
 @ApiBearerAuth()
