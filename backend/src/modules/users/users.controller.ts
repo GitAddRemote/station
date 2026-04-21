@@ -12,7 +12,6 @@ import {
   UseGuards,
   HttpCode,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UserDto } from './dto/user.dto';
@@ -25,8 +24,8 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
-  getProfile(@Req() req: Request) {
-    return req.user;
+  getProfile(@Req() req: AuthenticatedRequest) {
+    return { id: req.user.userId, username: req.user.username };
   }
 
   @UseGuards(AuthGuard('jwt'))

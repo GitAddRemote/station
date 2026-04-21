@@ -65,11 +65,16 @@ export class AuditLogInterceptor implements NestInterceptor {
           request.params?.roleId;
 
         if (rawEntityId !== undefined) {
-          const parsed =
-            typeof rawEntityId === 'number'
-              ? rawEntityId
-              : parseInt(String(rawEntityId), 10);
-          entityId = isNaN(parsed) ? undefined : parsed;
+          if (typeof rawEntityId === 'number') {
+            entityId = Number.isNaN(rawEntityId) ? undefined : rawEntityId;
+          } else if (
+            typeof rawEntityId === 'string' &&
+            /^\d+$/.test(rawEntityId)
+          ) {
+            entityId = parseInt(rawEntityId, 10);
+          }
+          // Non-numeric IDs (e.g. UUIDs) are intentionally left as undefined
+          // to avoid silent truncation like parseInt('1e3...') → 1.
         }
 
         await this.auditLogsService.log({
