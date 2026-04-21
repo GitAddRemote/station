@@ -1,6 +1,6 @@
 import { Injectable, Logger, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, MoreThan, IsNull } from 'typeorm';
 import { UexSyncState, SyncStatus } from './uex-sync-state.entity';
 import { UexSyncConfig } from './uex-sync-config.entity';
 
@@ -257,7 +257,7 @@ export class UexSyncService {
           lastSuccessfulSyncAt: MoreThan(thresholdDate),
         },
         {
-          lastSuccessfulSyncAt: null as unknown as Date,
+          lastSuccessfulSyncAt: IsNull(),
         },
       ],
       order: { lastSuccessfulSyncAt: 'ASC' },

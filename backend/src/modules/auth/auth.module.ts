@@ -11,7 +11,6 @@ import { UsersModule } from '../users/users.module';
 import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TokenCleanupService } from './token-cleanup.service';
 
 @Module({
   imports: [
@@ -28,13 +27,7 @@ import { TokenCleanupService } from './token-cleanup.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    LocalStrategy,
-    JwtStrategy,
-    RefreshTokenStrategy,
-    TokenCleanupService,
-  ],
+  providers: [AuthService, LocalStrategy, JwtStrategy, RefreshTokenStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}
