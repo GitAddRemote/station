@@ -8,22 +8,6 @@ import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity
 import { BaseUexEntity } from '../entities/base-uex.entity';
 
 /**
- * Update DTO for soft-delete operations
- */
-interface SoftDeleteUpdate {
-  deleted: true;
-  modifiedById: number;
-}
-
-/**
- * Update DTO for activation operations
- */
-interface ActivationUpdate {
-  active: boolean;
-  modifiedById: number;
-}
-
-/**
  * Base repository class for UEX entities
  * Automatically filters out soft-deleted records in all queries
  */
@@ -95,24 +79,22 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
    * Mark record as soft deleted
    */
   async markAsDeleted(id: number, modifiedBy: number): Promise<void> {
-    const updateData: SoftDeleteUpdate = {
+    await this.update(id, {
       deleted: true,
       modifiedById: modifiedBy,
-    };
-    await this.update(id, updateData as unknown as QueryDeepPartialEntity<T>);
+    } as unknown as QueryDeepPartialEntity<T>);
   }
 
   /**
    * Mark record as soft deleted by UEX ID
    */
   async markAsDeletedByUexId(uexId: number, modifiedBy: number): Promise<void> {
-    const updateData: SoftDeleteUpdate = {
-      deleted: true,
-      modifiedById: modifiedBy,
-    };
     await this.update(
       { uexId } as FindOptionsWhere<T>,
-      updateData as unknown as QueryDeepPartialEntity<T>,
+      {
+        deleted: true,
+        modifiedById: modifiedBy,
+      } as unknown as QueryDeepPartialEntity<T>,
     );
   }
 
@@ -120,21 +102,19 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
    * Mark record as inactive
    */
   async deactivate(id: number, modifiedBy: number): Promise<void> {
-    const updateData: ActivationUpdate = {
+    await this.update(id, {
       active: false,
       modifiedById: modifiedBy,
-    };
-    await this.update(id, updateData as unknown as QueryDeepPartialEntity<T>);
+    } as unknown as QueryDeepPartialEntity<T>);
   }
 
   /**
    * Mark record as active
    */
   async activate(id: number, modifiedBy: number): Promise<void> {
-    const updateData: ActivationUpdate = {
+    await this.update(id, {
       active: true,
       modifiedById: modifiedBy,
-    };
-    await this.update(id, updateData as unknown as QueryDeepPartialEntity<T>);
+    } as unknown as QueryDeepPartialEntity<T>);
   }
 }

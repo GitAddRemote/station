@@ -294,6 +294,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
 
+    const body =
+      typeof exceptionResponse === 'object' && exceptionResponse !== null
+        ? (exceptionResponse as Record<string, unknown>)
+        : {};
     const errorResponse = {
       success: false,
       statusCode: status,
@@ -303,12 +307,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message:
         typeof exceptionResponse === 'string'
           ? exceptionResponse
-          : (exceptionResponse as any).message,
-      errors:
-        typeof exceptionResponse === 'object' &&
-        (exceptionResponse as any).errors
-          ? (exceptionResponse as any).errors
-          : undefined,
+          : (body['message'] as string | undefined),
+      errors: body['errors'],
     };
 
     response.status(status).json(errorResponse);
@@ -322,7 +322,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 // interceptors/transform.interceptor.ts
 @Injectable()
 export class TransformInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
       map((data) => ({
         success: true,

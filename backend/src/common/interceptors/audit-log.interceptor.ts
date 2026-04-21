@@ -53,7 +53,7 @@ export class AuditLogInterceptor implements NestInterceptor {
     const { action, entityType } = auditMetadata;
 
     return next.handle().pipe(
-      tap(async (response: unknown) => {
+      tap((response: unknown) => {
         const typedResponse = response as AuditLogResponse | undefined;
 
         // Extract entity ID from response or params
@@ -77,25 +77,29 @@ export class AuditLogInterceptor implements NestInterceptor {
           // to avoid silent truncation like parseInt('1e3...') → 1.
         }
 
-        await this.auditLogsService.log({
-          userId: user?.userId,
-          username: user?.username,
-          action,
-          entityType,
-          entityId,
-          metadata: {
-            method: request.method,
-            url: request.url,
-            params: request.params,
-            query: request.query,
-          },
-          newValues: typedResponse as Record<string, unknown> | undefined,
-          ipAddress: request.ip,
-          userAgent:
-            typeof request.headers['user-agent'] === 'string'
-              ? request.headers['user-agent']
-              : undefined,
-        });
+        this.auditLogsService
+          .log({
+            userId: user?.userId,
+            username: user?.username,
+            action,
+            entityType,
+            entityId,
+            metadata: {
+              method: request.method,
+              url: request.url,
+              params: request.params,
+              query: request.query,
+            },
+            newValues: typedResponse as Record<string, unknown> | undefined,
+            ipAddress: request.ip,
+            userAgent:
+              typeof request.headers['user-agent'] === 'string'
+                ? request.headers['user-agent']
+                : undefined,
+          })
+          .catch(() => {
+            // Audit log failures must not affect the response pipeline
+          });
       }),
     );
   }
