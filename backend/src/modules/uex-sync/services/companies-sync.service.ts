@@ -78,9 +78,13 @@ export class CompaniesSyncService {
         durationMs,
         syncMode: 'full',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const durationMs = Date.now() - startTime;
-      await this.syncService.recordSyncFailure(endpoint, error, durationMs);
+      await this.syncService.recordSyncFailure(
+        endpoint,
+        error as Error,
+        durationMs,
+      );
       throw error;
     } finally {
       await this.syncService.releaseSyncLock(endpoint);

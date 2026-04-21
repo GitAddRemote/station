@@ -102,7 +102,9 @@ export const InventoryFiltersPanel = ({
             value={filters.search}
             autoFocus={autoFocusSearch}
             disabled={disabled}
-            onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, search: e.target.value }))
+            }
           />
         </Grid>
         <Grid item xs={6} md={2}>
@@ -116,7 +118,8 @@ export const InventoryFiltersPanel = ({
               onChange={(e) =>
                 setFilters((prev) => ({
                   ...prev,
-                  categoryId: e.target.value === '' ? '' : Number(e.target.value),
+                  categoryId:
+                    e.target.value === '' ? '' : Number(e.target.value),
                 }))
               }
             >
@@ -142,7 +145,8 @@ export const InventoryFiltersPanel = ({
               onChange={(e) =>
                 setFilters((prev) => ({
                   ...prev,
-                  locationId: e.target.value === '' ? '' : Number(e.target.value),
+                  locationId:
+                    e.target.value === '' ? '' : Number(e.target.value),
                 }))
               }
             >
@@ -184,7 +188,9 @@ export const InventoryFiltersPanel = ({
             <Select
               labelId="org-selector-label"
               label="View"
-              value={viewMode === 'personal' ? 'personal' : selectedOrgId ?? ''}
+              value={
+                viewMode === 'personal' ? 'personal' : (selectedOrgId ?? '')
+              }
               disabled={disabled}
               onChange={(e) => {
                 const value = e.target.value;
@@ -216,29 +222,40 @@ export const InventoryFiltersPanel = ({
         </Grid>
       </Grid>
 
-      <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 3, mb: 1, color: '#9aa0a6' }}>
+      <Typography
+        variant="body2"
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          mt: 3,
+          mb: 1,
+          color: '#9aa0a6',
+        }}
+      >
         <ViewAgendaIcon fontSize="small" />
-        Showing {itemCount.toLocaleString()} of {totalCount.toLocaleString()} items
+        Showing {itemCount.toLocaleString()} of {totalCount.toLocaleString()}{' '}
+        items
       </Typography>
 
       <Grid container spacing={2} alignItems="center">
         <Grid item>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={filters.sharedOnly}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      sharedOnly: e.target.checked,
-                    }))
-                  }
-                  size="small"
-                  disabled={disabled || viewMode === 'org'}
-                />
-              }
-              label="Shared only"
-            />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={filters.sharedOnly}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    sharedOnly: e.target.checked,
+                  }))
+                }
+                size="small"
+                disabled={disabled || viewMode === 'org'}
+              />
+            }
+            label="Shared only"
+          />
         </Grid>
         <Grid item>
           <Button
@@ -246,7 +263,9 @@ export const InventoryFiltersPanel = ({
             variant="outlined"
             color="inherit"
             disabled={disabled}
-            onClick={() => setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))}
+            onClick={() =>
+              setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
+            }
           >
             Sort: {sortBy} ({sortDir})
           </Button>
@@ -259,7 +278,11 @@ export const InventoryFiltersPanel = ({
               label="Sort By"
               value={sortBy}
               disabled={disabled}
-              onChange={(e) => setSortBy(e.target.value as 'name' | 'quantity' | 'location' | 'date')}
+              onChange={(e) =>
+                setSortBy(
+                  e.target.value as 'name' | 'quantity' | 'location' | 'date',
+                )
+              }
             >
               <MenuItem value="date">Last updated</MenuItem>
               <MenuItem value="name">Name</MenuItem>
@@ -276,7 +299,11 @@ export const InventoryFiltersPanel = ({
               label="Group By"
               value={groupBy}
               disabled={disabled}
-              onChange={(e) => setGroupBy(e.target.value as 'none' | 'category' | 'location' | 'share')}
+              onChange={(e) =>
+                setGroupBy(
+                  e.target.value as 'none' | 'category' | 'location' | 'share',
+                )
+              }
               startAdornment={<GroupWorkIcon sx={{ mr: 1 }} />}
             >
               <MenuItem value="none">No grouping</MenuItem>
@@ -313,7 +340,9 @@ export const InventoryFiltersPanel = ({
               label="View mode"
               value={density}
               disabled={disabled}
-              onChange={(e) => setDensity(e.target.value as 'standard' | 'compact')}
+              onChange={(e) =>
+                setDensity(e.target.value as 'standard' | 'compact')
+              }
             >
               <MenuItem value="standard">Standard</MenuItem>
               <MenuItem value="compact">Editor Mode</MenuItem>
@@ -322,7 +351,11 @@ export const InventoryFiltersPanel = ({
         </Grid>
         {showAddButton && (
           <Grid item>
-            <Button variant="contained" onClick={onOpenAddDialog} disabled={disabled}>
+            <Button
+              variant="contained"
+              onClick={onOpenAddDialog}
+              disabled={disabled}
+            >
               {addButtonLabel}
             </Button>
           </Grid>

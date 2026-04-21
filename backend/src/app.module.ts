@@ -65,10 +65,12 @@ if (!isTest) {
           });
           console.log('✅ Redis cache connected successfully');
           return { store };
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.warn(
             '⚠️  Redis connection failed, using in-memory cache:',
-            error?.message || error,
+            errorMessage,
           );
           // Fall back to in-memory cache if Redis is not available
           return {

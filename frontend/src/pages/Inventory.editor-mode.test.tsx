@@ -18,7 +18,8 @@ const mockGetUserPermissions = jest.fn();
 jest.mock('../services/inventory.service', () => ({
   inventoryService: {
     getCategories: jest.fn().mockResolvedValue([]),
-    getUserOrganizations: (...args: unknown[]) => mockGetUserOrganizations(...args),
+    getUserOrganizations: (...args: unknown[]) =>
+      mockGetUserOrganizations(...args),
     getInventory: (...args: unknown[]) => mockGetInventory(...args),
     getOrgInventory: (...args: unknown[]) => mockGetOrgInventory(...args),
     updateItem: (...args: unknown[]) => mockUpdateItem(...args),
@@ -75,7 +76,9 @@ jest.mock('../hooks/useMemoizedLocations', () => {
   const original = jest.requireActual('../hooks/useMemoizedLocations');
   return {
     ...original,
-    useMemoizedLocations: jest.fn((...args: unknown[]) => original.useMemoizedLocations(...args)),
+    useMemoizedLocations: jest.fn((...args: unknown[]) =>
+      original.useMemoizedLocations(...args),
+    ),
   };
 });
 const mockItem = {
@@ -98,8 +101,18 @@ const mockItem = {
 describe('Inventory editor mode inline controls', () => {
   beforeEach(() => {
     jest.resetAllMocks();
-    mockGetInventory.mockResolvedValue({ items: [mockItem], total: 1, limit: 25, offset: 0 });
-    mockGetOrgInventory.mockResolvedValue({ items: [mockItem], total: 1, limit: 25, offset: 0 });
+    mockGetInventory.mockResolvedValue({
+      items: [mockItem],
+      total: 1,
+      limit: 25,
+      offset: 0,
+    });
+    mockGetOrgInventory.mockResolvedValue({
+      items: [mockItem],
+      total: 1,
+      limit: 25,
+      offset: 0,
+    });
     mockGetUserOrganizations.mockResolvedValue([]);
     mockUpdateItem.mockResolvedValue({});
     mockUpdateOrgItem.mockResolvedValue({});
@@ -118,7 +131,9 @@ describe('Inventory editor mode inline controls', () => {
       offset: 0,
     });
     mockGetUserPermissions.mockResolvedValue(['can_edit_org_inventory']);
-    const mockedLocationCache = locationCache as jest.Mocked<typeof locationCache>;
+    const mockedLocationCache = locationCache as jest.Mocked<
+      typeof locationCache
+    >;
     const mockLocations: LocationRecord[] = [
       {
         id: '200',
@@ -164,7 +179,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
@@ -191,7 +208,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
@@ -242,7 +261,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewSelect = screen.getByLabelText('View');
     fireEvent.mouseDown(viewSelect);
@@ -285,7 +306,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewSelect = screen.getByLabelText('View');
     fireEvent.mouseDown(viewSelect);
@@ -301,7 +324,9 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.mouseDown(viewSelect);
     const listbox = await screen.findByRole('presentation');
     const options = Array.from(listbox.querySelectorAll('[role="option"]'));
-    const maybeOrgOption = options.find((opt) => opt.textContent && opt.textContent !== 'My Inventory');
+    const maybeOrgOption = options.find(
+      (opt) => opt.textContent && opt.textContent !== 'My Inventory',
+    );
     if (maybeOrgOption) {
       fireEvent.click(maybeOrgOption);
     }
@@ -326,7 +351,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
@@ -336,7 +363,9 @@ describe('Inventory editor mode inline controls', () => {
     const saveButton = await screen.findByTestId('new-row-save');
     fireEvent.click(saveButton);
 
-    await waitFor(() => expect(screen.getByText('Select an item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Select an item')).toBeInTheDocument(),
+    );
     const itemInput = await screen.findByTestId('new-row-item-input');
     await waitFor(() => expect(document.activeElement).toBe(itemInput));
   });
@@ -348,7 +377,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -368,7 +399,9 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.click(saveButton);
 
     expect(mockCreateItem).not.toHaveBeenCalled();
-    expect(screen.getByText('Quantity must be at least 0.01')).toBeInTheDocument();
+    expect(
+      screen.getByText('Quantity must be at least 0.01'),
+    ).toBeInTheDocument();
   });
 
   it('keeps the row dirty and shows retry on API failure', async () => {
@@ -380,13 +413,17 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    fireEvent.change(await screen.findByTestId('new-row-item-input'), { target: { value: 'New' } });
+    fireEvent.change(await screen.findByTestId('new-row-item-input'), {
+      target: { value: 'New' },
+    });
     fireEvent.click(await screen.findByText('New Catalog Item'));
 
     const locationInput = await screen.findByTestId('new-row-location-input');
@@ -399,9 +436,13 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.click(screen.getByTestId('new-row-save'));
 
     await waitFor(() =>
-      expect(screen.getByText('Unable to add item. Please try again.')).toBeInTheDocument(),
+      expect(
+        screen.getByText('Unable to add item. Please try again.'),
+      ).toBeInTheDocument(),
     );
-    expect((screen.getByTestId('new-row-quantity') as HTMLInputElement).value).toBe('7');
+    expect(
+      (screen.getByTestId('new-row-quantity') as HTMLInputElement).value,
+    ).toBe('7');
     const retryButton = screen.getByTestId('new-row-retry');
     fireEvent.click(retryButton);
     await waitFor(() => expect(mockCreateItem).toHaveBeenCalledTimes(2));
@@ -414,7 +455,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -450,7 +493,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewSelect = screen.getByLabelText('View');
     fireEvent.mouseDown(viewSelect);
@@ -458,10 +503,14 @@ describe('Inventory editor mode inline controls', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText('You do not have permission to add items to this organization.'),
+        screen.getByText(
+          'You do not have permission to add items to this organization.',
+        ),
       ).toBeInTheDocument(),
     );
-    expect(screen.queryByRole('button', { name: 'Add org item' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add org item' }),
+    ).not.toBeInTheDocument();
   });
 
   it('handles org add conflicts by loading the existing item and merging quantities', async () => {
@@ -477,7 +526,12 @@ describe('Inventory editor mode inline controls', () => {
     ]);
     mockGetUserPermissions.mockResolvedValue(['can_edit_org_inventory']);
     mockGetOrgInventory
-      .mockResolvedValueOnce({ items: [mockItem], total: 1, limit: 25, offset: 0 })
+      .mockResolvedValueOnce({
+        items: [mockItem],
+        total: 1,
+        limit: 25,
+        offset: 0,
+      })
       .mockResolvedValueOnce({
         items: [
           {
@@ -508,13 +562,17 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewSelect = screen.getByLabelText('View');
     fireEvent.mouseDown(viewSelect);
     fireEvent.click(await screen.findByText('Test Org'));
 
-    const addButton = await screen.findByRole('button', { name: 'Add org item' });
+    const addButton = await screen.findByRole('button', {
+      name: 'Add org item',
+    });
     fireEvent.click(addButton);
 
     fireEvent.click(await screen.findByText('New Catalog Item'));
@@ -539,7 +597,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
@@ -550,7 +610,9 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.click(saveButton);
 
     await waitFor(() =>
-      expect(screen.getByText('Unable to save. Please try again.')).toBeInTheDocument(),
+      expect(
+        screen.getByText('Unable to save. Please try again.'),
+      ).toBeInTheDocument(),
     );
     await waitFor(() => expect(document.activeElement).toBe(saveButton));
   });
@@ -562,7 +624,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
 
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
@@ -585,7 +649,9 @@ describe('Inventory editor mode inline controls', () => {
     await waitFor(() => expect(mockCreateItem).toHaveBeenCalled());
     const refreshedItemInput = await screen.findByTestId('new-row-item-input');
     expect((refreshedItemInput as HTMLInputElement).value).toBe('');
-    await waitFor(() => expect(document.activeElement).toBe(refreshedItemInput));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(refreshedItemInput),
+    );
   });
 
   it('moves focus to save when pressing Enter on quantity', async () => {
@@ -595,7 +661,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -616,7 +684,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -628,7 +698,9 @@ describe('Inventory editor mode inline controls', () => {
 
     await user.type(locationInput, 'Al');
 
-    await waitFor(() => expect(screen.queryByText('Beta Port')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText('Beta Port')).not.toBeInTheDocument(),
+    );
   });
 
   it('selects a location via keyboard navigation in the new row combobox', async () => {
@@ -639,7 +711,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -660,7 +734,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -674,16 +750,22 @@ describe('Inventory editor mode inline controls', () => {
     await user.click(locationInput);
     await user.type(locationInput, 'Nowhere');
 
-    await waitFor(() => expect(screen.queryByText('Beta Port')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText('Beta Port')).not.toBeInTheDocument(),
+    );
     await user.keyboard('{Enter}');
 
-    await waitFor(() => expect(screen.getByText('No matches found')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('No matches found')).toBeInTheDocument(),
+    );
 
     const quantityInput = await screen.findByTestId('new-row-quantity');
     await user.type(quantityInput, '4');
     await user.click(screen.getByTestId('new-row-save'));
 
-    await waitFor(() => expect(screen.getByText('Select a valid location')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Select a valid location')).toBeInTheDocument(),
+    );
     expect(mockCreateItem).not.toHaveBeenCalled();
   });
 
@@ -694,7 +776,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -702,7 +786,9 @@ describe('Inventory editor mode inline controls', () => {
 
     const quantityInput = await screen.findByTestId('new-row-quantity');
     fireEvent.change(quantityInput, { target: { value: '100000' } });
-    expect(screen.getByText('Large quantity entered - verify value.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Large quantity entered - verify value.'),
+    ).toBeInTheDocument();
 
     fireEvent.change(quantityInput, { target: { value: '1000000' } });
     expect(quantityInput).toHaveValue('100000');
@@ -730,7 +816,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -748,7 +836,9 @@ describe('Inventory editor mode inline controls', () => {
     await waitFor(() => expect(document.activeElement).toBe(saveButton));
 
     await user.keyboard('{Enter}');
-    const nextLocationInput = await screen.findByTestId('inline-location-item-2');
+    const nextLocationInput = await screen.findByTestId(
+      'inline-location-item-2',
+    );
     await waitFor(() => expect(document.activeElement).toBe(nextLocationInput));
   });
 
@@ -761,22 +851,24 @@ describe('Inventory editor mode inline controls', () => {
       locationId: 201,
       locationName: 'Alpha Base',
     };
-    mockGetInventory.mockImplementation((params?: { offset?: number; limit?: number }) => {
-      if (params?.offset === 25) {
+    mockGetInventory.mockImplementation(
+      (params?: { offset?: number; limit?: number }) => {
+        if (params?.offset === 25) {
+          return Promise.resolve({
+            items: [pageTwoItem],
+            total: 26,
+            limit: 25,
+            offset: 25,
+          });
+        }
         return Promise.resolve({
-          items: [pageTwoItem],
+          items: [mockItem],
           total: 26,
           limit: 25,
-          offset: 25,
+          offset: 0,
         });
-      }
-      return Promise.resolve({
-        items: [mockItem],
-        total: 26,
-        limit: 25,
-        offset: 0,
-      });
-    });
+      },
+    );
 
     render(
       <MemoryRouter initialEntries={['/inventory']}>
@@ -784,7 +876,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -793,7 +887,9 @@ describe('Inventory editor mode inline controls', () => {
     const saveButton = await screen.findByTestId('inline-save-item-1');
     await user.click(saveButton);
 
-    const nextLocationInput = await screen.findByTestId('inline-location-item-2');
+    const nextLocationInput = await screen.findByTestId(
+      'inline-location-item-2',
+    );
     await waitFor(() => expect(document.activeElement).toBe(nextLocationInput));
   });
 
@@ -805,7 +901,9 @@ describe('Inventory editor mode inline controls', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Test Item')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Test Item')).toBeInTheDocument(),
+    );
     const viewModeSelect = screen.getByLabelText('View mode');
     fireEvent.mouseDown(viewModeSelect);
     const editorOption = await screen.findByText('Editor Mode');
@@ -818,17 +916,25 @@ describe('Inventory editor mode inline controls', () => {
     itemInput.focus();
 
     await user.tab();
-    expect(document.activeElement).toBe(await screen.findByTestId('new-row-location-input'));
+    expect(document.activeElement).toBe(
+      await screen.findByTestId('new-row-location-input'),
+    );
 
     await user.tab();
-    expect(document.activeElement).toBe(await screen.findByTestId('new-row-quantity'));
+    expect(document.activeElement).toBe(
+      await screen.findByTestId('new-row-quantity'),
+    );
 
     await user.tab();
-    expect(document.activeElement).toBe(await screen.findByTestId('new-row-save'));
+    expect(document.activeElement).toBe(
+      await screen.findByTestId('new-row-save'),
+    );
   });
 
   it('memoizes location filtering for inline rows', () => {
-    const { useMemoizedLocations: mockedHook } = jest.requireMock('../hooks/useMemoizedLocations');
+    const { useMemoizedLocations: mockedHook } = jest.requireMock(
+      '../hooks/useMemoizedLocations',
+    );
     render(
       <MemoryRouter initialEntries={['/inventory']}>
         <InventoryPage />

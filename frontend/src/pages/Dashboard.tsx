@@ -260,7 +260,10 @@ const Dashboard = () => {
         </Grid>
 
         <Box sx={{ mt: 6 }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: '#e8eaed' }}>
+          <Typography
+            variant="h5"
+            sx={{ mb: 3, fontWeight: 600, color: '#e8eaed' }}
+          >
             Quick Actions
           </Typography>
           <Grid container spacing={2}>
@@ -268,7 +271,9 @@ const Dashboard = () => {
               <Button
                 variant="contained"
                 startIcon={<GroupsIcon />}
-                onClick={() => alert('Create Organization feature coming soon!')}
+                onClick={() =>
+                  alert('Create Organization feature coming soon!')
+                }
               >
                 Create Organization
               </Button>

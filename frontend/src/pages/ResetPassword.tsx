@@ -27,7 +27,9 @@ const ResetPassword = () => {
 
   useEffect(() => {
     if (!token) {
-      setError('Invalid or missing reset token. Please request a new password reset link.');
+      setError(
+        'Invalid or missing reset token. Please request a new password reset link.',
+      );
     }
   }, [token]);
 

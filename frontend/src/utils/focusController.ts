@@ -36,7 +36,11 @@ export class FocusController<RowKey, FieldKey> {
    * Register a focus callback for a row/field combination.
    * Returns an unregister function.
    */
-  register(rowKey: RowKey, fieldKey: FieldKey, focus: FocusCallback): () => void {
+  register(
+    rowKey: RowKey,
+    fieldKey: FieldKey,
+    focus: FocusCallback,
+  ): () => void {
     let fields = this.registry.get(rowKey);
     if (!fields) {
       fields = new Map<FieldKey, FocusCallback>();
@@ -81,7 +85,10 @@ export class FocusController<RowKey, FieldKey> {
    * Advance focus to the next field in the same row, or the next row's first field.
    * If at the last row, delegates to onBoundary to resolve the next target (e.g., next page).
    */
-  async focusNext(currentRow: RowKey, currentField: FieldKey): Promise<boolean> {
+  async focusNext(
+    currentRow: RowKey,
+    currentField: FieldKey,
+  ): Promise<boolean> {
     const fieldIndex = this.fieldOrder.indexOf(currentField);
     const rowOrder = this.getRowOrder();
     const rowIndex = rowOrder.indexOf(currentRow);

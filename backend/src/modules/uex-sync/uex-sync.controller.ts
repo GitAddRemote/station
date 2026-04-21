@@ -196,7 +196,9 @@ export class UexSyncController {
           deleted,
           durationMs,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Sync failed';
         results.push({
           endpoint,
           status: SyncStatus.FAILED,
@@ -205,7 +207,7 @@ export class UexSyncController {
           updated: 0,
           deleted: 0,
           durationMs: Date.now() - start,
-          errorMessage: error?.message || 'Sync failed',
+          errorMessage,
         });
       }
     }

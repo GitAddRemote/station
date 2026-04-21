@@ -27,7 +27,11 @@ interface InventoryNewRowProps {
   locationEditing: boolean;
   selectedLocation: LocationOption | null;
   filteredLocations: LocationOption[];
-  draft: { itemId: number | ''; locationId: number | ''; quantity: number | '' };
+  draft: {
+    itemId: number | '';
+    locationId: number | '';
+    quantity: number | '';
+  };
   errors: {
     item?: string | null;
     location?: string | null;
@@ -166,7 +170,9 @@ export const InventoryNewRow = ({
           filterOptions={(options) => options}
           value={locationEditing ? null : selectedLocation}
           inputValue={
-            locationEditing ? locationInput : selectedLocation?.name ?? locationInput
+            locationEditing
+              ? locationInput
+              : (selectedLocation?.name ?? locationInput)
           }
           getOptionLabel={(option) => option?.name ?? ''}
           isOptionEqualToValue={(option, value) => option.id === value.id}
@@ -268,7 +274,11 @@ export const InventoryNewRow = ({
           />
         )}
         <Tooltip
-          title={orgBlocked ? 'Select an organization to save items in org view.' : ''}
+          title={
+            orgBlocked
+              ? 'Select an organization to save items in org view.'
+              : ''
+          }
           disableHoverListener={!orgBlocked}
         >
           <span>

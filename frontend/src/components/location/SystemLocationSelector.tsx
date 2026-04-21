@@ -138,7 +138,9 @@ const SystemLocationSelector = ({
     const matching = locations
       .filter((location) => location.locationType !== 'star_system')
       .filter((location) => {
-        const hierarchy = location.hierarchyPath as Record<string, string> | undefined;
+        const hierarchy = location.hierarchyPath as
+          | Record<string, string>
+          | undefined;
         const system = hierarchy?.system?.toLowerCase() || '';
         if (systemName && system !== systemName) {
           return false;
@@ -189,9 +191,7 @@ const SystemLocationSelector = ({
         <Autocomplete
           fullWidth
           options={filteredSystems}
-          value={
-            systems.find((system) => system.id === value.systemId) || null
-          }
+          value={systems.find((system) => system.id === value.systemId) || null}
           getOptionLabel={(option) => option.name}
           onChange={(_, option) => {
             const systemId = option ? option.id : '';

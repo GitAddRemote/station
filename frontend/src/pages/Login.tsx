@@ -59,11 +59,19 @@ const Login = () => {
       } else {
         const errorData = await response.json();
         console.error('Login error:', errorData);
-        setError(errorData.message || errorData.error || 'Invalid username or password');
+        setError(
+          errorData.message ||
+            errorData.error ||
+            'Invalid username or password',
+        );
       }
     } catch (err: unknown) {
       console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Cannot connect to server. Please make sure the backend is running.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Cannot connect to server. Please make sure the backend is running.',
+      );
     } finally {
       setLoading(false);
     }
@@ -241,7 +249,8 @@ const Login = () => {
           <DialogContent>
             {!resetSuccess && (
               <Typography sx={{ mb: 2, color: '#9aa0a6' }}>
-                Enter your email address and we'll send you a link to reset your password.
+                Enter your email address and we'll send you a link to reset your
+                password.
               </Typography>
             )}
 
@@ -279,7 +288,10 @@ const Login = () => {
               </Button>
             ) : (
               <>
-                <Button onClick={handleCloseForgotPassword} disabled={resetLoading}>
+                <Button
+                  onClick={handleCloseForgotPassword}
+                  disabled={resetLoading}
+                >
                   Cancel
                 </Button>
                 <Button

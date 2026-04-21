@@ -7,6 +7,12 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
+interface HttpExceptionResponse {
+  message?: string | string[];
+  errors?: unknown;
+  [key: string]: unknown;
+}
+
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: HttpException, host: ArgumentsHost) {
@@ -16,21 +22,28 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
 
+    let message: string | string[] = 'An error occurred';
+    let errors: unknown = undefined;
+
+    if (typeof exceptionResponse === 'string') {
+      message = exceptionResponse;
+    } else if (
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null
+    ) {
+      const typedResponse = exceptionResponse as HttpExceptionResponse;
+      message = typedResponse.message || 'An error occurred';
+      errors = typedResponse.errors;
+    }
+
     const errorResponse = {
       success: false,
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
-      message:
-        typeof exceptionResponse === 'string'
-          ? exceptionResponse
-          : (exceptionResponse as any).message || 'An error occurred',
-      errors:
-        typeof exceptionResponse === 'object' &&
-        (exceptionResponse as any).errors
-          ? (exceptionResponse as any).errors
-          : undefined,
+      message,
+      errors,
     };
 
     response.status(status).json(errorResponse);

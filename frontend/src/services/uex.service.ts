@@ -40,7 +40,9 @@ export interface StarSystem {
 }
 
 export const uexService = {
-  async searchItems(params: CatalogSearchParams): Promise<CatalogSearchResponse> {
+  async searchItems(
+    params: CatalogSearchParams,
+  ): Promise<CatalogSearchResponse> {
     const response = await axios.get(`${API_URL}/api/uex/items`, {
       params,
       headers: getAuthHeader(),

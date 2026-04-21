@@ -1,4 +1,12 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -46,7 +54,12 @@ import ShareIcon from '@mui/icons-material/Share';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import BusinessIcon from '@mui/icons-material/Business';
-import { inventoryService, InventoryCategory, InventoryItem, OrgInventoryItem } from '../services/inventory.service';
+import {
+  inventoryService,
+  InventoryCategory,
+  InventoryItem,
+  OrgInventoryItem,
+} from '../services/inventory.service';
 import { uexService, CatalogItem } from '../services/uex.service';
 import { locationCache } from '../services/locationCache';
 import type { SystemLocationValue } from '../components/location/SystemLocationSelector';
@@ -55,7 +68,10 @@ import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
 import InventoryNewRow from '../components/inventory/InventoryNewRow';
 import InventoryFiltersPanel from '../components/inventory/InventoryFiltersPanel';
-import { OrgPermission, permissionsService } from '../services/permissions.service';
+import {
+  OrgPermission,
+  permissionsService,
+} from '../services/permissions.service';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
@@ -98,7 +114,9 @@ const readStoredDensity = (): 'standard' | 'compact' => {
 
 const valueText = (value: number) => `${value.toLocaleString()} qty`;
 
-const LazySystemLocationSelector = lazy(() => import('../components/location/SystemLocationSelector'));
+const LazySystemLocationSelector = lazy(
+  () => import('../components/location/SystemLocationSelector'),
+);
 
 const InventoryPage = () => {
   const navigate = useNavigate();
@@ -106,10 +124,18 @@ const InventoryPage = () => {
   const firstCatalogItemRef = useRef<HTMLDivElement | null>(null);
   const catalogItemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const systemSelectRef = useRef<HTMLInputElement | null>(null);
-  const [user, setUser] = useState<{ userId: number; username: string } | null>(null);
-  const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(() => readStoredOrgId());
-  const [viewMode, setViewMode] = useState<'personal' | 'org'>(() => readStoredViewMode());
+  const [user, setUser] = useState<{ userId: number; username: string } | null>(
+    null,
+  );
+  const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>(
+    [],
+  );
+  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(() =>
+    readStoredOrgId(),
+  );
+  const [viewMode, setViewMode] = useState<'personal' | 'org'>(() =>
+    readStoredViewMode(),
+  );
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [items, setItems] = useState<InventoryRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -131,17 +157,21 @@ const InventoryPage = () => {
   const [catalogRowsPerPage, setCatalogRowsPerPage] = useState(25);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
-  const [destinationSelection, setDestinationSelection] = useState<SystemLocationValue>({
-    systemId: '',
-    locationId: '',
-  });
+  const [selectedCatalogItem, setSelectedCatalogItem] =
+    useState<CatalogItem | null>(null);
+  const [destinationSelection, setDestinationSelection] =
+    useState<SystemLocationValue>({
+      systemId: '',
+      locationId: '',
+    });
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemNotes, setNewItemNotes] = useState('');
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [orgPermissions, setOrgPermissions] = useState<OrgPermission[]>([]);
   const [orgPermissionsLoading, setOrgPermissionsLoading] = useState(false);
-  const [orgPermissionsError, setOrgPermissionsError] = useState<string | null>(null);
+  const [orgPermissionsError, setOrgPermissionsError] = useState<string | null>(
+    null,
+  );
 
   const [filters, setFilters] = useState({
     search: '',
@@ -150,29 +180,42 @@ const InventoryPage = () => {
     sharedOnly: false,
     valueRange: [0, 100000] as [number, number],
   });
-  const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'location' | 'date'>('date');
+  const [sortBy, setSortBy] = useState<
+    'name' | 'quantity' | 'location' | 'date'
+  >('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [groupBy, setGroupBy] = useState<'none' | 'category' | 'location' | 'share'>('none');
+  const [groupBy, setGroupBy] = useState<
+    'none' | 'category' | 'location' | 'share'
+  >('none');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [density, setDensity] = useState<'standard' | 'compact'>(() => readStoredDensity());
+  const [density, setDensity] = useState<'standard' | 'compact'>(() =>
+    readStoredDensity(),
+  );
   const [inlineDrafts, setInlineDrafts] = useState<Record<string, InlineDraft>>(
     {},
   );
   const [inlineSaving, setInlineSaving] = useState<Set<string>>(new Set());
   const [inlineSaved, setInlineSaved] = useState<Set<string>>(new Set());
-  const [inlineError, setInlineError] = useState<Record<string, string | null>>({});
-  const [allLocations, setAllLocations] = useState<{ id: number; name: string }[]>([]);
+  const [inlineError, setInlineError] = useState<Record<string, string | null>>(
+    {},
+  );
+  const [allLocations, setAllLocations] = useState<
+    { id: number; name: string }[]
+  >([]);
   const locationNameById = useMemo(
     () => new Map(allLocations.map((loc) => [loc.id, loc.name])),
     [allLocations],
   );
-  const [inlineLocationInputs, setInlineLocationInputs] = useState<Record<string, string>>({});
+  const [inlineLocationInputs, setInlineLocationInputs] = useState<
+    Record<string, string>
+  >({});
   const [inlineActiveField, setInlineActiveField] = useState<{
     rowKey: string;
     field: 'location' | 'quantity';
   } | null>(null);
-  const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] = useState(false);
+  const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] =
+    useState(false);
   const [newRowDraft, setNewRowDraft] = useState<{
     itemId: number | '';
     locationId: number | '';
@@ -182,7 +225,8 @@ const InventoryPage = () => {
     locationId: '',
     quantity: '',
   });
-  const [newRowSelectedItem, setNewRowSelectedItem] = useState<CatalogItem | null>(null);
+  const [newRowSelectedItem, setNewRowSelectedItem] =
+    useState<CatalogItem | null>(null);
   const [newRowItemInput, setNewRowItemInput] = useState('');
   const [newRowItemOptions, setNewRowItemOptions] = useState<CatalogItem[]>([]);
   const [newRowItemLoading, setNewRowItemLoading] = useState(false);
@@ -254,13 +298,22 @@ const InventoryPage = () => {
     }
     return null;
   }, [page, rowsPerPage, totalCount]);
-  const focusController = useFocusController<string, 'location' | 'quantity' | 'save'>({
+  const focusController = useFocusController<
+    string,
+    'location' | 'quantity' | 'save'
+  >({
     fieldOrder: useMemo(() => ['location', 'quantity', 'save'] as const, []),
     getRowOrder,
     onBoundary: handleFocusBoundary,
   });
-  const newRowFocusController = useFocusController<'new-row', 'item' | 'location' | 'quantity' | 'save'>({
-    fieldOrder: useMemo(() => ['item', 'location', 'quantity', 'save'] as const, []),
+  const newRowFocusController = useFocusController<
+    'new-row',
+    'item' | 'location' | 'quantity' | 'save'
+  >({
+    fieldOrder: useMemo(
+      () => ['item', 'location', 'quantity', 'save'] as const,
+      [],
+    ),
     getRowOrder: getNewRowOrder,
   });
   const locationRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -273,11 +326,7 @@ const InventoryPage = () => {
   const newRowItemCache = useRef<Map<string, CatalogItem[]>>(new Map());
 
   const activateInlineField = useCallback(
-    (
-      rowKey: string,
-      field: 'location' | 'quantity',
-      initialInput?: string,
-    ) => {
+    (rowKey: string, field: 'location' | 'quantity', initialInput?: string) => {
       setInlineActiveField({ rowKey, field });
       if (field === 'location') {
         setInlineLocationInputs((prev) => ({
@@ -290,23 +339,26 @@ const InventoryPage = () => {
     [],
   );
   const handleInlineDraftChange = useCallback(
-    (itemId: string, changes: Partial<{ locationId: number | ''; quantity: number | '' }>) => {
+    (
+      itemId: string,
+      changes: Partial<{ locationId: number | ''; quantity: number | '' }>,
+    ) => {
       setInlineDrafts((prev) => {
         const nextLocation =
           changes.locationId === undefined
-            ? prev[itemId]?.locationId ?? ''
+            ? (prev[itemId]?.locationId ?? '')
             : changes.locationId === ''
-            ? ''
-            : Number.isNaN(Number(changes.locationId))
-            ? ''
-            : (Number(changes.locationId) as number);
+              ? ''
+              : Number.isNaN(Number(changes.locationId))
+                ? ''
+                : (Number(changes.locationId) as number);
         return {
           ...prev,
           [itemId]: {
             locationId: nextLocation,
             quantity:
               changes.quantity === undefined
-                ? prev[itemId]?.quantity ?? 0
+                ? (prev[itemId]?.quantity ?? 0)
                 : (changes.quantity as number | ''),
           },
         };
@@ -315,18 +367,24 @@ const InventoryPage = () => {
     },
     [],
   );
-  const handleInlineErrorChange = useCallback((itemId: string, message: string | null) => {
-    setInlineError((prev) => ({
-      ...prev,
-      [itemId]: message,
-    }));
-  }, []);
-  const handleInlineLocationInputChange = useCallback((rowKey: string, value: string) => {
-    setInlineLocationInputs((prev) => ({
-      ...prev,
-      [rowKey]: value,
-    }));
-  }, []);
+  const handleInlineErrorChange = useCallback(
+    (itemId: string, message: string | null) => {
+      setInlineError((prev) => ({
+        ...prev,
+        [itemId]: message,
+      }));
+    },
+    [],
+  );
+  const handleInlineLocationInputChange = useCallback(
+    (rowKey: string, value: string) => {
+      setInlineLocationInputs((prev) => ({
+        ...prev,
+        [rowKey]: value,
+      }));
+    },
+    [],
+  );
   const handleInlineLocationFocus = useCallback((itemId: string) => {
     setInlineError((prev) => ({ ...prev, [itemId]: null }));
   }, []);
@@ -362,15 +420,24 @@ const InventoryPage = () => {
       return null;
     });
   }, []);
-  const handleLocationRef = useCallback((ref: HTMLInputElement | null, key: string) => {
-    locationRefs.current[key] = ref;
-  }, []);
-  const handleQuantityRef = useCallback((ref: HTMLInputElement | null, key: string) => {
-    quantityRefs.current[key] = ref;
-  }, []);
-  const handleSaveRef = useCallback((ref: HTMLButtonElement | null, key: string) => {
-    saveRefs.current[key] = ref;
-  }, []);
+  const handleLocationRef = useCallback(
+    (ref: HTMLInputElement | null, key: string) => {
+      locationRefs.current[key] = ref;
+    },
+    [],
+  );
+  const handleQuantityRef = useCallback(
+    (ref: HTMLInputElement | null, key: string) => {
+      quantityRefs.current[key] = ref;
+    },
+    [],
+  );
+  const handleSaveRef = useCallback(
+    (ref: HTMLButtonElement | null, key: string) => {
+      saveRefs.current[key] = ref;
+    },
+    [],
+  );
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -403,7 +470,9 @@ const InventoryPage = () => {
     (viewMode === 'org' && Boolean(selectedOrgId) && canManageOrgInventory);
   const addButtonLabel = viewMode === 'org' ? 'Add org item' : 'Add item';
   const selectedOrgName = useMemo(
-    () => orgOptions.find((org) => org.id === selectedOrgId)?.name ?? 'Organization',
+    () =>
+      orgOptions.find((org) => org.id === selectedOrgId)?.name ??
+      'Organization',
     [orgOptions, selectedOrgId],
   );
 
@@ -439,21 +508,18 @@ const InventoryPage = () => {
     }
   }, []);
 
-  const fetchOrganizations = useCallback(
-    async (userId: number) => {
-      try {
-        const orgs = await inventoryService.getUserOrganizations(userId);
-        const mapped = orgs.map((entry) => ({
-          id: entry.organization?.id ?? entry.organizationId,
-          name: entry.organization?.name ?? `Org #${entry.organizationId}`,
-        }));
-        setOrgOptions(mapped);
-      } catch (err) {
-        console.error('Error loading organizations', err);
-      }
-    },
-    [],
-  );
+  const fetchOrganizations = useCallback(async (userId: number) => {
+    try {
+      const orgs = await inventoryService.getUserOrganizations(userId);
+      const mapped = orgs.map((entry) => ({
+        id: entry.organization?.id ?? entry.organizationId,
+        name: entry.organization?.name ?? `Org #${entry.organizationId}`,
+      }));
+      setOrgOptions(mapped);
+    } catch (err) {
+      console.error('Error loading organizations', err);
+    }
+  }, []);
 
   const fetchCatalog = useCallback(async () => {
     try {
@@ -486,7 +552,12 @@ const InventoryPage = () => {
     } finally {
       setCatalogLoading(false);
     }
-  }, [debouncedCatalogSearch, catalogCategoryId, catalogRowsPerPage, catalogPage]);
+  }, [
+    debouncedCatalogSearch,
+    catalogCategoryId,
+    catalogRowsPerPage,
+    catalogPage,
+  ]);
 
   const fetchInventory = useCallback(async () => {
     if (!user) {
@@ -509,8 +580,8 @@ const InventoryPage = () => {
         sortBy === 'date'
           ? 'date_modified'
           : sortBy === 'location'
-          ? 'location'
-          : sortBy;
+            ? 'location'
+            : sortBy;
       const limit = rowsPerPage;
       const offset = page * rowsPerPage;
 
@@ -530,7 +601,10 @@ const InventoryPage = () => {
         setItems(data.items);
         setTotalCount(data.total);
         if (page > 0) {
-          const lastPage = Math.max(0, Math.floor((data.total - 1) / rowsPerPage));
+          const lastPage = Math.max(
+            0,
+            Math.floor((data.total - 1) / rowsPerPage),
+          );
           if (page > lastPage) {
             setPage(lastPage);
           }
@@ -553,7 +627,10 @@ const InventoryPage = () => {
         setItems(data.items);
         setTotalCount(data.total);
         if (page > 0) {
-          const lastPage = Math.max(0, Math.floor((data.total - 1) / rowsPerPage));
+          const lastPage = Math.max(
+            0,
+            Math.floor((data.total - 1) / rowsPerPage),
+          );
           if (page > lastPage) {
             setPage(lastPage);
           }
@@ -588,7 +665,9 @@ const InventoryPage = () => {
 
   const openAddDialog = () => {
     if (viewMode === 'org' && !canManageOrgInventory) {
-      setCatalogError('You do not have permission to add items to this organization.');
+      setCatalogError(
+        'You do not have permission to add items to this organization.',
+      );
       return;
     }
     setAddDialogOpen(true);
@@ -607,7 +686,9 @@ const InventoryPage = () => {
     setAddDialogOpen(false);
   };
 
-  const handleCreateInventoryItem = async (options?: { stayOpen?: boolean }) => {
+  const handleCreateInventoryItem = async (options?: {
+    stayOpen?: boolean;
+  }) => {
     const isOrgView = viewMode === 'org' && selectedOrgId !== null;
     if (!selectedCatalogItem) {
       setCatalogError('Select an item to add.');
@@ -618,7 +699,9 @@ const InventoryPage = () => {
       return;
     }
     if (viewMode === 'org' && !canManageOrgInventory) {
-      setCatalogError('You do not have permission to add items to this organization.');
+      setCatalogError(
+        'You do not have permission to add items to this organization.',
+      );
       return;
     }
     if (destinationSelection.locationId === '') {
@@ -661,7 +744,9 @@ const InventoryPage = () => {
             });
           }
         } else if (isOrgView) {
-          setCatalogError('This item already exists for the selected location.');
+          setCatalogError(
+            'This item already exists for the selected location.',
+          );
           return;
         } else {
           await inventoryService.createItem({
@@ -702,11 +787,14 @@ const InventoryPage = () => {
       }
     } catch (err) {
       console.error('Error adding inventory item', err);
-      const status = err && typeof err === 'object' && 'response' in err
-        ? (err as { response?: { status?: number } }).response?.status
-        : undefined;
+      const status =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
       if (status === 403) {
-        setCatalogError('You do not have permission to add items to this organization.');
+        setCatalogError(
+          'You do not have permission to add items to this organization.',
+        );
       } else if (status === 409 && viewMode === 'org' && selectedOrgId) {
         const numericLocationId = Number(destinationSelection.locationId);
         let existing = items.find(
@@ -716,18 +804,24 @@ const InventoryPage = () => {
         );
         if (!existing && selectedCatalogItem) {
           try {
-            const lookupResult = await inventoryService.getOrgInventory(selectedOrgId, {
-              gameId: GAME_ID,
-              uexItemId: selectedCatalogItem.uexId,
-              locationId: numericLocationId,
-              limit: 1,
-              offset: 0,
-            });
+            const lookupResult = await inventoryService.getOrgInventory(
+              selectedOrgId,
+              {
+                gameId: GAME_ID,
+                uexItemId: selectedCatalogItem.uexId,
+                locationId: numericLocationId,
+                limit: 1,
+                offset: 0,
+              },
+            );
             if (lookupResult.items.length > 0) {
               existing = lookupResult.items[0];
             }
           } catch (lookupErr) {
-            console.error('Error looking up conflicting org inventory item', lookupErr);
+            console.error(
+              'Error looking up conflicting org inventory item',
+              lookupErr,
+            );
           }
         }
         if (existing) {
@@ -820,7 +914,15 @@ const InventoryPage = () => {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, filters.categoryId, filters.locationId, filters.sharedOnly, filters.valueRange, viewMode, selectedOrgId]);
+  }, [
+    debouncedSearch,
+    filters.categoryId,
+    filters.locationId,
+    filters.sharedOnly,
+    filters.valueRange,
+    viewMode,
+    selectedOrgId,
+  ]);
 
   useEffect(() => {
     setCatalogPage(0);
@@ -899,16 +1001,15 @@ const InventoryPage = () => {
       return;
     }
     setInlineDrafts(
-      items.reduce<Record<string, { locationId: number | ''; quantity: number }>>(
-        (acc, item) => {
-          acc[item.id] = {
-            locationId: item.locationId ?? '',
-            quantity: Number(item.quantity) || 0,
-          };
-          return acc;
-        },
-        {},
-      ),
+      items.reduce<
+        Record<string, { locationId: number | ''; quantity: number }>
+      >((acc, item) => {
+        acc[item.id] = {
+          locationId: item.locationId ?? '',
+          quantity: Number(item.quantity) || 0,
+        };
+        return acc;
+      }, {}),
     );
   }, [items, setInlineDrafts]);
 
@@ -1021,7 +1122,10 @@ const InventoryPage = () => {
     if (!Number.isInteger(parsedLocationId) || parsedLocationId <= 0) {
       errors.location = 'Select a valid location';
     }
-    if (!Number.isFinite(parsedQuantity) || parsedQuantity < MIN_INVENTORY_QUANTITY) {
+    if (
+      !Number.isFinite(parsedQuantity) ||
+      parsedQuantity < MIN_INVENTORY_QUANTITY
+    ) {
       errors.quantity = 'Quantity must be at least 0.01';
     }
 
@@ -1169,7 +1273,9 @@ const InventoryPage = () => {
   useEffect(() => {
     setNewRowErrors((prev) => ({
       ...prev,
-      org: newRowOrgBlocked ? 'Select an organization to add items in org view.' : null,
+      org: newRowOrgBlocked
+        ? 'Select an organization to add items in org view.'
+        : null,
     }));
   }, [newRowOrgBlocked]);
 
@@ -1199,7 +1305,7 @@ const InventoryPage = () => {
       })
       .catch((err) => {
         console.error('Failed to load locations', err);
-    });
+      });
   }, []);
 
   useEffect(() => {
@@ -1281,111 +1387,121 @@ const InventoryPage = () => {
     [inlineDrafts],
   );
 
-  const handleInlineSave = useCallback(async (item: InventoryRecord) => {
-    const draft = getInlineDraft(item);
-    const parsedLocationId =
-      draft.locationId === '' ? NaN : Number(draft.locationId);
-    const parsedQuantity = Number(draft.quantity);
+  const handleInlineSave = useCallback(
+    async (item: InventoryRecord) => {
+      const draft = getInlineDraft(item);
+      const parsedLocationId =
+        draft.locationId === '' ? NaN : Number(draft.locationId);
+      const parsedQuantity = Number(draft.quantity);
 
-    if (
-      !Number.isInteger(parsedLocationId) ||
-      parsedLocationId <= 0 ||
-      !Number.isFinite(parsedQuantity) ||
-      parsedQuantity < MIN_INVENTORY_QUANTITY
-    ) {
-      setInlineError((prev) => ({
-        ...prev,
-        [item.id]:
-          !Number.isInteger(parsedLocationId) || parsedLocationId <= 0
-            ? 'Select a valid location'
-            : 'Quantity must be at least 0.01',
-      }));
-      if (!Number.isInteger(parsedLocationId) || parsedLocationId <= 0) {
-        focusController.focus(item.id.toString(), 'location');
-      } else {
-        focusController.focus(item.id.toString(), 'quantity');
+      if (
+        !Number.isInteger(parsedLocationId) ||
+        parsedLocationId <= 0 ||
+        !Number.isFinite(parsedQuantity) ||
+        parsedQuantity < MIN_INVENTORY_QUANTITY
+      ) {
+        setInlineError((prev) => ({
+          ...prev,
+          [item.id]:
+            !Number.isInteger(parsedLocationId) || parsedLocationId <= 0
+              ? 'Select a valid location'
+              : 'Quantity must be at least 0.01',
+        }));
+        if (!Number.isInteger(parsedLocationId) || parsedLocationId <= 0) {
+          focusController.focus(item.id.toString(), 'location');
+        } else {
+          focusController.focus(item.id.toString(), 'quantity');
+        }
+        return false;
       }
-      return false;
-    }
 
-    const nextSaving = new Set(inlineSaving);
-    nextSaving.add(item.id);
-    setInlineSaving(nextSaving);
-    const prevItem =
-      items.find((entry) => entry.id === item.id) ??
-      ({
+      const nextSaving = new Set(inlineSaving);
+      nextSaving.add(item.id);
+      setInlineSaving(nextSaving);
+      const prevItem =
+        items.find((entry) => entry.id === item.id) ??
+        ({
+          ...item,
+        } as InventoryRecord);
+      const updatedItem: InventoryRecord = {
         ...item,
-      } as InventoryRecord);
-    const updatedItem: InventoryRecord = {
-      ...item,
-      locationId: parsedLocationId,
-      quantity: parsedQuantity,
-      locationName: locationNameById.get(parsedLocationId) || item.locationName,
-    };
-    setItems((prev) =>
-      prev.map((entry) => (entry.id === item.id ? updatedItem : entry)),
-    );
-
-    try {
-      if (viewMode === 'org' && selectedOrgId) {
-        await inventoryService.updateOrgItem(selectedOrgId, item.id, {
-          locationId: parsedLocationId,
-          quantity: parsedQuantity,
-        });
-      } else {
-        await inventoryService.updateItem(item.id, {
-          locationId: parsedLocationId,
-          quantity: parsedQuantity,
-        });
-      }
-      setInlineSaved((prev) => {
-        const next = new Set(prev);
-        next.add(item.id.toString());
-        setTimeout(() => {
-          setInlineSaved((current) => {
-            const copy = new Set(current);
-            copy.delete(item.id.toString());
-            return copy;
-          });
-        }, 1200);
-        return next;
-      });
-      return true;
-    } catch (err) {
-      console.error('Inline save failed', err);
+        locationId: parsedLocationId,
+        quantity: parsedQuantity,
+        locationName:
+          locationNameById.get(parsedLocationId) || item.locationName,
+      };
       setItems((prev) =>
-        prev.map((entry) => (entry.id === item.id ? prevItem : entry)),
+        prev.map((entry) => (entry.id === item.id ? updatedItem : entry)),
       );
-      setInlineError((prev) => ({
-        ...prev,
-        [item.id]: 'Unable to save. Please try again.',
-      }));
-      focusController.focus(item.id.toString(), 'save');
-      return false;
-    } finally {
-      const updated = new Set(inlineSaving);
-      updated.delete(item.id);
-      setInlineSaving(updated);
-    }
-  }, [
-    focusController,
-    getInlineDraft,
-    inlineSaving,
-    items,
-    locationNameById,
-    selectedOrgId,
-    viewMode,
-  ]);
 
-  const handleInlineSaveAndAdvance = useCallback(async (item: InventoryRecord) => {
-    const saved = await handleInlineSave(item);
-    if (saved) {
-      const advanced = await focusController.focusNext(item.id.toString(), 'save');
-      if (!advanced && items.length > 0) {
-        focusController.focus(items[0].id.toString(), 'location');
+      try {
+        if (viewMode === 'org' && selectedOrgId) {
+          await inventoryService.updateOrgItem(selectedOrgId, item.id, {
+            locationId: parsedLocationId,
+            quantity: parsedQuantity,
+          });
+        } else {
+          await inventoryService.updateItem(item.id, {
+            locationId: parsedLocationId,
+            quantity: parsedQuantity,
+          });
+        }
+        setInlineSaved((prev) => {
+          const next = new Set(prev);
+          next.add(item.id.toString());
+          setTimeout(() => {
+            setInlineSaved((current) => {
+              const copy = new Set(current);
+              copy.delete(item.id.toString());
+              return copy;
+            });
+          }, 1200);
+          return next;
+        });
+        return true;
+      } catch (err) {
+        console.error('Inline save failed', err);
+        setItems((prev) =>
+          prev.map((entry) => (entry.id === item.id ? prevItem : entry)),
+        );
+        setInlineError((prev) => ({
+          ...prev,
+          [item.id]: 'Unable to save. Please try again.',
+        }));
+        focusController.focus(item.id.toString(), 'save');
+        return false;
+      } finally {
+        const updated = new Set(inlineSaving);
+        updated.delete(item.id);
+        setInlineSaving(updated);
       }
-    }
-  }, [focusController, handleInlineSave, items]);
+    },
+    [
+      focusController,
+      getInlineDraft,
+      inlineSaving,
+      items,
+      locationNameById,
+      selectedOrgId,
+      viewMode,
+    ],
+  );
+
+  const handleInlineSaveAndAdvance = useCallback(
+    async (item: InventoryRecord) => {
+      const saved = await handleInlineSave(item);
+      if (saved) {
+        const advanced = await focusController.focusNext(
+          item.id.toString(),
+          'save',
+        );
+        if (!advanced && items.length > 0) {
+          focusController.focus(items[0].id.toString(), 'location');
+        }
+      }
+    },
+    [focusController, handleInlineSave, items],
+  );
 
   const openActionDialog = (mode: ActionMode) => {
     setActionMode(mode);
@@ -1456,7 +1572,9 @@ const InventoryPage = () => {
           notes: actionItem.notes,
         });
       } else {
-        await inventoryService.updateItem(actionItem.id, { quantity: remaining });
+        await inventoryService.updateItem(actionItem.id, {
+          quantity: remaining,
+        });
         await inventoryService.createItem({
           gameId: GAME_ID,
           uexItemId: actionItem.uexItemId,
@@ -1543,7 +1661,10 @@ const InventoryPage = () => {
         }}
       >
         <Stack spacing={2}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography
+            variant="h6"
+            sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+          >
             {actionMode === 'edit' && <EditIcon fontSize="small" />}
             {actionMode === 'split' && <CallSplitIcon fontSize="small" />}
             {actionMode === 'share' && <ShareIcon fontSize="small" />}
@@ -1551,10 +1672,10 @@ const InventoryPage = () => {
             {actionMode === 'edit'
               ? 'Edit item'
               : actionMode === 'split'
-              ? 'Split item'
-              : actionMode === 'share'
-              ? 'Share item'
-              : 'Delete item'}
+                ? 'Split item'
+                : actionMode === 'share'
+                  ? 'Share item'
+                  : 'Delete item'}
           </Typography>
           {actionMode === 'edit' && (
             <>
@@ -1721,10 +1842,15 @@ const InventoryPage = () => {
           {actionMode === 'delete' && (
             <>
               <Typography variant="body2">
-                Delete <strong>{actionItem.itemName || `Item ${actionItem.uexItemId}`}</strong>?
+                Delete{' '}
+                <strong>
+                  {actionItem.itemName || `Item ${actionItem.uexItemId}`}
+                </strong>
+                ?
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                This removes the record from the inventory. You can recreate it later.
+                This removes the record from the inventory. You can recreate it
+                later.
               </Typography>
               <Stack direction="row" spacing={1} justifyContent="flex-end">
                 <Button variant="text" onClick={closeActionMenu}>
@@ -1748,8 +1874,8 @@ const InventoryPage = () => {
 
   const addReady = Boolean(
     selectedCatalogItem &&
-    destinationSelection.locationId !== '' &&
-    newItemQuantity > 0,
+      destinationSelection.locationId !== '' &&
+      newItemQuantity > 0,
   );
 
   const handleAddKeyDown = (event: KeyboardEvent) => {
@@ -1833,10 +1959,13 @@ const InventoryPage = () => {
     const originalQuantity = Number(item.quantity) || 0;
     const draftQuantityNumber = Number(draft.quantity);
     const isDirty =
-      draftLocationId !== originalLocationId || draftQuantityNumber !== originalQuantity;
+      draftLocationId !== originalLocationId ||
+      draftQuantityNumber !== originalQuantity;
     const isRowActive = inlineActiveField?.rowKey === rowKey;
-    const isLocationActive = isRowActive && inlineActiveField?.field === 'location';
-    const isQuantityActive = isRowActive && inlineActiveField?.field === 'quantity';
+    const isLocationActive =
+      isRowActive && inlineActiveField?.field === 'location';
+    const isQuantityActive =
+      isRowActive && inlineActiveField?.field === 'quantity';
     const resolvedLocationName = Number.isFinite(draftLocationId)
       ? locationNameById.get(draftLocationId as number)
       : undefined;
@@ -1844,7 +1973,7 @@ const InventoryPage = () => {
       inlineLocationInputs[rowKey] ??
       (isLocationActive
         ? ''
-        : resolvedLocationName ?? item.locationName ?? '');
+        : (resolvedLocationName ?? item.locationName ?? ''));
     const saving = inlineSaving.has(item.id);
     const errorText = inlineError[item.id];
     const saved = inlineSaved.has(item.id.toString());
@@ -1885,7 +2014,14 @@ const InventoryPage = () => {
 
   return (
     <Box sx={{ minHeight: '100vh', backgroundColor: '#0b1118' }}>
-      <AppBar position="sticky" color="transparent" sx={{ backdropFilter: 'blur(6px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <AppBar
+        position="sticky"
+        color="transparent"
+        sx={{
+          backdropFilter: 'blur(6px)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
         <Toolbar>
           <IconButton color="inherit" onClick={() => navigate('/dashboard')}>
             <ArrowBackIcon />
@@ -1932,7 +2068,10 @@ const InventoryPage = () => {
           <Container maxWidth="xl" sx={{ py: 1.5 }}>
             <Stack direction="row" spacing={1.5} alignItems="center">
               <BusinessIcon sx={{ color: ORG_ACCENT }} fontSize="small" />
-              <Typography variant="subtitle2" sx={{ color: '#f7f1e8', fontWeight: 600 }}>
+              <Typography
+                variant="subtitle2"
+                sx={{ color: '#f7f1e8', fontWeight: 600 }}
+              >
                 Organization mode
               </Typography>
               <Divider
@@ -1941,7 +2080,9 @@ const InventoryPage = () => {
                 sx={{ borderColor: 'rgba(242, 162, 85, 0.35)' }}
               />
               <Typography variant="body2" sx={{ color: '#f0d9c0' }}>
-                {selectedOrgId ? `Working in ${selectedOrgName}` : 'Select an organization to continue.'}
+                {selectedOrgId
+                  ? `Working in ${selectedOrgName}`
+                  : 'Select an organization to continue.'}
               </Typography>
             </Stack>
           </Container>
@@ -1990,325 +2131,397 @@ const InventoryPage = () => {
         )}
         <Box sx={{ pointerEvents: inventoryBusy ? 'none' : 'auto' }}>
           <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Card
-              sx={{
-                background: 'linear-gradient(120deg, #0f1724 0%, #0f1b2c 50%, #0c1220 100%)',
-                border: '1px solid rgba(255,255,255,0.05)',
-              }}
-            >
-              <CardContent>
-                <InventoryFiltersPanel
-                  filters={filters}
-                  setFilters={setFilters}
-                  categories={categories}
-                  locationOptions={locationOptions}
-                  valueText={valueText}
-                  maxQuantity={maxQuantity}
-                  sortBy={sortBy}
-                  sortDir={sortDir}
-                  setSortBy={(value) => setSortBy(value)}
-                  setSortDir={(updater) => setSortDir(updater)}
-                  groupBy={groupBy}
-                  setGroupBy={(value) => setGroupBy(value)}
-                  density={density}
-                  setDensity={(value) => setDensity(value)}
-                  viewMode={viewMode}
-                  setViewMode={(mode) => setViewMode(mode)}
-                  selectedOrgId={selectedOrgId}
-                  setSelectedOrgId={(value) => setSelectedOrgId(value)}
-                  orgOptions={orgOptions}
-                  userInitial={user?.username?.charAt(0).toUpperCase() || 'U'}
-                  onOpenAddDialog={openAddDialog}
-                  showAddButton={showAddButton}
-                  addButtonLabel={addButtonLabel}
-                  totalCount={totalCount}
-                  itemCount={items.length}
-                  autoFocusSearch
-                  disabled={inventoryBusy}
-                />
-                {viewMode === 'org' && selectedOrgId && !canManageOrgInventory && !orgPermissionsLoading && (
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    You do not have permission to add items to this organization.
-                  </Alert>
-                )}
-                {orgPermissionsError && (
-                  <Alert severity="warning" sx={{ mt: 2 }}>
-                    {orgPermissionsError}
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+            <Grid item xs={12}>
+              <Card
+                sx={{
+                  background:
+                    'linear-gradient(120deg, #0f1724 0%, #0f1b2c 50%, #0c1220 100%)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                }}
+              >
+                <CardContent>
+                  <InventoryFiltersPanel
+                    filters={filters}
+                    setFilters={setFilters}
+                    categories={categories}
+                    locationOptions={locationOptions}
+                    valueText={valueText}
+                    maxQuantity={maxQuantity}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    setSortBy={(value) => setSortBy(value)}
+                    setSortDir={(updater) => setSortDir(updater)}
+                    groupBy={groupBy}
+                    setGroupBy={(value) => setGroupBy(value)}
+                    density={density}
+                    setDensity={(value) => setDensity(value)}
+                    viewMode={viewMode}
+                    setViewMode={(mode) => setViewMode(mode)}
+                    selectedOrgId={selectedOrgId}
+                    setSelectedOrgId={(value) => setSelectedOrgId(value)}
+                    orgOptions={orgOptions}
+                    userInitial={user?.username?.charAt(0).toUpperCase() || 'U'}
+                    onOpenAddDialog={openAddDialog}
+                    showAddButton={showAddButton}
+                    addButtonLabel={addButtonLabel}
+                    totalCount={totalCount}
+                    itemCount={items.length}
+                    autoFocusSearch
+                    disabled={inventoryBusy}
+                  />
+                  {viewMode === 'org' &&
+                    selectedOrgId &&
+                    !canManageOrgInventory &&
+                    !orgPermissionsLoading && (
+                      <Alert severity="info" sx={{ mt: 2 }}>
+                        You do not have permission to add items to this
+                        organization.
+                      </Alert>
+                    )}
+                  {orgPermissionsError && (
+                    <Alert severity="warning" sx={{ mt: 2 }}>
+                      {orgPermissionsError}
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
 
-          <Grid item xs={12}>
-            <Card sx={{ backgroundColor: '#0e1520', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <CardContent>
-                {refreshing && (
-                  <LinearProgress sx={{ mb: 2 }} color="primary" />
-                )}
-                {error && (
-                  <Box
-                    sx={{
-                      backgroundColor: 'rgba(255,99,71,0.08)',
-                      border: '1px solid rgba(255,99,71,0.2)',
-                      borderRadius: 2,
-                      p: 2,
-                      mb: 2,
-                    }}
-                  >
-                    <Typography color="error">{error}</Typography>
-                  </Box>
-                )}
-                {!showEmptyState && (
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={2}
-                    sx={{ mb: 2, color: '#9aa0a6' }}
-                  >
-                    <ViewAgendaIcon fontSize="small" />
-                    <Typography variant="body2">
-                      Showing {items.length.toLocaleString()} of {totalCount.toLocaleString()} items
-                    </Typography>
-                  </Stack>
-                )}
-                {isEditorMode && (
-                  <>
+            <Grid item xs={12}>
+              <Card
+                sx={{
+                  backgroundColor: '#0e1520',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                }}
+              >
+                <CardContent>
+                  {refreshing && (
+                    <LinearProgress sx={{ mb: 2 }} color="primary" />
+                  )}
+                  {error && (
                     <Box
                       sx={{
-                        position: 'sticky',
-                        top: 0,
-                        zIndex: 2,
-                        backgroundColor: '#0e1520',
-                        px: 1.5,
-                        py: 0.75,
-                        borderTop: '1px solid rgba(255,255,255,0.04)',
-                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        backgroundColor: 'rgba(255,99,71,0.08)',
+                        border: '1px solid rgba(255,99,71,0.2)',
+                        borderRadius: 2,
+                        p: 2,
+                        mb: 2,
                       }}
                     >
+                      <Typography color="error">{error}</Typography>
+                    </Box>
+                  )}
+                  {!showEmptyState && (
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={2}
+                      sx={{ mb: 2, color: '#9aa0a6' }}
+                    >
+                      <ViewAgendaIcon fontSize="small" />
+                      <Typography variant="body2">
+                        Showing {items.length.toLocaleString()} of{' '}
+                        {totalCount.toLocaleString()} items
+                      </Typography>
+                    </Stack>
+                  )}
+                  {isEditorMode && (
+                    <>
                       <Box
                         sx={{
-                          display: 'grid',
-                          gridTemplateColumns: {
-                            xs: '1fr',
-                            md:
-                              density === 'compact'
-                                ? '2fr 1fr 1fr 1fr auto'
-                                : '2fr 1fr 1fr 1fr auto',
-                          },
-                          alignItems: 'center',
-                          color: 'text.secondary',
-                          fontSize: 12,
-                          letterSpacing: 0.2,
-                          textTransform: 'uppercase',
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 2,
+                          backgroundColor: '#0e1520',
+                          px: 1.5,
+                          py: 0.75,
+                          borderTop: '1px solid rgba(255,255,255,0.04)',
+                          borderBottom: '1px solid rgba(255,255,255,0.04)',
                         }}
                       >
-                        <Typography variant="caption">Item</Typography>
-                        <Typography variant="caption">Location</Typography>
-                        <Typography variant="caption">Quantity</Typography>
-                        <Typography variant="caption">Updated</Typography>
-                        <Typography variant="caption" textAlign="right">
-                          Actions
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <InventoryNewRow
-                      isEditorMode={isEditorMode}
-                      itemOptions={newRowItemOptions}
-                      itemInput={newRowItemInput}
-                      selectedItem={newRowSelectedItem}
-                      itemLoading={newRowItemLoading}
-                      itemError={newRowItemError}
-                      locationInput={newRowLocationInput}
-                      locationEditing={newRowLocationEditing}
-                      selectedLocation={newRowSelectedLocation}
-                      filteredLocations={newRowFilteredLocations}
-                      draft={newRowDraft}
-                      errors={newRowErrors}
-                      dirty={newRowDirty}
-                      saving={newRowSaving}
-                      orgBlocked={newRowOrgBlocked}
-                      showQuantityWarning={
-                        Number.isFinite(newRowQuantityNumber) &&
-                        newRowQuantityNumber >= EDITOR_MODE_QUANTITY_MAX
-                      }
-                      onItemInputChange={(value, reason) => {
-                        setNewRowItemInput(value);
-                        if (reason === 'clear') {
-                          setNewRowSelectedItem(null);
-                          setNewRowDraft((prev) => ({ ...prev, itemId: '' }));
-                        }
-                        setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
-                      }}
-                      onItemSelect={(value) => {
-                        setNewRowSelectedItem(value);
-                        setNewRowDraft((prev) => ({
-                          ...prev,
-                          itemId: value ? value.uexId : '',
-                        }));
-                        setNewRowItemInput(value?.name ?? newRowItemInput);
-                        setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
-                        if (value) {
-                          newRowFocusController.focus('new-row', 'location');
-                        }
-                      }}
-                      onLocationInputChange={(value) => {
-                        setNewRowLocationInput(value);
-                        setNewRowLocationEditing(true);
-                        setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
-                      }}
-                      onLocationSelect={(value) => {
-                        setNewRowDraft((prev) => ({
-                          ...prev,
-                          locationId: value ? value.id : '',
-                        }));
-                        setNewRowLocationEditing(false);
-                        setNewRowLocationInput(value?.name ?? '');
-                        setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
-                        if (value) {
-                          newRowFocusController.focus('new-row', 'quantity');
-                        }
-                      }}
-                      onLocationEnter={(bestMatch) => {
-                        if (bestMatch) {
-                          setNewRowDraft((prev) => ({ ...prev, locationId: bestMatch.id }));
-                          setNewRowLocationInput(bestMatch.name);
-                          setNewRowLocationEditing(false);
-                          setNewRowErrors((prev) => ({ ...prev, location: null, api: null }));
-                          newRowFocusController.focus('new-row', 'quantity');
-                        } else {
-                          setNewRowErrors((prev) => ({
-                            ...prev,
-                            location: 'No matches found',
-                          }));
-                        }
-                      }}
-                      onLocationFocus={() => {
-                        setNewRowLocationEditing(true);
-                        setNewRowLocationInput('');
-                      }}
-                      onLocationBlur={(value) => {
-                        setNewRowLocationEditing(false);
-                        setNewRowLocationInput(value);
-                        setNewRowErrors((prev) => ({ ...prev, location: null }));
-                      }}
-                      onQuantityChange={(value) => {
-                        const raw = value.trim();
-                        if (raw === '') {
-                          setNewRowDraft((prev) => ({ ...prev, quantity: '' }));
-                          setNewRowErrors((prev) => ({
-                            ...prev,
-                            quantity: 'Quantity is required',
-                            api: null,
-                          }));
-                          return;
-                        }
-                        const numeric = Number(raw);
-                        const nextQuantity = Number.isNaN(numeric)
-                          ? ''
-                          : Math.min(numeric, EDITOR_MODE_QUANTITY_MAX);
-                        setNewRowDraft((prev) => ({
-                          ...prev,
-                          quantity: nextQuantity,
-                        }));
-                        if (!Number.isFinite(numeric) || numeric < MIN_INVENTORY_QUANTITY) {
-                          setNewRowErrors((prev) => ({
-                            ...prev,
-                            quantity: 'Quantity must be at least 0.01',
-                            api: null,
-                          }));
-                        } else {
-                          setNewRowErrors((prev) => ({ ...prev, quantity: null, api: null }));
-                        }
-                      }}
-                      onQuantityEnter={() => newRowFocusController.focus('new-row', 'save')}
-                      onSave={handleNewRowSave}
-                      onRetry={handleNewRowSave}
-                      itemRef={newRowItemRef}
-                      locationRef={newRowLocationRef}
-                      quantityRef={newRowQuantityRef}
-                      saveRef={newRowSaveRef}
-                    />
-                  </>
-                )}
-                {showEmptyState ? (
-                  <Box sx={{ textAlign: 'center', py: 8 }}>
-                    <InventoryIcon sx={{ fontSize: 42, color: '#4A9EFF' }} />
-                    <Typography variant="h6" sx={{ mt: 2 }}>
-                      No inventory matches your filters
-                    </Typography>
-                    <Typography color="text.secondary">
-                      Adjust filters or sync new items to get started.
-                    </Typography>
-                  </Box>
-                ) : (
-                  <>
-                    <Stack spacing={2}>
-                      {Array.from(groupedItems.entries()).map(([group, groupItems]) => (
                         <Box
-                          key={group}
                           sx={{
-                            border: '1px solid rgba(255,255,255,0.04)',
-                            borderRadius: 2,
-                            overflow: 'hidden',
+                            display: 'grid',
+                            gridTemplateColumns: {
+                              xs: '1fr',
+                              md:
+                                density === 'compact'
+                                  ? '2fr 1fr 1fr 1fr auto'
+                                  : '2fr 1fr 1fr 1fr auto',
+                            },
+                            alignItems: 'center',
+                            color: 'text.secondary',
+                            fontSize: 12,
+                            letterSpacing: 0.2,
+                            textTransform: 'uppercase',
                           }}
                         >
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              px: density === 'compact' ? 1.5 : 2,
-                              py: density === 'compact' ? 1 : 1.5,
-                              backgroundColor: 'rgba(255,255,255,0.02)',
-                            }}
-                          >
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Chip
-                                size="small"
-                                label={group}
-                                color="primary"
-                                variant="outlined"
-                              />
-                              <Typography variant="body2" color="text.secondary">
-                                {groupItems.length} item{groupItems.length === 1 ? '' : 's'}
-                              </Typography>
-                            </Stack>
-                          </Box>
-                          <Divider sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />
-                          <Stack divider={<Divider flexItem sx={{ borderColor: 'rgba(255,255,255,0.04)' }} />}>
-                            {groupItems.map((item) => renderInlineRow(item))}
-                          </Stack>
+                          <Typography variant="caption">Item</Typography>
+                          <Typography variant="caption">Location</Typography>
+                          <Typography variant="caption">Quantity</Typography>
+                          <Typography variant="caption">Updated</Typography>
+                          <Typography variant="caption" textAlign="right">
+                            Actions
+                          </Typography>
                         </Box>
-                      ))}
-                    </Stack>
-                    <TablePagination
-                      component="div"
-                      count={totalCount}
-                      page={page}
-                      onPageChange={(_, newPage) => {
-                        if (inventoryBusy) return;
-                        setPage(newPage);
-                      }}
-                      rowsPerPage={rowsPerPage}
-                      onRowsPerPageChange={(event) => {
-                        if (inventoryBusy) return;
-                        setRowsPerPage(parseInt(event.target.value, 10));
-                        setPage(0);
-                      }}
-                      rowsPerPageOptions={[10, 25, 50, 100, 250]}
-                      backIconButtonProps={{ disabled: inventoryBusy }}
-                      nextIconButtonProps={{ disabled: inventoryBusy }}
-                      SelectProps={{ disabled: inventoryBusy }}
-                      sx={{ mt: 2 }}
-                    />
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                      </Box>
+                      <InventoryNewRow
+                        isEditorMode={isEditorMode}
+                        itemOptions={newRowItemOptions}
+                        itemInput={newRowItemInput}
+                        selectedItem={newRowSelectedItem}
+                        itemLoading={newRowItemLoading}
+                        itemError={newRowItemError}
+                        locationInput={newRowLocationInput}
+                        locationEditing={newRowLocationEditing}
+                        selectedLocation={newRowSelectedLocation}
+                        filteredLocations={newRowFilteredLocations}
+                        draft={newRowDraft}
+                        errors={newRowErrors}
+                        dirty={newRowDirty}
+                        saving={newRowSaving}
+                        orgBlocked={newRowOrgBlocked}
+                        showQuantityWarning={
+                          Number.isFinite(newRowQuantityNumber) &&
+                          newRowQuantityNumber >= EDITOR_MODE_QUANTITY_MAX
+                        }
+                        onItemInputChange={(value, reason) => {
+                          setNewRowItemInput(value);
+                          if (reason === 'clear') {
+                            setNewRowSelectedItem(null);
+                            setNewRowDraft((prev) => ({ ...prev, itemId: '' }));
+                          }
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            item: null,
+                            api: null,
+                          }));
+                        }}
+                        onItemSelect={(value) => {
+                          setNewRowSelectedItem(value);
+                          setNewRowDraft((prev) => ({
+                            ...prev,
+                            itemId: value ? value.uexId : '',
+                          }));
+                          setNewRowItemInput(value?.name ?? newRowItemInput);
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            item: null,
+                            api: null,
+                          }));
+                          if (value) {
+                            newRowFocusController.focus('new-row', 'location');
+                          }
+                        }}
+                        onLocationInputChange={(value) => {
+                          setNewRowLocationInput(value);
+                          setNewRowLocationEditing(true);
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            location: null,
+                            api: null,
+                          }));
+                        }}
+                        onLocationSelect={(value) => {
+                          setNewRowDraft((prev) => ({
+                            ...prev,
+                            locationId: value ? value.id : '',
+                          }));
+                          setNewRowLocationEditing(false);
+                          setNewRowLocationInput(value?.name ?? '');
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            location: null,
+                            api: null,
+                          }));
+                          if (value) {
+                            newRowFocusController.focus('new-row', 'quantity');
+                          }
+                        }}
+                        onLocationEnter={(bestMatch) => {
+                          if (bestMatch) {
+                            setNewRowDraft((prev) => ({
+                              ...prev,
+                              locationId: bestMatch.id,
+                            }));
+                            setNewRowLocationInput(bestMatch.name);
+                            setNewRowLocationEditing(false);
+                            setNewRowErrors((prev) => ({
+                              ...prev,
+                              location: null,
+                              api: null,
+                            }));
+                            newRowFocusController.focus('new-row', 'quantity');
+                          } else {
+                            setNewRowErrors((prev) => ({
+                              ...prev,
+                              location: 'No matches found',
+                            }));
+                          }
+                        }}
+                        onLocationFocus={() => {
+                          setNewRowLocationEditing(true);
+                          setNewRowLocationInput('');
+                        }}
+                        onLocationBlur={(value) => {
+                          setNewRowLocationEditing(false);
+                          setNewRowLocationInput(value);
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            location: null,
+                          }));
+                        }}
+                        onQuantityChange={(value) => {
+                          const raw = value.trim();
+                          if (raw === '') {
+                            setNewRowDraft((prev) => ({
+                              ...prev,
+                              quantity: '',
+                            }));
+                            setNewRowErrors((prev) => ({
+                              ...prev,
+                              quantity: 'Quantity is required',
+                              api: null,
+                            }));
+                            return;
+                          }
+                          const numeric = Number(raw);
+                          const nextQuantity = Number.isNaN(numeric)
+                            ? ''
+                            : Math.min(numeric, EDITOR_MODE_QUANTITY_MAX);
+                          setNewRowDraft((prev) => ({
+                            ...prev,
+                            quantity: nextQuantity,
+                          }));
+                          if (
+                            !Number.isFinite(numeric) ||
+                            numeric < MIN_INVENTORY_QUANTITY
+                          ) {
+                            setNewRowErrors((prev) => ({
+                              ...prev,
+                              quantity: 'Quantity must be at least 0.01',
+                              api: null,
+                            }));
+                          } else {
+                            setNewRowErrors((prev) => ({
+                              ...prev,
+                              quantity: null,
+                              api: null,
+                            }));
+                          }
+                        }}
+                        onQuantityEnter={() =>
+                          newRowFocusController.focus('new-row', 'save')
+                        }
+                        onSave={handleNewRowSave}
+                        onRetry={handleNewRowSave}
+                        itemRef={newRowItemRef}
+                        locationRef={newRowLocationRef}
+                        quantityRef={newRowQuantityRef}
+                        saveRef={newRowSaveRef}
+                      />
+                    </>
+                  )}
+                  {showEmptyState ? (
+                    <Box sx={{ textAlign: 'center', py: 8 }}>
+                      <InventoryIcon sx={{ fontSize: 42, color: '#4A9EFF' }} />
+                      <Typography variant="h6" sx={{ mt: 2 }}>
+                        No inventory matches your filters
+                      </Typography>
+                      <Typography color="text.secondary">
+                        Adjust filters or sync new items to get started.
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      <Stack spacing={2}>
+                        {Array.from(groupedItems.entries()).map(
+                          ([group, groupItems]) => (
+                            <Box
+                              key={group}
+                              sx={{
+                                border: '1px solid rgba(255,255,255,0.04)',
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  px: density === 'compact' ? 1.5 : 2,
+                                  py: density === 'compact' ? 1 : 1.5,
+                                  backgroundColor: 'rgba(255,255,255,0.02)',
+                                }}
+                              >
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                >
+                                  <Chip
+                                    size="small"
+                                    label={group}
+                                    color="primary"
+                                    variant="outlined"
+                                  />
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    {groupItems.length} item
+                                    {groupItems.length === 1 ? '' : 's'}
+                                  </Typography>
+                                </Stack>
+                              </Box>
+                              <Divider
+                                sx={{ borderColor: 'rgba(255,255,255,0.04)' }}
+                              />
+                              <Stack
+                                divider={
+                                  <Divider
+                                    flexItem
+                                    sx={{
+                                      borderColor: 'rgba(255,255,255,0.04)',
+                                    }}
+                                  />
+                                }
+                              >
+                                {groupItems.map((item) =>
+                                  renderInlineRow(item),
+                                )}
+                              </Stack>
+                            </Box>
+                          ),
+                        )}
+                      </Stack>
+                      <TablePagination
+                        component="div"
+                        count={totalCount}
+                        page={page}
+                        onPageChange={(_, newPage) => {
+                          if (inventoryBusy) return;
+                          setPage(newPage);
+                        }}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={(event) => {
+                          if (inventoryBusy) return;
+                          setRowsPerPage(parseInt(event.target.value, 10));
+                          setPage(0);
+                        }}
+                        rowsPerPageOptions={[10, 25, 50, 100, 250]}
+                        backIconButtonProps={{ disabled: inventoryBusy }}
+                        nextIconButtonProps={{ disabled: inventoryBusy }}
+                        SelectProps={{ disabled: inventoryBusy }}
+                        sx={{ mt: 2 }}
+                      />
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-        </Grid>
         </Box>
       </Container>
 
@@ -2350,7 +2563,9 @@ const InventoryPage = () => {
                       onKeyDown={handleCatalogSearchKeyDown}
                     />
                     <FormControl fullWidth>
-                      <InputLabel id="catalog-category-label">Category</InputLabel>
+                      <InputLabel id="catalog-category-label">
+                        Category
+                      </InputLabel>
                       <Select
                         labelId="catalog-category-label"
                         label="Category"
@@ -2371,7 +2586,11 @@ const InventoryPage = () => {
                         ))}
                       </Select>
                     </FormControl>
-                    <Suspense fallback={<LinearProgress sx={{ height: 4, borderRadius: 2 }} />}>
+                    <Suspense
+                      fallback={
+                        <LinearProgress sx={{ height: 4, borderRadius: 2 }} />
+                      }
+                    >
                       <LazySystemLocationSelector
                         value={destinationSelection}
                         onChange={setDestinationSelection}
@@ -2387,14 +2606,18 @@ const InventoryPage = () => {
                           type="number"
                           inputProps={{ min: 0.01, step: 0.01 }}
                           value={newItemQuantity}
-                          onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                          onChange={(e) =>
+                            setNewItemQuantity(Number(e.target.value))
+                          }
                         />
                         <Stack direction="row" spacing={1}>
                           <Button
                             size="small"
                             variant="outlined"
                             onClick={() =>
-                              setNewItemQuantity((qty) => Number(Math.max(0.01, qty - 1).toFixed(2)))
+                              setNewItemQuantity((qty) =>
+                                Number(Math.max(0.01, qty - 1).toFixed(2)),
+                              )
                             }
                           >
                             -1
@@ -2403,7 +2626,9 @@ const InventoryPage = () => {
                             size="small"
                             variant="outlined"
                             onClick={() =>
-                              setNewItemQuantity((qty) => Number(Math.max(0.01, qty + 1).toFixed(2)))
+                              setNewItemQuantity((qty) =>
+                                Number(Math.max(0.01, qty + 1).toFixed(2)),
+                              )
                             }
                           >
                             +1
@@ -2417,7 +2642,8 @@ const InventoryPage = () => {
                         onChange={(e) => setNewItemNotes(e.target.value)}
                       />
                       <Typography variant="caption" color="text.secondary">
-                        Tip: Ctrl/Cmd + Enter to add and keep this dialog open for rapid entry.
+                        Tip: Ctrl/Cmd + Enter to add and keep this dialog open
+                        for rapid entry.
                       </Typography>
                     </Stack>
                   </Stack>
@@ -2433,12 +2659,19 @@ const InventoryPage = () => {
                     minHeight: 360,
                   }}
                 >
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={1}
+                    sx={{ mb: 1 }}
+                  >
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                       Catalog results
                     </Typography>
                     {catalogLoading ? (
-                      <LinearProgress sx={{ flex: 1, height: 4, borderRadius: 1 }} />
+                      <LinearProgress
+                        sx={{ flex: 1, height: 4, borderRadius: 1 }}
+                      />
                     ) : (
                       <Typography variant="caption" color="text.secondary">
                         {catalogTotal.toLocaleString()} items
@@ -2446,7 +2679,9 @@ const InventoryPage = () => {
                     )}
                   </Stack>
                   {catalogLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <Box
+                      sx={{ display: 'flex', justifyContent: 'center', py: 4 }}
+                    >
                       <CircularProgress size={24} />
                     </Box>
                   ) : catalogItems.length === 0 ? (
@@ -2481,7 +2716,9 @@ const InventoryPage = () => {
                           }}
                         >
                           <ListItemIcon>
-                            <Radio checked={selectedCatalogItem?.id === item.id} />
+                            <Radio
+                              checked={selectedCatalogItem?.id === item.id}
+                            />
                           </ListItemIcon>
                           <ListItemText
                             primary={item.name}

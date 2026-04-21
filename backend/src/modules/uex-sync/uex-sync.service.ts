@@ -257,7 +257,7 @@ export class UexSyncService {
           lastSuccessfulSyncAt: MoreThan(thresholdDate),
         },
         {
-          lastSuccessfulSyncAt: null as any,
+          lastSuccessfulSyncAt: null as unknown as Date,
         },
       ],
       order: { lastSuccessfulSyncAt: 'ASC' },

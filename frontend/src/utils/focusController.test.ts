@@ -18,8 +18,12 @@ describe('FocusController', () => {
     const calls: string[] = [];
     const controller = makeController(['row-1']);
 
-    controller.register('row-1', 'location', () => calls.push('row-1:location'));
-    controller.register('row-1', 'quantity', () => calls.push('row-1:quantity'));
+    controller.register('row-1', 'location', () =>
+      calls.push('row-1:location'),
+    );
+    controller.register('row-1', 'quantity', () =>
+      calls.push('row-1:quantity'),
+    );
     controller.register('row-1', 'save', () => calls.push('row-1:save'));
 
     await controller.focusNext('row-1', 'location');
@@ -31,7 +35,9 @@ describe('FocusController', () => {
     const controller = makeController(['row-1', 'row-2']);
 
     controller.register('row-1', 'save', () => calls.push('row-1:save'));
-    controller.register('row-2', 'location', () => calls.push('row-2:location'));
+    controller.register('row-2', 'location', () =>
+      calls.push('row-2:location'),
+    );
 
     await controller.focusNext('row-1', 'save');
     expect(calls).toContain('row-2:location');
@@ -45,7 +51,9 @@ describe('FocusController', () => {
     });
 
     controller.register('row-1', 'save', () => calls.push('row-1:save'));
-    controller.register('row-2', 'location', () => calls.push('row-2:location'));
+    controller.register('row-2', 'location', () =>
+      calls.push('row-2:location'),
+    );
 
     await controller.focusNext('row-1', 'save');
     expect(calls).toEqual(['boundary:row-1', 'row-2:location']);

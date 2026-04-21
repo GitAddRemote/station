@@ -10,6 +10,7 @@
 Both projects are well-architected NestJS SaaS applications with similar tech stacks (NestJS, TypeORM, PostgreSQL, React, Material-UI). However, Matrix Academy has implemented several production-ready features and best practices that Station could benefit from adopting.
 
 **Priority Recommendations:**
+
 1. ✅ **HIGH**: Implement Redis caching layer
 2. ✅ **HIGH**: Add comprehensive user profile fields (firstName, lastName, phoneNumber, bio)
 3. ✅ **HIGH**: Build protected Dashboard and admin UI pages
@@ -25,18 +26,20 @@ Both projects are well-architected NestJS SaaS applications with similar tech st
 
 ### 1. Caching Infrastructure ⭐ HIGH PRIORITY
 
-| Feature | Matrix Academy | Station | Recommendation |
-|---------|---------------|---------|----------------|
-| **Redis Integration** | ✅ Implemented with caching patterns and automatic invalidation | ⚠️ Config files exist but not utilized | **IMPLEMENT** |
-| **Cache Strategy** | Documented invalidation patterns for data consistency | N/A | **IMPLEMENT** |
+| Feature               | Matrix Academy                                                  | Station                                | Recommendation |
+| --------------------- | --------------------------------------------------------------- | -------------------------------------- | -------------- |
+| **Redis Integration** | ✅ Implemented with caching patterns and automatic invalidation | ⚠️ Config files exist but not utilized | **IMPLEMENT**  |
+| **Cache Strategy**    | Documented invalidation patterns for data consistency           | N/A                                    | **IMPLEMENT**  |
 
 **Why Station Needs This:**
+
 - Gaming guild data (organizations, members, roles) is frequently read but infrequently updated
 - Permission aggregation queries could benefit significantly from caching
 - User session data and organization member lists are perfect cache candidates
 - Redis would improve API response times by 10-100x for cached queries
 
 **Implementation Plan:**
+
 ```typescript
 // Example: Cache organization members
 @Injectable()
@@ -48,7 +51,7 @@ export class OrganizationsService {
 
     const data = await this.orgRepository.findOne({
       where: { id },
-      relations: ['userOrganizationRoles', 'userOrganizationRoles.user']
+      relations: ['userOrganizationRoles', 'userOrganizationRoles.user'],
     });
 
     await this.redis.set(cacheKey, JSON.stringify(data), 'EX', 300); // 5min TTL
@@ -64,6 +67,7 @@ export class OrganizationsService {
 ```
 
 **Recommended Cache Targets:**
+
 - Organization member lists (TTL: 5-10 minutes)
 - User permissions aggregation (TTL: 15 minutes)
 - Role definitions (TTL: 1 hour)
@@ -73,15 +77,16 @@ export class OrganizationsService {
 
 ### 2. Enhanced User Profile Fields ⭐ HIGH PRIORITY
 
-| Feature | Matrix Academy | Station | Recommendation |
-|---------|---------------|---------|----------------|
-| **First Name** | ✅ Optional field | ❌ Not implemented | **ADD** |
-| **Last Name** | ✅ Optional field | ❌ Not implemented | **ADD** |
-| **Phone Number** | ✅ Optional field | ❌ Not implemented | **ADD** |
-| **Bio** | ✅ Optional text field | ❌ Not implemented | **ADD** |
-| **Profile PATCH Endpoint** | ✅ `/users/profile` | ✅ `/users/profile` (GET only) | **ENHANCE** |
+| Feature                    | Matrix Academy         | Station                        | Recommendation |
+| -------------------------- | ---------------------- | ------------------------------ | -------------- |
+| **First Name**             | ✅ Optional field      | ❌ Not implemented             | **ADD**        |
+| **Last Name**              | ✅ Optional field      | ❌ Not implemented             | **ADD**        |
+| **Phone Number**           | ✅ Optional field      | ❌ Not implemented             | **ADD**        |
+| **Bio**                    | ✅ Optional text field | ❌ Not implemented             | **ADD**        |
+| **Profile PATCH Endpoint** | ✅ `/users/profile`    | ✅ `/users/profile` (GET only) | **ENHANCE**    |
 
 **Why Station Needs This:**
+
 - Gaming guilds need member profiles with display names beyond username
 - Contact information (phone) useful for guild event coordination
 - Bio field perfect for "main character/class" or "preferred game modes"
@@ -90,33 +95,46 @@ export class OrganizationsService {
 **Implementation Plan:**
 
 **Step 1: Database Migration**
+
 ```typescript
 // migration: add-user-profile-fields.ts
 export class AddUserProfileFields1700000000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.addColumn('users', new TableColumn({
-      name: 'firstName',
-      type: 'varchar',
-      length: '100',
-      isNullable: true
-    }));
-    await queryRunner.addColumn('users', new TableColumn({
-      name: 'lastName',
-      type: 'varchar',
-      length: '100',
-      isNullable: true
-    }));
-    await queryRunner.addColumn('users', new TableColumn({
-      name: 'phoneNumber',
-      type: 'varchar',
-      length: '20',
-      isNullable: true
-    }));
-    await queryRunner.addColumn('users', new TableColumn({
-      name: 'bio',
-      type: 'text',
-      isNullable: true
-    }));
+    await queryRunner.addColumn(
+      'users',
+      new TableColumn({
+        name: 'firstName',
+        type: 'varchar',
+        length: '100',
+        isNullable: true,
+      }),
+    );
+    await queryRunner.addColumn(
+      'users',
+      new TableColumn({
+        name: 'lastName',
+        type: 'varchar',
+        length: '100',
+        isNullable: true,
+      }),
+    );
+    await queryRunner.addColumn(
+      'users',
+      new TableColumn({
+        name: 'phoneNumber',
+        type: 'varchar',
+        length: '20',
+        isNullable: true,
+      }),
+    );
+    await queryRunner.addColumn(
+      'users',
+      new TableColumn({
+        name: 'bio',
+        type: 'text',
+        isNullable: true,
+      }),
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -129,6 +147,7 @@ export class AddUserProfileFields1700000000000 implements MigrationInterface {
 ```
 
 **Step 2: Update User Entity**
+
 ```typescript
 @Entity('users')
 export class User {
@@ -149,6 +168,7 @@ export class User {
 ```
 
 **Step 3: Update DTOs**
+
 ```typescript
 export class UpdateProfileDto {
   @IsOptional()
@@ -174,6 +194,7 @@ export class UpdateProfileDto {
 ```
 
 **Step 4: Add Profile Update Endpoint**
+
 ```typescript
 @Patch('profile')
 @UseGuards(AuthGuard('jwt'))
@@ -186,13 +207,14 @@ async updateProfile(@Request() req, @Body() dto: UpdateProfileDto) {
 
 ### 3. Frontend Dashboard & Protected Pages ⭐ HIGH PRIORITY
 
-| Feature | Matrix Academy | Station | Recommendation |
-|---------|---------------|---------|----------------|
-| **Protected Dashboard** | ✅ Implemented with auth redirect | ❌ Not implemented | **BUILD** |
-| **Profile Page** | ✅ With update form | ❌ Not implemented | **BUILD** |
-| **Responsive Design** | ✅ Mobile/tablet/desktop | ⚠️ Basic responsive | **ENHANCE** |
+| Feature                 | Matrix Academy                    | Station             | Recommendation |
+| ----------------------- | --------------------------------- | ------------------- | -------------- |
+| **Protected Dashboard** | ✅ Implemented with auth redirect | ❌ Not implemented  | **BUILD**      |
+| **Profile Page**        | ✅ With update form               | ❌ Not implemented  | **BUILD**      |
+| **Responsive Design**   | ✅ Mobile/tablet/desktop          | ⚠️ Basic responsive | **ENHANCE**    |
 
 **Why Station Needs This:**
+
 - Users need a post-login experience beyond API access
 - Guild members need to view their organizations, roles, and permissions
 - Admins need UI for managing organizations and members
@@ -223,6 +245,7 @@ async updateProfile(@Request() req, @Body() dto: UpdateProfileDto) {
    - Requires admin permission check
 
 **React Router Structure:**
+
 ```typescript
 const router = createBrowserRouter([
   { path: '/', element: <Home /> },
@@ -244,12 +267,13 @@ const router = createBrowserRouter([
 
 ### 4. Standardized Error Response Patterns ⭐ MEDIUM PRIORITY
 
-| Feature | Matrix Academy | Station | Recommendation |
-|---------|---------------|---------|----------------|
-| **Error Response Format** | ✅ Standardized across all endpoints | ⚠️ Default NestJS format | **STANDARDIZE** |
-| **Response Transformation** | ✅ Consistent transformation patterns | ⚠️ Basic | **IMPLEMENT** |
+| Feature                     | Matrix Academy                        | Station                  | Recommendation  |
+| --------------------------- | ------------------------------------- | ------------------------ | --------------- |
+| **Error Response Format**   | ✅ Standardized across all endpoints  | ⚠️ Default NestJS format | **STANDARDIZE** |
+| **Response Transformation** | ✅ Consistent transformation patterns | ⚠️ Basic                 | **IMPLEMENT**   |
 
 **Why Station Needs This:**
+
 - Consistent error handling improves frontend development
 - Better debugging and monitoring
 - Professional API appearance
@@ -258,6 +282,7 @@ const router = createBrowserRouter([
 **Implementation Plan:**
 
 **Global Exception Filter:**
+
 ```typescript
 // filters/http-exception.filter.ts
 @Catch(HttpException)
@@ -275,12 +300,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
-      message: typeof exceptionResponse === 'string'
-        ? exceptionResponse
-        : (exceptionResponse as any).message,
-      errors: typeof exceptionResponse === 'object' && (exceptionResponse as any).errors
-        ? (exceptionResponse as any).errors
-        : undefined
+      message:
+        typeof exceptionResponse === 'string'
+          ? exceptionResponse
+          : (exceptionResponse as any).message,
+      errors:
+        typeof exceptionResponse === 'object' &&
+        (exceptionResponse as any).errors
+          ? (exceptionResponse as any).errors
+          : undefined,
     };
 
     response.status(status).json(errorResponse);
@@ -289,24 +317,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
 ```
 
 **Success Response Interceptor:**
+
 ```typescript
 // interceptors/transform.interceptor.ts
 @Injectable()
 export class TransformInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
-      map(data => ({
+      map((data) => ({
         success: true,
         statusCode: context.switchToHttp().getResponse().statusCode,
         timestamp: new Date().toISOString(),
-        data
-      }))
+        data,
+      })),
     );
   }
 }
 ```
 
 **Apply Globally:**
+
 ```typescript
 // main.ts
 async function bootstrap() {
@@ -318,6 +348,7 @@ async function bootstrap() {
 ```
 
 **Example Responses:**
+
 ```json
 // Success Response
 {
@@ -361,13 +392,14 @@ async function bootstrap() {
 
 ### 5. Enhanced Landing Page ⭐ MEDIUM PRIORITY
 
-| Feature | Matrix Academy | Station | Recommendation |
-|---------|---------------|---------|----------------|
-| **Hero Section** | ✅ Prominent hero with CTA | ⚠️ Basic header | **ENHANCE** |
-| **Feature Highlights** | ✅ Feature showcase section | ❌ Not implemented | **ADD** |
-| **Theming** | ✅ Matrix-themed (green/black) | ⚠️ Basic MUI theme | **ENHANCE** |
+| Feature                | Matrix Academy                 | Station            | Recommendation |
+| ---------------------- | ------------------------------ | ------------------ | -------------- |
+| **Hero Section**       | ✅ Prominent hero with CTA     | ⚠️ Basic header    | **ENHANCE**    |
+| **Feature Highlights** | ✅ Feature showcase section    | ❌ Not implemented | **ADD**        |
+| **Theming**            | ✅ Matrix-themed (green/black) | ⚠️ Basic MUI theme | **ENHANCE**    |
 
 **Why Station Needs This:**
+
 - First impression matters for attracting gaming guilds
 - Clear value proposition encourages registration
 - Professional appearance builds trust
@@ -455,12 +487,13 @@ export function Home() {
 
 ### 6. Accessibility Compliance ⭐ MEDIUM PRIORITY
 
-| Feature | Matrix Academy | Station | Recommendation |
-|---------|---------------|---------|----------------|
-| **WCAG 2.1 AA** | ✅ Compliance target | ⚠️ Not documented | **IMPLEMENT** |
-| **Accessibility Audits** | ✅ Part of testing | ❌ Not implemented | **ADD** |
+| Feature                  | Matrix Academy       | Station            | Recommendation |
+| ------------------------ | -------------------- | ------------------ | -------------- |
+| **WCAG 2.1 AA**          | ✅ Compliance target | ⚠️ Not documented  | **IMPLEMENT**  |
+| **Accessibility Audits** | ✅ Part of testing   | ❌ Not implemented | **ADD**        |
 
 **Why Station Needs This:**
+
 - Legal compliance in many jurisdictions
 - Better user experience for all users
 - SEO benefits
@@ -484,6 +517,7 @@ export function Home() {
    - Semantic HTML structure
 
 4. **Form Accessibility**
+
    ```typescript
    <TextField
      id="username"
@@ -505,6 +539,7 @@ export function Home() {
    - Add Lighthouse CI to GitHub Actions
 
 **Add to package.json:**
+
 ```json
 {
   "devDependencies": {
@@ -518,18 +553,20 @@ export function Home() {
 
 ### 7. Technical Documentation Structure ⭐ LOW PRIORITY
 
-| Feature | Matrix Academy | Station | Recommendation |
-|---------|---------------|---------|----------------|
-| **docs/ Directory** | ✅ Technical documentation | ❌ Not implemented | **CREATE** |
-| **API Documentation** | ✅ Swagger at /api/docs | ✅ Swagger at /api/docs | ✅ Already have |
+| Feature               | Matrix Academy             | Station                 | Recommendation  |
+| --------------------- | -------------------------- | ----------------------- | --------------- |
+| **docs/ Directory**   | ✅ Technical documentation | ❌ Not implemented      | **CREATE**      |
+| **API Documentation** | ✅ Swagger at /api/docs    | ✅ Swagger at /api/docs | ✅ Already have |
 
 **Why Station Needs This:**
+
 - Onboarding new developers
 - Documenting architectural decisions
 - Usage guides for API consumers
 - Contributing guidelines
 
 **Recommended Documentation Structure:**
+
 ```
 docs/
 ├── README.md                    # Documentation index
@@ -556,12 +593,13 @@ docs/
 
 ### 8. Test Coverage Tracking ⭐ LOW PRIORITY
 
-| Feature | Matrix Academy | Station | Recommendation |
-|---------|---------------|---------|----------------|
-| **CodeCov Integration** | ✅ Tracks coverage metrics | ❌ Not implemented | **ADD** |
-| **Coverage Badges** | ✅ In README | ❌ Not implemented | **ADD** |
+| Feature                 | Matrix Academy             | Station            | Recommendation |
+| ----------------------- | -------------------------- | ------------------ | -------------- |
+| **CodeCov Integration** | ✅ Tracks coverage metrics | ❌ Not implemented | **ADD**        |
+| **Coverage Badges**     | ✅ In README               | ❌ Not implemented | **ADD**        |
 
 **Why Station Needs This:**
+
 - Visibility into test coverage trends
 - PR feedback on coverage changes
 - Quality metrics tracking
@@ -569,6 +607,7 @@ docs/
 **Implementation:**
 
 1. **Add CodeCov to GitHub Actions:**
+
 ```yaml
 # .github/workflows/backend-ci.yml
 - name: Run tests with coverage
@@ -583,11 +622,13 @@ docs/
 ```
 
 2. **Add Coverage Badge to README:**
+
 ```markdown
 [![codecov](https://codecov.io/gh/GitAddRemote/station/branch/main/graph/badge.svg)](https://codecov.io/gh/GitAddRemote/station)
 ```
 
 3. **Configure Jest for Coverage:**
+
 ```json
 // backend/jest.config.js
 {
@@ -650,23 +691,27 @@ These features are not in either project but would be valuable for a production 
 ## Implementation Priority Matrix
 
 ### Immediate (Sprint 1-2)
+
 1. ✅ Redis caching implementation
 2. ✅ Enhanced user profile fields (firstName, lastName, phone, bio)
 3. ✅ Protected Dashboard page
 
 ### Short-term (Sprint 3-4)
+
 4. ✅ Profile management page
 5. ✅ Organization detail pages
 6. ✅ Standardized error responses
 7. ✅ Enhanced landing page
 
 ### Medium-term (Sprint 5-8)
+
 8. ✅ Accessibility compliance (WCAG 2.1 AA)
 9. ✅ Technical documentation structure
 10. ✅ CodeCov integration
 11. ✅ Organization settings pages
 
 ### Long-term (Future)
+
 12. Email notification system
 13. Audit logging
 14. Organization invitation system
@@ -679,16 +724,19 @@ These features are not in either project but would be valuable for a production 
 Matrix Academy demonstrates several production-ready patterns that Station should adopt:
 
 **Critical Additions:**
+
 - **Redis caching** will dramatically improve performance for frequently-accessed data
 - **Enhanced user profiles** provide essential member information for gaming guilds
 - **Protected dashboard/admin pages** complete the user experience loop
 
 **Quality Improvements:**
+
 - **Standardized API responses** improve developer experience
 - **Accessibility compliance** ensures inclusivity and legal compliance
 - **Enhanced landing page** improves user acquisition
 
 **Nice-to-Haves:**
+
 - **Technical documentation** aids onboarding
 - **Test coverage tracking** maintains quality standards
 
@@ -697,6 +745,7 @@ Station has excellent architectural foundations (multi-org support, flexible RBA
 ---
 
 **Next Steps:**
+
 1. Review this comparison with the team
 2. Prioritize features based on business goals
 3. Create implementation tickets for chosen features
