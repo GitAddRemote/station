@@ -156,9 +156,11 @@ export class ItemsSyncService {
         durationMs,
         syncMode: useDelta ? 'delta' : 'full',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const durationMs = Date.now() - startTime;
-      await this.syncService.recordSyncFailure(endpoint, error, durationMs);
+      const syncError =
+        error instanceof Error ? error : new Error(String(error));
+      await this.syncService.recordSyncFailure(endpoint, syncError, durationMs);
       throw error;
     } finally {
       await this.syncService.releaseSyncLock(endpoint);
@@ -224,7 +226,7 @@ export class ItemsSyncService {
       `Syncing items for category: ${category.name} (${category.uexId})`,
     );
 
-    const filters: any = {};
+    const filters: Record<string, Date | string | number> = {};
     if (lastSyncAt) {
       filters.date_modified = lastSyncAt;
     }
@@ -266,15 +268,15 @@ export class ItemsSyncService {
 
   private async fetchWithRetry(
     categoryId: number,
-    filters: any,
+    filters: Record<string, Date | string | number>,
   ): Promise<UEXItemResponse[]> {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
         return await this.uexClient.fetchItemsByCategory(categoryId, filters);
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
 
         // Don't retry rate limits
         if (error instanceof RateLimitException) {

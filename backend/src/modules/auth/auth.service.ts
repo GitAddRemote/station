@@ -17,6 +17,8 @@ import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ValidatedUser } from './interfaces/validated-user.interface';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -35,7 +37,10 @@ export class AuthService {
     private passwordResetRepository: Repository<PasswordReset>,
   ) {}
 
-  async validateUser(username: string, pass: string): Promise<any> {
+  async validateUser(
+    username: string,
+    pass: string,
+  ): Promise<ValidatedUser | null> {
     const user = await this.usersService.findOne(username);
     const trimmedPass = pass.trim();
 
@@ -60,9 +65,9 @@ export class AuthService {
   }
 
   async login(
-    user: Omit<User, 'password'>,
+    user: ValidatedUser,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const payload = { username: user.username, sub: user.id };
+    const payload: JwtPayload = { username: user.username, sub: user.id };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = await this.generateRefreshToken(user.id);
 

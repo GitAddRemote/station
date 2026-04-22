@@ -31,6 +31,8 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
+import { QueryParams, asString } from '../../common/types/query-params.type';
 
 @ApiTags('Organization Inventory')
 @ApiBearerAuth()
@@ -40,7 +42,7 @@ export class OrgInventoryController {
   constructor(private readonly orgInventoryService: OrgInventoryService) {}
 
   private readOptionalNumber(
-    query: Record<string, any>,
+    query: QueryParams,
     keys: string[],
     fieldName: string,
     options?: {
@@ -87,9 +89,9 @@ export class OrgInventoryController {
     type: [OrgInventoryItemDto],
   })
   async list(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('orgId', ParseIntPipe) orgId: number,
-    @Query() query: Record<string, any>,
+    @Query() query: QueryParams,
   ): Promise<{
     items: OrgInventoryItemDto[];
     total: number;
@@ -137,7 +139,7 @@ export class OrgInventoryController {
           min: 1,
         },
       ),
-      search: query.search,
+      search: asString(query.search),
       limit: this.readOptionalNumber(query, ['limit'], 'limit', {
         integer: true,
         min: 1,
@@ -146,13 +148,19 @@ export class OrgInventoryController {
         integer: true,
         min: 0,
       }),
-      sort: query.sort,
-      order: query.order,
+      sort: asString(query.sort) as
+        | 'name'
+        | 'quantity'
+        | 'location'
+        | 'date_added'
+        | 'date_modified'
+        | undefined,
+      order: asString(query.order) as 'asc' | 'desc' | undefined,
       activeOnly:
         query.active_only !== undefined
-          ? query.active_only === 'true' || query.active_only === true
+          ? query.active_only === 'true'
           : query.activeOnly !== undefined
-            ? query.activeOnly === 'true' || query.activeOnly === true
+            ? query.activeOnly === 'true'
             : undefined,
       minQuantity: this.readOptionalNumber(
         query,
@@ -196,7 +204,7 @@ export class OrgInventoryController {
   @ApiResponse({ status: 403, description: 'Permission denied' })
   @ApiResponse({ status: 409, description: 'Inventory item already exists' })
   async create(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('orgId', ParseIntPipe) orgId: number,
     @Body() createDto: CreateOrgInventoryItemDto,
   ): Promise<OrgInventoryItemDto> {
@@ -219,7 +227,7 @@ export class OrgInventoryController {
     type: OrgInventorySummaryDto,
   })
   async getSummary(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('orgId', ParseIntPipe) orgId: number,
     @Query('gameId', ParseIntPipe) gameId: number,
   ): Promise<OrgInventorySummaryDto> {
@@ -241,7 +249,7 @@ export class OrgInventoryController {
   })
   @ApiResponse({ status: 404, description: 'Item not found' })
   async findById(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('orgId', ParseIntPipe) orgId: number,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<OrgInventoryItemDto> {
@@ -264,7 +272,7 @@ export class OrgInventoryController {
   @ApiResponse({ status: 404, description: 'Item not found' })
   @ApiResponse({ status: 403, description: 'Permission denied' })
   async update(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('orgId', ParseIntPipe) orgId: number,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateOrgInventoryItemDto,
@@ -290,7 +298,7 @@ export class OrgInventoryController {
   @ApiResponse({ status: 404, description: 'Item not found' })
   @ApiResponse({ status: 403, description: 'Permission denied' })
   async delete(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('orgId', ParseIntPipe) orgId: number,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {

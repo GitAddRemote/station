@@ -56,13 +56,13 @@ export class AuditLog {
   entityId?: number;
 
   @Column('jsonb', { nullable: true })
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 
   @Column('jsonb', { nullable: true })
-  oldValues?: Record<string, any>;
+  oldValues?: Record<string, unknown>;
 
   @Column('jsonb', { nullable: true })
-  newValues?: Record<string, any>;
+  newValues?: Record<string, unknown>;
 
   @Column({ nullable: true })
   ipAddress?: string;

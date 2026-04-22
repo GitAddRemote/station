@@ -12,11 +12,11 @@ import {
   UseGuards,
   HttpCode,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UserDto } from './dto/user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 
 @Controller('users')
 export class UsersController {
@@ -24,18 +24,20 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
-  getProfile(@Req() req: Request) {
-    return req.user;
+  getProfile(@Req() req: AuthenticatedRequest) {
+    return { userId: req.user.userId, username: req.user.username };
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Patch('profile')
   async updateProfile(
-    @Req() req: Request,
+    @Req() req: AuthenticatedRequest,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    const userId = (req.user as any).userId;
-    return await this.usersService.updateProfile(userId, updateProfileDto);
+    const userId = req.user.userId;
+    const { password: _password, ...safeUser } =
+      await this.usersService.updateProfile(userId, updateProfileDto);
+    return safeUser;
   }
 
   @UseGuards(AuthGuard('jwt'))

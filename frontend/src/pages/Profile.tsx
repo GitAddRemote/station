@@ -42,7 +42,10 @@ const Profile = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordMessage, setPasswordMessage] = useState({ type: '', text: '' });
+  const [passwordMessage, setPasswordMessage] = useState({
+    type: '',
+    text: '',
+  });
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
@@ -132,11 +135,17 @@ const Profile = () => {
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
       } else {
         const error = await response.json();
-        setMessage({ type: 'error', text: error.message || 'Failed to update profile' });
+        setMessage({
+          type: 'error',
+          text: error.message || 'Failed to update profile',
+        });
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      setMessage({ type: 'error', text: 'An error occurred while updating your profile' });
+      setMessage({
+        type: 'error',
+        text: 'An error occurred while updating your profile',
+      });
     } finally {
       setSaving(false);
     }
@@ -154,7 +163,10 @@ const Profile = () => {
 
     // Validate password length
     if (newPassword.length < 6) {
-      setPasswordMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+      setPasswordMessage({
+        type: 'error',
+        text: 'Password must be at least 6 characters',
+      });
       return;
     }
 
@@ -183,11 +195,17 @@ const Profile = () => {
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setPasswordMessage({ type: 'error', text: data.message || 'Failed to change password' });
+        setPasswordMessage({
+          type: 'error',
+          text: data.message || 'Failed to change password',
+        });
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      setPasswordMessage({ type: 'error', text: 'An error occurred while changing your password' });
+      setPasswordMessage({
+        type: 'error',
+        text: 'An error occurred while changing your password',
+      });
     } finally {
       setChangingPassword(false);
     }
@@ -375,12 +393,18 @@ const Profile = () => {
         {/* Change Password Card */}
         <Card sx={{ mt: 4 }}>
           <CardContent sx={{ p: 4 }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#e8eaed' }}>
+            <Typography
+              variant="h6"
+              sx={{ mb: 2, fontWeight: 600, color: '#e8eaed' }}
+            >
               Change Password
             </Typography>
 
             {passwordMessage.text && (
-              <Alert severity={passwordMessage.type as 'success' | 'error'} sx={{ mb: 3 }}>
+              <Alert
+                severity={passwordMessage.type as 'success' | 'error'}
+                sx={{ mb: 3 }}
+              >
                 {passwordMessage.text}
               </Alert>
             )}
@@ -432,7 +456,9 @@ const Profile = () => {
                   startIcon={<LockIcon />}
                   disabled={changingPassword}
                 >
-                  {changingPassword ? 'Changing Password...' : 'Change Password'}
+                  {changingPassword
+                    ? 'Changing Password...'
+                    : 'Change Password'}
                 </Button>
               </Stack>
             </form>

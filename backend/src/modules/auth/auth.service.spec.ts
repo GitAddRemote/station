@@ -135,17 +135,19 @@ describe('AuthService', () => {
     it('should generate token that expires in 1 hour', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
       const now = new Date();
-      let savedToken: any;
+      let savedToken: { expiresAt: Date } | undefined;
 
-      mockPasswordResetRepository.save.mockImplementation((token) => {
-        savedToken = token;
-        return Promise.resolve(token);
-      });
+      mockPasswordResetRepository.save.mockImplementation(
+        (token: { expiresAt: Date }) => {
+          savedToken = token;
+          return Promise.resolve(token);
+        },
+      );
 
       await service.requestPasswordReset(mockUser.email);
 
       expect(savedToken).toBeDefined();
-      const expiryTime = new Date(savedToken.expiresAt).getTime();
+      const expiryTime = new Date(savedToken!.expiresAt).getTime();
       const expectedExpiry = now.getTime() + 60 * 60 * 1000; // 1 hour
       expect(Math.abs(expiryTime - expectedExpiry)).toBeLessThan(1000); // Within 1 second
     });
@@ -364,25 +366,29 @@ describe('AuthService', () => {
       });
 
       it('should persist the SHA-256 hash, not the raw token', async () => {
-        let savedData: any;
-        mockRefreshTokenRepository.save.mockImplementation((data) => {
-          savedData = data;
-          return Promise.resolve(data);
-        });
+        let savedData: { token: string; expiresAt: Date } | undefined;
+        mockRefreshTokenRepository.save.mockImplementation(
+          (data: { token: string; expiresAt: Date }) => {
+            savedData = data;
+            return Promise.resolve(data);
+          },
+        );
 
         const raw = await service.generateRefreshToken(mockUser.id);
 
-        expect(savedData.token).toBe(sha256(raw));
-        expect(savedData.token).not.toBe(raw);
+        expect(savedData!.token).toBe(sha256(raw));
+        expect(savedData!.token).not.toBe(raw);
       });
 
       it('should set expiry 7 calendar days from now', async () => {
         const now = new Date();
-        let savedData: any;
-        mockRefreshTokenRepository.save.mockImplementation((data) => {
-          savedData = data;
-          return Promise.resolve(data);
-        });
+        let savedData: { token: string; expiresAt: Date } | undefined;
+        mockRefreshTokenRepository.save.mockImplementation(
+          (data: { token: string; expiresAt: Date }) => {
+            savedData = data;
+            return Promise.resolve(data);
+          },
+        );
 
         await service.generateRefreshToken(mockUser.id);
 
@@ -391,7 +397,7 @@ describe('AuthService', () => {
         const expected = new Date(now);
         expected.setDate(expected.getDate() + 7);
         expect(
-          Math.abs(savedData.expiresAt.getTime() - expected.getTime()),
+          Math.abs(savedData!.expiresAt.getTime() - expected.getTime()),
         ).toBeLessThan(1000);
       });
     });

@@ -13,6 +13,24 @@ import {
   AuditLogMetadata,
 } from '../decorators/audit-log.decorator';
 
+interface AuditLogResponse {
+  id?: number | string;
+  [key: string]: unknown;
+}
+
+interface AuditLogRequest {
+  user?: {
+    userId?: number;
+    username?: string;
+  };
+  params?: Record<string, string>;
+  query?: Record<string, unknown>;
+  method: string;
+  url: string;
+  ip: string;
+  headers: Record<string, string | string[] | undefined>;
+}
+
 @Injectable()
 export class AuditLogInterceptor implements NestInterceptor {
   constructor(
@@ -20,7 +38,7 @@ export class AuditLogInterceptor implements NestInterceptor {
     private auditLogsService: AuditLogsService,
   ) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const auditMetadata = this.reflector.getAllAndOverride<AuditLogMetadata>(
       AUDIT_LOG_KEY,
       [context.getHandler(), context.getClass()],
@@ -30,35 +48,64 @@ export class AuditLogInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest() as AuditLogRequest;
     const user = request.user;
     const { action, entityType } = auditMetadata;
 
     return next.handle().pipe(
-      tap(async (response) => {
+      tap((response: unknown) => {
+        const isPlainObject =
+          typeof response === 'object' &&
+          response !== null &&
+          !Array.isArray(response);
+        const typedResponse = isPlainObject
+          ? (response as AuditLogResponse)
+          : undefined;
+
         // Extract entity ID from response or params
-        const entityId =
-          response?.id ||
+        let entityId: number | undefined;
+        const rawEntityId =
+          typedResponse?.id ||
           request.params?.id ||
           request.params?.organizationId ||
           request.params?.roleId;
 
-        await this.auditLogsService.log({
-          userId: user?.userId,
-          username: user?.username,
-          action,
-          entityType,
-          entityId: entityId ? parseInt(entityId, 10) : undefined,
-          metadata: {
-            method: request.method,
-            url: request.url,
-            params: request.params,
-            query: request.query,
-          },
-          newValues: response,
-          ipAddress: request.ip,
-          userAgent: request.headers['user-agent'],
-        });
+        if (rawEntityId !== undefined) {
+          if (typeof rawEntityId === 'number') {
+            entityId = Number.isNaN(rawEntityId) ? undefined : rawEntityId;
+          } else if (
+            typeof rawEntityId === 'string' &&
+            /^\d+$/.test(rawEntityId)
+          ) {
+            entityId = parseInt(rawEntityId, 10);
+          }
+          // Non-numeric IDs (e.g. UUIDs) are intentionally left as undefined
+          // to avoid silent truncation like parseInt('1e3...') → 1.
+        }
+
+        this.auditLogsService
+          .log({
+            userId: user?.userId,
+            username: user?.username,
+            action,
+            entityType,
+            entityId,
+            metadata: {
+              method: request.method,
+              url: request.url,
+              params: request.params,
+              query: request.query,
+            },
+            newValues: typedResponse,
+            ipAddress: request.ip,
+            userAgent:
+              typeof request.headers['user-agent'] === 'string'
+                ? request.headers['user-agent']
+                : undefined,
+          })
+          .catch(() => {
+            // Audit log failures must not affect the response pipeline
+          });
       }),
     );
   }

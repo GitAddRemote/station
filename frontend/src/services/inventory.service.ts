@@ -93,7 +93,8 @@ const buildInventoryQuery = (params: InventorySearchParams) => {
   if (params.uexItemId !== undefined) query.uex_item_id = params.uexItemId;
   if (params.locationId !== undefined) query.location_id = params.locationId;
   if (params.sharedOnly !== undefined) query.shared_only = params.sharedOnly;
-  if (params.sharedOrgId !== undefined) query.shared_org_id = params.sharedOrgId;
+  if (params.sharedOrgId !== undefined)
+    query.shared_org_id = params.sharedOrgId;
   if (params.search) query.search = params.search;
   if (params.minQuantity !== undefined) query.min_quantity = params.minQuantity;
   if (params.maxQuantity !== undefined) query.max_quantity = params.maxQuantity;
@@ -185,7 +186,12 @@ export const inventoryService = {
   /**
    * Create new inventory item
    */
-  async createItem(item: Omit<InventoryItem, 'id' | 'userId' | 'dateAdded' | 'dateModified' | 'active'>): Promise<InventoryItem> {
+  async createItem(
+    item: Omit<
+      InventoryItem,
+      'id' | 'userId' | 'dateAdded' | 'dateModified' | 'active'
+    >,
+  ): Promise<InventoryItem> {
     const response = await axios.post(`${API_URL}/api/inventory`, item, {
       headers: getAuthHeader(),
     });
@@ -195,10 +201,17 @@ export const inventoryService = {
   /**
    * Update inventory item
    */
-  async updateItem(id: string, updates: Partial<InventoryItem>): Promise<InventoryItem> {
-    const response = await axios.put(`${API_URL}/api/inventory/${id}`, updates, {
-      headers: getAuthHeader(),
-    });
+  async updateItem(
+    id: string,
+    updates: Partial<InventoryItem>,
+  ): Promise<InventoryItem> {
+    const response = await axios.put(
+      `${API_URL}/api/inventory/${id}`,
+      updates,
+      {
+        headers: getAuthHeader(),
+      },
+    );
     return response.data;
   },
 
@@ -268,13 +281,10 @@ export const inventoryService = {
       offset?: number;
     },
   ): Promise<InventoryListResponse> {
-    const response = await axios.get(
-      `${API_URL}/api/orgs/${orgId}/inventory`,
-      {
-        params: buildOrgInventoryQuery(params),
-        headers: getAuthHeader(),
-      },
-    );
+    const response = await axios.get(`${API_URL}/api/orgs/${orgId}/inventory`, {
+      params: buildOrgInventoryQuery(params),
+      headers: getAuthHeader(),
+    });
 
     return response.data;
   },

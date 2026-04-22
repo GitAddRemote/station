@@ -89,19 +89,20 @@ export class UEXItemsClient {
       );
 
       return items;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof RateLimitException) {
         throw error;
       }
 
-      if (error.response?.status >= 500) {
+      const errorResponse = error as { response?: { status?: number } };
+      if (error && (errorResponse.response?.status ?? 0) >= 500) {
         throw new UEXServerException(
-          `UEX server error: ${error.message || 'Unknown error'}`,
+          `UEX server error: ${(error instanceof Error ? error.message : 'Unknown error') || 'Unknown error'}`,
         );
       }
 
       throw new UEXClientException(
-        `Failed to fetch items for category ${categoryId}: ${error.message || 'Unknown error'}`,
+        `Failed to fetch items for category ${categoryId}: ${(error instanceof Error ? error.message : 'Unknown error') || 'Unknown error'}`,
       );
     }
   }
@@ -144,19 +145,20 @@ export class UEXItemsClient {
       this.logger.log(`Fetched ${items.length} items from UEX API`);
 
       return items;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof RateLimitException) {
         throw error;
       }
 
-      if (error.response?.status >= 500) {
+      const errorResponse = error as { response?: { status?: number } };
+      if (error && (errorResponse.response?.status ?? 0) >= 500) {
         throw new UEXServerException(
-          `UEX server error: ${error.message || 'Unknown error'}`,
+          `UEX server error: ${(error instanceof Error ? error.message : 'Unknown error') || 'Unknown error'}`,
         );
       }
 
       throw new UEXClientException(
-        `Failed to fetch items: ${error.message || 'Unknown error'}`,
+        `Failed to fetch items: ${(error instanceof Error ? error.message : 'Unknown error') || 'Unknown error'}`,
       );
     }
   }

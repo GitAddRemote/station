@@ -55,7 +55,7 @@ export class CategoriesSyncService {
       // Determine sync mode (delta vs full)
       const syncDecision = await this.syncService.shouldUseDeltaSync(endpoint);
       const useDelta = !forceFull && syncDecision.useDelta;
-      const filters: any = { type: 'item' }; // MVP: only item categories
+      const filters: Record<string, Date | string | number> = { type: 'item' }; // MVP: only item categories
 
       if (useDelta && syncDecision.lastSyncAt) {
         filters.date_modified = syncDecision.lastSyncAt;
@@ -93,23 +93,27 @@ export class CategoriesSyncService {
       );
 
       return { ...result, durationMs, syncMode: useDelta ? 'delta' : 'full' };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const durationMs = Date.now() - startTime;
-      await this.syncService.recordSyncFailure(endpoint, error, durationMs);
+      const syncError =
+        error instanceof Error ? error : new Error(String(error));
+      await this.syncService.recordSyncFailure(endpoint, syncError, durationMs);
       throw error;
     } finally {
       await this.syncService.releaseSyncLock(endpoint);
     }
   }
 
-  private async fetchWithRetry(filters: any): Promise<UEXCategoryResponse[]> {
+  private async fetchWithRetry(
+    filters: Record<string, Date | string | number>,
+  ): Promise<UEXCategoryResponse[]> {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
         return await this.uexClient.fetchCategories(filters);
-      } catch (error: any) {
-        lastError = error;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
 
         // Don't retry rate limits
         if (error instanceof RateLimitException) {

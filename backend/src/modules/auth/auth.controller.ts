@@ -23,13 +23,15 @@ import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 import { UserDto } from '../users/dto/user.dto';
-import { User } from '../users/user.entity';
 import { Request as ExpressRequest, Response } from 'express';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/password-reset.dto';
+import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
+import { RefreshTokenRequest } from './interfaces/refresh-token-request.interface';
+import { ValidatedUser } from './interfaces/validated-user.interface';
 
 // Parse throttle config once at module load time.
 // Number() handles numeric strings and NaN from non-numeric input; the
@@ -97,11 +99,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(
-    @Request() req: ExpressRequest,
+    @Request() req: ExpressRequest & { user: ValidatedUser },
     @Res({ passthrough: true }) res: Response,
   ) {
-    const user = req.user as Omit<User, 'password'>;
-    const tokens = await this.authService.login(user);
+    const tokens = await this.authService.login(req.user);
     res.cookie(
       'access_token',
       tokens.accessToken,
@@ -112,7 +113,7 @@ export class AuthController {
       tokens.refreshToken,
       this.cookieOptions(7 * 24 * 60 * 60 * 1000),
     );
-    return { message: 'Login successful', username: user.username };
+    return { message: 'Login successful', username: req.user.username };
   }
 
   @ApiOperation({ summary: 'Register new user' })
@@ -130,8 +131,8 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Request() req: any) {
-    return { id: req.user.userId, username: req.user.username };
+  me(@Request() req: AuthenticatedRequest) {
+    return { userId: req.user.userId, username: req.user.username };
   }
 
   @ApiOperation({ summary: 'Refresh access token using refresh token cookie' })
@@ -141,7 +142,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(
-    @Request() req: any,
+    @Request() req: RefreshTokenRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
     const tokens = await this.authService.refreshAccessToken(
@@ -166,7 +167,10 @@ export class AuthController {
   @UseGuards(RefreshTokenAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('logout')
-  async logout(@Request() req: any, @Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Request() req: RefreshTokenRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     await this.authService.revokeRefreshToken(req.user.refreshToken);
     const { maxAge: _maxAge, ...clearOpts } = this.cookieOptions(0);
     res.clearCookie('access_token', clearOpts);
@@ -209,7 +213,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('change-password')
   async changePassword(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     const userId = req.user.userId;

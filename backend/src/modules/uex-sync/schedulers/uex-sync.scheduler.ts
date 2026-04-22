@@ -44,10 +44,14 @@ export class UEXSyncScheduler {
           `created: ${result.created}, updated: ${result.updated}, ` +
           `deleted: ${result.deleted}, duration: ${result.durationMs}ms`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Scheduled categories sync failed: ${error.message}`,
-        error.stack,
+        `Scheduled categories sync failed: ${errorMessage}`,
+        errorStack,
       );
       // Error already recorded in sync state by service
       // Add alerting here if needed
@@ -82,10 +86,14 @@ export class UEXSyncScheduler {
           `created: ${result.created}, updated: ${result.updated}, ` +
           `deleted: ${result.deleted}, duration: ${result.durationMs}ms`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Scheduled items sync failed: ${error.message}`,
-        error.stack,
+        `Scheduled items sync failed: ${errorMessage}`,
+        errorStack,
       );
       // Error already recorded in sync state by service
       // Add alerting here if needed
@@ -120,10 +128,14 @@ export class UEXSyncScheduler {
           `total created: ${result.totalCreated}, updated: ${result.totalUpdated}, ` +
           `deleted: ${result.totalDeleted}, duration: ${result.totalDurationMs}ms`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       this.logger.error(
-        `Scheduled locations sync failed: ${error.message}`,
-        error.stack,
+        `Scheduled locations sync failed: ${errorMessage}`,
+        errorStack,
       );
       // Error already recorded in sync state by service
       // Add alerting here if needed

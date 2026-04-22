@@ -7,8 +7,8 @@ import { UexSyncConfig } from './uex-sync-config.entity';
 
 describe('UexSyncService', () => {
   let service: UexSyncService;
-  let mockSyncStateRepository: any;
-  let mockSyncConfigRepository: any;
+  let mockSyncStateRepository: Record<string, jest.Mock>;
+  let mockSyncConfigRepository: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     mockSyncStateRepository = {

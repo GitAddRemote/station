@@ -3,6 +3,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
 
 describe('AuthController - Password Reset', () => {
   let controller: AuthController;
@@ -121,8 +122,8 @@ describe('AuthController - Password Reset', () => {
   describe('changePassword', () => {
     it('should call authService.changePassword with userId and passwords', async () => {
       const mockRequest = {
-        user: { userId: 1 },
-      };
+        user: { userId: 1, username: 'testuser' },
+      } as unknown as AuthenticatedRequest;
       const currentPassword = 'oldPassword123';
       const newPassword = 'newSecurePassword123';
       const expectedResponse = { message: 'Password changed successfully' };
@@ -144,8 +145,8 @@ describe('AuthController - Password Reset', () => {
 
     it('should handle incorrect current password error', async () => {
       const mockRequest = {
-        user: { userId: 1 },
-      };
+        user: { userId: 1, username: 'testuser' },
+      } as AuthenticatedRequest;
       const currentPassword = 'wrongPassword';
       const newPassword = 'newPassword123';
 
@@ -163,8 +164,8 @@ describe('AuthController - Password Reset', () => {
 
     it('should extract userId from authenticated request', async () => {
       const mockRequest = {
-        user: { userId: 42 },
-      };
+        user: { userId: 42, username: 'testuser' },
+      } as unknown as AuthenticatedRequest;
       const currentPassword = 'oldPassword123';
       const newPassword = 'newPassword123';
 

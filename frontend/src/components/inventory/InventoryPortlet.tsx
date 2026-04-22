@@ -92,9 +92,8 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
         categoryId: typeof categoryId === 'number' ? categoryId : undefined,
       };
 
-      const { items: fetchedItems, total } = await inventoryService.getInventory(
-        params,
-      );
+      const { items: fetchedItems, total } =
+        await inventoryService.getInventory(params);
 
       setItems(fetchedItems);
       setTotalCount(total ?? fetchedItems.length);
@@ -118,7 +117,9 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
     setPage(newPage);
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeRowsPerPage = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
@@ -263,7 +264,11 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
                             variant="outlined"
                           />
                         ) : (
-                          <Chip label="Private" size="small" variant="outlined" />
+                          <Chip
+                            label="Private"
+                            size="small"
+                            variant="outlined"
+                          />
                         )}
                       </TableCell>
                     </TableRow>

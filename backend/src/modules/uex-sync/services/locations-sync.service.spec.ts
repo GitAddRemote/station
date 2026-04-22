@@ -15,16 +15,16 @@ import { UEXLocationsClient } from '../clients/uex-locations.client';
 
 describe('LocationsSyncService', () => {
   let service: LocationsSyncService;
-  let mockStarSystemRepository: any;
-  let mockPlanetRepository: any;
-  let mockMoonRepository: any;
-  let mockCityRepository: any;
-  let mockSpaceStationRepository: any;
-  let mockOutpostRepository: any;
-  let mockPoiRepository: any;
-  let mockUexClient: any;
-  let mockSyncService: any;
-  let mockSystemUserService: any;
+  let mockStarSystemRepository: Record<string, jest.Mock>;
+  let mockPlanetRepository: Record<string, jest.Mock>;
+  let mockMoonRepository: Record<string, jest.Mock>;
+  let mockCityRepository: Record<string, jest.Mock>;
+  let mockSpaceStationRepository: Record<string, jest.Mock>;
+  let mockOutpostRepository: Record<string, jest.Mock>;
+  let mockPoiRepository: Record<string, jest.Mock>;
+  let mockUexClient: Record<string, jest.Mock>;
+  let mockSyncService: Record<string, jest.Mock>;
+  let mockSystemUserService: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     const createMockRepository = () => ({
@@ -109,7 +109,7 @@ describe('LocationsSyncService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string, defaultValue: any) => defaultValue),
+            get: jest.fn((key: string, defaultValue: unknown) => defaultValue),
           },
         },
       ],

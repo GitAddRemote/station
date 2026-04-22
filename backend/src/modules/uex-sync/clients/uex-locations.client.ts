@@ -197,19 +197,20 @@ export class UEXLocationsClient {
       this.logger.log(`Fetched ${locations.length} ${endpoint} from UEX API`);
 
       return locations;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof RateLimitException) {
         throw error;
       }
 
-      if (error.response?.status >= 500) {
+      const errorResponse = error as { response?: { status?: number } };
+      if (error && (errorResponse.response?.status ?? 0) >= 500) {
         throw new UEXServerException(
-          `UEX server error: ${error.message || 'Unknown error'}`,
+          `UEX server error: ${(error instanceof Error ? error.message : 'Unknown error') || 'Unknown error'}`,
         );
       }
 
       throw new UEXClientException(
-        `Failed to fetch ${endpoint}: ${error.message || 'Unknown error'}`,
+        `Failed to fetch ${endpoint}: ${(error instanceof Error ? error.message : 'Unknown error') || 'Unknown error'}`,
       );
     }
   }

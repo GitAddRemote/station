@@ -13,7 +13,10 @@ import {
 import CheckIcon from '@mui/icons-material/Check';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
-import type { InventoryItem, OrgInventoryItem } from '../../services/inventory.service';
+import type {
+  InventoryItem,
+  OrgInventoryItem,
+} from '../../services/inventory.service';
 import type { FocusController } from '../../utils/focusController';
 import { useMemoizedLocations } from '../../hooks/useMemoizedLocations';
 
@@ -64,9 +67,16 @@ interface InventoryInlineRowProps {
     selectedName?: string,
   ) => void;
   onQuantityBlur: (rowKey: string) => void;
-  onActivateField: (rowKey: string, field: 'location' | 'quantity', initialInput?: string) => void;
+  onActivateField: (
+    rowKey: string,
+    field: 'location' | 'quantity',
+    initialInput?: string,
+  ) => void;
   onSave: (item: InventoryRecord) => void;
-  onOpenActions?: (event: MouseEvent<HTMLElement>, item: InventoryRecord) => void;
+  onOpenActions?: (
+    event: MouseEvent<HTMLElement>,
+    item: InventoryRecord,
+  ) => void;
   setLocationRef: (ref: HTMLInputElement | null, key: string) => void;
   setQuantityRef: (ref: HTMLInputElement | null, key: string) => void;
   setSaveRef: (ref: HTMLButtonElement | null, key: string) => void;
@@ -115,10 +125,9 @@ const InventoryInlineRow = ({
   }, [draftLocationId, locationNameById, item.locationName]);
 
   const draftQuantityNumber = Number(inlineDraft.quantity);
-  const displayQuantity =
-    Number.isFinite(draftQuantityNumber)
-      ? draftQuantityNumber
-      : Number(item.quantity);
+  const displayQuantity = Number.isFinite(draftQuantityNumber)
+    ? draftQuantityNumber
+    : Number(item.quantity);
 
   return (
     <Box
@@ -126,13 +135,18 @@ const InventoryInlineRow = ({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md: density === 'compact' ? '2fr 1fr 1fr 1fr auto' : '2fr 1fr 1fr 1fr auto',
+          md:
+            density === 'compact'
+              ? '2fr 1fr 1fr 1fr auto'
+              : '2fr 1fr 1fr 1fr auto',
         },
         gap: density === 'compact' ? 0.75 : 2,
         alignItems: 'center',
         px: density === 'compact' ? 1 : 2,
         py: density === 'compact' ? 0.45 : 1.5,
-        backgroundColor: isRowActive ? 'rgba(74, 158, 255, 0.08)' : 'transparent',
+        backgroundColor: isRowActive
+          ? 'rgba(74, 158, 255, 0.08)'
+          : 'transparent',
         '&:hover': {
           backgroundColor: isRowActive
             ? 'rgba(74, 158, 255, 0.12)'
@@ -199,7 +213,12 @@ const InventoryInlineRow = ({
                 onChange={(_, value) => {
                   onDraftChange(item.id, { locationId: value ? value.id : '' });
                   onLocationInputChange(rowKey, value?.name ?? '');
-                  onLocationBlur(rowKey, item.id, draftLocationId, value?.name ?? '');
+                  onLocationBlur(
+                    rowKey,
+                    item.id,
+                    draftLocationId,
+                    value?.name ?? '',
+                  );
                   onErrorChange(item.id, null);
                 }}
                 onInputChange={(_, value) => {
@@ -209,7 +228,12 @@ const InventoryInlineRow = ({
                   onLocationFocus(item.id);
                 }}
                 onBlur={() => {
-                  onLocationBlur(rowKey, item.id, draftLocationId, selectedLocation?.name ?? '');
+                  onLocationBlur(
+                    rowKey,
+                    item.id,
+                    draftLocationId,
+                    selectedLocation?.name ?? '',
+                  );
                 }}
                 renderOption={(props, option) => (
                   <li {...props} key={option.id}>
@@ -231,7 +255,12 @@ const InventoryInlineRow = ({
                         if (bestMatch) {
                           onDraftChange(item.id, { locationId: bestMatch.id });
                           onLocationInputChange(rowKey, bestMatch.name);
-                          onLocationBlur(rowKey, item.id, draftLocationId, bestMatch.name);
+                          onLocationBlur(
+                            rowKey,
+                            item.id,
+                            draftLocationId,
+                            bestMatch.name,
+                          );
                           onErrorChange(item.id, null);
                           focusController.focus(rowKey, 'quantity');
                         } else {
@@ -239,7 +268,10 @@ const InventoryInlineRow = ({
                         }
                       } else if (event.key === 'Escape') {
                         event.preventDefault();
-                        onLocationInputChange(rowKey, selectedLocation?.name ?? '');
+                        onLocationInputChange(
+                          rowKey,
+                          selectedLocation?.name ?? '',
+                        );
                         onLocationBlur(
                           rowKey,
                           item.id,
@@ -300,7 +332,9 @@ const InventoryInlineRow = ({
                 aria-label={`Edit location for ${item.itemName ?? `Item ${item.uexItemId}`}`}
               >
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {selectedLocation?.name || item.locationName || 'Select location'}
+                  {selectedLocation?.name ||
+                    item.locationName ||
+                    'Select location'}
                 </Typography>
                 <EditIcon
                   className="inline-edit-icon"
@@ -318,7 +352,10 @@ const InventoryInlineRow = ({
             <Typography variant="body2" color="text.secondary">
               Quantity
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700, letterSpacing: 0.1 }}>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 700, letterSpacing: 0.1 }}
+            >
               {Number(item.quantity).toLocaleString()}
             </Typography>
           </>
@@ -345,7 +382,10 @@ const InventoryInlineRow = ({
                       quantity: Math.min(numeric, EDITOR_MODE_QUANTITY_MAX),
                     });
                   }
-                  if (!Number.isFinite(numeric) || numeric < MIN_INVENTORY_QUANTITY) {
+                  if (
+                    !Number.isFinite(numeric) ||
+                    numeric < MIN_INVENTORY_QUANTITY
+                  ) {
                     onErrorChange(item.id, 'Quantity must be at least 0.01');
                   } else {
                     onErrorChange(item.id, null);
@@ -365,7 +405,9 @@ const InventoryInlineRow = ({
                     focusController.focus(rowKey, 'save');
                   } else if (event.key === 'Escape') {
                     event.preventDefault();
-                    onDraftChange(item.id, { quantity: Number(item.quantity) || 0 });
+                    onDraftChange(item.id, {
+                      quantity: Number(item.quantity) || 0,
+                    });
                     onErrorChange(item.id, null);
                     onQuantityBlur(rowKey);
                   }
@@ -375,10 +417,11 @@ const InventoryInlineRow = ({
                   '& input': {
                     MozAppearance: 'textfield',
                   },
-                  '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0,
-                  },
+                  '& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button':
+                    {
+                      WebkitAppearance: 'none',
+                      margin: 0,
+                    },
                 }}
               />
             ) : (
@@ -413,7 +456,10 @@ const InventoryInlineRow = ({
                 }}
                 aria-label={`Edit quantity for ${item.itemName ?? `Item ${item.uexItemId}`}`}
               >
-                <Typography variant="body2" sx={{ fontWeight: 700, letterSpacing: 0.1 }}>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 700, letterSpacing: 0.1 }}
+                >
                   {displayQuantity.toLocaleString()}
                 </Typography>
                 <EditIcon
@@ -433,13 +479,16 @@ const InventoryInlineRow = ({
           </Typography>
         )}
         <Typography variant="body2">
-          {new Date(item.dateModified || item.dateAdded || '').toLocaleDateString()}
+          {new Date(
+            item.dateModified || item.dateAdded || '',
+          ).toLocaleDateString()}
         </Typography>
-        {Number.isFinite(draftQuantityNumber) && draftQuantityNumber >= EDITOR_MODE_QUANTITY_MAX && (
-          <Typography variant="caption" sx={{ color: 'warning.main' }}>
-            Large quantity entered - verify value.
-          </Typography>
-        )}
+        {Number.isFinite(draftQuantityNumber) &&
+          draftQuantityNumber >= EDITOR_MODE_QUANTITY_MAX && (
+            <Typography variant="caption" sx={{ color: 'warning.main' }}>
+              Large quantity entered - verify value.
+            </Typography>
+          )}
       </Stack>
       <Stack
         direction="row"
@@ -507,7 +556,10 @@ const InventoryInlineRow = ({
   );
 };
 
-const areEqual = (prev: InventoryInlineRowProps, next: InventoryInlineRowProps) =>
+const areEqual = (
+  prev: InventoryInlineRowProps,
+  next: InventoryInlineRowProps,
+) =>
   prev.item === next.item &&
   prev.density === next.density &&
   prev.allLocations === next.allLocations &&

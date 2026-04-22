@@ -63,7 +63,8 @@ const Home = () => {
           minHeight: '80vh',
           display: 'flex',
           alignItems: 'center',
-          background: 'linear-gradient(135deg, #1e2328 0%, #2a2f35 50%, #1e2328 100%)',
+          background:
+            'linear-gradient(135deg, #1e2328 0%, #2a2f35 50%, #1e2328 100%)',
           position: 'relative',
           overflow: 'hidden',
           '&::before': {
@@ -74,7 +75,8 @@ const Home = () => {
             transform: 'translate(-50%, -50%)',
             width: '600px',
             height: '600px',
-            background: 'radial-gradient(circle, rgba(74, 158, 255, 0.15) 0%, transparent 70%)',
+            background:
+              'radial-gradient(circle, rgba(74, 158, 255, 0.15) 0%, transparent 70%)',
             filter: 'blur(80px)',
             animation: 'pulse 4s ease-in-out infinite',
           },
@@ -98,7 +100,8 @@ const Home = () => {
                 fontSize: { xs: '2.5rem', md: '4rem' },
                 fontWeight: 800,
                 mb: 3,
-                background: 'linear-gradient(135deg, #7ABDFF 0%, #4A9EFF 50%, #2563EB 100%)',
+                background:
+                  'linear-gradient(135deg, #7ABDFF 0%, #4A9EFF 50%, #2563EB 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 textShadow: '0 0 40px rgba(74, 158, 255, 0.3)',
@@ -214,8 +217,8 @@ const Home = () => {
                   Multi-Organization Support
                 </Typography>
                 <Typography sx={{ color: '#9aa0a6', lineHeight: 1.7 }}>
-                  Manage multiple guilds from one account with separate roles and
-                  permissions for each organization.
+                  Manage multiple guilds from one account with separate roles
+                  and permissions for each organization.
                 </Typography>
               </CardContent>
             </Card>
@@ -247,8 +250,8 @@ const Home = () => {
                   Advanced Permissions
                 </Typography>
                 <Typography sx={{ color: '#9aa0a6', lineHeight: 1.7 }}>
-                  Fine-grained role-based access control with flexible permission
-                  sets for every organization and member.
+                  Fine-grained role-based access control with flexible
+                  permission sets for every organization and member.
                 </Typography>
               </CardContent>
             </Card>
@@ -340,7 +343,9 @@ const Home = () => {
                     mb: 3,
                   }}
                 >
-                  <AdminPanelSettingsIcon sx={{ fontSize: 40, color: '#4A9EFF' }} />
+                  <AdminPanelSettingsIcon
+                    sx={{ fontSize: 40, color: '#4A9EFF' }}
+                  />
                 </Box>
                 <Typography variant="h5" sx={{ mb: 2, fontWeight: 600 }}>
                   Member Profiles
@@ -379,8 +384,8 @@ const Home = () => {
                   Secure & Reliable
                 </Typography>
                 <Typography sx={{ color: '#9aa0a6', lineHeight: 1.7 }}>
-                  JWT authentication with refresh tokens, bcrypt password hashing,
-                  and comprehensive security measures.
+                  JWT authentication with refresh tokens, bcrypt password
+                  hashing, and comprehensive security measures.
                 </Typography>
               </CardContent>
             </Card>
@@ -416,7 +421,8 @@ const Home = () => {
                 color: 'rgba(255, 255, 255, 0.9)',
               }}
             >
-              Join thousands of gaming organizations using Station to manage their teams
+              Join thousands of gaming organizations using Station to manage
+              their teams
             </Typography>
             <Button
               component={Link}
