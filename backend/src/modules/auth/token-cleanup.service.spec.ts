@@ -7,6 +7,14 @@ import { PasswordReset } from './password-reset.entity';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 
+// Mock the cron module so CronJob.start() is a no-op and never leaves active
+// timers that cause Jest to hang after the suite finishes.
+jest.mock('cron', () => ({
+  CronJob: jest.fn().mockImplementation(() => ({
+    start: jest.fn(),
+  })),
+}));
+
 // Helper that mirrors the safe JEST_WORKER_ID restore pattern used throughout
 // this file: deletes the variable when the original value was undefined rather
 // than assigning the string 'undefined' (Node coerces undefined to 'undefined'
