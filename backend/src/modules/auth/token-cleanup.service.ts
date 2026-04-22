@@ -49,11 +49,16 @@ export class TokenCleanupService implements OnApplicationBootstrap {
     // evaluated at class-definition time (before DI runs), so there is no way
     // to inject ConfigService into a @Cron() expression.  Reading from
     // ConfigService here gives us the fully-loaded, validated config value.
-    // Use || so a blank/whitespace-only value is treated the same as unset.
     const DEFAULT_CRON = DEFAULT_CLEANUP_CRON;
     const rawExpression = this.configService
       .get<string>('REFRESH_TOKEN_CLEANUP_CRON')
       ?.trim();
+    if (rawExpression === '') {
+      this.logger.warn(
+        'REFRESH_TOKEN_CLEANUP_CRON is set but blank — ' +
+          `falling back to default "${DEFAULT_CRON}"`,
+      );
+    }
     const cronExpression = rawExpression || DEFAULT_CRON;
 
     let effectiveExpression = cronExpression;

@@ -167,7 +167,7 @@ describe('TokenCleanupService', () => {
       restoreWorker(originalWorker);
     });
 
-    it('should treat blank REFRESH_TOKEN_CLEANUP_CRON as unset and use default', () => {
+    it('should treat blank REFRESH_TOKEN_CLEANUP_CRON as unset, log a warning, and use default', () => {
       const originalWorker = process.env['JEST_WORKER_ID'];
       delete process.env['JEST_WORKER_ID'];
       mockConfigService.get.mockImplementation((key: string) => {
@@ -175,13 +175,23 @@ describe('TokenCleanupService', () => {
         if (key === 'REFRESH_TOKEN_CLEANUP_CRON') return '   '; // blank/whitespace
         return undefined;
       });
+      const warnSpy = jest
+        .spyOn(
+          (service as unknown as { logger: { warn: jest.Mock } }).logger,
+          'warn',
+        )
+        .mockImplementation(() => undefined);
 
       service.onApplicationBootstrap();
 
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('REFRESH_TOKEN_CLEANUP_CRON is set but blank'),
+      );
       expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledWith(
         'tokenCleanup',
         expect.any(Object),
       );
+      warnSpy.mockRestore();
       restoreWorker(originalWorker);
     });
   });
