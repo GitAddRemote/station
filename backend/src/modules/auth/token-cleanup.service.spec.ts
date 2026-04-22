@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TokenCleanupService } from './token-cleanup.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -95,9 +96,9 @@ describe('TokenCleanupService', () => {
     it('should not register cron when schedulerRegistry is absent', () => {
       // Simulate the @Optional() case: schedulerRegistry is undefined
       const serviceWithoutRegistry = new TokenCleanupService(
-        mockRefreshTokenRepository as any,
-        mockPasswordResetRepository as any,
-        mockConfigService as any,
+        mockRefreshTokenRepository as unknown as Repository<RefreshToken>,
+        mockPasswordResetRepository as unknown as Repository<PasswordReset>,
+        mockConfigService as unknown as ConfigService,
         undefined,
       );
 
