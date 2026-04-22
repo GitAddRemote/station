@@ -7,6 +7,8 @@ import {
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { BaseUexEntity } from '../entities/base-uex.entity';
 
+type BaseUexUpdate = QueryDeepPartialEntity<BaseUexEntity>;
+
 /**
  * Base repository class for UEX entities
  * Automatically filters out soft-deleted records in all queries
@@ -79,22 +81,18 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
    * Mark record as soft deleted
    */
   async markAsDeleted(id: number, modifiedBy: number): Promise<void> {
-    await this.update(id, {
-      deleted: true,
-      modifiedById: modifiedBy,
-    } as unknown as QueryDeepPartialEntity<T>);
+    const update: BaseUexUpdate = { deleted: true, modifiedById: modifiedBy };
+    await this.update(id, update as QueryDeepPartialEntity<T>);
   }
 
   /**
    * Mark record as soft deleted by UEX ID
    */
   async markAsDeletedByUexId(uexId: number, modifiedBy: number): Promise<void> {
+    const update: BaseUexUpdate = { deleted: true, modifiedById: modifiedBy };
     await this.update(
       { uexId } as FindOptionsWhere<T>,
-      {
-        deleted: true,
-        modifiedById: modifiedBy,
-      } as unknown as QueryDeepPartialEntity<T>,
+      update as QueryDeepPartialEntity<T>,
     );
   }
 
@@ -102,19 +100,15 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
    * Mark record as inactive
    */
   async deactivate(id: number, modifiedBy: number): Promise<void> {
-    await this.update(id, {
-      active: false,
-      modifiedById: modifiedBy,
-    } as unknown as QueryDeepPartialEntity<T>);
+    const update: BaseUexUpdate = { active: false, modifiedById: modifiedBy };
+    await this.update(id, update as QueryDeepPartialEntity<T>);
   }
 
   /**
    * Mark record as active
    */
   async activate(id: number, modifiedBy: number): Promise<void> {
-    await this.update(id, {
-      active: true,
-      modifiedById: modifiedBy,
-    } as unknown as QueryDeepPartialEntity<T>);
+    const update: BaseUexUpdate = { active: true, modifiedById: modifiedBy };
+    await this.update(id, update as QueryDeepPartialEntity<T>);
   }
 }
