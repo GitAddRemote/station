@@ -55,4 +55,7 @@ export const envValidationSchema = Joi.object({
   UEX_RATE_LIMIT_PAUSE_MS: Joi.number().default(2000),
   UEX_ENDPOINTS_PAUSE_MS: Joi.number().default(2000),
   UEX_API_KEY: Joi.string().allow('').default(''),
+
+  // Token cleanup scheduler (optional — defaults to 3 AM daily)
+  REFRESH_TOKEN_CLEANUP_CRON: Joi.string().default('0 3 * * *'),
 });
