@@ -38,30 +38,87 @@ export class UserInventoryController {
     private readonly userInventoryService: UserInventoryService,
   ) {}
 
+  private readOptionalNumber(
+    query: QueryParams,
+    keys: string[],
+    fieldName: string,
+    options?: { integer?: boolean; min?: number },
+  ): number | undefined {
+    const rawValue = keys
+      .map((key) => query[key])
+      .find((value) => value !== undefined);
+
+    if (rawValue === undefined || rawValue === '') {
+      return undefined;
+    }
+
+    const parsed = Number(rawValue);
+    if (Number.isNaN(parsed)) {
+      throw new BadRequestException(`${fieldName} must be a number`);
+    }
+    if (options?.integer && !Number.isInteger(parsed)) {
+      throw new BadRequestException(`${fieldName} must be an integer`);
+    }
+    if (options?.min !== undefined && parsed < options.min) {
+      throw new BadRequestException(
+        `${fieldName} must be greater than or equal to ${options.min}`,
+      );
+    }
+    return parsed;
+  }
+
   @Get()
   async list(
     @Query() query: QueryParams,
     @Request() req: AuthenticatedRequest,
   ) {
     const userId = req.user.userId;
-    const parsedMinQuantity = Number(
-      query.min_quantity ?? query.minQuantity ?? Number.NaN,
+
+    const gameId = this.readOptionalNumber(
+      query,
+      ['game_id', 'gameId'],
+      'game_id',
+      { integer: true },
     );
-    const parsedMaxQuantity = Number(
-      query.max_quantity ?? query.maxQuantity ?? Number.NaN,
-    );
+    if (!gameId) {
+      throw new BadRequestException('game_id is required');
+    }
 
     const searchDto: UserInventorySearchDto = {
-      gameId: Number(query.game_id ?? query.gameId),
-      categoryId: query.category_id ? Number(query.category_id) : undefined,
-      uexItemId: query.uex_item_id ? Number(query.uex_item_id) : undefined,
-      locationId: query.location_id ? Number(query.location_id) : undefined,
-      sharedOrgId: query.shared_org_id
-        ? Number(query.shared_org_id)
-        : undefined,
+      gameId,
+      categoryId: this.readOptionalNumber(
+        query,
+        ['category_id', 'categoryId'],
+        'category_id',
+        { integer: true },
+      ),
+      uexItemId: this.readOptionalNumber(
+        query,
+        ['uex_item_id', 'uexItemId'],
+        'uex_item_id',
+        { integer: true },
+      ),
+      locationId: this.readOptionalNumber(
+        query,
+        ['location_id', 'locationId'],
+        'location_id',
+        { integer: true },
+      ),
+      sharedOrgId: this.readOptionalNumber(
+        query,
+        ['shared_org_id', 'sharedOrgId'],
+        'shared_org_id',
+        { integer: true },
+      ),
       search: asString(query.search),
-      limit: query.limit ? Number(query.limit) : undefined,
-      offset: query.offset ? Number(query.offset) : undefined,
+      limit: this.readOptionalNumber(query, ['limit'], 'limit', {
+        integer: true,
+        min: 1,
+      }),
+      offset: this.readOptionalNumber(query, ['offset'], 'offset', {
+        integer: true,
+        min: 0,
+      }),
       sort: asString(query.sort) as
         | 'name'
         | 'quantity'
@@ -74,17 +131,17 @@ export class UserInventoryController {
         query.shared_only !== undefined
           ? query.shared_only === 'true'
           : undefined,
-      minQuantity: Number.isNaN(parsedMinQuantity)
-        ? undefined
-        : parsedMinQuantity,
-      maxQuantity: Number.isNaN(parsedMaxQuantity)
-        ? undefined
-        : parsedMaxQuantity,
+      minQuantity: this.readOptionalNumber(
+        query,
+        ['min_quantity', 'minQuantity'],
+        'min_quantity',
+      ),
+      maxQuantity: this.readOptionalNumber(
+        query,
+        ['max_quantity', 'maxQuantity'],
+        'max_quantity',
+      ),
     };
-
-    if (!searchDto.gameId) {
-      throw new BadRequestException('game_id is required');
-    }
 
     return this.userInventoryService.findAll(userId, searchDto);
   }
