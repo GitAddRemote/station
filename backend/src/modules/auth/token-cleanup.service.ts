@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
+import { DEFAULT_CLEANUP_CRON } from './token-cleanup.constants';
 
 @Injectable()
 export class TokenCleanupService implements OnApplicationBootstrap {
@@ -49,7 +50,7 @@ export class TokenCleanupService implements OnApplicationBootstrap {
     // to inject ConfigService into a @Cron() expression.  Reading from
     // ConfigService here gives us the fully-loaded, validated config value.
     // Use || so a blank/whitespace-only value is treated the same as unset.
-    const DEFAULT_CRON = '0 3 * * *';
+    const DEFAULT_CRON = DEFAULT_CLEANUP_CRON;
     const rawExpression = this.configService
       .get<string>('REFRESH_TOKEN_CLEANUP_CRON')
       ?.trim();
