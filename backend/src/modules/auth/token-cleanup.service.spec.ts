@@ -7,12 +7,17 @@ import { PasswordReset } from './password-reset.entity';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 
-// Mock the cron module so CronJob.start() is a no-op and never leaves active
-// timers that cause Jest to hang after the suite finishes.
+// Mock the cron module so no real timers are ever started in tests.
+// CronJob throws for obviously invalid expressions (matching real behaviour)
+// so the try/catch fallback path in onApplicationBootstrap() can be exercised.
+const INVALID_CRON_EXPRESSIONS = new Set(['not-a-valid-cron']);
 jest.mock('cron', () => ({
-  CronJob: jest.fn().mockImplementation(() => ({
-    start: jest.fn(),
-  })),
+  CronJob: jest.fn().mockImplementation((expression: string) => {
+    if (INVALID_CRON_EXPRESSIONS.has(expression)) {
+      throw new Error(`Invalid cron expression: ${expression}`);
+    }
+    return { start: jest.fn() };
+  }),
 }));
 
 // Helper that mirrors the safe JEST_WORKER_ID restore pattern used throughout
@@ -264,9 +269,11 @@ describe('TokenCleanupService', () => {
           mockRefreshTokenRepository.createQueryBuilder,
         ).toHaveBeenCalled();
         const [whereClause, params] = mockQueryBuilder.where.mock.calls[0];
-        expect(whereClause).toContain('revoked');
+        // Boolean flag is inlined (not parameterised) so the partial index is usable
+        expect(whereClause).toContain('revoked = TRUE');
         expect(whereClause).toContain('"expiresAt"');
-        expect(params).toMatchObject({ revoked: true, now: expect.any(Date) });
+        expect(params).toMatchObject({ now: expect.any(Date) });
+        expect(params).not.toHaveProperty('revoked');
       });
 
       it('should delete used and expired password resets', async () => {
@@ -276,9 +283,11 @@ describe('TokenCleanupService', () => {
           mockPasswordResetRepository.createQueryBuilder,
         ).toHaveBeenCalled();
         const [whereClause, params] = mockQueryBuilder.where.mock.calls[1];
-        expect(whereClause).toContain('used');
+        // Boolean flag is inlined (not parameterised) so the partial index is usable
+        expect(whereClause).toContain('used = TRUE');
         expect(whereClause).toContain('"expiresAt"');
-        expect(params).toMatchObject({ used: true, now: expect.any(Date) });
+        expect(params).toMatchObject({ now: expect.any(Date) });
+        expect(params).not.toHaveProperty('used');
       });
 
       it('should not throw when a query fails', async () => {

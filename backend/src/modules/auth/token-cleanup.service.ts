@@ -102,10 +102,7 @@ export class TokenCleanupService implements OnApplicationBootstrap {
       const { affected } = await this.refreshTokenRepository
         .createQueryBuilder()
         .delete()
-        .where('revoked = :revoked OR "expiresAt" < :now', {
-          revoked: true,
-          now,
-        })
+        .where('revoked = TRUE OR "expiresAt" < :now', { now })
         .execute();
       refreshDeleted = affected ?? 0;
     } catch (error) {
@@ -120,7 +117,7 @@ export class TokenCleanupService implements OnApplicationBootstrap {
       const { affected } = await this.passwordResetRepository
         .createQueryBuilder()
         .delete()
-        .where('used = :used OR "expiresAt" < :now', { used: true, now })
+        .where('used = TRUE OR "expiresAt" < :now', { now })
         .execute();
       resetDeleted = affected ?? 0;
     } catch (error) {
