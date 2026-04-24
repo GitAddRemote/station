@@ -1,0 +1,10 @@
+{
+  "name": "infra",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node -e \"process.exit(0)\"",
+    "test": "node --test tests/**/*.test.mjs"
+  }
+}

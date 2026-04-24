@@ -6,6 +6,7 @@ yarn-error.log*
 
 # Environment variables
 .env
+.env.production
 
 # Logs
 logs/
@@ -56,3 +57,9 @@ out/
 .DS_Store
 
 .turbo/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/terraform.tfvars
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
