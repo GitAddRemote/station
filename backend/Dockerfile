@@ -10,6 +10,8 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 
+ENV NODE_ENV=production
+
 WORKDIR /app
 
 RUN addgroup -S station && adduser -S station -G station
