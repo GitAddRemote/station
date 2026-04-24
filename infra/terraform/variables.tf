@@ -4,18 +4,28 @@ variable "linode_token" {
   sensitive   = true
 }
 
-variable "linode_instance_id" {
-  description = "Existing Linode instance ID to import."
-  type        = number
-}
-
-variable "linode_domain_id" {
-  description = "Existing Linode domain ID to import."
-  type        = number
-}
-
 variable "vps_ip" {
   description = "Public IPv4 address of the Station VPS."
+  type        = string
+}
+
+variable "vps_label" {
+  description = "Linode label of the imported VPS."
+  type        = string
+}
+
+variable "vps_region" {
+  description = "Linode region slug of the imported VPS."
+  type        = string
+}
+
+variable "vps_type" {
+  description = "Linode plan type of the imported VPS."
+  type        = string
+}
+
+variable "vps_image" {
+  description = "Base image recorded for the imported VPS."
   type        = string
 }
 

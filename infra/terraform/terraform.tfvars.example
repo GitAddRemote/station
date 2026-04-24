@@ -1,5 +1,7 @@
 linode_token       = "replace-with-your-linode-api-token"
-linode_instance_id = 12345678
-linode_domain_id   = 87654321
 vps_ip             = "203.0.113.10"
+vps_label          = "station-vps"
+vps_region         = "us-east"
+vps_type           = "g6-standard-1"
+vps_image          = "linode/ubuntu24.04"
 ssh_public_key     = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... deploy@example"
