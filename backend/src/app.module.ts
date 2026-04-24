@@ -24,6 +24,7 @@ import { UexSyncModule } from './modules/uex-sync/uex-sync.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { UserInventoryModule } from './modules/user-inventory/user-inventory.module';
 import { OrgInventoryModule } from './modules/org-inventory/org-inventory.module';
+import { HealthModule } from './health/health.module';
 
 const isTest =
   process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
@@ -145,6 +146,7 @@ if (!isTest) {
     LocationsModule,
     UserInventoryModule,
     OrgInventoryModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [

@@ -27,4 +27,16 @@ describe('AppController (e2e)', () => {
       .expect(200)
       .expect('Hello World!');
   });
+
+  it('/health (GET)', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/health')
+      .expect(200);
+
+    expect(response.body).toEqual({
+      status: 'ok',
+      timestamp: expect.any(String),
+    });
+    expect(Number.isNaN(Date.parse(response.body.timestamp))).toBe(false);
+  });
 });
