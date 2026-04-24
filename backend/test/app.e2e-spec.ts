@@ -21,6 +21,10 @@ describe('AppController (e2e)', () => {
     await seedSystemUser(dataSource);
   });
 
+  afterEach(async () => {
+    await app.close();
+  });
+
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
