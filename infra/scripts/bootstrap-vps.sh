@@ -65,7 +65,7 @@ fi
 install -d -m 755 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" "${STATION_ROOT}"
 install -d -m 755 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" "${STATION_ROOT}/logs"
 
-"$(dirname "$0")/setup-swap.sh"
+bash "$(dirname "$0")/setup-swap.sh"
 
 echo
 echo "Bootstrap complete."

@@ -46,8 +46,8 @@ Keep real values in `infra/terraform/terraform.tfvars`, which is gitignored.
 Issue `#107` builds on the Terraform layer after DNS from issue `#106` has propagated.
 
 1. Copy the repository or the `infra/` directory to the VPS.
-2. Run `infra/scripts/bootstrap-vps.sh` as `root`.
-3. Install the deploy key for the `deploy` user when prompted by the script.
+2. Export `DEPLOY_SSH_PUBLIC_KEY` as the deploy user's public SSH key, then run `infra/scripts/bootstrap-vps.sh` as `root`.
+3. If you did not set `DEPLOY_SSH_PUBLIC_KEY`, manually append the deploy public key to `/home/deploy/.ssh/authorized_keys` after the script finishes.
 4. Review and install the Nginx site configs from `infra/nginx/`.
 5. Run `infra/scripts/issue-certs.sh` to request the initial certificates.
 6. Verify renewal with `certbot renew --dry-run`.
