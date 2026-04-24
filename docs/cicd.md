@@ -63,5 +63,5 @@ bash infra/scripts/deploy.sh
 
 ## Notes
 
-- The workflow currently writes a placeholder release notes file and should be upgraded with the release-notes generation from issue `#112`.
+- The workflow currently writes a placeholder release notes file and should be upgraded with the release-notes generation from issue `#124`.
 - CI workflows ignore `release/**` pushes so the release workflow remains the single deployment path.

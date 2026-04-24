@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/gitaddremote/station-backend:staging
+    image: ghcr.io/gitaddremote/station-backend:${STATION_VERSION:-staging}
     restart: unless-stopped
     env_file:
       - .env.staging
@@ -20,7 +20,7 @@ services:
     stop_grace_period: 30s
 
   frontend:
-    image: ghcr.io/gitaddremote/station-frontend:staging
+    image: ghcr.io/gitaddremote/station-frontend:${STATION_VERSION:-staging}
     restart: unless-stopped
     ports:
       - '127.0.0.1:3003:80'
@@ -34,8 +34,6 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    env_file:
-      - .env.staging
     environment:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
@@ -56,8 +54,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    env_file:
-      - .env.staging
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     command: sh -c 'redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes'
     volumes:
       - redis_staging_data:/data
