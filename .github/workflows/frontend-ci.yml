@@ -2,10 +2,14 @@ name: Frontend CI
 
 on:
   push:
+    branches-ignore:
+      - 'release/**'
     paths:
       - 'frontend/**'
       - '.github/workflows/**'
   pull_request:
+    branches-ignore:
+      - 'release/**'
     paths:
       - 'frontend/**'
       - '.github/workflows/**'

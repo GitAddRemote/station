@@ -1,0 +1,190 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/gitaddremote/station-backend
+  FRONTEND_IMAGE: ghcr.io/gitaddremote/station-frontend
+
+jobs:
+  build-and-push:
+    name: Build And Push Images
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive version from release branch
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#release/}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.BACKEND_IMAGE }}:staging
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.FRONTEND_IMAGE }}:staging
+
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: staging
+
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Deploy staging
+        env:
+          STATION_VERSION: ${{ needs.build-and-push.outputs.version }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" \
+            "cd /opt/station && STATION_VERSION=${STATION_VERSION} bash infra/scripts/deploy-staging.sh"
+
+      - name: Wait for staging health
+        env:
+          STAGING_HEALTH_URL: https://staging.api.drdnt.org/health
+        run: |
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error "$STAGING_HEALTH_URL" >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Staging health check failed"
+          exit 1
+
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-push
+      - deploy-staging
+    environment: production
+
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy production
+        env:
+          STATION_VERSION: ${{ needs.build-and-push.outputs.version }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" \
+            "cd /opt/station && STATION_VERSION=${STATION_VERSION} bash infra/scripts/deploy.sh"
+
+      - name: Promote images to latest
+        env:
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "${BACKEND_IMAGE}:latest" \
+            "${BACKEND_IMAGE}:${VERSION}"
+          docker buildx imagetools create \
+            --tag "${FRONTEND_IMAGE}:latest" \
+            "${FRONTEND_IMAGE}:${VERSION}"
+
+      - name: Wait for production health
+        env:
+          PRODUCTION_HEALTH_URL: https://api.drdnt.org/health
+        run: |
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error "$PRODUCTION_HEALTH_URL" >/dev/null; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Production health check failed"
+          exit 1
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-push
+      - deploy-production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create git tag
+        env:
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${VERSION}" "${GITHUB_SHA}"
+          git push origin "${VERSION}"
+
+      - name: Prepare release notes
+        env:
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          cat <<EOF > release-notes.md
+          Release ${VERSION}
+
+          TODO: Replace with generated release notes from issue #112.
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build-and-push.outputs.version }}
+          name: ${{ needs.build-and-push.outputs.version }}
+          body_path: release-notes.md
+          files: release-notes.md

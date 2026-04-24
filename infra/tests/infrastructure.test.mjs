@@ -136,10 +136,37 @@ test('deploy script uses docker compose with the production env file', () => {
   );
 });
 
+test('staging scripts use the staging compose and env files', () => {
+  const deployStaging = readInfraFile('scripts/deploy-staging.sh');
+  const stagingUp = readInfraFile('scripts/staging-up.sh');
+  const stagingDown = readInfraFile('scripts/staging-down.sh');
+
+  assert.match(
+    deployStaging,
+    /docker compose --env-file \.env\.staging -f docker-compose\.staging\.yml pull/,
+  );
+  assert.match(
+    deployStaging,
+    /docker compose --env-file \.env\.staging -f docker-compose\.staging\.yml up -d --no-deps backend frontend/,
+  );
+  assert.match(
+    stagingUp,
+    /docker compose --env-file \.env\.staging -f docker-compose\.staging\.yml up -d/,
+  );
+  assert.match(
+    stagingDown,
+    /docker compose --env-file \.env\.staging -f docker-compose\.staging\.yml down/,
+  );
+});
+
 test('nginx configs target the expected upstreams', () => {
   const apiConfig = readInfraFile('nginx/api.drdnt.org.conf');
   const stationConfig = readInfraFile('nginx/station.drdnt.org.conf');
   const botConfig = readInfraFile('nginx/bot.drdnt.org.conf');
+  const stagingApiConfig = readInfraFile('nginx/staging.api.drdnt.org.conf');
+  const stagingStationConfig = readInfraFile(
+    'nginx/staging.station.drdnt.org.conf',
+  );
 
   assert.match(apiConfig, /server_name api\.drdnt\.org;/);
   assert.match(apiConfig, /proxy_pass http:\/\/127\.0\.0\.1:3001;/);
@@ -151,6 +178,18 @@ test('nginx configs target the expected upstreams', () => {
 
   assert.match(botConfig, /server_name bot\.drdnt\.org;/);
   assert.match(botConfig, /proxy_pass http:\/\/127\.0\.0\.1:3999;/);
+
+  assert.match(stagingApiConfig, /server_name staging\.api\.drdnt\.org;/);
+  assert.match(stagingApiConfig, /proxy_pass http:\/\/127\.0\.0\.1:3002;/);
+
+  assert.match(
+    stagingStationConfig,
+    /server_name staging\.station\.drdnt\.org;/,
+  );
+  assert.match(
+    stagingStationConfig,
+    /proxy_pass http:\/\/127\.0\.0\.1:3003;/,
+  );
 });
 
 test('infra scripts are executable on disk', () => {
@@ -159,8 +198,44 @@ test('infra scripts are executable on disk', () => {
   ).mode;
   const swapMode = statSync(path.join(infraRoot, 'scripts/setup-swap.sh')).mode;
   const certMode = statSync(path.join(infraRoot, 'scripts/issue-certs.sh')).mode;
+  const deployStagingMode = statSync(
+    path.join(infraRoot, 'scripts/deploy-staging.sh'),
+  ).mode;
+  const stagingUpMode = statSync(
+    path.join(infraRoot, 'scripts/staging-up.sh'),
+  ).mode;
+  const stagingDownMode = statSync(
+    path.join(infraRoot, 'scripts/staging-down.sh'),
+  ).mode;
 
   assert.ok(bootstrapMode & 0o111);
   assert.ok(swapMode & 0o111);
   assert.ok(certMode & 0o111);
+  assert.ok(deployStagingMode & 0o111);
+  assert.ok(stagingUpMode & 0o111);
+  assert.ok(stagingDownMode & 0o111);
+});
+
+test('release workflow and CI branch rules are configured', () => {
+  const releaseWorkflow = readInfraFile('../.github/workflows/release.yml');
+  const backendCiWorkflow = readInfraFile('../.github/workflows/backend-ci.yml');
+  const frontendCiWorkflow = readInfraFile('../.github/workflows/frontend-ci.yml');
+  const cicdDoc = readInfraFile('../docs/cicd.md');
+
+  assert.match(releaseWorkflow, /branches:\s*\n\s*- 'release\/\*\*'/);
+  assert.match(releaseWorkflow, /deploy-staging/);
+  assert.match(releaseWorkflow, /environment: staging/);
+  assert.match(releaseWorkflow, /deploy-production/);
+  assert.match(releaseWorkflow, /environment: production/);
+  assert.match(releaseWorkflow, /softprops\/action-gh-release@v2/);
+
+  assert.match(backendCiWorkflow, /branches-ignore:/);
+  assert.match(backendCiWorkflow, /'release\/\*\*'/);
+  assert.match(frontendCiWorkflow, /branches-ignore:/);
+  assert.match(frontendCiWorkflow, /'release\/\*\*'/);
+
+  assert.match(cicdDoc, /GitHub Environments/);
+  assert.match(cicdDoc, /VPS_SSH_KEY/);
+  assert.match(cicdDoc, /staging-up\.sh/);
+  assert.match(cicdDoc, /Rollback/);
 });

@@ -2,10 +2,14 @@ name: Backend CI
 
 on:
   push:
+    branches-ignore:
+      - 'release/**'
     paths:
       - 'backend/**'
       - '.github/workflows/**'
   pull_request:
+    branches-ignore:
+      - 'release/**'
     paths:
       - 'backend/**'
       - '.github/workflows/**'
