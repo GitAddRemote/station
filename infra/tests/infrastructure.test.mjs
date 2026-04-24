@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -70,4 +71,77 @@ test('infra README documents terraform import and apply workflow', () => {
   assert.match(readme, /terraform import linode_domain\.drdnt_org/);
   assert.match(readme, /terraform plan/);
   assert.match(readme, /terraform apply/);
+});
+
+test('bash scripts have valid shell syntax', () => {
+  execFileSync('bash', [
+    '-n',
+    path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
+    path.join(infraRoot, 'scripts/setup-swap.sh'),
+    path.join(infraRoot, 'scripts/issue-certs.sh'),
+  ]);
+});
+
+test('bootstrap script provisions required VPS baseline steps', () => {
+  const script = readInfraFile('scripts/bootstrap-vps.sh');
+
+  assert.match(script, /apt update/);
+  assert.match(script, /apt upgrade -y/);
+  assert.match(script, /docker-ce/);
+  assert.match(script, /docker-compose-plugin/);
+  assert.match(script, /nginx/);
+  assert.match(script, /certbot/);
+  assert.match(script, /python3-certbot-nginx/);
+  assert.match(script, /useradd -m -s \/bin\/bash "\$\{DEPLOY_USER\}"/);
+  assert.match(script, /usermod -aG docker "\$\{DEPLOY_USER\}"/);
+  assert.match(script, /authorized_keys/);
+  assert.match(script, /\/opt\/station/);
+  assert.match(script, /setup-swap\.sh/);
+});
+
+test('swap script creates and persists a 2 GB swap file', () => {
+  const script = readInfraFile('scripts/setup-swap.sh');
+
+  assert.match(script, /fallocate -l 2G \/swapfile/);
+  assert.match(script, /chmod 600 \/swapfile/);
+  assert.match(script, /mkswap \/swapfile/);
+  assert.match(script, /swapon \/swapfile/);
+  assert.match(script, /\/swapfile none swap sw 0 0/);
+});
+
+test('cert issuance script requests all Station domains and verifies renewal', () => {
+  const script = readInfraFile('scripts/issue-certs.sh');
+
+  assert.match(script, /certbot --nginx/);
+  assert.match(script, /-d api\.drdnt\.org/);
+  assert.match(script, /-d station\.drdnt\.org/);
+  assert.match(script, /-d bot\.drdnt\.org/);
+  assert.match(script, /certbot renew --dry-run/);
+});
+
+test('nginx configs target the expected upstreams', () => {
+  const apiConfig = readInfraFile('nginx/api.drdnt.org.conf');
+  const stationConfig = readInfraFile('nginx/station.drdnt.org.conf');
+  const botConfig = readInfraFile('nginx/bot.drdnt.org.conf');
+
+  assert.match(apiConfig, /server_name api\.drdnt\.org;/);
+  assert.match(apiConfig, /proxy_pass http:\/\/127\.0\.0\.1:3001;/);
+
+  assert.match(stationConfig, /server_name station\.drdnt\.org;/);
+  assert.match(stationConfig, /proxy_pass http:\/\/127\.0\.0\.1:5173;/);
+
+  assert.match(botConfig, /server_name bot\.drdnt\.org;/);
+  assert.match(botConfig, /proxy_pass http:\/\/127\.0\.0\.1:3999;/);
+});
+
+test('infra scripts are executable on disk', () => {
+  const bootstrapMode = statSync(
+    path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
+  ).mode;
+  const swapMode = statSync(path.join(infraRoot, 'scripts/setup-swap.sh')).mode;
+  const certMode = statSync(path.join(infraRoot, 'scripts/issue-certs.sh')).mode;
+
+  assert.ok(bootstrapMode & 0o111);
+  assert.ok(swapMode & 0o111);
+  assert.ok(certMode & 0o111);
 });
