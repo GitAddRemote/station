@@ -89,6 +89,7 @@ if (!isTest) {
               host: configService.get<string>('REDIS_HOST', 'localhost'),
               port: configService.get<number>('REDIS_PORT', 6379),
             },
+            password: configService.get<string>('REDIS_PASSWORD') || undefined,
             ttl: 300000, // 5 minutes default TTL in milliseconds
           });
           console.log('✅ Redis cache connected successfully');
