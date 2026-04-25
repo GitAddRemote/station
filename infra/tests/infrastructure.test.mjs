@@ -330,3 +330,10 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /Backend and frontend CI still run on `release\/\*\*` pushes, but the release workflow no longer depends on those separate runs to gate deploys/);
   assert.match(cicdDoc, /Rollback/);
 });
+
+test('staging env example quotes values that contain spaces', () => {
+  const stagingEnvExample = readInfraFile('../.env.staging.example');
+
+  assert.match(stagingEnvExample, /^APP_NAME="STATION BACKEND STAGING"$/m);
+  assert.match(stagingEnvExample, /^REFRESH_TOKEN_CLEANUP_CRON="0 3 \* \* \*"$/m);
+});
