@@ -18,7 +18,7 @@ resource "linode_instance" "vps" {
   type            = var.vps_type
   region          = var.vps_region
   image           = var.vps_image
-  authorized_keys = [var.ssh_public_key]
+  authorized_keys = var.ssh_public_key == null ? null : [var.ssh_public_key]
 
   lifecycle {
     prevent_destroy = true
@@ -65,4 +65,8 @@ resource "linode_firewall" "station" {
   outbound_policy = "ACCEPT"
 
   linodes = [linode_instance.vps.id]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

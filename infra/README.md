@@ -34,11 +34,11 @@ Review `terraform plan` before every apply. The existing VPS must be imported ra
 ### Variables
 
 - `linode_token`: Linode API token
-- `vps_ip`: public IPv4 of the VPS
+- `vps_ip`: optional fallback public IPv4 of the VPS if the imported instance IP is not yet available
 - `vps_label`: Linode label of the imported VPS
 - `vps_region`: Linode region slug of the imported VPS
 - `vps_type`: Linode plan type of the imported VPS
 - `vps_image`: base image recorded for the imported VPS
-- `ssh_public_key`: deploy SSH public key
+- `ssh_public_key`: optional deploy SSH public key when Terraform should manage authorized keys
 
 Keep real values in `infra/terraform/terraform.tfvars`, which is gitignored.

@@ -5,8 +5,10 @@ variable "linode_token" {
 }
 
 variable "vps_ip" {
-  description = "Public IPv4 address of the Station VPS."
+  description = "Optional fallback public IPv4 address of the Station VPS when the imported instance IP is not yet available."
   type        = string
+  nullable    = true
+  default     = null
 }
 
 variable "vps_label" {
@@ -30,6 +32,8 @@ variable "vps_image" {
 }
 
 variable "ssh_public_key" {
-  description = "SSH public key content for the deploy user."
+  description = "SSH public key content for the deploy user. Optional for imported VPS workflows; set this only when Terraform should manage authorized keys."
   type        = string
+  nullable    = true
+  default     = null
 }

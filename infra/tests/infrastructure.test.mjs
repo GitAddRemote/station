@@ -22,6 +22,7 @@ test('terraform configuration files exist and define the Linode foundation', () 
   assert.match(mainTf, /source\s*=\s*"linode\/linode"/);
   assert.match(mainTf, /resource "linode_instance" "vps"/);
   assert.match(mainTf, /resource "linode_firewall" "station"/);
+  assert.match(mainTf, /prevent_destroy = true/);
   assert.match(mainTf, /ports\s*=\s*"22"/);
   assert.match(mainTf, /ports\s*=\s*"80"/);
   assert.match(mainTf, /ports\s*=\s*"443"/);
@@ -30,6 +31,9 @@ test('terraform configuration files exist and define the Linode foundation', () 
   assert.match(dnsTf, /resource "linode_domain_record" "api"/);
   assert.match(dnsTf, /resource "linode_domain_record" "station"/);
   assert.match(dnsTf, /resource "linode_domain_record" "bot"/);
+  assert.match(dnsTf, /locals\s*\{/);
+  assert.match(dnsTf, /linode_instance\.vps\.ip_address/);
+  assert.match(dnsTf, /prevent_destroy = true/);
 
   assert.match(variablesTf, /variable "linode_token"/);
   assert.match(variablesTf, /variable "vps_ip"/);
@@ -38,6 +42,8 @@ test('terraform configuration files exist and define the Linode foundation', () 
   assert.match(variablesTf, /variable "vps_type"/);
   assert.match(variablesTf, /variable "vps_image"/);
   assert.match(variablesTf, /variable "ssh_public_key"/);
+  assert.match(variablesTf, /nullable\s*=\s*true/);
+  assert.match(variablesTf, /default\s*=\s*null/);
 
   assert.match(outputsTf, /output "vps_ip"/);
   assert.match(outputsTf, /output "api_fqdn"/);
