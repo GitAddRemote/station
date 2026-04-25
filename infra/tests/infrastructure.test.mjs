@@ -187,6 +187,17 @@ test('staging scripts use the staging compose and env files', () => {
 test('release workflow safely quotes station version for remote deploys', () => {
   const workflow = readInfraFile('../.github/workflows/release.yml');
 
+  assert.match(workflow, /concurrency:\s*\n\s*group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}/);
+  assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(workflow, /validate-release/);
+  assert.match(workflow, /needs: validate-release/);
+  assert.match(workflow, /Run backend lint/);
+  assert.match(workflow, /Run backend unit tests/);
+  assert.match(workflow, /Run backend E2E tests/);
+  assert.match(workflow, /Run backend build/);
+  assert.match(workflow, /Run frontend lint/);
+  assert.match(workflow, /Run frontend typecheck/);
+  assert.match(workflow, /Run frontend build/);
   assert.match(workflow, /ESCAPED_STATION_VERSION="\$\(printf '%q' "\$\{STATION_VERSION\}"\)"/);
   assert.match(
     workflow,
@@ -291,6 +302,8 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /VPS_KNOWN_HOSTS/);
   assert.match(cicdDoc, /staging-up\.sh/);
   assert.match(cicdDoc, /station-staging/);
-  assert.match(cicdDoc, /Backend and frontend CI still run on `release\/\*\*` pushes/);
+  assert.match(cicdDoc, /release workflow now runs its own backend\/frontend validation before image build and deploy/);
+  assert.match(cicdDoc, /Release runs are serialized per release branch/);
+  assert.match(cicdDoc, /Backend and frontend CI still run on `release\/\*\*` pushes, but the release workflow no longer depends on those separate runs to gate deploys/);
   assert.match(cicdDoc, /Rollback/);
 });
