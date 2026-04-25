@@ -22,6 +22,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SaveIcon from '@mui/icons-material/Save';
 import LockIcon from '@mui/icons-material/Lock';
+import { API_URL } from '../config/api';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -51,9 +52,8 @@ const Profile = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
         const token = localStorage.getItem('access_token');
-        const response = await fetch(`${apiUrl}/users/profile`, {
+        const response = await fetch(`${API_URL}/users/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -115,9 +115,8 @@ const Profile = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiUrl}/users/profile`, {
+      const response = await fetch(`${API_URL}/users/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -173,9 +172,8 @@ const Profile = () => {
     setChangingPassword(true);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiUrl}/auth/change-password`, {
+      const response = await fetch(`${API_URL}/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

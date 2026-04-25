@@ -168,19 +168,19 @@ test('staging scripts use the staging compose and env files', () => {
 
   assert.match(
     deployStaging,
-    /docker compose --env-file \.env\.staging -f docker-compose\.staging\.yml pull/,
+    /docker compose(?: (?:--project-name|-p) \S+)? --env-file \.env\.staging -f docker-compose\.staging\.yml pull/,
   );
   assert.match(
     deployStaging,
-    /docker compose --env-file \.env\.staging -f docker-compose\.staging\.yml up -d --no-deps backend frontend/,
+    /docker compose(?: (?:--project-name|-p) \S+)? --env-file \.env\.staging -f docker-compose\.staging\.yml up -d --no-deps backend frontend/,
   );
   assert.match(
     stagingUp,
-    /docker compose --env-file \.env\.staging -f docker-compose\.staging\.yml up -d/,
+    /docker compose(?: (?:--project-name|-p) \S+)? --env-file \.env\.staging -f docker-compose\.staging\.yml up -d/,
   );
   assert.match(
     stagingDown,
-    /docker compose --env-file \.env\.staging -f docker-compose\.staging\.yml down/,
+    /docker compose(?: (?:--project-name|-p) \S+)? --env-file \.env\.staging -f docker-compose\.staging\.yml down/,
   );
 });
 
@@ -259,6 +259,7 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(releaseWorkflow, /deploy-production/);
   assert.match(releaseWorkflow, /environment: production/);
   assert.match(releaseWorkflow, /softprops\/action-gh-release@v2/);
+  assert.match(releaseWorkflow, /Wait for production health[\s\S]*Promote images to latest/);
 
   assert.match(backendCiWorkflow, /branches-ignore:/);
   assert.match(backendCiWorkflow, /'release\/\*\*'/);
@@ -268,5 +269,6 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /GitHub Environments/);
   assert.match(cicdDoc, /VPS_SSH_KEY/);
   assert.match(cicdDoc, /staging-up\.sh/);
+  assert.match(cicdDoc, /station-staging/);
   assert.match(cicdDoc, /Rollback/);
 });

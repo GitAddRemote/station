@@ -36,6 +36,7 @@ Staging runs on the same VPS with separate ports and env file:
 - frontend: `127.0.0.1:3003 -> 80`
 - env file: `/opt/station/.env.staging`
 - compose file: `/opt/station/docker-compose.staging.yml`
+- compose project: `station-staging` so staging commands do not target the production stack in the same directory
 
 Useful commands:
 
@@ -65,3 +66,4 @@ bash infra/scripts/deploy.sh
 
 - The workflow currently writes a placeholder release notes file and should be upgraded with the release-notes generation from issue `#124`.
 - CI workflows ignore `release/**` pushes so the release workflow remains the single deployment path.
+- The frontend runtime derives the API host from the current hostname by default (`station.drdnt.org -> api.drdnt.org`, `staging.station.drdnt.org -> staging.api.drdnt.org`), while still allowing `VITE_API_URL` to override that mapping when needed.

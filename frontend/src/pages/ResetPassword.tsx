@@ -13,6 +13,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import LockResetIcon from '@mui/icons-material/LockReset';
+import { API_URL } from '../config/api';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -58,8 +59,7 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${apiUrl}/auth/reset-password`, {
+      const response = await fetch(`${API_URL}/auth/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

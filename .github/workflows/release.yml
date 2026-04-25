@@ -128,17 +128,6 @@ jobs:
           ssh -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" \
             "cd /opt/station && STATION_VERSION=${STATION_VERSION} bash infra/scripts/deploy.sh"
 
-      - name: Promote images to latest
-        env:
-          VERSION: ${{ needs.build-and-push.outputs.version }}
-        run: |
-          docker buildx imagetools create \
-            --tag "${BACKEND_IMAGE}:latest" \
-            "${BACKEND_IMAGE}:${VERSION}"
-          docker buildx imagetools create \
-            --tag "${FRONTEND_IMAGE}:latest" \
-            "${FRONTEND_IMAGE}:${VERSION}"
-
       - name: Wait for production health
         env:
           PRODUCTION_HEALTH_URL: https://api.drdnt.org/health
@@ -151,6 +140,17 @@ jobs:
           done
           echo "Production health check failed"
           exit 1
+
+      - name: Promote images to latest
+        env:
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "${BACKEND_IMAGE}:latest" \
+            "${BACKEND_IMAGE}:${VERSION}"
+          docker buildx imagetools create \
+            --tag "${FRONTEND_IMAGE}:latest" \
+            "${FRONTEND_IMAGE}:${VERSION}"
 
   create-release:
     name: Create Release
