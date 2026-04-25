@@ -68,11 +68,13 @@ test('terraform configuration files exist and define the Linode foundation', () 
 
 test('gitignore excludes terraform local state and secrets', () => {
   const gitignore = readInfraFile('../.gitignore');
+  const lockfile = readInfraFile('../pnpm-lock.yaml');
 
   assert.match(gitignore, /infra\/terraform\/\.terraform\//);
   assert.match(gitignore, /infra\/terraform\/terraform\.tfvars/);
   assert.match(gitignore, /infra\/terraform\/\*\.tfstate/);
   assert.match(gitignore, /infra\/terraform\/\*\.tfstate\.backup/);
+  assert.match(lockfile, /\n  infra: \{\}/);
 });
 
 test('infra README documents terraform import and apply workflow', () => {

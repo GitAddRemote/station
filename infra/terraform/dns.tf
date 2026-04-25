@@ -1,5 +1,5 @@
 locals {
-  vps_ipv4 = var.vps_ip != null ? var.vps_ip : linode_instance.vps.ip_address
+  vps_ipv4 = linode_instance.vps.ip_address != null && linode_instance.vps.ip_address != "" ? linode_instance.vps.ip_address : var.vps_ip
 }
 
 resource "linode_domain" "drdnt_org" {
