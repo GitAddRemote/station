@@ -78,13 +78,16 @@ test('bash scripts have valid shell syntax', () => {
     return;
   }
 
+  const scripts = [
+    path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
+    path.join(infraRoot, 'scripts/setup-swap.sh'),
+    path.join(infraRoot, 'scripts/issue-certs.sh'),
+  ];
+
   try {
-    execFileSync('bash', [
-      '-n',
-      path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
-      path.join(infraRoot, 'scripts/setup-swap.sh'),
-      path.join(infraRoot, 'scripts/issue-certs.sh'),
-    ]);
+    for (const script of scripts) {
+      execFileSync('bash', ['-n', script]);
+    }
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error) {
       const code = String(error.code);
