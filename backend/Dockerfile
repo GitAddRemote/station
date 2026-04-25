@@ -17,7 +17,8 @@ WORKDIR /app
 RUN addgroup -S station && adduser -S station -G station
 
 COPY package*.json ./
-RUN npm ci --omit=dev --legacy-peer-deps
+RUN npm_config_cache=/tmp/.npm npm ci --omit=dev --legacy-peer-deps \
+  && rm -rf /tmp/.npm
 
 COPY --from=builder /app/dist ./dist
 
