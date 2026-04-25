@@ -19,6 +19,15 @@ resource "linode_domain_record" "api" {
   record_type = "A"
   target      = local.vps_ipv4
   ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  precondition {
+    condition     = local.vps_ipv4 != null && trim(local.vps_ipv4) != ""
+    error_message = "Provide vps_ip until the imported VPS exposes a non-empty public IPv4 address, otherwise DNS records cannot be created safely."
+  }
 }
 
 resource "linode_domain_record" "station" {
@@ -27,6 +36,15 @@ resource "linode_domain_record" "station" {
   record_type = "A"
   target      = local.vps_ipv4
   ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  precondition {
+    condition     = local.vps_ipv4 != null && trim(local.vps_ipv4) != ""
+    error_message = "Provide vps_ip until the imported VPS exposes a non-empty public IPv4 address, otherwise DNS records cannot be created safely."
+  }
 }
 
 resource "linode_domain_record" "bot" {
@@ -35,4 +53,13 @@ resource "linode_domain_record" "bot" {
   record_type = "A"
   target      = local.vps_ipv4
   ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  precondition {
+    condition     = local.vps_ipv4 != null && trim(local.vps_ipv4) != ""
+    error_message = "Provide vps_ip until the imported VPS exposes a non-empty public IPv4 address, otherwise DNS records cannot be created safely."
+  }
 }

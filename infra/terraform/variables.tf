@@ -5,10 +5,15 @@ variable "linode_token" {
 }
 
 variable "vps_ip" {
-  description = "Optional fallback public IPv4 address of the Station VPS when the imported instance IP is not yet available."
+  description = "Fallback public IPv4 address of the Station VPS. Provide this until the imported instance IP is available so DNS records always have a valid target."
   type        = string
   nullable    = true
   default     = null
+
+  validation {
+    condition     = var.vps_ip == null || trim(var.vps_ip) != ""
+    error_message = "vps_ip must be omitted or set to a non-empty IPv4 string."
+  }
 }
 
 variable "vps_label" {
