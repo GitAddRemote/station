@@ -42,3 +42,31 @@ Review `terraform plan` before every apply. The existing VPS must be imported ra
 - `ssh_public_key`: optional deploy SSH public key for initial instance configuration; authorized keys are not continuously managed after import
 
 Keep real values in `infra/terraform/terraform.tfvars`, which is gitignored.
+
+## VPS Baseline
+
+Issue `#107` builds on the Terraform layer after DNS from issue `#106` has propagated.
+
+1. Copy the repository or the `infra/` directory to the VPS.
+2. Export `DEPLOY_SSH_PUBLIC_KEY` as the deploy user's public SSH key, then run `infra/scripts/bootstrap-vps.sh` as `root`.
+3. If you did not set `DEPLOY_SSH_PUBLIC_KEY`, manually append the deploy public key to `/home/deploy/.ssh/authorized_keys` after the script finishes.
+4. Review and install the Nginx site configs from `infra/nginx/`.
+5. Run `infra/scripts/issue-certs.sh` to request the initial certificates.
+6. Verify renewal with `certbot renew --dry-run`.
+
+After setup, the VPS layout should look like:
+
+```text
+/opt/station/
+  docker-compose.prod.yml
+  .env.production
+  logs/
+```
+
+The scripts here are designed to establish the baseline only:
+
+- `infra/scripts/bootstrap-vps.sh`: installs Docker, Nginx, Certbot, the `deploy` user, `/opt/station`, and swap.
+- `infra/scripts/setup-swap.sh`: creates and enables a persistent 2 GB swap file.
+- `infra/scripts/issue-certs.sh`: requests the initial Let's Encrypt certificates for Station domains.
+
+The Nginx configs in `infra/nginx/` are plain HTTP bootstrap configs. Certbot updates them with HTTPS and redirect blocks after certificates are issued.
