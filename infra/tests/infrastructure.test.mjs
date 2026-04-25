@@ -108,6 +108,7 @@ test('bash scripts have valid shell syntax', () => {
     path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
     path.join(infraRoot, 'scripts/setup-swap.sh'),
     path.join(infraRoot, 'scripts/issue-certs.sh'),
+    path.join(infraRoot, 'scripts/deploy.sh'),
   ];
 
   try {
@@ -162,6 +163,23 @@ test('cert issuance script requests all Station domains and verifies renewal', (
   assert.match(script, /certbot renew --dry-run/);
 });
 
+test('deploy script uses docker compose with the production env file', () => {
+  const script = readInfraFile('scripts/deploy.sh');
+
+  assert.match(
+    script,
+    /docker compose --env-file \.env\.production -f docker-compose\.prod\.yml pull/,
+  );
+  assert.match(
+    script,
+    /docker compose --env-file \.env\.production -f docker-compose\.prod\.yml up -d --no-deps backend frontend/,
+  );
+  assert.match(
+    script,
+    /docker compose --env-file \.env\.production -f docker-compose\.prod\.yml ps/,
+  );
+});
+
 test('nginx configs target the expected upstreams', () => {
   const apiConfig = readInfraFile('nginx/api.drdnt.org.conf');
   const stationConfig = readInfraFile('nginx/station.drdnt.org.conf');
@@ -171,6 +189,8 @@ test('nginx configs target the expected upstreams', () => {
   assert.match(apiConfig, /proxy_pass http:\/\/127\.0\.0\.1:3001;/);
 
   assert.match(stationConfig, /server_name station\.drdnt\.org;/);
+  assert.match(stationConfig, /location \/api\/ \{/);
+  assert.match(stationConfig, /proxy_pass http:\/\/127\.0\.0\.1:3001;/);
   assert.match(stationConfig, /proxy_pass http:\/\/127\.0\.0\.1:3000;/);
 
   assert.match(botConfig, /server_name bot\.drdnt\.org;/);
@@ -187,8 +207,10 @@ test('infra scripts are executable on disk', () => {
   ).mode;
   const swapMode = statSync(path.join(infraRoot, 'scripts/setup-swap.sh')).mode;
   const certMode = statSync(path.join(infraRoot, 'scripts/issue-certs.sh')).mode;
+  const deployMode = statSync(path.join(infraRoot, 'scripts/deploy.sh')).mode;
 
   assert.ok(bootstrapMode & 0o111);
   assert.ok(swapMode & 0o111);
   assert.ok(certMode & 0o111);
+  assert.ok(deployMode & 0o111);
 });
