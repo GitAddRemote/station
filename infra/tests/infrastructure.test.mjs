@@ -184,6 +184,20 @@ test('staging scripts use the staging compose and env files', () => {
   );
 });
 
+test('release workflow safely quotes station version for remote deploys', () => {
+  const workflow = readInfraFile('../.github/workflows/release.yml');
+
+  assert.match(workflow, /ESCAPED_STATION_VERSION="\$\(printf '%q' "\$\{STATION_VERSION\}"\)"/);
+  assert.match(
+    workflow,
+    /STATION_VERSION=\$\{ESCAPED_STATION_VERSION\} bash infra\/scripts\/deploy-staging\.sh/,
+  );
+  assert.match(
+    workflow,
+    /STATION_VERSION=\$\{ESCAPED_STATION_VERSION\} bash infra\/scripts\/deploy\.sh/,
+  );
+});
+
 test('nginx configs target the expected upstreams', () => {
   const apiConfig = readInfraFile('nginx/api.drdnt.org.conf');
   const stationConfig = readInfraFile('nginx/station.drdnt.org.conf');

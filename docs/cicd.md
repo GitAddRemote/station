@@ -66,4 +66,5 @@ bash infra/scripts/deploy.sh
 
 - The workflow currently writes a placeholder release notes file and should be upgraded with the release-notes generation from issue `#124`.
 - CI workflows ignore `release/**` pushes so the release workflow remains the single deployment path.
-- The frontend runtime derives the API host from the current hostname by default (`station.drdnt.org -> api.drdnt.org`, `staging.station.drdnt.org -> staging.api.drdnt.org`), while still allowing `VITE_API_URL` to override that mapping when needed.
+- The release workflow shell-quotes `STATION_VERSION` before sending it over SSH so the remote deploy treats the version as data rather than shell syntax.
+- The frontend runtime derives the API host from the current hostname by default (`station.drdnt.org -> api.drdnt.org`, `staging.station.drdnt.org -> staging.api.drdnt.org`), while still allowing `VITE_API_URL` to override that mapping when needed. Unknown non-localhost hosts fall back to the same hostname on port `3001`, which keeps preview and LAN-accessed environments functional without baking a frontend-only localhost default.

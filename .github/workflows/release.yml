@@ -79,8 +79,9 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
+          ESCAPED_STATION_VERSION="$(printf '%q' "${STATION_VERSION}")"
           ssh -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" \
-            "cd /opt/station && STATION_VERSION=${STATION_VERSION} bash infra/scripts/deploy-staging.sh"
+            "cd /opt/station && STATION_VERSION=${ESCAPED_STATION_VERSION} bash infra/scripts/deploy-staging.sh"
 
       - name: Wait for staging health
         env:
@@ -125,8 +126,9 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
+          ESCAPED_STATION_VERSION="$(printf '%q' "${STATION_VERSION}")"
           ssh -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" \
-            "cd /opt/station && STATION_VERSION=${STATION_VERSION} bash infra/scripts/deploy.sh"
+            "cd /opt/station && STATION_VERSION=${ESCAPED_STATION_VERSION} bash infra/scripts/deploy.sh"
 
       - name: Wait for production health
         env:

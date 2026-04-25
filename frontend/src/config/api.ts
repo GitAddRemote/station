@@ -2,10 +2,12 @@ const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
 const deriveApiUrlFromHostname = () => {
   if (typeof window === 'undefined') {
-    return '';
+    return 'http://localhost:3001';
   }
 
-  switch (window.location.hostname) {
+  const { hostname, protocol } = window.location;
+
+  switch (hostname) {
     case 'station.drdnt.org':
       return 'https://api.drdnt.org';
     case 'staging.station.drdnt.org':
@@ -14,7 +16,7 @@ const deriveApiUrlFromHostname = () => {
     case '127.0.0.1':
       return 'http://localhost:3001';
     default:
-      return '';
+      return `${protocol}//${hostname}:3001`;
   }
 };
 
