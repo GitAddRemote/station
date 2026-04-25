@@ -196,6 +196,7 @@ test('release workflow safely quotes station version for remote deploys', () => 
     workflow,
     /STATION_VERSION=\$\{ESCAPED_STATION_VERSION\} bash infra\/scripts\/deploy\.sh/,
   );
+  assert.match(workflow, /if ! \[\[ "\$VERSION" =~ \^v\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\(\[\.-\]\[0-9A-Za-z\.-\]\+\)\?\$ \]\]; then/);
 });
 
 test('nginx configs target the expected upstreams', () => {
