@@ -6,5 +6,12 @@
     "declaration": true,
     "removeComments": true
   },
-  "include": ["src/**/*.ts", "data-source.ts"]
+  "include": ["src/**/*.ts", "data-source.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts"
+  ]
 }
