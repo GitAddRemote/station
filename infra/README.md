@@ -39,6 +39,6 @@ Review `terraform plan` before every apply. The existing VPS must be imported ra
 - `vps_region`: Linode region slug of the imported VPS
 - `vps_type`: Linode plan type of the imported VPS
 - `vps_image`: base image recorded for the imported VPS
-- `ssh_public_key`: optional deploy SSH public key when Terraform should manage authorized keys
+- `ssh_public_key`: optional deploy SSH public key for initial instance configuration; authorized keys are not continuously managed after import
 
 Keep real values in `infra/terraform/terraform.tfvars`, which is gitignored.

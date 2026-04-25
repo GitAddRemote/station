@@ -74,7 +74,7 @@ test('gitignore excludes terraform local state and secrets', () => {
   assert.match(gitignore, /infra\/terraform\/terraform\.tfvars/);
   assert.match(gitignore, /infra\/terraform\/\*\.tfstate/);
   assert.match(gitignore, /infra\/terraform\/\*\.tfstate\.backup/);
-  assert.match(lockfile, /\n  infra: \{\}/);
+  assert.match(lockfile, /(?:^|\n)importers:\s*(?:\n(?!\S).*)*\n\s{2,}infra:\s*(?:\{\}|$)/);
 });
 
 test('infra README documents terraform import and apply workflow', () => {
@@ -86,6 +86,8 @@ test('infra README documents terraform import and apply workflow', () => {
   assert.match(readme, /terraform import linode_domain\.drdnt_org/);
   assert.match(readme, /terraform plan/);
   assert.match(readme, /terraform apply/);
-  assert.doesNotMatch(readme, /linode_instance_id/);
-  assert.doesNotMatch(readme, /linode_domain_id/);
+  assert.match(
+    readme,
+    /ssh_public_key`: optional deploy SSH public key for initial instance configuration; authorized keys are not continuously managed after import/,
+  );
 });

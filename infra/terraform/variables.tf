@@ -32,7 +32,7 @@ variable "vps_image" {
 }
 
 variable "ssh_public_key" {
-  description = "SSH public key content for the deploy user. Optional for imported VPS workflows; set this only when Terraform should manage authorized keys."
+  description = "SSH public key content for the deploy user. Optional for imported VPS workflows; if set, this is intended only for initial/create-time authorized_keys configuration and is not reconciled by Terraform after import or later changes."
   type        = string
   nullable    = true
   default     = null
