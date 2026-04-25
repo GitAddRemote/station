@@ -14,5 +14,5 @@ export const getTestDatabaseConfig = (): TypeOrmModuleOptions => ({
 });
 
 export const getTestJwtSecret = (): string => {
-  return process.env.JWT_SECRET || 'test-jwt-secret-key-for-local-e2e-tests';
+  return process.env.JWT_SECRET || 'test-jwt-secret-key';
 };
