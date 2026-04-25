@@ -78,13 +78,17 @@ test('bash scripts have valid shell syntax', () => {
     return;
   }
 
+  const scripts = [
+    path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
+    path.join(infraRoot, 'scripts/setup-swap.sh'),
+    path.join(infraRoot, 'scripts/issue-certs.sh'),
+    path.join(infraRoot, 'scripts/deploy.sh'),
+  ];
+
   try {
-    execFileSync('bash', [
-      '-n',
-      path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
-      path.join(infraRoot, 'scripts/setup-swap.sh'),
-      path.join(infraRoot, 'scripts/issue-certs.sh'),
-    ]);
+    for (const script of scripts) {
+      execFileSync('bash', ['-n', script]);
+    }
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error) {
       const code = String(error.code);
@@ -177,8 +181,10 @@ test('infra scripts are executable on disk', () => {
   ).mode;
   const swapMode = statSync(path.join(infraRoot, 'scripts/setup-swap.sh')).mode;
   const certMode = statSync(path.join(infraRoot, 'scripts/issue-certs.sh')).mode;
+  const deployMode = statSync(path.join(infraRoot, 'scripts/deploy.sh')).mode;
 
   assert.ok(bootstrapMode & 0o111);
   assert.ok(swapMode & 0o111);
   assert.ok(certMode & 0o111);
+  assert.ok(deployMode & 0o111);
 });
