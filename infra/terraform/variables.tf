@@ -11,8 +11,13 @@ variable "vps_ip" {
   default     = null
 
   validation {
-    condition     = var.vps_ip == null || trim(var.vps_ip) != ""
-    error_message = "vps_ip must be omitted or set to a non-empty IPv4 string."
+    condition = (
+      var.vps_ip == null || (
+        trim(var.vps_ip) != "" &&
+        can(cidrhost("${trim(var.vps_ip)}/32", 0))
+      )
+    )
+    error_message = "vps_ip must be omitted or set to a valid IPv4 address."
   }
 }
 
