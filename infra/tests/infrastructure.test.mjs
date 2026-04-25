@@ -34,10 +34,8 @@ test('terraform configuration files exist and define the Linode foundation', () 
 
   assert.match(variablesTf, /variable "linode_token"/);
   assert.match(variablesTf, /variable "vps_ip"/);
-  assert.match(variablesTf, /variable "vps_label"/);
-  assert.match(variablesTf, /variable "vps_region"/);
-  assert.match(variablesTf, /variable "vps_type"/);
-  assert.match(variablesTf, /variable "vps_image"/);
+  assert.match(variablesTf, /variable "linode_instance_id"/);
+  assert.match(variablesTf, /variable "linode_domain_id"/);
   assert.match(variablesTf, /variable "ssh_public_key"/);
 
   assert.match(outputsTf, /output "vps_ip"/);
@@ -47,10 +45,8 @@ test('terraform configuration files exist and define the Linode foundation', () 
 
   assert.match(tfvars, /linode_token/);
   assert.match(tfvars, /vps_ip/);
-  assert.match(tfvars, /vps_label/);
-  assert.match(tfvars, /vps_region/);
-  assert.match(tfvars, /vps_type/);
-  assert.match(tfvars, /vps_image/);
+  assert.match(tfvars, /linode_instance_id/);
+  assert.match(tfvars, /linode_domain_id/);
   assert.match(tfvars, /ssh_public_key/);
 
   assert.ok(lockfile.trim().length > 0);
@@ -79,8 +75,6 @@ test('infra README documents terraform import and apply workflow', () => {
   assert.match(readme, /terraform import linode_domain\.drdnt_org/);
   assert.match(readme, /terraform plan/);
   assert.match(readme, /terraform apply/);
-  assert.doesNotMatch(readme, /linode_instance_id/);
-  assert.doesNotMatch(readme, /linode_domain_id/);
 });
 
 test('bash scripts have valid shell syntax', () => {
@@ -88,16 +82,20 @@ test('bash scripts have valid shell syntax', () => {
     return;
   }
 
+  const scripts = [
+    path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
+    path.join(infraRoot, 'scripts/setup-swap.sh'),
+    path.join(infraRoot, 'scripts/issue-certs.sh'),
+    path.join(infraRoot, 'scripts/deploy.sh'),
+    path.join(infraRoot, 'scripts/deploy-staging.sh'),
+    path.join(infraRoot, 'scripts/staging-up.sh'),
+    path.join(infraRoot, 'scripts/staging-down.sh'),
+  ];
+
   try {
-    execFileSync('bash', [
-      '-n',
-      path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
-      path.join(infraRoot, 'scripts/setup-swap.sh'),
-      path.join(infraRoot, 'scripts/issue-certs.sh'),
-      path.join(infraRoot, 'scripts/deploy-staging.sh'),
-      path.join(infraRoot, 'scripts/staging-up.sh'),
-      path.join(infraRoot, 'scripts/staging-down.sh'),
-    ]);
+    for (const script of scripts) {
+      execFileSync('bash', ['-n', script]);
+    }
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error) {
       const code = String(error.code);
@@ -229,6 +227,7 @@ test('infra scripts are executable on disk', () => {
   ).mode;
   const swapMode = statSync(path.join(infraRoot, 'scripts/setup-swap.sh')).mode;
   const certMode = statSync(path.join(infraRoot, 'scripts/issue-certs.sh')).mode;
+  const deployMode = statSync(path.join(infraRoot, 'scripts/deploy.sh')).mode;
   const deployStagingMode = statSync(
     path.join(infraRoot, 'scripts/deploy-staging.sh'),
   ).mode;
@@ -242,6 +241,7 @@ test('infra scripts are executable on disk', () => {
   assert.ok(bootstrapMode & 0o111);
   assert.ok(swapMode & 0o111);
   assert.ok(certMode & 0o111);
+  assert.ok(deployMode & 0o111);
   assert.ok(deployStagingMode & 0o111);
   assert.ok(stagingUpMode & 0o111);
   assert.ok(stagingDownMode & 0o111);

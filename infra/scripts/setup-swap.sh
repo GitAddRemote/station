@@ -14,6 +14,9 @@ fi
 if [ ! -f /swapfile ]; then
   fallocate -l 2G /swapfile
   chmod 600 /swapfile
+fi
+
+if ! blkid -o value -s TYPE /swapfile 2>/dev/null | grep -qx 'swap'; then
   mkswap /swapfile
 fi
 

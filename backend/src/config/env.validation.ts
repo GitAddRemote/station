@@ -22,6 +22,7 @@ export const envValidationSchema = Joi.object({
   // Redis
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().default(6379),
+  REDIS_PASSWORD: Joi.string().allow('').default(''),
   USE_REDIS_CACHE: Joi.string().valid('true', 'false').default('true'),
 
   // CORS / Frontend — required in production; default to localhost in dev/test
