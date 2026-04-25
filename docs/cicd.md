@@ -68,7 +68,7 @@ bash infra/scripts/deploy.sh
 
 - The workflow currently writes a placeholder release notes file and should be upgraded with the release-notes generation from issue `#124`.
 - The release workflow now runs its own backend/frontend validation before image build and deploy, so release branches are gated inside the same workflow that ships them.
-- Release runs are serialized per release branch with a workflow-level concurrency group so repeated pushes or reruns on the same release branch cannot overlap.
+- Release runs are serialized per release branch with a workflow-level concurrency group so repeated pushes or reruns on the same release branch queue behind the in-flight run instead of canceling it mid-deploy.
 - The shared staging and production deploy jobs also use a global `station-deploy` concurrency group so different release branches cannot race each other on the same VPS or image promotion path.
 - Release deployments pin the target host through `VPS_KNOWN_HOSTS` and use `StrictHostKeyChecking=yes` instead of trusting first use.
 - Backend and frontend CI still run on `release/**` pushes, but the release workflow no longer depends on those separate runs to gate deploys because it executes the same validation steps itself.

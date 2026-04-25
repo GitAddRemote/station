@@ -188,7 +188,7 @@ test('release workflow safely quotes station version for remote deploys', () => 
   const workflow = readInfraFile('../.github/workflows/release.yml');
 
   assert.match(workflow, /concurrency:\s*\n\s*group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}/);
-  assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(workflow, /cancel-in-progress: false/);
   assert.match(
     workflow,
     /deploy-staging:[\s\S]*?concurrency:\s*\n\s*group: station-deploy\s*\n\s*cancel-in-progress: false/,
