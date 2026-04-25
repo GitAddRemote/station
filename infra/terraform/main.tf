@@ -1,0 +1,72 @@
+terraform {
+  required_version = ">= 1.6.0"
+
+  required_providers {
+    linode = {
+      source  = "linode/linode"
+      version = "~> 2.34"
+    }
+  }
+}
+
+provider "linode" {
+  token = var.linode_token
+}
+
+resource "linode_instance" "vps" {
+  label           = var.vps_label
+  type            = var.vps_type
+  region          = var.vps_region
+  image           = var.vps_image
+  authorized_keys = var.ssh_public_key == null ? null : [var.ssh_public_key]
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      type,
+      region,
+      image,
+      authorized_keys,
+    ]
+  }
+}
+
+resource "linode_firewall" "station" {
+  label = "station-vps-firewall"
+
+  inbound {
+    label    = "allow-ssh"
+    action   = "ACCEPT"
+    protocol = "TCP"
+    ports    = "22"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
+
+  inbound {
+    label    = "allow-http"
+    action   = "ACCEPT"
+    protocol = "TCP"
+    ports    = "80"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
+
+  inbound {
+    label    = "allow-https"
+    action   = "ACCEPT"
+    protocol = "TCP"
+    ports    = "443"
+    ipv4     = ["0.0.0.0/0"]
+    ipv6     = ["::/0"]
+  }
+
+  inbound_policy  = "DROP"
+  outbound_policy = "ACCEPT"
+
+  linodes = [linode_instance.vps.id]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
