@@ -301,10 +301,22 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(releaseWorkflow, /softprops\/action-gh-release@v2/);
   assert.match(releaseWorkflow, /Wait for production health[\s\S]*Promote images to latest/);
 
-  assert.doesNotMatch(backendCiWorkflow, /branches-ignore:/);
-  assert.doesNotMatch(backendCiWorkflow, /'release\/\*\*'/);
-  assert.doesNotMatch(frontendCiWorkflow, /branches-ignore:/);
-  assert.doesNotMatch(frontendCiWorkflow, /'release\/\*\*'/);
+  assert.doesNotMatch(
+    backendCiWorkflow,
+    /branches-ignore:\s*\n(?:\s*-\s*.*\n)*\s*-\s*'release\/\*\*'/,
+  );
+  assert.match(
+    backendCiWorkflow,
+    /on:\s*\n\s*push:\s*\n\s*paths:\s*\n(?:\s*-\s*'.*'\n)+\s*pull_request:/,
+  );
+  assert.doesNotMatch(
+    frontendCiWorkflow,
+    /branches-ignore:\s*\n(?:\s*-\s*.*\n)*\s*-\s*'release\/\*\*'/,
+  );
+  assert.match(
+    frontendCiWorkflow,
+    /on:\s*\n\s*push:\s*\n\s*paths:\s*\n(?:\s*-\s*'.*'\n)+\s*pull_request:/,
+  );
 
   assert.match(cicdDoc, /GitHub Environments/);
   assert.match(cicdDoc, /VPS_SSH_KEY/);

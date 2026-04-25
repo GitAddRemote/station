@@ -14,7 +14,6 @@ permissions:
   packages: write
 
 env:
-  REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/gitaddremote/station-backend
   FRONTEND_IMAGE: ghcr.io/gitaddremote/station-frontend
 
