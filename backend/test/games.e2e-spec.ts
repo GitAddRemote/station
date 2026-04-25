@@ -38,7 +38,7 @@ describe('Games (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   describe('GamesService', () => {
