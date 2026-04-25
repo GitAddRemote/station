@@ -25,7 +25,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -173,6 +173,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: staging
+    concurrency:
+      group: station-deploy
+      cancel-in-progress: false
 
     steps:
       - name: Start SSH agent
@@ -235,6 +238,9 @@ jobs:
       - build-and-push
       - deploy-staging
     environment: production
+    concurrency:
+      group: station-deploy
+      cancel-in-progress: false
 
     steps:
       - name: Set up Docker Buildx

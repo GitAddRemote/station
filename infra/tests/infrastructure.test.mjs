@@ -189,7 +189,16 @@ test('release workflow safely quotes station version for remote deploys', () => 
 
   assert.match(workflow, /concurrency:\s*\n\s*group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}/);
   assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(
+    workflow,
+    /deploy-staging:[\s\S]*?concurrency:\s*\n\s*group: station-deploy\s*\n\s*cancel-in-progress: false/,
+  );
+  assert.match(
+    workflow,
+    /deploy-production:[\s\S]*?concurrency:\s*\n\s*group: station-deploy\s*\n\s*cancel-in-progress: false/,
+  );
   assert.match(workflow, /validate-release/);
+  assert.match(workflow, /image: postgres:16-alpine/);
   assert.match(workflow, /needs: validate-release/);
   assert.match(workflow, /Run backend lint/);
   assert.match(workflow, /Run backend unit tests/);
@@ -304,6 +313,8 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /station-staging/);
   assert.match(cicdDoc, /release workflow now runs its own backend\/frontend validation before image build and deploy/);
   assert.match(cicdDoc, /Release runs are serialized per release branch/);
+  assert.match(cicdDoc, /global `station-deploy` concurrency group/);
+  assert.match(cicdDoc, /postgres:16-alpine/);
   assert.match(cicdDoc, /Backend and frontend CI still run on `release\/\*\*` pushes, but the release workflow no longer depends on those separate runs to gate deploys/);
   assert.match(cicdDoc, /Rollback/);
 });
