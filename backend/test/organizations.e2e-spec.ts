@@ -59,7 +59,7 @@ describe('Organizations (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   describe('/organizations (POST)', () => {

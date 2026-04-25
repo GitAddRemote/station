@@ -94,7 +94,7 @@ describe('UserOrganizationRoles (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   describe('/user-organization-roles/assign (POST)', () => {
