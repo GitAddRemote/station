@@ -197,6 +197,11 @@ test('release workflow safely quotes station version for remote deploys', () => 
     /STATION_VERSION=\$\{ESCAPED_STATION_VERSION\} bash infra\/scripts\/deploy\.sh/,
   );
   assert.match(workflow, /if ! \[\[ "\$VERSION" =~ \^v\[0-9\]\+\\\.\[0-9\]\+\\\.\[0-9\]\+\(\[\.-\]\[0-9A-Za-z\.-\]\+\)\?\$ \]\]; then/);
+  assert.match(workflow, /VPS_KNOWN_HOSTS/);
+  assert.match(workflow, /StrictHostKeyChecking=yes/);
+  assert.match(workflow, /printf '%s\\n' "\$VPS_KNOWN_HOSTS" > ~\/\.ssh\/known_hosts/);
+  assert.match(workflow, /curl --fail --silent --show-error --connect-timeout 5 --max-time "\$max_time"/);
+  assert.match(workflow, /deadline=\$\(\(SECONDS \+ 120\)\)/);
 });
 
 test('nginx configs target the expected upstreams', () => {
@@ -276,14 +281,16 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(releaseWorkflow, /softprops\/action-gh-release@v2/);
   assert.match(releaseWorkflow, /Wait for production health[\s\S]*Promote images to latest/);
 
-  assert.match(backendCiWorkflow, /branches-ignore:/);
-  assert.match(backendCiWorkflow, /'release\/\*\*'/);
-  assert.match(frontendCiWorkflow, /branches-ignore:/);
-  assert.match(frontendCiWorkflow, /'release\/\*\*'/);
+  assert.doesNotMatch(backendCiWorkflow, /branches-ignore:/);
+  assert.doesNotMatch(backendCiWorkflow, /'release\/\*\*'/);
+  assert.doesNotMatch(frontendCiWorkflow, /branches-ignore:/);
+  assert.doesNotMatch(frontendCiWorkflow, /'release\/\*\*'/);
 
   assert.match(cicdDoc, /GitHub Environments/);
   assert.match(cicdDoc, /VPS_SSH_KEY/);
+  assert.match(cicdDoc, /VPS_KNOWN_HOSTS/);
   assert.match(cicdDoc, /staging-up\.sh/);
   assert.match(cicdDoc, /station-staging/);
+  assert.match(cicdDoc, /Backend and frontend CI still run on `release\/\*\*` pushes/);
   assert.match(cicdDoc, /Rollback/);
 });

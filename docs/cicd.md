@@ -25,6 +25,7 @@ Create two repository environments in GitHub settings:
 | Secret        | Description                           |
 | ------------- | ------------------------------------- |
 | `VPS_SSH_KEY` | Private SSH key for the `deploy` user |
+| `VPS_KNOWN_HOSTS` | Pinned SSH host key entries for the deploy target |
 | `VPS_HOST`    | VPS public IP or hostname             |
 | `VPS_USER`    | SSH user, expected to be `deploy`     |
 
@@ -65,6 +66,8 @@ bash infra/scripts/deploy.sh
 ## Notes
 
 - The workflow currently writes a placeholder release notes file and should be upgraded with the release-notes generation from issue `#124`.
-- CI workflows ignore `release/**` pushes so the release workflow remains the single deployment path.
+- Release deployments pin the target host through `VPS_KNOWN_HOSTS` and use `StrictHostKeyChecking=yes` instead of trusting first use.
+- Backend and frontend CI still run on `release/**` pushes, so the exact release branch is linted, tested, typechecked, and built before deploy jobs proceed.
 - The release workflow shell-quotes `STATION_VERSION` before sending it over SSH so the remote deploy treats the version as data rather than shell syntax.
+- Health-check polling bounds each `curl` attempt with explicit connect and total timeouts so a single hung request cannot stall the full deploy window.
 - The frontend runtime derives the API host from the current hostname by default (`station.drdnt.org -> api.drdnt.org`, `staging.station.drdnt.org -> staging.api.drdnt.org`), while still allowing `VITE_API_URL` to override that mapping when needed. Unknown non-localhost hosts fall back to the same hostname on port `3001`, which keeps preview and LAN-accessed environments functional without baking a frontend-only localhost default.
