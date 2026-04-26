@@ -20,6 +20,7 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import InventoryPortlet from '../components/inventory/InventoryPortlet';
+import { API_URL } from '../config/api';
 
 interface User {
   username: string;
@@ -35,9 +36,8 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
         const token = localStorage.getItem('access_token');
-        const response = await fetch(`${apiUrl}/users/profile`, {
+        const response = await fetch(`${API_URL}/users/profile`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

@@ -12,6 +12,7 @@ import {
   Stack,
 } from '@mui/material';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import { API_URL } from '../config/api';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -27,8 +28,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const registerResponse = await fetch(`${apiUrl}/auth/register`, {
+      const registerResponse = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,7 +38,7 @@ const Register = () => {
 
       if (registerResponse.ok) {
         // Auto-login after successful registration
-        const loginResponse = await fetch(`${apiUrl}/auth/login`, {
+        const loginResponse = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -1,0 +1,363 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  BACKEND_IMAGE: ghcr.io/gitaddremote/station-backend
+  FRONTEND_IMAGE: ghcr.io/gitaddremote/station-frontend
+
+jobs:
+  validate-release:
+    name: Validate Release Branch
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: station_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run backend lint
+        working-directory: backend
+        env:
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci-minimum-32-chars
+        run: pnpm run lint
+
+      - name: Run backend unit tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci-minimum-32-chars
+          USE_REDIS_CACHE: 'false'
+        run: pnpm test --coverage --passWithNoTests
+
+      - name: Run backend E2E tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci-minimum-32-chars
+          USE_REDIS_CACHE: 'false'
+        run: pnpm run test:e2e
+
+      - name: Run backend build
+        working-directory: backend
+        env:
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: test
+          DATABASE_PASSWORD: test
+          DATABASE_NAME: station_test
+          JWT_SECRET: test-secret-key-for-ci-minimum-32-chars
+        run: pnpm run build
+
+      - name: Run frontend lint
+        working-directory: frontend
+        run: pnpm run lint
+
+      - name: Run frontend typecheck
+        working-directory: frontend
+        run: pnpm run typecheck
+
+      - name: Run frontend build
+        working-directory: frontend
+        run: pnpm run build
+
+  build-and-push:
+    name: Build And Push Images
+    runs-on: ubuntu-latest
+    needs: validate-release
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive version from release branch
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#release/}"
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release branch name: ${GITHUB_REF_NAME}" >&2
+            echo "Expected branch format: release/vX.Y.Z" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.BACKEND_IMAGE }}:staging
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.version }}
+            ${{ env.FRONTEND_IMAGE }}:staging
+
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: staging
+    concurrency:
+      group: station-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Configure SSH known_hosts
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy staging
+        env:
+          STATION_VERSION: ${{ needs.build-and-push.outputs.version }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ESCAPED_STATION_VERSION="$(printf '%q' "${STATION_VERSION}")"
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "cd /opt/station && STATION_VERSION=${ESCAPED_STATION_VERSION} bash infra/scripts/deploy-staging.sh"
+
+      - name: Wait for staging health
+        env:
+          STAGING_HEALTH_URL: https://staging.api.drdnt.org/health
+        run: |
+          deadline=$((SECONDS + 120))
+          for attempt in $(seq 1 24); do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+
+            max_time=$remaining
+            if [ "$max_time" -gt 10 ]; then
+              max_time=10
+            fi
+
+            if curl --fail --silent --show-error --connect-timeout 5 --max-time "$max_time" "$STAGING_HEALTH_URL" >/dev/null; then
+              exit 0
+            fi
+
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            sleep 5
+          done
+          echo "Staging health check failed"
+          exit 1
+
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-push
+      - deploy-staging
+    environment: production
+    concurrency:
+      group: station-deploy
+      cancel-in-progress: false
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Configure SSH known_hosts
+        env:
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy production
+        env:
+          STATION_VERSION: ${{ needs.build-and-push.outputs.version }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ESCAPED_STATION_VERSION="$(printf '%q' "${STATION_VERSION}")"
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "cd /opt/station && STATION_VERSION=${ESCAPED_STATION_VERSION} bash infra/scripts/deploy.sh"
+
+      - name: Wait for production health
+        env:
+          PRODUCTION_HEALTH_URL: https://api.drdnt.org/health
+        run: |
+          deadline=$((SECONDS + 120))
+          for attempt in $(seq 1 24); do
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+
+            max_time=$remaining
+            if [ "$max_time" -gt 10 ]; then
+              max_time=10
+            fi
+
+            if curl --fail --silent --show-error --connect-timeout 5 --max-time "$max_time" "$PRODUCTION_HEALTH_URL" >/dev/null; then
+              exit 0
+            fi
+
+            remaining=$((deadline - SECONDS))
+            if [ "$remaining" -le 0 ]; then
+              break
+            fi
+            sleep 5
+          done
+          echo "Production health check failed"
+          exit 1
+
+      - name: Promote images to latest
+        env:
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "${BACKEND_IMAGE}:latest" \
+            "${BACKEND_IMAGE}:${VERSION}"
+          docker buildx imagetools create \
+            --tag "${FRONTEND_IMAGE}:latest" \
+            "${FRONTEND_IMAGE}:${VERSION}"
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-push
+      - deploy-production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create git tag
+        env:
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
+            echo "Tag ${VERSION} already exists locally; skipping tag creation."
+          elif git ls-remote --exit-code --tags origin "refs/tags/${VERSION}" >/dev/null 2>&1; then
+            echo "Tag ${VERSION} already exists on origin; skipping tag creation."
+          else
+            git tag "${VERSION}" "${GITHUB_SHA}"
+            git push origin "${VERSION}"
+          fi
+
+      - name: Prepare release notes
+        env:
+          VERSION: ${{ needs.build-and-push.outputs.version }}
+        run: |
+          cat <<EOF > release-notes.md
+          Release ${VERSION}
+
+          TODO: Replace with generated release notes from issue #124.
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build-and-push.outputs.version }}
+          name: ${{ needs.build-and-push.outputs.version }}
+          body_path: release-notes.md
+          files: release-notes.md

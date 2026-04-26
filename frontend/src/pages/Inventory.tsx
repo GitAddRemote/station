@@ -72,6 +72,7 @@ import {
   OrgPermission,
   permissionsService,
 } from '../services/permissions.service';
+import { API_URL } from '../config/api';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
@@ -478,9 +479,8 @@ const InventoryPage = () => {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiUrl}/users/profile`, {
+      const response = await fetch(`${API_URL}/users/profile`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL } from '../config/api';
 
 export const OrgPermission = {
   CAN_VIEW_ORG_INVENTORY: 'can_view_org_inventory',
