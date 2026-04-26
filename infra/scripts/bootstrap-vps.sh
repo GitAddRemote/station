@@ -13,7 +13,7 @@ STATION_ROOT="/opt/station"
 apt update
 apt upgrade -y
 
-apt install -y ca-certificates curl gnupg lsb-release
+apt install -y ca-certificates curl gnupg lsb-release cron logrotate rclone
 
 install -m 0755 -d /etc/apt/keyrings
 if [ ! -f /etc/apt/keyrings/docker.asc ]; then
@@ -41,6 +41,7 @@ apt install -y \
 
 systemctl enable --now docker
 systemctl enable --now nginx
+systemctl enable --now cron
 
 if ! id -u "${DEPLOY_USER}" >/dev/null 2>&1; then
   useradd -m -s /bin/bash "${DEPLOY_USER}"
@@ -67,9 +68,20 @@ install -d -m 755 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" "${STATION_ROOT}/logs"
 
 bash "$(dirname "$0")/setup-swap.sh"
 
+BACKUP_CRON='0 3 * * * cd /opt/station && bash infra/scripts/backup-db.sh >> /opt/station/logs/backup.log 2>&1'
+(
+  crontab -u "${DEPLOY_USER}" -l 2>/dev/null | grep -Fv 'infra/scripts/backup-db.sh' || true
+  echo "${BACKUP_CRON}"
+) | crontab -u "${DEPLOY_USER}" -
+
+if [ -f "$(dirname "$0")/../logrotate/station-backup" ]; then
+  install -m 644 "$(dirname "$0")/../logrotate/station-backup" /etc/logrotate.d/station-backup
+fi
+
 echo
 echo "Bootstrap complete."
 echo "- Install Nginx configs from infra/nginx/ into /etc/nginx/sites-available/"
 echo "- Enable the sites and reload Nginx."
 echo "- Run infra/scripts/issue-certs.sh once DNS is live."
 echo "- Confirm the deploy user can SSH and run Docker commands without sudo."
+echo "- Configure B2 secrets and verify /opt/station/rclone.conf is written during deploy."
