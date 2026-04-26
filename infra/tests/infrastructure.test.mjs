@@ -327,10 +327,16 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(releaseWorkflow, /orhun\/git-cliff-action@v4/);
   assert.match(releaseWorkflow, /args: --tag "\$\{\{ needs\.build-and-push\.outputs\.version \}\}" --strip header --output RELEASE_NOTES\.md/);
   assert.match(releaseWorkflow, /args: --output CHANGELOG\.md/);
-  assert.match(releaseWorkflow, /git switch --create changelog-main origin\/main/);
+  assert.match(releaseWorkflow, /Persist generated CHANGELOG\.md/);
+  assert.match(releaseWorkflow, /Checkout main for changelog update/);
+  assert.match(releaseWorkflow, /path: changelog-main/);
+  assert.match(releaseWorkflow, /working-directory: changelog-main/);
+  assert.match(releaseWorkflow, /cp CHANGELOG\.md "\$\{RUNNER_TEMP\}\/CHANGELOG\.md"/);
+  assert.match(releaseWorkflow, /git checkout -B changelog-sync origin\/main/);
+  assert.match(releaseWorkflow, /for attempt in 1 2 3; do/);
   assert.match(releaseWorkflow, /git push origin HEAD:main/);
   assert.match(releaseWorkflow, /Wait for production health[\s\S]*Promote images to latest/);
-  assert.match(releaseWorkflow, /Create git tag[\s\S]*Generate release notes[\s\S]*Update CHANGELOG\.md[\s\S]*Commit CHANGELOG\.md to main[\s\S]*Create GitHub Release/);
+  assert.match(releaseWorkflow, /Create git tag[\s\S]*Generate release notes[\s\S]*Update CHANGELOG\.md[\s\S]*Persist generated CHANGELOG\.md[\s\S]*Checkout main for changelog update[\s\S]*Commit CHANGELOG\.md to main[\s\S]*Create GitHub Release/);
 
   assert.match(releaseNotesWorkflow, /workflow_dispatch:/);
   assert.match(releaseNotesWorkflow, /description: Existing tag to regenerate release notes/);
@@ -347,6 +353,7 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cliffConfig, /Testing/);
   assert.match(cliffConfig, /Documentation/);
   assert.match(cliffConfig, /Chores/);
+  assert.match(cliffConfig, /\^v\[0-9\]\+\\\\\.\[0-9\]\+\\\\\.\[0-9\]\+\(\[\.-\]\.\*\)\?\$/);
   assert.match(changelog, /^# Changelog$/m);
 
   assert.doesNotMatch(

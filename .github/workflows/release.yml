@@ -362,22 +362,45 @@ jobs:
           config: cliff.toml
           args: --output CHANGELOG.md
 
+      - name: Persist generated CHANGELOG.md
+        run: cp CHANGELOG.md "${RUNNER_TEMP}/CHANGELOG.md"
+
+      - name: Checkout main for changelog update
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: changelog-main
+          fetch-depth: 0
+
       - name: Commit CHANGELOG.md to main
+        working-directory: changelog-main
         env:
           VERSION: ${{ needs.build-and-push.outputs.version }}
         run: |
-          git fetch origin main
-          git switch --create changelog-main origin/main
-          cp "${GITHUB_WORKSPACE}/CHANGELOG.md" CHANGELOG.md
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          if git diff --cached --quiet; then
-            echo "CHANGELOG.md is already up to date"
-            exit 0
-          fi
-          git commit -m "chore: update CHANGELOG.md for ${VERSION}"
-          git push origin HEAD:main
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git checkout -B changelog-sync origin/main
+            cp "${RUNNER_TEMP}/CHANGELOG.md" CHANGELOG.md
+            git add CHANGELOG.md
+
+            if git diff --cached --quiet; then
+              echo "CHANGELOG.md is already up to date"
+              exit 0
+            fi
+
+            git commit -m "chore: update CHANGELOG.md for ${VERSION}"
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+
+            git reset --hard origin/main
+            sleep 2
+          done
+
+          echo "Failed to update CHANGELOG.md on main after 3 attempts" >&2
+          exit 1
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
