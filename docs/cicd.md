@@ -11,7 +11,7 @@ release/v0.2.0 push
   -> deploy staging automatically
   -> wait for production approval
   -> deploy production
-  -> create git tag and GitHub Release
+  -> create git tag, CHANGELOG.md update, and GitHub Release
 ```
 
 ## GitHub Environments
@@ -66,7 +66,6 @@ bash infra/scripts/deploy.sh
 
 ## Notes
 
-- The workflow currently writes a placeholder release notes file and should be upgraded with the release-notes generation from issue `#124`.
 - The release workflow now runs its own backend/frontend validation before image build and deploy, so release branches are gated inside the same workflow that ships them.
 - Release runs are serialized per release branch with a workflow-level concurrency group so repeated pushes or reruns on the same release branch queue behind the in-flight run instead of canceling it mid-deploy.
 - The shared staging and production deploy jobs also use a global `station-deploy` concurrency group so different release branches cannot race each other on the same VPS or image promotion path.
@@ -76,3 +75,14 @@ bash infra/scripts/deploy.sh
 - Health-check polling bounds each `curl` attempt with explicit connect and total timeouts so a single hung request cannot stall the full deploy window.
 - Release validation runs against `postgres:16-alpine` so the test database matches the same Postgres major version used by staging and production compose stacks.
 - The frontend runtime derives the API host from the current hostname by default (`station.drdnt.org -> api.drdnt.org`, `staging.station.drdnt.org -> staging.api.drdnt.org`), while still allowing `VITE_API_URL` to override that mapping when needed. Unknown non-localhost hosts fall back to the same hostname on port `3001`, which keeps preview and LAN-accessed environments functional without baking a frontend-only localhost default.
+
+## Release Notes
+
+Release notes are generated from conventional commits with `git-cliff`:
+
+- `cliff.toml` defines the changelog groups and rendering template.
+- The release workflow generates `RELEASE_NOTES.md` for the current tag and uses it as the GitHub Release body and downloadable asset.
+- The same release job regenerates the cumulative root `CHANGELOG.md` and commits it back to `main`.
+- `.github/workflows/release-notes.yml` exists as a manual `workflow_dispatch` escape hatch for regenerating the release body for an existing tag without re-running the full deploy.
+
+If you need to change how commits are grouped, edit `cliff.toml` and keep the group names aligned with the conventional commit types used in this repository.

@@ -344,20 +344,45 @@ jobs:
             git push origin "${VERSION}"
           fi
 
-      - name: Prepare release notes
+      - name: Generate release notes
+        uses: orhun/git-cliff-action@v4
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          OUTPUT: RELEASE_NOTES.md
+        with:
+          config: cliff.toml
+          args: --tag "${{ needs.build-and-push.outputs.version }}" --strip header --output RELEASE_NOTES.md
+
+      - name: Update CHANGELOG.md
+        uses: orhun/git-cliff-action@v4
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          OUTPUT: CHANGELOG.md
+        with:
+          config: cliff.toml
+          args: --output CHANGELOG.md
+
+      - name: Commit CHANGELOG.md to main
         env:
           VERSION: ${{ needs.build-and-push.outputs.version }}
         run: |
-          cat <<EOF > release-notes.md
-          Release ${VERSION}
-
-          TODO: Replace with generated release notes from issue #124.
-          EOF
+          git fetch origin main
+          git switch --create changelog-main origin/main
+          cp "${GITHUB_WORKSPACE}/CHANGELOG.md" CHANGELOG.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "CHANGELOG.md is already up to date"
+            exit 0
+          fi
+          git commit -m "chore: update CHANGELOG.md for ${VERSION}"
+          git push origin HEAD:main
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.build-and-push.outputs.version }}
           name: ${{ needs.build-and-push.outputs.version }}
-          body_path: release-notes.md
-          files: release-notes.md
+          body_path: RELEASE_NOTES.md
+          files: RELEASE_NOTES.md
