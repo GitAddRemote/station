@@ -1,0 +1,10 @@
+/opt/station/logs/backup.log {
+  weekly
+  rotate 12
+  compress
+  missingok
+  notifempty
+  copytruncate
+  su deploy deploy
+  create 0640 deploy deploy
+}

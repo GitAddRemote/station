@@ -109,6 +109,8 @@ test('bash scripts have valid shell syntax', () => {
 
   const scripts = [
     path.join(infraRoot, 'scripts/bootstrap-vps.sh'),
+    path.join(infraRoot, 'scripts/backup-db.sh'),
+    path.join(infraRoot, 'scripts/restore-db.sh'),
     path.join(infraRoot, 'scripts/setup-swap.sh'),
     path.join(infraRoot, 'scripts/issue-certs.sh'),
     path.join(infraRoot, 'scripts/deploy.sh'),
@@ -137,6 +139,9 @@ test('bootstrap script provisions required VPS baseline steps', () => {
 
   assert.match(script, /apt update/);
   assert.match(script, /apt upgrade -y/);
+  assert.match(script, /cron/);
+  assert.match(script, /logrotate/);
+  assert.match(script, /rclone/);
   assert.match(script, /docker-ce/);
   assert.match(script, /docker-compose-plugin/);
   assert.match(script, /nginx/);
@@ -147,6 +152,31 @@ test('bootstrap script provisions required VPS baseline steps', () => {
   assert.match(script, /authorized_keys/);
   assert.match(script, /\/opt\/station/);
   assert.match(script, /bash "\$\(dirname "\$0"\)\/setup-swap\.sh"/);
+  assert.match(script, /backup-db\.sh >> \/opt\/station\/logs\/backup\.log/);
+  assert.match(script, /logrotate\/station-backup/);
+});
+
+test('backup and restore scripts use docker compose and rclone with production env', () => {
+  const backupScript = readInfraFile('scripts/backup-db.sh');
+  const restoreScript = readInfraFile('scripts/restore-db.sh');
+  const logrotateConfig = readInfraFile('logrotate/station-backup');
+
+  assert.match(backupScript, /RCLONE_CONFIG_FILE="\$\{STATION_ROOT\}\/rclone\.conf"/);
+  assert.match(backupScript, /source "\$\{ENV_FILE\}"/);
+  assert.match(backupScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" exec -T postgres/);
+  assert.match(backupScript, /pg_dump -U "\$\{DATABASE_USER\}" -d "\$\{DATABASE_NAME\}"/);
+  assert.match(backupScript, /rclone copyto "\$\{BACKUP_FILE\}" "b2:\$\{B2_BUCKET\}\/\$\{REMOTE_PATH\}"/);
+  assert.match(backupScript, /LABEL="\$\{1:-\$\{BACKUP_LABEL:-nightly\}\}"/);
+
+  assert.match(restoreScript, /rclone copyto "b2:\$\{B2_BUCKET\}\/\$\{BACKUP_PATH\}"/);
+  assert.match(restoreScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" stop backend/);
+  assert.match(restoreScript, /psql -U "\$\{DATABASE_USER\}" -d "\$\{DATABASE_NAME\}"/);
+  assert.match(restoreScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" start backend/);
+
+  assert.match(logrotateConfig, /\/opt\/station\/logs\/backup\.log/);
+  assert.match(logrotateConfig, /weekly/);
+  assert.match(logrotateConfig, /rotate 12/);
+  assert.match(logrotateConfig, /compress/);
 });
 
 test('swap script creates and persists a 2 GB swap file', () => {
@@ -266,6 +296,13 @@ test('release workflow safely quotes station version for remote deploys', () => 
   assert.match(workflow, /B2_APPLICATION_KEY=\$\{B2_APPLICATION_KEY\}/);
   assert.match(workflow, /B2_BUCKET=\$\{B2_BUCKET\}/);
   assert.match(workflow, /BACKUP_HEALTHCHECK_URL=\$\{BACKUP_HEALTHCHECK_URL\}/);
+  assert.match(workflow, /Write production rclone config/);
+  assert.match(workflow, /cat > \/opt\/station\/rclone\.conf <<'RCLONEEOF'/);
+  assert.match(workflow, /account = \$\{B2_ACCOUNT_ID\}/);
+  assert.match(workflow, /key = \$\{B2_APPLICATION_KEY\}/);
+  assert.match(workflow, /chmod 600 \/opt\/station\/rclone\.conf/);
+  assert.match(workflow, /Pre-deploy database backup/);
+  assert.match(workflow, /BACKUP_LABEL=pre-deploy-\$\{GITHUB_SHA::7\} bash infra\/scripts\/backup-db\.sh/);
   assert.match(workflow, /curl --fail --silent --show-error --connect-timeout 5 --max-time "\$max_time"/);
   assert.match(workflow, /deadline=\$\(\(SECONDS \+ 120\)\)/);
 });
@@ -406,6 +443,8 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /JWT_SECRET/);
   assert.match(cicdDoc, /REDIS_PASSWORD/);
   assert.match(cicdDoc, /B2_APPLICATION_KEY/);
+  assert.match(cicdDoc, /rclone\.conf/);
+  assert.match(cicdDoc, /pre-deploy PostgreSQL backup/);
   assert.match(cicdDoc, /BACKUP_HEALTHCHECK_URL/);
   assert.match(cicdDoc, /staging-up\.sh/);
   assert.match(cicdDoc, /station-staging/);
@@ -432,6 +471,7 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(secretsDoc, /B2_APPLICATION_KEY/);
   assert.match(secretsDoc, /LOGTAIL_SOURCE_TOKEN/);
   assert.match(secretsDoc, /BACKUP_HEALTHCHECK_URL/);
+  assert.match(secretsDoc, /production PostgreSQL backups to Backblaze B2/);
   assert.match(secretsDoc, /## Generic Rotation Procedure/);
   assert.match(secretsDoc, /## JWT Secret Rotation/);
   assert.match(secretsDoc, /## Database Password Rotation/);
