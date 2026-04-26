@@ -6,8 +6,9 @@ yarn-error.log*
 
 # Environment variables
 .env
-.env.production
-.env.staging
+.env.*
+!.env.production.example
+!.env.staging.example
 
 # Logs
 logs/
@@ -41,9 +42,6 @@ coverage/
 
 # Yarn Integrity file
 .yarn-integrity
-
-# dotenv environment variable files
-.env
 
 # next.js build output
 .next/
