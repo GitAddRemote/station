@@ -14,11 +14,21 @@ provider "linode" {
 }
 
 resource "linode_instance" "vps" {
-  label      = "station-vps"
-  type       = "g6-standard-1"
-  region     = "us-east"
-  image      = "linode/ubuntu24.04"
-  authorized_keys = [var.ssh_public_key]
+  label           = var.vps_label
+  type            = var.vps_type
+  region          = var.vps_region
+  image           = var.vps_image
+  authorized_keys = var.ssh_public_key == null ? null : [var.ssh_public_key]
+
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes = [
+      type,
+      region,
+      image,
+      authorized_keys,
+    ]
+  }
 }
 
 resource "linode_firewall" "station" {
@@ -55,4 +65,8 @@ resource "linode_firewall" "station" {
   outbound_policy = "ACCEPT"
 
   linodes = [linode_instance.vps.id]
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

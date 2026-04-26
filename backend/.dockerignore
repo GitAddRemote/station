@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env*
 **/*.test.ts
+**/*.spec.ts
 test/
 coverage/
 .git/

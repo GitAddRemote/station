@@ -4,7 +4,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
       - DATABASE_HOST=your_database_host
       - DATABASE_PORT=5433
@@ -16,4 +16,4 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "3001:3000"
+      - "3000:8080"

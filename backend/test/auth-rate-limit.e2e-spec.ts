@@ -62,7 +62,7 @@ describe('Auth - Rate Limiting (e2e)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it('should return 429 after exceeding the login rate limit', async () => {

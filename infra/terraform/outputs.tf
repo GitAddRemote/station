@@ -1,6 +1,6 @@
 output "vps_ip" {
   description = "Public IPv4 address for the Station VPS."
-  value       = var.vps_ip
+  value       = local.vps_ipv4
 }
 
 output "api_fqdn" {

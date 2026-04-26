@@ -74,7 +74,7 @@ describe('Auth - Password Reset (e2e)', () => {
     await passwordResetRepository.delete({ userId: testUser.id });
     await userRepository.delete({ id: testUser.id });
 
-    await app.close();
+    await app?.close();
   });
 
   describe('POST /auth/forgot-password', () => {
