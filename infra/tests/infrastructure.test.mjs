@@ -72,6 +72,9 @@ test('terraform configuration files exist and define the Linode foundation', () 
 test('gitignore excludes terraform local state and secrets', () => {
   const gitignore = readInfraFile('../.gitignore');
 
+  assert.match(gitignore, /^\.env\.\*$/m);
+  assert.match(gitignore, /^!\.env\.production\.example$/m);
+  assert.match(gitignore, /^!\.env\.staging\.example$/m);
   assert.match(gitignore, /infra\/terraform\/\.terraform\//);
   assert.match(gitignore, /infra\/terraform\/terraform\.tfvars/);
   assert.match(gitignore, /infra\/terraform\/\*\.tfstate/);
@@ -242,6 +245,27 @@ test('release workflow safely quotes station version for remote deploys', () => 
   assert.match(workflow, /VPS_KNOWN_HOSTS/);
   assert.match(workflow, /StrictHostKeyChecking=yes/);
   assert.match(workflow, /printf '%s\\n' "\$VPS_KNOWN_HOSTS" > ~\/\.ssh\/known_hosts/);
+  assert.match(workflow, /Write staging environment file/);
+  assert.match(workflow, /Write production environment file/);
+  assert.match(workflow, /cat > \/opt\/station\/\.env\.staging <<'ENVEOF'/);
+  assert.match(workflow, /cat > \/opt\/station\/\.env\.production <<'ENVEOF'/);
+  assert.match(workflow, /chmod 600 \/opt\/station\/\.env\.staging/);
+  assert.match(workflow, /chmod 600 \/opt\/station\/\.env\.production/);
+  assert.match(workflow, /DATABASE_HOST=\$\{DATABASE_HOST\}/);
+  assert.match(workflow, /DATABASE_PORT=\$\{DATABASE_PORT\}/);
+  assert.match(workflow, /DATABASE_USER=\$\{DATABASE_USER\}/);
+  assert.match(workflow, /DATABASE_PASSWORD=\$\{DATABASE_PASSWORD\}/);
+  assert.match(workflow, /DATABASE_NAME=\$\{DATABASE_NAME\}/);
+  assert.match(workflow, /JWT_SECRET=\$\{JWT_SECRET\}/);
+  assert.match(workflow, /REDIS_PASSWORD=\$\{REDIS_PASSWORD\}/);
+  assert.match(workflow, /ALLOWED_ORIGIN=\$\{ALLOWED_ORIGIN\}/);
+  assert.match(workflow, /FRONTEND_URL=\$\{FRONTEND_URL\}/);
+  assert.match(workflow, /SENTRY_DSN=\$\{SENTRY_DSN\}/);
+  assert.match(workflow, /LOGTAIL_SOURCE_TOKEN=\$\{LOGTAIL_SOURCE_TOKEN\}/);
+  assert.match(workflow, /B2_ACCOUNT_ID=\$\{B2_ACCOUNT_ID\}/);
+  assert.match(workflow, /B2_APPLICATION_KEY=\$\{B2_APPLICATION_KEY\}/);
+  assert.match(workflow, /B2_BUCKET=\$\{B2_BUCKET\}/);
+  assert.match(workflow, /BACKUP_HEALTHCHECK_URL=\$\{BACKUP_HEALTHCHECK_URL\}/);
   assert.match(workflow, /curl --fail --silent --show-error --connect-timeout 5 --max-time "\$max_time"/);
   assert.match(workflow, /deadline=\$\(\(SECONDS \+ 120\)\)/);
 });
@@ -317,6 +341,7 @@ test('release workflow and CI branch rules are configured', () => {
   const cicdDoc = readInfraFile('../docs/cicd.md');
   const cliffConfig = readInfraFile('../cliff.toml');
   const changelog = readInfraFile('../CHANGELOG.md');
+  const secretsDoc = readInfraFile('docs/secrets.md');
 
   assert.match(releaseWorkflow, /branches:\s*\n\s*- 'release\/\*\*'/);
   assert.match(releaseWorkflow, /deploy-staging/);
@@ -374,10 +399,18 @@ test('release workflow and CI branch rules are configured', () => {
   );
 
   assert.match(cicdDoc, /GitHub Environments/);
+  assert.match(cicdDoc, /environment-scoped secrets/);
   assert.match(cicdDoc, /VPS_SSH_KEY/);
   assert.match(cicdDoc, /VPS_KNOWN_HOSTS/);
+  assert.match(cicdDoc, /DATABASE_PASSWORD/);
+  assert.match(cicdDoc, /JWT_SECRET/);
+  assert.match(cicdDoc, /REDIS_PASSWORD/);
+  assert.match(cicdDoc, /B2_APPLICATION_KEY/);
+  assert.match(cicdDoc, /BACKUP_HEALTHCHECK_URL/);
   assert.match(cicdDoc, /staging-up\.sh/);
   assert.match(cicdDoc, /station-staging/);
+  assert.match(cicdDoc, /chmod 600/);
+  assert.match(cicdDoc, /infra\/docs\/secrets\.md/);
   assert.match(cicdDoc, /## Release Notes/);
   assert.match(cicdDoc, /git-cliff/);
   assert.match(cicdDoc, /RELEASE_NOTES\.md/);
@@ -389,6 +422,21 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /postgres:16-alpine/);
   assert.match(cicdDoc, /Backend and frontend CI still run on `release\/\*\*` pushes, but the release workflow no longer depends on those separate runs to gate deploys/);
   assert.match(cicdDoc, /Rollback/);
+
+  assert.match(secretsDoc, /^# Secrets Management$/m);
+  assert.match(secretsDoc, /## Secret Inventory/);
+  assert.match(secretsDoc, /VPS_KNOWN_HOSTS/);
+  assert.match(secretsDoc, /DATABASE_PASSWORD/);
+  assert.match(secretsDoc, /JWT_SECRET/);
+  assert.match(secretsDoc, /REDIS_PASSWORD/);
+  assert.match(secretsDoc, /B2_APPLICATION_KEY/);
+  assert.match(secretsDoc, /LOGTAIL_SOURCE_TOKEN/);
+  assert.match(secretsDoc, /BACKUP_HEALTHCHECK_URL/);
+  assert.match(secretsDoc, /## Generic Rotation Procedure/);
+  assert.match(secretsDoc, /## JWT Secret Rotation/);
+  assert.match(secretsDoc, /## Database Password Rotation/);
+  assert.match(secretsDoc, /## SSH Key Rotation/);
+  assert.match(secretsDoc, /chmod 600/);
 });
 
 test('staging env example quotes values that contain spaces', () => {

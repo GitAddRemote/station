@@ -70,3 +70,11 @@ The scripts here are designed to establish the baseline only:
 - `infra/scripts/issue-certs.sh`: requests the initial Let's Encrypt certificates for Station domains.
 
 The Nginx configs in `infra/nginx/` are plain HTTP bootstrap configs. Certbot updates them with HTTPS and redirect blocks after certificates are issued.
+
+## Secrets
+
+Issue `#128` documents environment-scoped secret management in `infra/docs/secrets.md`.
+
+- GitHub `staging` and `production` environments hold the deploy-time secrets.
+- The release workflow writes `/opt/station/.env.staging` and `/opt/station/.env.production` on the VPS during deploys.
+- Those files are recreated on every deploy and locked down with `chmod 600`.
