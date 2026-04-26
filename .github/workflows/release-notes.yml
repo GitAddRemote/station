@@ -1,0 +1,40 @@
+name: Release Notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to regenerate release notes for (for example v0.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate-release-notes:
+    name: Regenerate Release Notes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --tag "${{ inputs.tag }}" --strip header --output RELEASE_NOTES.md
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          OUTPUT: RELEASE_NOTES.md
+
+      - name: Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.tag }}
+          body_path: RELEASE_NOTES.md
+          files: RELEASE_NOTES.md

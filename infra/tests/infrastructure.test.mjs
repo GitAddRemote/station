@@ -311,9 +311,12 @@ test('infra scripts are executable on disk', () => {
 
 test('release workflow and CI branch rules are configured', () => {
   const releaseWorkflow = readInfraFile('../.github/workflows/release.yml');
+  const releaseNotesWorkflow = readInfraFile('../.github/workflows/release-notes.yml');
   const backendCiWorkflow = readInfraFile('../.github/workflows/backend-ci.yml');
   const frontendCiWorkflow = readInfraFile('../.github/workflows/frontend-ci.yml');
   const cicdDoc = readInfraFile('../docs/cicd.md');
+  const cliffConfig = readInfraFile('../cliff.toml');
+  const changelog = readInfraFile('../CHANGELOG.md');
 
   assert.match(releaseWorkflow, /branches:\s*\n\s*- 'release\/\*\*'/);
   assert.match(releaseWorkflow, /deploy-staging/);
@@ -321,7 +324,37 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(releaseWorkflow, /deploy-production/);
   assert.match(releaseWorkflow, /environment: production/);
   assert.match(releaseWorkflow, /softprops\/action-gh-release@v2/);
+  assert.match(releaseWorkflow, /orhun\/git-cliff-action@v4/);
+  assert.match(releaseWorkflow, /args: --tag "\$\{\{ needs\.build-and-push\.outputs\.version \}\}" --strip header --output RELEASE_NOTES\.md/);
+  assert.match(releaseWorkflow, /args: --output CHANGELOG\.md/);
+  assert.match(releaseWorkflow, /Persist generated CHANGELOG\.md/);
+  assert.match(releaseWorkflow, /Checkout main for changelog update/);
+  assert.match(releaseWorkflow, /path: changelog-main/);
+  assert.match(releaseWorkflow, /working-directory: changelog-main/);
+  assert.match(releaseWorkflow, /cp CHANGELOG\.md "\$\{RUNNER_TEMP\}\/CHANGELOG\.md"/);
+  assert.match(releaseWorkflow, /git checkout -B changelog-sync origin\/main/);
+  assert.match(releaseWorkflow, /for attempt in 1 2 3; do/);
+  assert.match(releaseWorkflow, /git push origin HEAD:main/);
   assert.match(releaseWorkflow, /Wait for production health[\s\S]*Promote images to latest/);
+  assert.match(releaseWorkflow, /Create git tag[\s\S]*Generate release notes[\s\S]*Update CHANGELOG\.md[\s\S]*Persist generated CHANGELOG\.md[\s\S]*Checkout main for changelog update[\s\S]*Commit CHANGELOG\.md to main[\s\S]*Create GitHub Release/);
+
+  assert.match(releaseNotesWorkflow, /workflow_dispatch:/);
+  assert.match(releaseNotesWorkflow, /description: Existing tag to regenerate release notes/);
+  assert.match(releaseNotesWorkflow, /orhun\/git-cliff-action@v4/);
+  assert.match(releaseNotesWorkflow, /softprops\/action-gh-release@v2/);
+  assert.match(releaseNotesWorkflow, /tag_name: \$\{\{ inputs\.tag \}\}/);
+
+  assert.match(cliffConfig, /\[changelog\]/);
+  assert.match(cliffConfig, /### \{\{ group \}\}/);
+  assert.match(cliffConfig, /Features/);
+  assert.match(cliffConfig, /Bug Fixes/);
+  assert.match(cliffConfig, /Performance/);
+  assert.match(cliffConfig, /Refactoring/);
+  assert.match(cliffConfig, /Testing/);
+  assert.match(cliffConfig, /Documentation/);
+  assert.match(cliffConfig, /Chores/);
+  assert.match(cliffConfig, /\^v\[0-9\]\+\\\\\.\[0-9\]\+\\\\\.\[0-9\]\+\(\[\.-\]\.\*\)\?\$/);
+  assert.match(changelog, /^# Changelog$/m);
 
   assert.doesNotMatch(
     backendCiWorkflow,
@@ -345,6 +378,11 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /VPS_KNOWN_HOSTS/);
   assert.match(cicdDoc, /staging-up\.sh/);
   assert.match(cicdDoc, /station-staging/);
+  assert.match(cicdDoc, /## Release Notes/);
+  assert.match(cicdDoc, /git-cliff/);
+  assert.match(cicdDoc, /RELEASE_NOTES\.md/);
+  assert.match(cicdDoc, /CHANGELOG\.md/);
+  assert.match(cicdDoc, /release-notes\.yml/);
   assert.match(cicdDoc, /release workflow now runs its own backend\/frontend validation before image build and deploy/);
   assert.match(cicdDoc, /Release runs are serialized per release branch/);
   assert.match(cicdDoc, /global `station-deploy` concurrency group/);
