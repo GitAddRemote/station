@@ -41,6 +41,8 @@ rclone copyto "b2:${B2_BUCKET}/${BACKUP_PATH}" "${LOCAL_FILE}" \
   --b2-chunk-size 96M
 
 echo "${LOG_PREFIX} WARNING: backend writes will be stopped during restore"
+echo "${LOG_PREFIX} WARNING: this restore replays the SQL dump into the existing database."
+echo "${LOG_PREFIX} WARNING: if you need a clean replacement, drop and recreate the target database first."
 echo "${LOG_PREFIX} Starting in 5 seconds. Press Ctrl+C to abort."
 sleep 5
 

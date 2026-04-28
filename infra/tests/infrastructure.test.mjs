@@ -163,12 +163,17 @@ test('backup and restore scripts use docker compose and rclone with production e
 
   assert.match(backupScript, /RCLONE_CONFIG_FILE="\$\{STATION_ROOT\}\/rclone\.conf"/);
   assert.match(backupScript, /source "\$\{ENV_FILE\}"/);
+  assert.match(backupScript, /trap 'rm -f "\$\{BACKUP_FILE\}"' EXIT/);
   assert.match(backupScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" exec -T postgres/);
   assert.match(backupScript, /pg_dump -U "\$\{DATABASE_USER\}" -d "\$\{DATABASE_NAME\}"/);
   assert.match(backupScript, /rclone copyto "\$\{BACKUP_FILE\}" "b2:\$\{B2_BUCKET\}\/\$\{REMOTE_PATH\}"/);
   assert.match(backupScript, /LABEL="\$\{1:-\$\{BACKUP_LABEL:-nightly\}\}"/);
+  assert.match(backupScript, /BACKUP_HEALTHCHECK_URL/);
+  assert.match(backupScript, /curl -fsS --retry 3 "\$\{BACKUP_HEALTHCHECK_URL\}"/);
 
   assert.match(restoreScript, /rclone copyto "b2:\$\{B2_BUCKET\}\/\$\{BACKUP_PATH\}"/);
+  assert.match(restoreScript, /replays the SQL dump into the existing database/);
+  assert.match(restoreScript, /drop and recreate the target database first/);
   assert.match(restoreScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" stop backend/);
   assert.match(restoreScript, /psql -U "\$\{DATABASE_USER\}" -d "\$\{DATABASE_NAME\}"/);
   assert.match(restoreScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" start backend/);

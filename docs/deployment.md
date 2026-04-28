@@ -36,3 +36,4 @@ bash infra/scripts/restore-db.sh postgres/202605/20260510_030000_nightly.sql.gz
 ```
 
 The restore script stops the backend, restores into the running production Postgres container, and starts the backend again after the import finishes.
+It replays the SQL dump into the current database. If you need a clean replacement restore, drop and recreate the target database first.

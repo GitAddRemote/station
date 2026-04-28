@@ -32,6 +32,7 @@ BACKUP_FILE="/tmp/station_backup_${TIMESTAMP}_${LABEL}.sql.gz"
 REMOTE_PATH="postgres/${TIMESTAMP:0:6}/${TIMESTAMP}_${LABEL}.sql.gz"
 
 export RCLONE_CONFIG="${RCLONE_CONFIG_FILE}"
+trap 'rm -f "${BACKUP_FILE}"' EXIT
 
 echo "${LOG_PREFIX} Starting backup at ${TIMESTAMP} (${LABEL})"
 
@@ -46,5 +47,12 @@ rclone copyto "${BACKUP_FILE}" "b2:${B2_BUCKET}/${REMOTE_PATH}" \
 
 echo "${LOG_PREFIX} Uploaded to b2:${B2_BUCKET}/${REMOTE_PATH}"
 
-rm -f "${BACKUP_FILE}"
+if [ -n "${BACKUP_HEALTHCHECK_URL:-}" ]; then
+  if curl -fsS --retry 3 "${BACKUP_HEALTHCHECK_URL}" >/dev/null; then
+    echo "${LOG_PREFIX} Healthcheck ping sent"
+  else
+    echo "${LOG_PREFIX} WARNING: healthcheck ping failed after upload" >&2
+  fi
+fi
+
 echo "${LOG_PREFIX} Complete"
