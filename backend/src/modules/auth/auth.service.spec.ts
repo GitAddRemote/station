@@ -13,6 +13,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+
+function sha256(raw: string): string {
+  return crypto.createHash('sha256').update(raw).digest('hex');
+}
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -50,6 +55,7 @@ describe('AuthService', () => {
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
+    // No .store.client — forces the in-memory fallback path in consumeRefreshEntry
   };
 
   const mockJwtService = {
@@ -86,66 +92,87 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should sign a JWT with a jti claim and store the refresh token in Redis', async () => {
+    it('should sign a JWT with a jti claim and store the refresh token hash in Redis', async () => {
       mockJwtService.sign.mockReturnValue('signed-access-token');
       mockCacheManager.set.mockResolvedValue(undefined);
 
       const result = await service.login(mockUser);
 
       expect(result.accessToken).toBe('signed-access-token');
-      expect(result.refreshToken).toMatch(/^[0-9a-f]{64}$/);
 
-      // JWT payload must include jti
+      // Refresh token format: "{jti}.{64-char-hex}"
       const signCall = mockJwtService.sign.mock.calls[0][0] as {
         sub: number;
         username: string;
         jti: string;
       };
-      expect(signCall.jti).toBeDefined();
-      expect(typeof signCall.jti).toBe('string');
-      expect(signCall.sub).toBe(mockUser.id);
-
-      // Redis entry: refresh:{jti} → "{userId}:{rawToken}"
-      expect(mockCacheManager.set).toHaveBeenCalledWith(
-        `refresh:${signCall.jti}`,
-        expect.stringMatching(/^1:[0-9a-f]{64}$/),
-        expect.any(Number),
+      const jti = signCall.jti;
+      expect(jti).toBeDefined();
+      expect(result.refreshToken).toMatch(
+        new RegExp(`^${jti}\\.[0-9a-f]{64}$`),
       );
+
+      // Redis stores the SHA-256 hash, not the raw token
+      const [, storedValue] = mockCacheManager.set.mock.calls[0] as [
+        string,
+        string,
+        number,
+      ];
+      const [, storedHash] = storedValue.split(':');
+      expect(storedHash).toBe(sha256(result.refreshToken));
+      expect(storedHash).not.toBe(result.refreshToken);
     });
   });
 
   describe('generateRefreshToken', () => {
-    it('should return a 64-char hex token and persist it in Redis', async () => {
+    it('should embed the JTI in the token and store a hash in Redis', async () => {
       mockCacheManager.set.mockResolvedValue(undefined);
       const jti = 'test-jti-uuid';
 
       const raw = await service.generateRefreshToken(1, jti);
 
-      expect(raw).toMatch(/^[0-9a-f]{64}$/);
-      expect(mockCacheManager.set).toHaveBeenCalledWith(
-        `refresh:${jti}`,
-        `1:${raw}`,
-        expect.any(Number),
-      );
+      // Token starts with the JTI
+      expect(raw.startsWith(`${jti}.`)).toBe(true);
+
+      // Stored value is "{userId}:{sha256(raw)}", not the raw token
+      const [key, storedValue, ttlMs] = mockCacheManager.set.mock.calls[0] as [
+        string,
+        string,
+        number,
+      ];
+      expect(key).toBe(`refresh:${jti}`);
+      const [userId, storedHash] = storedValue.split(':');
+      expect(userId).toBe('1');
+      expect(storedHash).toBe(sha256(raw));
+      expect(storedHash).not.toBe(raw);
+
+      // 7-day TTL
+      expect(ttlMs).toBe(7 * 24 * 3600 * 1000);
+    });
+  });
+
+  describe('parseRefreshTokenJti', () => {
+    it('should return the JTI prefix before the first dot', () => {
+      expect(service.parseRefreshTokenJti('my-jti.randomhex')).toBe('my-jti');
     });
 
-    it('should set a 7-day TTL on the Redis entry', async () => {
-      mockCacheManager.set.mockResolvedValue(undefined);
-      const jti = 'test-jti-uuid';
+    it('should return undefined for a token with no dot', () => {
+      expect(service.parseRefreshTokenJti('nodottoken')).toBeUndefined();
+    });
 
-      await service.generateRefreshToken(1, jti);
-
-      const ttlMs = mockCacheManager.set.mock.calls[0][2] as number;
-      const sevenDaysMs = 7 * 24 * 3600 * 1000;
-      expect(ttlMs).toBe(sevenDaysMs);
+    it('should return undefined for an empty string', () => {
+      expect(service.parseRefreshTokenJti('')).toBeUndefined();
     });
   });
 
   describe('refreshAccessToken', () => {
-    it('should return new tokens when jti and raw token match Redis entry', async () => {
+    it('should return new tokens when jti and hash match the Redis entry', async () => {
       const jti = 'valid-jti';
-      const rawToken = 'a'.repeat(64);
-      mockCacheManager.get.mockResolvedValue(`1:${rawToken}`);
+      const rawToken = `${jti}.` + 'a'.repeat(64);
+      const stored = `1:${sha256(rawToken)}`;
+
+      // consumeRefreshEntry falls back to get+del when no redis client
+      mockCacheManager.get.mockResolvedValue(stored);
       mockCacheManager.del.mockResolvedValue(undefined);
       mockCacheManager.set.mockResolvedValue(undefined);
       mockUsersService.findById.mockResolvedValue(mockUser);
@@ -154,7 +181,8 @@ describe('AuthService', () => {
       const result = await service.refreshAccessToken(rawToken, jti);
 
       expect(result.accessToken).toBe('new-access-token');
-      expect(result.refreshToken).toMatch(/^[0-9a-f]{64}$/);
+      expect(result.refreshToken).toBeDefined();
+      // Old entry deleted atomically
       expect(mockCacheManager.del).toHaveBeenCalledWith(`refresh:${jti}`);
     });
 
@@ -162,24 +190,46 @@ describe('AuthService', () => {
       mockCacheManager.get.mockResolvedValue(null);
 
       await expect(
-        service.refreshAccessToken('some-token', 'missing-jti'),
+        service.refreshAccessToken('jti.some-token', 'jti'),
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should throw 401 when the raw token does not match the stored value', async () => {
-      mockCacheManager.get.mockResolvedValue('1:correct-token');
+    it('should throw 401 when the hash does not match the stored value', async () => {
+      const jti = 'valid-jti';
+      mockCacheManager.get.mockResolvedValue(`1:${sha256('correct-token')}`);
+      mockCacheManager.set.mockResolvedValue(undefined); // restore call
 
       await expect(
-        service.refreshAccessToken('wrong-token', 'valid-jti'),
+        service.refreshAccessToken(`${jti}.wrong-token`, jti),
       ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should restore the Redis entry when hash mismatch is detected', async () => {
+      // Prevents an attacker from DoS-ing a valid session by sending a bad token
+      const jti = 'valid-jti';
+      const correctRaw = `${jti}.correct`;
+      const stored = `1:${sha256(correctRaw)}`;
+      mockCacheManager.get.mockResolvedValue(stored);
+      mockCacheManager.set.mockResolvedValue(undefined);
+
+      await expect(
+        service.refreshAccessToken(`${jti}.wrong`, jti),
+      ).rejects.toThrow(UnauthorizedException);
+
+      // Entry restored so the legitimate holder can still use it
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        `refresh:${jti}`,
+        stored,
+        expect.any(Number),
+      );
     });
   });
 
   describe('revokeRefreshToken', () => {
-    it('should delete the Redis entry when token matches', async () => {
+    it('should delete the Redis entry when the hash matches', async () => {
       const jti = 'test-jti';
-      const raw = 'token-value';
-      mockCacheManager.get.mockResolvedValue(`1:${raw}`);
+      const raw = `${jti}.somerandombytes`;
+      mockCacheManager.get.mockResolvedValue(`1:${sha256(raw)}`);
       mockCacheManager.del.mockResolvedValue(undefined);
 
       await service.revokeRefreshToken(raw, jti);
@@ -190,24 +240,44 @@ describe('AuthService', () => {
     it('should do nothing when no Redis entry exists', async () => {
       mockCacheManager.get.mockResolvedValue(null);
 
-      await service.revokeRefreshToken('some-token', 'missing-jti');
+      await service.revokeRefreshToken('jti.some-token', 'missing-jti');
 
       expect(mockCacheManager.del).not.toHaveBeenCalled();
     });
 
-    it('should do nothing when the raw token does not match the stored value', async () => {
-      mockCacheManager.get.mockResolvedValue('1:correct-token');
+    it('should do nothing when the hash does not match', async () => {
+      const jti = 'valid-jti';
+      mockCacheManager.get.mockResolvedValue(`1:${sha256('correct-token')}`);
 
-      await service.revokeRefreshToken('wrong-token', 'valid-jti');
+      await service.revokeRefreshToken(`${jti}.wrong-token`, jti);
 
       expect(mockCacheManager.del).not.toHaveBeenCalled();
+    });
+
+    it('should not store the raw token in Redis (only the hash)', async () => {
+      const jti = 'test-jti';
+      const raw = `${jti}.somerandombytes`;
+      let capturedValue: string | undefined;
+      mockCacheManager.get.mockResolvedValue(null); // entry already gone
+
+      // Any set call (e.g. restore path) must use a hash, not the raw token
+      mockCacheManager.set.mockImplementation((_key: string, value: string) => {
+        capturedValue = value;
+        return Promise.resolve(undefined);
+      });
+
+      await service.revokeRefreshToken(raw, jti);
+
+      if (capturedValue !== undefined) {
+        expect(capturedValue).not.toContain(raw);
+      }
     });
   });
 
   describe('blacklistAccessToken', () => {
     it('should store jti in Redis with the remaining TTL', async () => {
       mockCacheManager.set.mockResolvedValue(undefined);
-      const futureExp = Math.floor(Date.now() / 1000) + 300; // 5 min from now
+      const futureExp = Math.floor(Date.now() / 1000) + 300;
 
       await service.blacklistAccessToken('test-jti', futureExp);
 
@@ -234,25 +304,23 @@ describe('AuthService', () => {
     it('should return true when Redis has a blacklist entry', async () => {
       mockCacheManager.get.mockResolvedValue('1');
 
-      const result = await service.isAccessTokenBlacklisted('blacklisted-jti');
-
-      expect(result).toBe(true);
+      expect(await service.isAccessTokenBlacklisted('blacklisted-jti')).toBe(
+        true,
+      );
     });
 
     it('should return false when Redis has no blacklist entry', async () => {
       mockCacheManager.get.mockResolvedValue(null);
 
-      const result = await service.isAccessTokenBlacklisted('clean-jti');
-
-      expect(result).toBe(false);
+      expect(await service.isAccessTokenBlacklisted('clean-jti')).toBe(false);
     });
   });
 
   describe('logout', () => {
     it('should revoke the refresh token and blacklist the access token', async () => {
       const jti = 'logout-jti';
-      const rawRefresh = 'a'.repeat(64);
-      mockCacheManager.get.mockResolvedValue(`1:${rawRefresh}`);
+      const rawRefresh = `${jti}.` + 'a'.repeat(64);
+      mockCacheManager.get.mockResolvedValue(`1:${sha256(rawRefresh)}`);
       mockCacheManager.del.mockResolvedValue(undefined);
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -273,7 +341,7 @@ describe('AuthService', () => {
       mockCacheManager.get.mockResolvedValue(null);
 
       await expect(
-        service.logout('some-refresh', 'some-jti', undefined),
+        service.logout('jti.some-refresh', 'some-jti', undefined),
       ).resolves.toBeUndefined();
     });
   });

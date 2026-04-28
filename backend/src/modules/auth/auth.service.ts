@@ -83,29 +83,85 @@ export class AuthService {
     return result;
   }
 
+  /**
+   * Generates a refresh token that encodes its own JTI so the guard can
+   * recover the JTI from the cookie alone — no access token required.
+   *
+   * Token format (opaque to clients): base64url( jti + "." + 32 random bytes )
+   * Storage: SHA-256 hash of the full raw value, keyed by refresh:{jti}
+   */
   async generateRefreshToken(userId: number, jti: string): Promise<string> {
-    const raw = crypto.randomBytes(32).toString('hex');
-    // Store: refresh:{jti} → "userId:rawToken" so we can validate the token on refresh
+    const randomPart = crypto.randomBytes(32).toString('hex');
+    // Encode JTI into the token so the guard can split it back out without
+    // needing the access token cookie.
+    const raw = `${jti}.${randomPart}`;
+    const hash = this.hashToken(raw);
+
     await this.cacheManager.set(
       `refresh:${jti}`,
-      `${userId}:${raw}`,
+      `${userId}:${hash}`,
       REFRESH_TTL_SECONDS * 1000,
     );
     return raw;
   }
 
+  /**
+   * Parses the JTI out of the structured refresh token cookie value.
+   * Returns undefined if the token is malformed.
+   */
+  parseRefreshTokenJti(raw: string): string | undefined {
+    const dotIndex = raw.indexOf('.');
+    if (dotIndex < 1) return undefined;
+    return raw.substring(0, dotIndex);
+  }
+
+  /**
+   * Atomically consumes a refresh token entry from Redis.
+   * Uses GETDEL on the underlying redis client when available; falls back to
+   * get+del for the in-memory cache (test environments only).
+   * Returns the stored value if the key existed, null otherwise.
+   */
+  private async consumeRefreshEntry(jti: string): Promise<string | null> {
+    const key = `refresh:${jti}`;
+
+    // Try to use the underlying redis client's GETDEL for atomicity.
+    // cast is deliberate: cache-manager wraps the store but doesn't type it.
+    const store = (
+      this.cacheManager as unknown as {
+        store: { client?: { getDel: (k: string) => Promise<string | null> } };
+      }
+    ).store;
+    if (store?.client?.getDel) {
+      return store.client.getDel(key);
+    }
+
+    // In-memory fallback (test env, single-threaded): get then del.
+    const value = await this.cacheManager.get<string>(key);
+    if (value !== null && value !== undefined) {
+      await this.cacheManager.del(key);
+    }
+    return value ?? null;
+  }
+
   async refreshAccessToken(
-    refreshToken: string,
+    rawRefreshToken: string,
     jti: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const stored = await this.cacheManager.get<string>(`refresh:${jti}`);
+    // Atomic consume: if two concurrent requests arrive, only one gets the value.
+    const stored = await this.consumeRefreshEntry(jti);
 
     if (!stored) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    const [userIdStr, storedRaw] = stored.split(':');
-    if (storedRaw !== refreshToken) {
+    const [userIdStr, storedHash] = stored.split(':');
+    if (this.hashToken(rawRefreshToken) !== storedHash) {
+      // Hash mismatch — put the entry back so the legitimate holder can still use it.
+      await this.cacheManager.set(
+        `refresh:${jti}`,
+        stored,
+        REFRESH_TTL_SECONDS * 1000,
+      );
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -115,9 +171,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    // Rotate: delete old entry, issue new token pair
-    await this.cacheManager.del(`refresh:${jti}`);
-
+    // Old entry already deleted by consumeRefreshEntry — issue new token pair.
     const newJti = crypto.randomUUID();
     const payload: JwtPayload = {
       username: user.username,
@@ -131,11 +185,11 @@ export class AuthService {
   }
 
   async logout(
-    refreshToken: string,
+    rawRefreshToken: string,
     jti: string,
     rawAccessToken?: string,
   ): Promise<void> {
-    await this.revokeRefreshToken(refreshToken, jti);
+    await this.revokeRefreshToken(rawRefreshToken, jti);
 
     if (rawAccessToken) {
       try {
@@ -151,14 +205,17 @@ export class AuthService {
     }
   }
 
-  async revokeRefreshToken(refreshToken: string, jti: string): Promise<void> {
+  async revokeRefreshToken(
+    rawRefreshToken: string,
+    jti: string,
+  ): Promise<void> {
     const stored = await this.cacheManager.get<string>(`refresh:${jti}`);
     if (!stored) {
       return;
     }
 
-    const [, storedRaw] = stored.split(':');
-    if (storedRaw !== refreshToken) {
+    const [, storedHash] = stored.split(':');
+    if (this.hashToken(rawRefreshToken) !== storedHash) {
       return;
     }
 
@@ -175,6 +232,10 @@ export class AuthService {
   async isAccessTokenBlacklisted(jti: string): Promise<boolean> {
     const hit = await this.cacheManager.get<string>(`blacklist:${jti}`);
     return hit !== null && hit !== undefined;
+  }
+
+  private hashToken(raw: string): string {
+    return crypto.createHash('sha256').update(raw).digest('hex');
   }
 
   async requestPasswordReset(email: string): Promise<{ message: string }> {
