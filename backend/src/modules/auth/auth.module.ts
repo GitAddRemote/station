@@ -50,12 +50,8 @@ import { createClient } from 'redis';
           password: configService.get<string>('REDIS_PASSWORD') || undefined,
         });
 
-        try {
-          await client.connect();
-          return client;
-        } catch {
-          return null;
-        }
+        await client.connect();
+        return client;
       },
     },
   ],

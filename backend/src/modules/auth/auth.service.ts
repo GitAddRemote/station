@@ -27,6 +27,9 @@ export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
 
 /** Minimal interface for the operations AuthService needs on the raw client. */
 export interface RedisClientLike {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, options: { PX: number }): Promise<unknown>;
+  del(key: string): Promise<unknown>;
   getDel(key: string): Promise<string | null>;
   pTTL(key: string): Promise<number>;
 }
@@ -110,11 +113,7 @@ export class AuthService {
     const raw = `${jti}.${randomPart}`;
     const hash = this.hashToken(raw);
 
-    await this.cacheManager.set(
-      `refresh:${jti}`,
-      `${userId}:${hash}`,
-      REFRESH_TTL_SECONDS * 1000,
-    );
+    await this.authSet(`refresh:${jti}`, `${userId}:${hash}`, REFRESH_TTL_MS);
     return raw;
   }
 
@@ -132,7 +131,8 @@ export class AuthService {
    * Atomically consumes a refresh token entry from Redis.
    * Uses GETDEL on the injected raw redis client when available; falls back to
    * get+del for the in-memory cache (test environments only).
-   * Returns [storedValue, remainingTtlMs] if the key existed, [null, 0] otherwise.
+   * Returns [storedValue, remainingTtlMs]. remainingTtlMs is 0 when the key
+   * has no positive TTL — callers must not restore the entry in that case.
    */
   private async consumeRefreshEntry(
     jti: string,
@@ -141,9 +141,11 @@ export class AuthService {
 
     if (this.redisClient) {
       // Read TTL before deleting so we can restore it accurately on mismatch.
+      // pTTL returns -2 (key missing) or -1 (no expiry) for non-positive cases.
       const remainingMs = await this.redisClient.pTTL(key);
       const value = await this.redisClient.getDel(key);
-      return [value, Math.max(0, remainingMs)];
+      // Only return a positive TTL — callers treat 0 as "do not restore".
+      return [value, remainingMs > 0 ? remainingMs : 0];
     }
 
     // In-memory fallback (test env, single-threaded): get then del.
@@ -168,8 +170,12 @@ export class AuthService {
     const [userIdStr, storedHash] = stored.split(':');
     if (this.hashToken(rawRefreshToken) !== storedHash) {
       // Hash mismatch — restore with the original remaining TTL so the
-      // legitimate holder can still use their token and the session isn't reset.
-      await this.cacheManager.set(`refresh:${jti}`, stored, remainingTtlMs);
+      // legitimate holder can still use their token. Only restore if the TTL
+      // was positive; a zero TTL means the key was about to expire and must
+      // not be written back without an expiry (which would make it immortal).
+      if (remainingTtlMs > 0) {
+        await this.authSet(`refresh:${jti}`, stored, remainingTtlMs);
+      }
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -217,7 +223,7 @@ export class AuthService {
     rawRefreshToken: string,
     jti: string,
   ): Promise<void> {
-    const stored = await this.cacheManager.get<string>(`refresh:${jti}`);
+    const stored = await this.authGet(`refresh:${jti}`);
     if (!stored) {
       return;
     }
@@ -227,23 +233,59 @@ export class AuthService {
       return;
     }
 
-    await this.cacheManager.del(`refresh:${jti}`);
+    await this.authDel(`refresh:${jti}`);
   }
 
   async blacklistAccessToken(jti: string, exp: number): Promise<void> {
-    const remainingMs = Math.max(0, exp * 1000 - Date.now());
+    const remainingMs = exp * 1000 - Date.now();
     if (remainingMs > 0) {
-      await this.cacheManager.set(`blacklist:${jti}`, '1', remainingMs);
+      await this.authSet(`blacklist:${jti}`, '1', remainingMs);
     }
   }
 
   async isAccessTokenBlacklisted(jti: string): Promise<boolean> {
-    const hit = await this.cacheManager.get<string>(`blacklist:${jti}`);
+    const hit = await this.authGet(`blacklist:${jti}`);
     return hit !== null && hit !== undefined;
   }
 
   private hashToken(raw: string): string {
     return crypto.createHash('sha256').update(raw).digest('hex');
+  }
+
+  /** Read an auth-state key. Uses raw Redis client when available. */
+  private async authGet(key: string): Promise<string | null> {
+    if (this.redisClient) {
+      return this.redisClient.get(key);
+    }
+    return (await this.cacheManager.get<string>(key)) ?? null;
+  }
+
+  /**
+   * Write an auth-state key with a mandatory positive TTL.
+   * Throws if ttlMs ≤ 0 — auth state must always expire.
+   */
+  private async authSet(
+    key: string,
+    value: string,
+    ttlMs: number,
+  ): Promise<void> {
+    if (ttlMs <= 0) {
+      throw new Error(`authSet called with non-positive TTL for key ${key}`);
+    }
+    if (this.redisClient) {
+      await this.redisClient.set(key, value, { PX: Math.ceil(ttlMs) });
+      return;
+    }
+    await this.cacheManager.set(key, value, Math.ceil(ttlMs));
+  }
+
+  /** Delete an auth-state key. Uses raw Redis client when available. */
+  private async authDel(key: string): Promise<void> {
+    if (this.redisClient) {
+      await this.redisClient.del(key);
+      return;
+    }
+    await this.cacheManager.del(key);
   }
 
   async requestPasswordReset(email: string): Promise<{ message: string }> {
