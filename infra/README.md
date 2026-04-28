@@ -89,6 +89,12 @@ Issue `#125` adds the production backup contract:
 
 The production release workflow writes `/opt/station/rclone.conf` from GitHub environment secrets and runs a pre-deploy backup before rolling the backend forward.
 
+Issue `#133` adds backup failure alerting via a healthchecks.io dead-man's switch:
+
+- `backup-db.sh` pings `BACKUP_HEALTHCHECK_URL` after a successful upload; if the ping is absent, healthchecks.io fires an alert
+- `BACKUP_HEALTHCHECK_URL` is a production-only GitHub environment secret written into `.env.production` at deploy time
+- See `infra/docs/backups.md` for operational procedures: verification, alert response, retention policy, and restore steps
+
 ## Redis Persistence
 
 Issue `#126` enables Redis AOF persistence in both compose stacks and documents verification/recovery in `infra/docs/redis.md`.
