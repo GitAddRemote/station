@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from './auth.service';
+import { AuthService, REDIS_CLIENT } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { SystemUserService } from '../users/system-user.service';
 import { JwtService } from '@nestjs/jwt';
@@ -55,7 +55,6 @@ describe('AuthService', () => {
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
-    // No .store.client — forces the in-memory fallback path in consumeRefreshEntry
   };
 
   const mockJwtService = {
@@ -63,8 +62,11 @@ describe('AuthService', () => {
     decode: jest.fn(),
   };
 
+  // USE_REDIS_CACHE=false so the constructor guard does not throw when
+  // REDIS_CLIENT is not provided (redisClient === null is the test path).
   const mockConfigService = {
     get: jest.fn((key: string) => {
+      if (key === 'USE_REDIS_CACHE') return 'false';
       if (key === 'FRONTEND_URL') return 'http://localhost:5173';
       if (key === 'JWT_SECRET') return 'test-secret';
       return null;
@@ -84,6 +86,8 @@ describe('AuthService', () => {
           useValue: mockPasswordResetRepository,
         },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
+        // No REDIS_CLIENT provider → redisClient is null → in-memory fallback path
+        { provide: REDIS_CLIENT, useValue: null },
       ],
     }).compile();
 
@@ -92,7 +96,7 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should sign a JWT with a jti claim and store the refresh token hash in Redis', async () => {
+    it('should create a session, sign a JWT with a jti claim, and store the refresh token hash', async () => {
       mockJwtService.sign.mockReturnValue('signed-access-token');
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -112,13 +116,16 @@ describe('AuthService', () => {
         new RegExp(`^${jti}\\.[0-9a-f]{64}$`),
       );
 
-      // Redis stores the SHA-256 hash, not the raw token
-      const [, storedValue] = mockCacheManager.set.mock.calls[0] as [
+      // set is called twice: once for session:{sid}, once for refresh:{jti}
+      expect(mockCacheManager.set).toHaveBeenCalledTimes(2);
+
+      // The refresh entry stores the SHA-256 hash, not the raw token
+      const refreshSetCall = mockCacheManager.set.mock.calls[1] as [
         string,
         string,
         number,
       ];
-      const [, storedHash] = storedValue.split(':');
+      const [, storedHash] = refreshSetCall[1].split(':');
       expect(storedHash).toBe(sha256(result.refreshToken));
       expect(storedHash).not.toBe(result.refreshToken);
     });
@@ -128,23 +135,25 @@ describe('AuthService', () => {
     it('should embed the JTI in the token and store a hash in Redis', async () => {
       mockCacheManager.set.mockResolvedValue(undefined);
       const jti = 'test-jti-uuid';
+      const sid = 'test-sid-uuid';
 
-      const raw = await service.generateRefreshToken(1, jti);
+      const raw = await service.generateRefreshToken(1, jti, sid);
 
       // Token starts with the JTI
       expect(raw.startsWith(`${jti}.`)).toBe(true);
 
-      // Stored value is "{userId}:{sha256(raw)}", not the raw token
+      // Stored value is "{userId}:{sha256(raw)}:{sid}", not the raw token
       const [key, storedValue, ttlMs] = mockCacheManager.set.mock.calls[0] as [
         string,
         string,
         number,
       ];
       expect(key).toBe(`refresh:${jti}`);
-      const [userId, storedHash] = storedValue.split(':');
+      const [userId, storedHash, storedSid] = storedValue.split(':');
       expect(userId).toBe('1');
       expect(storedHash).toBe(sha256(raw));
       expect(storedHash).not.toBe(raw);
+      expect(storedSid).toBe(sid);
 
       // 7-day TTL
       expect(ttlMs).toBe(7 * 24 * 3600 * 1000);
@@ -166,13 +175,18 @@ describe('AuthService', () => {
   });
 
   describe('refreshAccessToken', () => {
-    it('should return new tokens when jti and hash match the Redis entry', async () => {
+    const sid = 'test-session-id';
+
+    it('should return new tokens when jti and hash match and session is alive', async () => {
       const jti = 'valid-jti';
       const rawToken = `${jti}.` + 'a'.repeat(64);
-      const stored = `1:${sha256(rawToken)}`;
+      const stored = `1:${sha256(rawToken)}:${sid}`;
 
-      // consumeRefreshEntry falls back to get+del when no redis client
-      mockCacheManager.get.mockResolvedValue(stored);
+      // consumeRefreshEntry falls back to get+del when no redis client;
+      // second get is for session:{sid} check
+      mockCacheManager.get
+        .mockResolvedValueOnce(stored) // refresh:{jti}
+        .mockResolvedValueOnce('1'); // session:{sid} — alive
       mockCacheManager.del.mockResolvedValue(undefined);
       mockCacheManager.set.mockResolvedValue(undefined);
       mockUsersService.findById.mockResolvedValue(mockUser);
@@ -182,7 +196,7 @@ describe('AuthService', () => {
 
       expect(result.accessToken).toBe('new-access-token');
       expect(result.refreshToken).toBeDefined();
-      // Old entry deleted atomically
+      // Old refresh entry deleted atomically
       expect(mockCacheManager.del).toHaveBeenCalledWith(`refresh:${jti}`);
     });
 
@@ -196,7 +210,9 @@ describe('AuthService', () => {
 
     it('should throw 401 when the hash does not match the stored value', async () => {
       const jti = 'valid-jti';
-      mockCacheManager.get.mockResolvedValue(`1:${sha256('correct-token')}`);
+      mockCacheManager.get.mockResolvedValue(
+        `1:${sha256('correct-token')}:${sid}`,
+      );
       mockCacheManager.set.mockResolvedValue(undefined); // restore call
 
       await expect(
@@ -208,7 +224,7 @@ describe('AuthService', () => {
       // Prevents an attacker from DoS-ing a valid session by sending a bad token
       const jti = 'valid-jti';
       const correctRaw = `${jti}.correct`;
-      const stored = `1:${sha256(correctRaw)}`;
+      const stored = `1:${sha256(correctRaw)}:${sid}`;
       mockCacheManager.get.mockResolvedValue(stored);
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -223,17 +239,35 @@ describe('AuthService', () => {
         expect.any(Number),
       );
     });
+
+    it('should throw 401 when session has been revoked', async () => {
+      const jti = 'valid-jti';
+      const rawToken = `${jti}.` + 'a'.repeat(64);
+      const stored = `1:${sha256(rawToken)}:${sid}`;
+
+      mockCacheManager.get
+        .mockResolvedValueOnce(stored) // refresh:{jti}
+        .mockResolvedValueOnce(null); // session:{sid} — revoked
+      mockCacheManager.del.mockResolvedValue(undefined);
+
+      await expect(service.refreshAccessToken(rawToken, jti)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
   });
 
   describe('revokeRefreshToken', () => {
-    it('should delete the Redis entry when the hash matches', async () => {
+    const sid = 'test-session-id';
+
+    it('should delete the session and the refresh entry when hash matches', async () => {
       const jti = 'test-jti';
       const raw = `${jti}.somerandombytes`;
-      mockCacheManager.get.mockResolvedValue(`1:${sha256(raw)}`);
+      mockCacheManager.get.mockResolvedValue(`1:${sha256(raw)}:${sid}`);
       mockCacheManager.del.mockResolvedValue(undefined);
 
       await service.revokeRefreshToken(raw, jti);
 
+      expect(mockCacheManager.del).toHaveBeenCalledWith(`session:${sid}`);
       expect(mockCacheManager.del).toHaveBeenCalledWith(`refresh:${jti}`);
     });
 
@@ -247,7 +281,9 @@ describe('AuthService', () => {
 
     it('should do nothing when the hash does not match', async () => {
       const jti = 'valid-jti';
-      mockCacheManager.get.mockResolvedValue(`1:${sha256('correct-token')}`);
+      mockCacheManager.get.mockResolvedValue(
+        `1:${sha256('correct-token')}:${sid}`,
+      );
 
       await service.revokeRefreshToken(`${jti}.wrong-token`, jti);
 
@@ -317,10 +353,12 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    it('should revoke the refresh token and blacklist the access token', async () => {
+    const sid = 'test-session-id';
+
+    it('should revoke the session family and blacklist the access token', async () => {
       const jti = 'logout-jti';
       const rawRefresh = `${jti}.` + 'a'.repeat(64);
-      mockCacheManager.get.mockResolvedValue(`1:${sha256(rawRefresh)}`);
+      mockCacheManager.get.mockResolvedValue(`1:${sha256(rawRefresh)}:${sid}`);
       mockCacheManager.del.mockResolvedValue(undefined);
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -329,6 +367,8 @@ describe('AuthService', () => {
 
       await service.logout(rawRefresh, jti, 'raw-access-token');
 
+      // Session family revoked before the specific refresh entry
+      expect(mockCacheManager.del).toHaveBeenCalledWith(`session:${sid}`);
       expect(mockCacheManager.del).toHaveBeenCalledWith(`refresh:${jti}`);
       expect(mockCacheManager.set).toHaveBeenCalledWith(
         `blacklist:${jti}`,

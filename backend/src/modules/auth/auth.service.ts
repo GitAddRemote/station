@@ -55,7 +55,21 @@ export class AuthService {
     @Optional()
     @Inject(REDIS_CLIENT)
     private redisClient: RedisClientLike | null,
-  ) {}
+  ) {
+    // Auth state (refresh tokens, blacklist, sessions) must be shared across all
+    // instances. If USE_REDIS_CACHE=true but the Redis client failed to connect,
+    // reject startup rather than silently running with per-process state.
+    if (
+      redisClient === null &&
+      configService.get<string>('USE_REDIS_CACHE', 'true') === 'true'
+    ) {
+      throw new Error(
+        'Redis is required for auth state (refresh tokens, blacklist, sessions) ' +
+          'but the connection failed. Set USE_REDIS_CACHE=false to run without ' +
+          'Redis (single-instance / test only).',
+      );
+    }
+  }
 
   async validateUser(
     username: string,
@@ -87,9 +101,14 @@ export class AuthService {
     user: ValidatedUser,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const jti = crypto.randomUUID();
+    // A session ID (SID) is stable across token rotations for this login.
+    // Deleting session:{sid} invalidates the entire token family regardless of
+    // which JTI the client currently holds.
+    const sid = crypto.randomUUID();
+    await this.authSet(`session:${sid}`, String(user.id), REFRESH_TTL_MS);
     const payload: JwtPayload = { username: user.username, sub: user.id, jti };
     const accessToken = this.jwtService.sign(payload);
-    const refreshToken = await this.generateRefreshToken(user.id, jti);
+    const refreshToken = await this.generateRefreshToken(user.id, jti, sid);
     return { accessToken, refreshToken };
   }
 
@@ -106,14 +125,23 @@ export class AuthService {
    * Token format (opaque to clients): base64url( jti + "." + 32 random bytes )
    * Storage: SHA-256 hash of the full raw value, keyed by refresh:{jti}
    */
-  async generateRefreshToken(userId: number, jti: string): Promise<string> {
+  async generateRefreshToken(
+    userId: number,
+    jti: string,
+    sid: string,
+  ): Promise<string> {
     const randomPart = crypto.randomBytes(32).toString('hex');
     // Encode JTI into the token so the guard can split it back out without
     // needing the access token cookie.
     const raw = `${jti}.${randomPart}`;
     const hash = this.hashToken(raw);
 
-    await this.authSet(`refresh:${jti}`, `${userId}:${hash}`, REFRESH_TTL_MS);
+    // Stored value: "{userId}:{hash}:{sid}" — SID threads through rotations.
+    await this.authSet(
+      `refresh:${jti}`,
+      `${userId}:${hash}:${sid}`,
+      REFRESH_TTL_MS,
+    );
     return raw;
   }
 
@@ -167,7 +195,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    const [userIdStr, storedHash] = stored.split(':');
+    const [userIdStr, storedHash, sid] = stored.split(':');
     if (this.hashToken(rawRefreshToken) !== storedHash) {
       // Hash mismatch — restore with the original remaining TTL so the
       // legitimate holder can still use their token. Only restore if the TTL
@@ -179,13 +207,21 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    // Verify the session family is still alive. If logout already deleted
+    // session:{sid}, all rotated tokens in this family are also invalidated.
+    const sessionAlive = await this.authGet(`session:${sid}`);
+    if (!sessionAlive) {
+      throw new UnauthorizedException('Session has been revoked');
+    }
+
     const userId = parseInt(userIdStr, 10);
     const user = await this.usersService.findById(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    // Old entry already deleted by consumeRefreshEntry — issue new token pair.
+    // Old entry already deleted by consumeRefreshEntry — issue new token pair
+    // carrying the same SID so the session family remains revocable.
     const newJti = crypto.randomUUID();
     const payload: JwtPayload = {
       username: user.username,
@@ -193,7 +229,11 @@ export class AuthService {
       jti: newJti,
     };
     const newAccessToken = this.jwtService.sign(payload);
-    const newRefreshToken = await this.generateRefreshToken(user.id, newJti);
+    const newRefreshToken = await this.generateRefreshToken(
+      user.id,
+      newJti,
+      sid,
+    );
 
     return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
@@ -228,11 +268,16 @@ export class AuthService {
       return;
     }
 
-    const [, storedHash] = stored.split(':');
+    const [, storedHash, sid] = stored.split(':');
     if (this.hashToken(rawRefreshToken) !== storedHash) {
       return;
     }
 
+    // Delete the session family first so any concurrently rotated token also
+    // becomes invalid before we remove this specific refresh entry.
+    if (sid) {
+      await this.authDel(`session:${sid}`);
+    }
     await this.authDel(`refresh:${jti}`);
   }
 
