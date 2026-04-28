@@ -432,6 +432,16 @@ jobs:
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
             "cd /opt/station && BACKUP_LABEL=pre-deploy-${GITHUB_SHA::7} bash infra/scripts/backup-db.sh"
 
+      - name: Verify pre-deploy backup uploaded
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "cd /opt/station && export RCLONE_CONFIG=/opt/station/rclone.conf && \
+             source /opt/station/.env.production && \
+             rclone ls \"b2:${B2_BUCKET}/postgres/\" | grep \"pre-deploy-${GITHUB_SHA::7}\\.sql.gz\""
+
       - name: Deploy production
         env:
           STATION_VERSION: ${{ needs.build-and-push.outputs.version }}
