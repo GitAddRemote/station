@@ -401,12 +401,36 @@ jobs:
           ENVEOF
           chmod 600 /opt/station/.env.production"
 
+      - name: Write production rclone config
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          B2_ACCOUNT_ID: ${{ secrets.B2_ACCOUNT_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "cat > /opt/station/rclone.conf <<'RCLONEEOF'
+          [b2]
+          type = b2
+          account = ${B2_ACCOUNT_ID}
+          key = ${B2_APPLICATION_KEY}
+          hard_delete = false
+          RCLONEEOF
+          chmod 600 /opt/station/rclone.conf"
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pre-deploy database backup
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "cd /opt/station && BACKUP_LABEL=pre-deploy-${GITHUB_SHA::7} bash infra/scripts/backup-db.sh"
 
       - name: Deploy production
         env:

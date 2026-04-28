@@ -21,9 +21,9 @@ Use GitHub repository environments for `staging` and `production`. Store the fol
 | `REDIS_PASSWORD` | Yes | Yes | Generate with `openssl rand -base64 24`. |
 | `ALLOWED_ORIGIN` | Yes | Yes | `https://staging.station.drdnt.org` / `https://station.drdnt.org`. |
 | `FRONTEND_URL` | Yes | Yes | Used in password-reset links. Should match the frontend URL. |
-| `B2_ACCOUNT_ID` | Optional | Optional | Needed for backup work. |
-| `B2_APPLICATION_KEY` | Optional | Optional | Needed for backup work. |
-| `B2_BUCKET` | Optional | Optional | Example: `station-backups`. |
+| `B2_ACCOUNT_ID` | Optional | Yes | Needed for production PostgreSQL backups to Backblaze B2. |
+| `B2_APPLICATION_KEY` | Optional | Yes | Needed for production PostgreSQL backups to Backblaze B2. |
+| `B2_BUCKET` | Optional | Yes | Example: `station-backups`. |
 | `SENTRY_DSN` | Optional | Optional | Needed once Sentry is enabled. |
 | `LOGTAIL_SOURCE_TOKEN` | Optional | Optional | Needed once log aggregation is enabled. |
 | `BACKUP_HEALTHCHECK_URL` | Optional | Recommended | Production backup dead-man switch URL. Leave blank in staging if unused. |

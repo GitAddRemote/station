@@ -78,3 +78,13 @@ Issue `#128` documents environment-scoped secret management in `infra/docs/secre
 - GitHub `staging` and `production` environments hold the deploy-time secrets.
 - The release workflow writes `/opt/station/.env.staging` and `/opt/station/.env.production` on the VPS during deploys.
 - Those files are recreated on every deploy and locked down with `chmod 600`.
+
+## Backups
+
+Issue `#125` adds the production backup contract:
+
+- `infra/scripts/backup-db.sh`: creates a gzip-compressed `pg_dump` from the running production Postgres container and uploads it to Backblaze B2 via `rclone`
+- `infra/scripts/restore-db.sh`: downloads a backup from B2 and restores it into the production Postgres container
+- `infra/logrotate/station-backup`: rotates `/opt/station/logs/backup.log`
+
+The production release workflow writes `/opt/station/rclone.conf` from GitHub environment secrets and runs a pre-deploy backup before rolling the backend forward.
