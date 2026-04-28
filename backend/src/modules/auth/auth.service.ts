@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   Inject,
+  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,7 +23,16 @@ import { ConfigService } from '@nestjs/config';
 import { ValidatedUser } from './interfaces/validated-user.interface';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
+export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
+
+/** Minimal interface for the operations AuthService needs on the raw client. */
+export interface RedisClientLike {
+  getDel(key: string): Promise<string | null>;
+  pTTL(key: string): Promise<number>;
+}
+
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 days
+const REFRESH_TTL_MS = REFRESH_TTL_SECONDS * 1000;
 
 @Injectable()
 export class AuthService {
@@ -39,6 +49,9 @@ export class AuthService {
     private passwordResetRepository: Repository<PasswordReset>,
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
+    @Optional()
+    @Inject(REDIS_CLIENT)
+    private redisClient: RedisClientLike | null,
   ) {}
 
   async validateUser(
@@ -117,22 +130,20 @@ export class AuthService {
 
   /**
    * Atomically consumes a refresh token entry from Redis.
-   * Uses GETDEL on the underlying redis client when available; falls back to
+   * Uses GETDEL on the injected raw redis client when available; falls back to
    * get+del for the in-memory cache (test environments only).
-   * Returns the stored value if the key existed, null otherwise.
+   * Returns [storedValue, remainingTtlMs] if the key existed, [null, 0] otherwise.
    */
-  private async consumeRefreshEntry(jti: string): Promise<string | null> {
+  private async consumeRefreshEntry(
+    jti: string,
+  ): Promise<[string | null, number]> {
     const key = `refresh:${jti}`;
 
-    // Try to use the underlying redis client's GETDEL for atomicity.
-    // cast is deliberate: cache-manager wraps the store but doesn't type it.
-    const store = (
-      this.cacheManager as unknown as {
-        store: { client?: { getDel: (k: string) => Promise<string | null> } };
-      }
-    ).store;
-    if (store?.client?.getDel) {
-      return store.client.getDel(key);
+    if (this.redisClient) {
+      // Read TTL before deleting so we can restore it accurately on mismatch.
+      const remainingMs = await this.redisClient.pTTL(key);
+      const value = await this.redisClient.getDel(key);
+      return [value, Math.max(0, remainingMs)];
     }
 
     // In-memory fallback (test env, single-threaded): get then del.
@@ -140,7 +151,7 @@ export class AuthService {
     if (value !== null && value !== undefined) {
       await this.cacheManager.del(key);
     }
-    return value ?? null;
+    return [value ?? null, REFRESH_TTL_MS];
   }
 
   async refreshAccessToken(
@@ -148,7 +159,7 @@ export class AuthService {
     jti: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     // Atomic consume: if two concurrent requests arrive, only one gets the value.
-    const stored = await this.consumeRefreshEntry(jti);
+    const [stored, remainingTtlMs] = await this.consumeRefreshEntry(jti);
 
     if (!stored) {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -156,12 +167,9 @@ export class AuthService {
 
     const [userIdStr, storedHash] = stored.split(':');
     if (this.hashToken(rawRefreshToken) !== storedHash) {
-      // Hash mismatch — put the entry back so the legitimate holder can still use it.
-      await this.cacheManager.set(
-        `refresh:${jti}`,
-        stored,
-        REFRESH_TTL_SECONDS * 1000,
-      );
+      // Hash mismatch — restore with the original remaining TTL so the
+      // legitimate holder can still use their token and the session isn't reset.
+      await this.cacheManager.set(`refresh:${jti}`, stored, remainingTtlMs);
       throw new UnauthorizedException('Invalid refresh token');
     }
 
