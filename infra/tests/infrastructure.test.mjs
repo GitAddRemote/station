@@ -167,7 +167,7 @@ test('backup and restore scripts use docker compose and rclone with production e
   assert.match(backupScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" exec -T postgres/);
   assert.match(backupScript, /pg_dump -U "\$\{DATABASE_USER\}" -d "\$\{DATABASE_NAME\}"/);
   assert.match(backupScript, /rclone copyto "\$\{BACKUP_FILE\}" "b2:\$\{B2_BUCKET\}\/\$\{REMOTE_PATH\}"/);
-  assert.match(backupScript, /LABEL="\$\{1:-\$\{BACKUP_LABEL:-nightly\}\}"/);
+  assert.match(backupScript, /LABEL="\$\{BACKUP_LABEL:-\$\{1:-nightly\}\}"/);
   assert.match(backupScript, /BACKUP_HEALTHCHECK_URL/);
   assert.match(backupScript, /curl -fsS --retry 3 "\$\{BACKUP_HEALTHCHECK_URL\}"/);
 
@@ -182,6 +182,26 @@ test('backup and restore scripts use docker compose and rclone with production e
   assert.match(logrotateConfig, /weekly/);
   assert.match(logrotateConfig, /rotate 12/);
   assert.match(logrotateConfig, /compress/);
+});
+
+test('redis compose services use AOF persistence in staging and production', () => {
+  const prodCompose = readInfraFile('../docker-compose.prod.yml');
+  const stagingCompose = readInfraFile('../docker-compose.staging.yml');
+  const redisDoc = readInfraFile('docs/redis.md');
+
+  assert.match(prodCompose, /appendonly yes --appendfsync everysec/);
+  assert.match(prodCompose, /redis_aof:\/data/);
+  assert.match(prodCompose, /redis_aof:/);
+
+  assert.match(stagingCompose, /appendonly yes --appendfsync everysec/);
+  assert.match(stagingCompose, /redis_staging_aof:\/data/);
+  assert.match(stagingCompose, /redis_staging_aof:/);
+
+  assert.match(redisDoc, /^# Redis Persistence$/m);
+  assert.match(redisDoc, /appendfsync everysec/);
+  assert.match(redisDoc, /aof_enabled:1/);
+  assert.match(redisDoc, /aof_current_size/);
+  assert.match(redisDoc, /users may need to sign in again/);
 });
 
 test('swap script creates and persists a 2 GB swap file', () => {
@@ -308,6 +328,9 @@ test('release workflow safely quotes station version for remote deploys', () => 
   assert.match(workflow, /chmod 600 \/opt\/station\/rclone\.conf/);
   assert.match(workflow, /Pre-deploy database backup/);
   assert.match(workflow, /BACKUP_LABEL=pre-deploy-\$\{GITHUB_SHA::7\} bash infra\/scripts\/backup-db\.sh/);
+  assert.match(workflow, /Verify pre-deploy backup uploaded/);
+  assert.match(workflow, /rclone ls \\"b2:\$\{B2_BUCKET\}\/postgres\/\\"/);
+  assert.match(workflow, /grep \\"pre-deploy-\$\{GITHUB_SHA::7\}/);
   assert.match(workflow, /curl --fail --silent --show-error --connect-timeout 5 --max-time "\$max_time"/);
   assert.match(workflow, /deadline=\$\(\(SECONDS \+ 120\)\)/);
 });
@@ -450,6 +473,7 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /B2_APPLICATION_KEY/);
   assert.match(cicdDoc, /rclone\.conf/);
   assert.match(cicdDoc, /pre-deploy PostgreSQL backup/);
+  assert.match(cicdDoc, /verifies that the labeled pre-deploy backup exists in Backblaze B2/);
   assert.match(cicdDoc, /BACKUP_HEALTHCHECK_URL/);
   assert.match(cicdDoc, /staging-up\.sh/);
   assert.match(cicdDoc, /station-staging/);
@@ -465,6 +489,7 @@ test('release workflow and CI branch rules are configured', () => {
   assert.match(cicdDoc, /global `station-deploy` concurrency group/);
   assert.match(cicdDoc, /postgres:16-alpine/);
   assert.match(cicdDoc, /Backend and frontend CI still run on `release\/\*\*` pushes, but the release workflow no longer depends on those separate runs to gate deploys/);
+  assert.match(cicdDoc, /Redis now uses AOF persistence/);
   assert.match(cicdDoc, /Rollback/);
 
   assert.match(secretsDoc, /^# Secrets Management$/m);

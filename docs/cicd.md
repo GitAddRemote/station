@@ -84,6 +84,7 @@ bash infra/scripts/deploy.sh
 
 The release workflow rewrites `/opt/station/.env.production` before every production deploy and locks it down with `chmod 600`.
 It also writes `/opt/station/rclone.conf` from the production B2 secrets and runs a pre-deploy PostgreSQL backup before the backend rollout begins.
+The production job then verifies that the labeled pre-deploy backup exists in Backblaze B2 before continuing.
 
 ## Rollback
 
@@ -98,6 +99,7 @@ It also writes `/opt/station/rclone.conf` from the production B2 secrets and run
 - The shared staging and production deploy jobs also use a global `station-deploy` concurrency group so different release branches cannot race each other on the same VPS or image promotion path.
 - Release deployments pin the target host through `VPS_KNOWN_HOSTS` and use `StrictHostKeyChecking=yes` instead of trusting first use.
 - Production deploys fail closed if the pre-deploy backup cannot be created and uploaded to Backblaze B2.
+- Redis now uses AOF persistence with `appendfsync everysec` in both staging and production; see `infra/docs/redis.md` for verification and recovery notes.
 - Backend and frontend CI still run on `release/**` pushes, but the release workflow no longer depends on those separate runs to gate deploys because it executes the same validation steps itself.
 - The release workflow shell-quotes `STATION_VERSION` before sending it over SSH so the remote deploy treats the version as data rather than shell syntax.
 - Health-check polling bounds each `curl` attempt with explicit connect and total timeouts so a single hung request cannot stall the full deploy window.

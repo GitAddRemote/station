@@ -88,3 +88,11 @@ Issue `#125` adds the production backup contract:
 - `infra/logrotate/station-backup`: rotates `/opt/station/logs/backup.log`
 
 The production release workflow writes `/opt/station/rclone.conf` from GitHub environment secrets and runs a pre-deploy backup before rolling the backend forward.
+
+## Redis Persistence
+
+Issue `#126` enables Redis AOF persistence in both compose stacks and documents verification/recovery in `infra/docs/redis.md`.
+
+- production uses the `redis_aof` volume
+- staging uses the `redis_staging_aof` volume
+- both Redis services run with `--appendonly yes --appendfsync everysec`

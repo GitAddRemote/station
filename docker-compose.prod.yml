@@ -56,9 +56,14 @@ services:
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env.production}
-    command: sh -c 'redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes'
+    command:
+      [
+        "sh",
+        "-c",
+        "redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes --appendfsync everysec",
+      ]
     volumes:
-      - redis_data:/data
+      - redis_aof:/data
     healthcheck:
       test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping']
       interval: 10s
@@ -68,4 +73,4 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
+  redis_aof:

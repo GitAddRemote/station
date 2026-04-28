@@ -26,7 +26,7 @@ set +a
 : "${DATABASE_NAME:?DATABASE_NAME is required}"
 : "${B2_BUCKET:?B2_BUCKET is required}"
 
-LABEL="${1:-${BACKUP_LABEL:-nightly}}"
+LABEL="${BACKUP_LABEL:-${1:-nightly}}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_FILE="/tmp/station_backup_${TIMESTAMP}_${LABEL}.sql.gz"
 REMOTE_PATH="postgres/${TIMESTAMP:0:6}/${TIMESTAMP}_${LABEL}.sql.gz"
