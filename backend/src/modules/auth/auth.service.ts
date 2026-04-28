@@ -106,7 +106,12 @@ export class AuthService {
     // which JTI the client currently holds.
     const sid = crypto.randomUUID();
     await this.authSet(`session:${sid}`, String(user.id), REFRESH_TTL_MS);
-    const payload: JwtPayload = { username: user.username, sub: user.id, jti };
+    const payload: JwtPayload = {
+      username: user.username,
+      sub: user.id,
+      jti,
+      sid,
+    };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = await this.generateRefreshToken(user.id, jti, sid);
     return { accessToken, refreshToken };
@@ -236,6 +241,7 @@ export class AuthService {
       username: user.username,
       sub: user.id,
       jti: newJti,
+      sid,
     };
     const newAccessToken = this.jwtService.sign(payload);
     const newRefreshToken = await this.generateRefreshToken(
@@ -310,6 +316,11 @@ export class AuthService {
 
   async isAccessTokenBlacklisted(jti: string): Promise<boolean> {
     const hit = await this.authGet(`blacklist:${jti}`);
+    return hit !== null && hit !== undefined;
+  }
+
+  async isSessionAlive(sid: string): Promise<boolean> {
+    const hit = await this.authGet(`session:${sid}`);
     return hit !== null && hit !== undefined;
   }
 

@@ -31,6 +31,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     ) {
       throw new UnauthorizedException('Token has been revoked');
     }
+    // Check session family liveness. This catches access tokens issued after a
+    // concurrent refresh that raced with logout: even if the new JTI was never
+    // individually blacklisted, deleting session:{sid} at logout invalidates it.
+    if (payload.sid && !(await this.authService.isSessionAlive(payload.sid))) {
+      throw new UnauthorizedException('Session has been revoked');
+    }
     return { userId: payload.sub, username: payload.username };
   }
 }

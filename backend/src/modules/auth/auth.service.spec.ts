@@ -109,9 +109,12 @@ describe('AuthService', () => {
         sub: number;
         username: string;
         jti: string;
+        sid: string;
       };
       const jti = signCall.jti;
       expect(jti).toBeDefined();
+      // SID is embedded in the access token so JwtStrategy can check session liveness
+      expect(signCall.sid).toBeDefined();
       expect(result.refreshToken).toMatch(
         new RegExp(`^${jti}\\.[0-9a-f]{64}$`),
       );
@@ -360,6 +363,20 @@ describe('AuthService', () => {
       mockCacheManager.get.mockResolvedValue(null);
 
       expect(await service.isAccessTokenBlacklisted('clean-jti')).toBe(false);
+    });
+  });
+
+  describe('isSessionAlive', () => {
+    it('should return true when the session key exists in Redis', async () => {
+      mockCacheManager.get.mockResolvedValue('1');
+
+      expect(await service.isSessionAlive('live-sid')).toBe(true);
+    });
+
+    it('should return false when the session key is absent', async () => {
+      mockCacheManager.get.mockResolvedValue(null);
+
+      expect(await service.isSessionAlive('revoked-sid')).toBe(false);
     });
   });
 

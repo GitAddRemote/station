@@ -21,6 +21,7 @@ describe('AuthController - Password Reset', () => {
     logout: jest.fn(),
     blacklistAccessToken: jest.fn(),
     isAccessTokenBlacklisted: jest.fn(),
+    isSessionAlive: jest.fn(),
     parseRefreshTokenJti: jest.fn(),
   };
 
