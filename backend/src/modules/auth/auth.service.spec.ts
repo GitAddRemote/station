@@ -116,8 +116,8 @@ describe('AuthService', () => {
         new RegExp(`^${jti}\\.[0-9a-f]{64}$`),
       );
 
-      // set is called twice: once for session:{sid}, once for refresh:{jti}
-      expect(mockCacheManager.set).toHaveBeenCalledTimes(2);
+      // set is called three times: session:{sid}, refresh:{jti}, jti:{jti}
+      expect(mockCacheManager.set).toHaveBeenCalledTimes(3);
 
       // The refresh entry stores the SHA-256 hash, not the raw token
       const refreshSetCall = mockCacheManager.set.mock.calls[1] as [
@@ -132,7 +132,7 @@ describe('AuthService', () => {
   });
 
   describe('generateRefreshToken', () => {
-    it('should embed the JTI in the token and store a hash in Redis', async () => {
+    it('should embed the JTI in the token, store a hash, and write the reverse-index', async () => {
       mockCacheManager.set.mockResolvedValue(undefined);
       const jti = 'test-jti-uuid';
       const sid = 'test-sid-uuid';
@@ -142,21 +142,26 @@ describe('AuthService', () => {
       // Token starts with the JTI
       expect(raw.startsWith(`${jti}.`)).toBe(true);
 
-      // Stored value is "{userId}:{sha256(raw)}:{sid}", not the raw token
-      const [key, storedValue, ttlMs] = mockCacheManager.set.mock.calls[0] as [
-        string,
-        string,
-        number,
-      ];
-      expect(key).toBe(`refresh:${jti}`);
+      // First set call: refresh:{jti} → "{userId}:{sha256(raw)}:{sid}"
+      const [refreshKey, storedValue, refreshTtl] = mockCacheManager.set.mock
+        .calls[0] as [string, string, number];
+      expect(refreshKey).toBe(`refresh:${jti}`);
       const [userId, storedHash, storedSid] = storedValue.split(':');
       expect(userId).toBe('1');
       expect(storedHash).toBe(sha256(raw));
       expect(storedHash).not.toBe(raw);
       expect(storedSid).toBe(sid);
+      expect(refreshTtl).toBe(7 * 24 * 3600 * 1000);
 
-      // 7-day TTL
-      expect(ttlMs).toBe(7 * 24 * 3600 * 1000);
+      // Second set call: jti:{jti} → sid (reverse-index for logout race recovery)
+      const [jtiKey, jtiValue, jtiTtl] = mockCacheManager.set.mock.calls[1] as [
+        string,
+        string,
+        number,
+      ];
+      expect(jtiKey).toBe(`jti:${jti}`);
+      expect(jtiValue).toBe(sid);
+      expect(jtiTtl).toBe(7 * 24 * 3600 * 1000);
     });
   });
 
@@ -182,8 +187,8 @@ describe('AuthService', () => {
       const rawToken = `${jti}.` + 'a'.repeat(64);
       const stored = `1:${sha256(rawToken)}:${sid}`;
 
-      // consumeRefreshEntry falls back to get+del when no redis client;
-      // second get is for session:{sid} check
+      // get calls: (1) refresh:{jti} via consumeRefreshEntry,
+      //            (2) session:{sid} for liveness check
       mockCacheManager.get
         .mockResolvedValueOnce(stored) // refresh:{jti}
         .mockResolvedValueOnce('1'); // session:{sid} — alive
@@ -198,6 +203,12 @@ describe('AuthService', () => {
       expect(result.refreshToken).toBeDefined();
       // Old refresh entry deleted atomically
       expect(mockCacheManager.del).toHaveBeenCalledWith(`refresh:${jti}`);
+      // Session TTL renewed so it slides with the new refresh token
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        `session:${sid}`,
+        String(mockUser.id),
+        expect.any(Number),
+      );
     });
 
     it('should throw 401 when Redis has no entry for the jti', async () => {
@@ -358,7 +369,10 @@ describe('AuthService', () => {
     it('should revoke the session family and blacklist the access token', async () => {
       const jti = 'logout-jti';
       const rawRefresh = `${jti}.` + 'a'.repeat(64);
-      mockCacheManager.get.mockResolvedValue(`1:${sha256(rawRefresh)}:${sid}`);
+      // revokeRefreshToken reads refresh:{jti}; logout then reads jti:{jti}
+      mockCacheManager.get
+        .mockResolvedValueOnce(`1:${sha256(rawRefresh)}:${sid}`) // refresh:{jti}
+        .mockResolvedValueOnce(sid); // jti:{jti} reverse-index
       mockCacheManager.del.mockResolvedValue(undefined);
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -367,7 +381,7 @@ describe('AuthService', () => {
 
       await service.logout(rawRefresh, jti, 'raw-access-token');
 
-      // Session family revoked before the specific refresh entry
+      // Session family revoked (may be called twice — idempotent)
       expect(mockCacheManager.del).toHaveBeenCalledWith(`session:${sid}`);
       expect(mockCacheManager.del).toHaveBeenCalledWith(`refresh:${jti}`);
       expect(mockCacheManager.set).toHaveBeenCalledWith(
@@ -375,6 +389,27 @@ describe('AuthService', () => {
         '1',
         expect.any(Number),
       );
+    });
+
+    it('should still revoke the session when refresh entry was already rotated concurrently', async () => {
+      // Simulates the race: attacker refreshed just before logout arrived, so
+      // refresh:{jti} is already gone. Logout must still kill session:{sid}
+      // via the jti:{jti} reverse-index.
+      const jti = 'logout-jti';
+      const rawRefresh = `${jti}.` + 'a'.repeat(64);
+      mockCacheManager.get
+        .mockResolvedValueOnce(null) // refresh:{jti} — already consumed
+        .mockResolvedValueOnce(sid); // jti:{jti} reverse-index still present
+      mockCacheManager.del.mockResolvedValue(undefined);
+      mockCacheManager.set.mockResolvedValue(undefined);
+
+      const futureExp = Math.floor(Date.now() / 1000) + 900;
+      mockJwtService.decode.mockReturnValue({ jti, exp: futureExp });
+
+      await service.logout(rawRefresh, jti, 'raw-access-token');
+
+      // Session must still be revoked despite the refresh entry being gone
+      expect(mockCacheManager.del).toHaveBeenCalledWith(`session:${sid}`);
     });
 
     it('should not throw when access token is missing', async () => {

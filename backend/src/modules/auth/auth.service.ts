@@ -142,6 +142,10 @@ export class AuthService {
       `${userId}:${hash}:${sid}`,
       REFRESH_TTL_MS,
     );
+    // jti:{jti} → sid is a non-consumed reverse-index so logout can recover the
+    // SID from the JTI even if the refresh entry has already been GETDEL'd by a
+    // concurrent rotation before the logout request arrives.
+    await this.authSet(`jti:${jti}`, sid, REFRESH_TTL_MS);
     return raw;
   }
 
@@ -220,6 +224,11 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    // Renew the session TTL so it slides with the refresh token. Without this
+    // the original 7-day session window would expire before the client's
+    // most-recently issued refresh token, causing spurious 401s.
+    await this.authSet(`session:${sid}`, String(userId), REFRESH_TTL_MS);
+
     // Old entry already deleted by consumeRefreshEntry — issue new token pair
     // carrying the same SID so the session family remains revocable.
     const newJti = crypto.randomUUID();
@@ -243,7 +252,18 @@ export class AuthService {
     jti: string,
     rawAccessToken?: string,
   ): Promise<void> {
+    // Best-effort: revoke the refresh entry and delete session:{sid} from the
+    // stored value. This succeeds when refresh:{jti} has not been consumed yet.
     await this.revokeRefreshToken(rawRefreshToken, jti);
+
+    // Fallback for the race where a concurrent refresh already GETDEL'd the
+    // entry: look up the SID via the non-consumed reverse-index jti:{jti} and
+    // delete the session family directly. This is idempotent if revokeRefreshToken
+    // already deleted it.
+    const sid = await this.authGet(`jti:${jti}`);
+    if (sid) {
+      await this.authDel(`session:${sid}`);
+    }
 
     if (rawAccessToken) {
       try {
