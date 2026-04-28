@@ -147,6 +147,7 @@ export class AuthController {
   ) {
     const tokens = await this.authService.refreshAccessToken(
       req.user.refreshToken,
+      req.user.jti,
     );
     res.cookie(
       'access_token',
@@ -171,7 +172,13 @@ export class AuthController {
     @Request() req: RefreshTokenRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.revokeRefreshToken(req.user.refreshToken);
+    const rawAccessToken = req.cookies?.access_token as string | undefined;
+    await this.authService.logout(
+      req.user.refreshToken,
+      req.user.jti,
+      rawAccessToken,
+    );
+
     const { maxAge: _maxAge, ...clearOpts } = this.cookieOptions(0);
     res.clearCookie('access_token', clearOpts);
     res.clearCookie('refresh_token', clearOpts);

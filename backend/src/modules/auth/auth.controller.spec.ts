@@ -3,7 +3,9 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
+import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 
 describe('AuthController - Password Reset', () => {
   let controller: AuthController;
@@ -17,6 +19,9 @@ describe('AuthController - Password Reset', () => {
     register: jest.fn(),
     refreshAccessToken: jest.fn(),
     revokeRefreshToken: jest.fn(),
+    logout: jest.fn(),
+    blacklistAccessToken: jest.fn(),
+    isAccessTokenBlacklisted: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -33,6 +38,11 @@ describe('AuthController - Password Reset', () => {
             get: jest.fn().mockReturnValue('test'),
           },
         },
+        {
+          provide: JwtService,
+          useValue: { decode: jest.fn() },
+        },
+        RefreshTokenAuthGuard,
       ],
     }).compile();
 

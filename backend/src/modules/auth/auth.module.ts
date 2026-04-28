@@ -8,26 +8,32 @@ import { TokenCleanupService } from './token-cleanup.service';
 import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
-import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
+import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
-    TypeOrmModule.forFeature([RefreshToken, PasswordReset]),
+    TypeOrmModule.forFeature([PasswordReset]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' }, // Shorter access token expiry
+        signOptions: { expiresIn: '15m' },
       }),
       inject: [ConfigService],
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, TokenCleanupService, LocalStrategy, JwtStrategy],
+  providers: [
+    AuthService,
+    TokenCleanupService,
+    LocalStrategy,
+    JwtStrategy,
+    RefreshTokenAuthGuard,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -6,6 +6,8 @@ export interface JwtPayload {
   sub: number;
   /** Username */
   username: string;
+  /** JWT ID — unique identifier used for blacklisting on logout */
+  jti: string;
   /** Issued at timestamp (optional, added by JWT) */
   iat?: number;
   /** Expiration timestamp (optional, added by JWT) */

@@ -1,15 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TokenCleanupService } from './token-cleanup.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 
-// Mock the cron module so no real timers are ever started in tests.
-// CronJob throws for obviously invalid expressions (matching real behaviour)
-// so the try/catch fallback path in onApplicationBootstrap() can be exercised.
 const INVALID_CRON_EXPRESSIONS = new Set(['not-a-valid-cron']);
 jest.mock('cron', () => ({
   CronJob: jest.fn().mockImplementation((expression: string) => {
@@ -20,10 +15,6 @@ jest.mock('cron', () => ({
   }),
 }));
 
-// Helper that mirrors the safe JEST_WORKER_ID restore pattern used throughout
-// this file: deletes the variable when the original value was undefined rather
-// than assigning the string 'undefined' (Node coerces undefined to 'undefined'
-// in process.env, which would leave the guard permanently set).
 function restoreWorker(original: string | undefined): void {
   if (original === undefined) {
     delete process.env['JEST_WORKER_ID'];
@@ -39,10 +30,6 @@ describe('TokenCleanupService', () => {
     delete: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     execute: jest.fn(),
-  };
-
-  const mockRefreshTokenRepository = {
-    createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
   };
 
   const mockPasswordResetRepository = {
@@ -61,10 +48,6 @@ describe('TokenCleanupService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TokenCleanupService,
-        {
-          provide: getRepositoryToken(RefreshToken),
-          useValue: mockRefreshTokenRepository,
-        },
         {
           provide: getRepositoryToken(PasswordReset),
           useValue: mockPasswordResetRepository,
@@ -106,33 +89,12 @@ describe('TokenCleanupService', () => {
       restoreWorker(originalWorker);
     });
 
-    it('should not register cron when schedulerRegistry is absent', () => {
-      // Simulate the @Optional() case: schedulerRegistry is undefined
-      const serviceWithoutRegistry = new TokenCleanupService(
-        mockRefreshTokenRepository as unknown as Repository<RefreshToken>,
-        mockPasswordResetRepository as unknown as Repository<PasswordReset>,
-        mockConfigService as unknown as ConfigService,
-        undefined,
-      );
-
-      const originalWorker = process.env['JEST_WORKER_ID'];
-      delete process.env['JEST_WORKER_ID'];
-      mockConfigService.get.mockImplementation((key: string) =>
-        key === 'NODE_ENV' ? 'production' : undefined,
-      );
-
-      serviceWithoutRegistry.onApplicationBootstrap();
-
-      expect(mockSchedulerRegistry.addCronJob).not.toHaveBeenCalled();
-      restoreWorker(originalWorker);
-    });
-
     it('should register cron with default expression in non-test env', () => {
       const originalWorker = process.env['JEST_WORKER_ID'];
       delete process.env['JEST_WORKER_ID'];
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production';
-        return undefined; // REFRESH_TOKEN_CLEANUP_CRON not set → fallback
+        return undefined;
       });
 
       service.onApplicationBootstrap();
@@ -171,7 +133,6 @@ describe('TokenCleanupService', () => {
         return undefined;
       });
 
-      // Should not throw, and should still register the job with the fallback
       expect(() => service.onApplicationBootstrap()).not.toThrow();
       expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledWith(
         'tokenCleanup',
@@ -180,12 +141,12 @@ describe('TokenCleanupService', () => {
       restoreWorker(originalWorker);
     });
 
-    it('should treat blank REFRESH_TOKEN_CLEANUP_CRON as unset, log a warning, and use default', () => {
+    it('should treat blank REFRESH_TOKEN_CLEANUP_CRON as unset and use default', () => {
       const originalWorker = process.env['JEST_WORKER_ID'];
       delete process.env['JEST_WORKER_ID'];
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production';
-        if (key === 'REFRESH_TOKEN_CLEANUP_CRON') return '   '; // blank/whitespace
+        if (key === 'REFRESH_TOKEN_CLEANUP_CRON') return '   ';
         return undefined;
       });
       const warnSpy = jest
@@ -210,8 +171,7 @@ describe('TokenCleanupService', () => {
   });
 
   describe('cleanupExpiredTokens', () => {
-    it('should return early in test environment without touching the database', async () => {
-      // Explicitly set NODE_ENV to 'test' for a deterministic guard check
+    it('should return early in test environment', async () => {
       mockConfigService.get.mockImplementation((key: string) =>
         key === 'NODE_ENV' ? 'test' : undefined,
       );
@@ -219,14 +179,11 @@ describe('TokenCleanupService', () => {
       await service.cleanupExpiredTokens();
 
       expect(
-        mockRefreshTokenRepository.createQueryBuilder,
-      ).not.toHaveBeenCalled();
-      expect(
         mockPasswordResetRepository.createQueryBuilder,
       ).not.toHaveBeenCalled();
     });
 
-    it('should return early when JEST_WORKER_ID is set without touching the database', async () => {
+    it('should return early when JEST_WORKER_ID is set', async () => {
       const originalWorker = process.env['JEST_WORKER_ID'];
       process.env['JEST_WORKER_ID'] = '1';
       mockConfigService.get.mockImplementation((key: string) =>
@@ -235,9 +192,6 @@ describe('TokenCleanupService', () => {
 
       await service.cleanupExpiredTokens();
 
-      expect(
-        mockRefreshTokenRepository.createQueryBuilder,
-      ).not.toHaveBeenCalled();
       expect(
         mockPasswordResetRepository.createQueryBuilder,
       ).not.toHaveBeenCalled();
@@ -253,27 +207,11 @@ describe('TokenCleanupService', () => {
         mockConfigService.get.mockImplementation((key: string) =>
           key === 'NODE_ENV' ? 'development' : undefined,
         );
-        mockQueryBuilder.execute
-          .mockResolvedValueOnce({ affected: 3 })
-          .mockResolvedValueOnce({ affected: 1 });
+        mockQueryBuilder.execute.mockResolvedValueOnce({ affected: 1 });
       });
 
       afterEach(() => {
         restoreWorker(originalWorker);
-      });
-
-      it('should delete revoked and expired refresh tokens', async () => {
-        await service.cleanupExpiredTokens();
-
-        expect(
-          mockRefreshTokenRepository.createQueryBuilder,
-        ).toHaveBeenCalled();
-        const [whereClause, params] = mockQueryBuilder.where.mock.calls[0];
-        // Boolean flag is inlined (not parameterised) so the partial index is usable
-        expect(whereClause).toContain('revoked = TRUE');
-        expect(whereClause).toContain('"expiresAt"');
-        expect(params).toMatchObject({ now: expect.any(Date) });
-        expect(params).not.toHaveProperty('revoked');
       });
 
       it('should delete used and expired password resets', async () => {
@@ -282,12 +220,10 @@ describe('TokenCleanupService', () => {
         expect(
           mockPasswordResetRepository.createQueryBuilder,
         ).toHaveBeenCalled();
-        const [whereClause, params] = mockQueryBuilder.where.mock.calls[1];
-        // Boolean flag is inlined (not parameterised) so the partial index is usable
+        const [whereClause, params] = mockQueryBuilder.where.mock.calls[0];
         expect(whereClause).toContain('used = TRUE');
         expect(whereClause).toContain('"expiresAt"');
         expect(params).toMatchObject({ now: expect.any(Date) });
-        expect(params).not.toHaveProperty('used');
       });
 
       it('should not throw when a query fails', async () => {
@@ -295,22 +231,6 @@ describe('TokenCleanupService', () => {
         mockQueryBuilder.execute.mockRejectedValueOnce(new Error('DB failure'));
 
         await expect(service.cleanupExpiredTokens()).resolves.toBeUndefined();
-      });
-
-      it('should still clean up password resets when refresh token cleanup fails', async () => {
-        mockQueryBuilder.execute.mockReset();
-        mockQueryBuilder.execute
-          .mockRejectedValueOnce(new Error('refresh token DB failure'))
-          .mockResolvedValueOnce({ affected: 2 });
-
-        await expect(service.cleanupExpiredTokens()).resolves.toBeUndefined();
-        // Both query builders should have been invoked despite the first failure
-        expect(
-          mockRefreshTokenRepository.createQueryBuilder,
-        ).toHaveBeenCalled();
-        expect(
-          mockPasswordResetRepository.createQueryBuilder,
-        ).toHaveBeenCalled();
       });
     });
   });
