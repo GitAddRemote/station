@@ -1,14 +1,19 @@
 /**
  * Concurrency e2e tests for session-family revocation.
  *
- * These tests require a live Redis instance (USE_REDIS_CACHE=true) because
- * they exercise GETDEL atomicity, session-key TTL renewal, and cross-request
- * revocation behaviour that cannot be meaningfully tested with the in-memory
- * fallback. The suite self-skips when Redis is unavailable so that the
- * standard CI pipeline (USE_REDIS_CACHE=false) is not broken.
+ * These tests require a live Redis instance. They are gated by USE_REDIS_CACHE:
+ *
+ *   USE_REDIS_CACHE=true  → Redis is required. The suite fails hard if Redis is
+ *                           not reachable — a passing run proves live-Redis
+ *                           behaviour (GETDEL atomicity, session revocation, TTL
+ *                           renewal). This is the mode used by pnpm test:e2e:redis.
+ *
+ *   USE_REDIS_CACHE=false → The suite is skipped entirely (pending). This keeps
+ *                           the standard CI pipeline (which has no Redis) green
+ *                           without masking a real Redis failure.
  *
  * To run locally:
- *   USE_REDIS_CACHE=true pnpm --dir backend test:e2e -- --testPathPattern=auth-session-concurrency
+ *   USE_REDIS_CACHE=true pnpm --dir backend test:e2e:redis
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
@@ -61,36 +66,32 @@ async function login(
 // Suite
 // ---------------------------------------------------------------------------
 
+const REDIS_REQUIRED = process.env.USE_REDIS_CACHE === 'true';
+
 describe('Auth - session-family concurrency (e2e, requires Redis)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let testUser: User;
-  let redisAvailable = false;
 
   beforeAll(async () => {
-    // Probe Redis before standing up the full app so we can skip cleanly.
-    const useRedis =
-      process.env.USE_REDIS_CACHE === 'true' ||
-      process.env.NODE_ENV === 'production';
-
-    if (useRedis) {
-      const probe = createClient({
-        socket: {
-          host: process.env.REDIS_HOST ?? 'localhost',
-          port: parseInt(process.env.REDIS_PORT ?? '6379'),
-        },
-      });
-      try {
-        await probe.connect();
-        await probe.ping();
-        await probe.quit();
-        redisAvailable = true;
-      } catch {
-        redisAvailable = false;
-      }
+    if (!REDIS_REQUIRED) {
+      // Suite was included in a non-Redis run — mark pending so it is visible
+      // as skipped rather than silently green.
+      pending('Set USE_REDIS_CACHE=true to run the Redis concurrency suite');
+      return;
     }
 
-    if (!redisAvailable) return;
+    // Probe Redis. When USE_REDIS_CACHE=true a connection failure is a hard
+    // error — the suite must not pass without exercising real Redis.
+    const probe = createClient({
+      socket: {
+        host: process.env.REDIS_HOST ?? 'localhost',
+        port: parseInt(process.env.REDIS_PORT ?? '6379'),
+      },
+    });
+    await probe.connect(); // throws → beforeAll fails → all tests fail
+    await probe.ping();
+    await probe.quit();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -121,7 +122,7 @@ describe('Auth - session-family concurrency (e2e, requires Redis)', () => {
   });
 
   afterAll(async () => {
-    if (!redisAvailable) return;
+    if (!REDIS_REQUIRED) return;
     const userRepository = dataSource.getRepository(User);
     await userRepository.delete({ id: testUser.id });
     await app?.close();
@@ -131,11 +132,6 @@ describe('Auth - session-family concurrency (e2e, requires Redis)', () => {
   // 1. Parallel refresh race
   // -------------------------------------------------------------------------
   it('should allow exactly one winner when two requests race to consume the same refresh token', async () => {
-    if (!redisAvailable) {
-      console.log('Skipping: Redis not available');
-      return;
-    }
-
     const { cookieHeader } = await login(app.getHttpServer());
 
     // Fire both refresh requests concurrently with the same refresh token.
@@ -157,11 +153,6 @@ describe('Auth - session-family concurrency (e2e, requires Redis)', () => {
   // 2. Logout-vs-refresh race: session must be dead after logout wins or loses
   // -------------------------------------------------------------------------
   it('should invalidate the session even when refresh races logout', async () => {
-    if (!redisAvailable) {
-      console.log('Skipping: Redis not available');
-      return;
-    }
-
     const server = app.getHttpServer();
     const { cookieHeader } = await login(server);
 
@@ -211,11 +202,6 @@ describe('Auth - session-family concurrency (e2e, requires Redis)', () => {
   // 3. Session lifetime slides with token rotation
   // -------------------------------------------------------------------------
   it('should keep the session alive after a successful refresh', async () => {
-    if (!redisAvailable) {
-      console.log('Skipping: Redis not available');
-      return;
-    }
-
     const server = app.getHttpServer();
     const { cookieHeader } = await login(server);
 
@@ -256,11 +242,6 @@ describe('Auth - session-family concurrency (e2e, requires Redis)', () => {
   // 4. Old access token from before refresh is invalid after logout
   // -------------------------------------------------------------------------
   it('should reject access tokens from before a logout even after rotation occurred', async () => {
-    if (!redisAvailable) {
-      console.log('Skipping: Redis not available');
-      return;
-    }
-
     const server = app.getHttpServer();
     const {
       cookieHeader: originalCookieHeader,
