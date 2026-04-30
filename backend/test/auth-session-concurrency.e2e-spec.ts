@@ -8,9 +8,9 @@
  *                           behaviour (GETDEL atomicity, session revocation, TTL
  *                           renewal). This is the mode used by pnpm test:e2e:redis.
  *
- *   USE_REDIS_CACHE=false → The suite is skipped entirely (pending). This keeps
- *                           the standard CI pipeline (which has no Redis) green
- *                           without masking a real Redis failure.
+ *   USE_REDIS_CACHE=false → The suite is skipped entirely (describe.skip). This
+ *                           keeps the standard CI pipeline (which has no Redis)
+ *                           green without masking a real Redis failure.
  *
  * To run locally:
  *   USE_REDIS_CACHE=true pnpm --dir backend test:e2e:redis
@@ -68,19 +68,16 @@ async function login(
 
 const REDIS_REQUIRED = process.env.USE_REDIS_CACHE === 'true';
 
-describe('Auth - session-family concurrency (e2e, requires Redis)', () => {
+// jest-circus (Jest 27+) does not define pending(). Use describe.skip so the
+// suite is reported as skipped — not errored — when Redis is unavailable.
+const describeSuite = REDIS_REQUIRED ? describe : describe.skip;
+
+describeSuite('Auth - session-family concurrency (e2e, requires Redis)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let testUser: User;
 
   beforeAll(async () => {
-    if (!REDIS_REQUIRED) {
-      // Suite was included in a non-Redis run — mark pending so it is visible
-      // as skipped rather than silently green.
-      pending('Set USE_REDIS_CACHE=true to run the Redis concurrency suite');
-      return;
-    }
-
     // Probe Redis. When USE_REDIS_CACHE=true a connection failure is a hard
     // error — the suite must not pass without exercising real Redis.
     const probe = createClient({
@@ -122,7 +119,6 @@ describe('Auth - session-family concurrency (e2e, requires Redis)', () => {
   });
 
   afterAll(async () => {
-    if (!REDIS_REQUIRED) return;
     const userRepository = dataSource.getRepository(User);
     await userRepository.delete({ id: testUser.id });
     await app?.close();
