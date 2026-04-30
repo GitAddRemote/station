@@ -5,7 +5,6 @@ import { User } from './modules/users/user.entity';
 import { Organization } from './modules/organizations/organization.entity';
 import { Role } from './modules/roles/role.entity';
 import { UserOrganizationRole } from './modules/user-organization-roles/user-organization-role.entity';
-import { RefreshToken } from './modules/auth/refresh-token.entity';
 import { PasswordReset } from './modules/auth/password-reset.entity';
 import { AuditLog } from './modules/audit-logs/audit-log.entity';
 import { Game } from './modules/games/game.entity';
@@ -49,6 +48,7 @@ import { SeedInventoryManagerRole1764961461064 } from './migrations/176496146106
 import { CreateOrgInventoryItemsTable1764964935270 } from './migrations/1764964935270-CreateOrgInventoryItemsTable';
 import { AddUserInventoryUniqueIndex1765035000000 } from './migrations/1765035000000-AddUserInventoryUniqueIndex';
 import { AddTokenCleanupIndexes1765038000000 } from './migrations/1765038000000-AddTokenCleanupIndexes';
+import { DropRefreshTokensTable1777409770542 } from './migrations/1777409770542-DropRefreshTokensTable';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -62,7 +62,6 @@ export const AppDataSource = new DataSource({
     Organization,
     Role,
     UserOrganizationRole,
-    RefreshToken,
     PasswordReset,
     AuditLog,
     Game,
@@ -118,6 +117,9 @@ export const AppDataSource = new DataSource({
 
     // Token cleanup indexes (supports efficient revoked/expired deletes)
     AddTokenCleanupIndexes1765038000000,
+
+    // Refresh tokens moved to Redis — drop the DB table
+    DropRefreshTokensTable1777409770542,
   ],
   synchronize: false,
 });

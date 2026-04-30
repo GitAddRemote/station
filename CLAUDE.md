@@ -13,32 +13,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Commit Workflow
 
-**IMPORTANT**: Never commit code directly. Instead, provide git commit commands formatted for terminal execution:
-
-```bash
-git add file1.ts file2.ts
-git commit -m "feat: add user authentication system" \
-           -m "" \
-           -m "Implements JWT-based authentication with:" \
-           -m "- Access token (15min expiry)" \
-           -m "- Refresh token rotation (7 days)" \
-           -m "- Password hashing with bcrypt" \
-           -m "" \
-           -m "Security improvements:" \
-           -m "- Token revocation on logout" \
-           -m "- Automatic refresh token cleanup" \
-           -m "" \
-           -m "Tests: 12 new e2e tests covering auth flow"
-```
+**IMPORTANT**: Always stage, commit, push, and open PRs directly — do not provide commands for the user to run manually. Use the Bash tool to execute all git operations.
 
 **Format requirements**:
 
 - First line: conventional commit type (feat/fix/docs/test/refactor/perf/chore)
-- Use `-m` for each line of the commit message
-- Add blank lines with `-m ""` for readability
+- Add blank lines between sections for readability
 - Group related changes with bullet points
 - No attribution or AI-generated notices
-- User will execute the command manually
 
 ### Attribution
 

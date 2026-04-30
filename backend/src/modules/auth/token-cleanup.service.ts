@@ -9,7 +9,6 @@ import { CronJob } from 'cron';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { RefreshToken } from './refresh-token.entity';
 import { PasswordReset } from './password-reset.entity';
 import { DEFAULT_CLEANUP_CRON } from './token-cleanup.constants';
 
@@ -18,14 +17,9 @@ export class TokenCleanupService implements OnApplicationBootstrap {
   private readonly logger = new Logger(TokenCleanupService.name);
 
   constructor(
-    @InjectRepository(RefreshToken)
-    private readonly refreshTokenRepository: Repository<RefreshToken>,
     @InjectRepository(PasswordReset)
     private readonly passwordResetRepository: Repository<PasswordReset>,
     private readonly configService: ConfigService,
-    // Optional: ScheduleModule is intentionally excluded in test environments.
-    // @Optional() allows the service to be instantiated without it and
-    // onApplicationBootstrap() guards against a missing registry.
     @Optional() private readonly schedulerRegistry?: SchedulerRegistry,
   ) {}
 
@@ -45,10 +39,6 @@ export class TokenCleanupService implements OnApplicationBootstrap {
       return;
     }
 
-    // Use ConfigService rather than @Cron() because decorator arguments are
-    // evaluated at class-definition time (before DI runs), so there is no way
-    // to inject ConfigService into a @Cron() expression.  Reading from
-    // ConfigService here gives us the fully-loaded, validated config value.
     const DEFAULT_CRON = DEFAULT_CLEANUP_CRON;
     const rawExpression = this.configService
       .get<string>('REFRESH_TOKEN_CLEANUP_CRON')
@@ -95,23 +85,6 @@ export class TokenCleanupService implements OnApplicationBootstrap {
     this.logger.log('Starting expired/revoked token cleanup');
     const now = new Date();
 
-    // Each table is cleaned independently so a failure in one does not prevent
-    // the other from running — both errors are logged separately.
-    let refreshDeleted = 0;
-    try {
-      const { affected } = await this.refreshTokenRepository
-        .createQueryBuilder()
-        .delete()
-        .where('revoked = TRUE OR "expiresAt" < :now', { now })
-        .execute();
-      refreshDeleted = affected ?? 0;
-    } catch (error) {
-      this.logger.error(
-        'Refresh token cleanup failed',
-        error instanceof Error ? error.stack : String(error),
-      );
-    }
-
     let resetDeleted = 0;
     try {
       const { affected } = await this.passwordResetRepository
@@ -129,9 +102,7 @@ export class TokenCleanupService implements OnApplicationBootstrap {
 
     const duration = Date.now() - start;
     this.logger.log(
-      `Token cleanup complete in ${duration}ms — ` +
-        `deleted ${refreshDeleted} refresh token(s), ` +
-        `${resetDeleted} password reset(s)`,
+      `Token cleanup complete in ${duration}ms — deleted ${resetDeleted} password reset(s)`,
     );
   }
 }
