@@ -8,6 +8,7 @@ import { TokenCleanupService } from './token-cleanup.service';
 import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
+import { OauthClientsModule } from '../oauth-clients/oauth-clients.module';
 import { PasswordReset } from './password-reset.entity';
 import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -16,6 +17,7 @@ import { createClient } from 'redis';
 @Module({
   imports: [
     UsersModule,
+    OauthClientsModule,
     PassportModule,
     TypeOrmModule.forFeature([PasswordReset]),
     JwtModule.registerAsync({
@@ -59,6 +61,6 @@ import { createClient } from 'redis';
       },
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

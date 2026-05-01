@@ -25,6 +25,7 @@ import { LocationsModule } from './modules/locations/locations.module';
 import { UserInventoryModule } from './modules/user-inventory/user-inventory.module';
 import { OrgInventoryModule } from './modules/org-inventory/org-inventory.module';
 import { HealthModule } from './health/health.module';
+import { OauthClientsModule } from './modules/oauth-clients/oauth-clients.module';
 
 const isTest =
   process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
@@ -148,6 +149,7 @@ if (!isTest) {
     UserInventoryModule,
     OrgInventoryModule,
     HealthModule,
+    OauthClientsModule,
   ],
   controllers: [AppController],
   providers: [

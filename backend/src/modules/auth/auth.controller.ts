@@ -29,9 +29,11 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/password-reset.dto';
+import { TokenRequestDto } from './dto/token-request.dto';
 import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
 import { RefreshTokenRequest } from './interfaces/refresh-token-request.interface';
 import { ValidatedUser } from './interfaces/validated-user.interface';
+import { OauthClientsService } from '../oauth-clients/oauth-clients.service';
 
 // Parse throttle config once at module load time.
 // Number() handles numeric strings and NaN from non-numeric input; the
@@ -70,6 +72,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
+    private oauthClientsService: OauthClientsService,
   ) {}
 
   private cookieOptions(maxAge: number) {
@@ -80,6 +83,22 @@ export class AuthController {
       path: '/',
       maxAge,
     };
+  }
+
+  @ApiOperation({
+    summary: 'OAuth 2.0 Client Credentials token endpoint (M2M)',
+  })
+  @ApiBody({ type: TokenRequestDto })
+  @ApiResponse({ status: 200, description: 'Access token issued' })
+  @ApiResponse({ status: 401, description: 'Invalid client credentials' })
+  @HttpCode(HttpStatus.OK)
+  @Post('token')
+  async token(@Body() dto: TokenRequestDto) {
+    const client = await this.oauthClientsService.validateClient(
+      dto.client_id,
+      dto.client_secret,
+    );
+    return this.authService.issueClientToken(client);
   }
 
   @ApiOperation({ summary: 'Login user' })
