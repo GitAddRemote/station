@@ -1,6 +1,7 @@
 import {
   Injectable,
   ConflictException,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -32,7 +33,15 @@ export class OauthClientsService {
     }
     const clientSecretHash = await bcrypt.hash(plainSecret, 12);
     const client = this.repo.create({ clientId, clientSecretHash, scopes });
-    return this.repo.save(client);
+    try {
+      return await this.repo.save(client);
+    } catch (err: unknown) {
+      const pg = err as { code?: string };
+      if (pg.code === '23505') {
+        throw new ConflictException(`Client '${clientId}' already exists`);
+      }
+      throw new InternalServerErrorException('Failed to register client');
+    }
   }
 
   async findByClientId(clientId: string): Promise<OauthClient | null> {

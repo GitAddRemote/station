@@ -36,10 +36,17 @@ export class InternalApiKeyGuard implements CanActivate {
     const provided =
       apiKeyHeader || authorizationHeader.replace(/^ApiKey\s+/i, '');
 
-    if (
-      provided.length !== apiKey.length ||
-      !timingSafeEqual(Buffer.from(provided), Buffer.from(apiKey))
-    ) {
+    const providedBuf = Buffer.from(provided);
+    const apiKeyBuf = Buffer.from(apiKey);
+    let valid = false;
+    try {
+      valid =
+        providedBuf.length === apiKeyBuf.length &&
+        timingSafeEqual(providedBuf, apiKeyBuf);
+    } catch {
+      // Length mismatch or other error — treat as invalid.
+    }
+    if (!valid) {
       throw new UnauthorizedException('Invalid internal API key');
     }
 

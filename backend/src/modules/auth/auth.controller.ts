@@ -119,8 +119,9 @@ export class AuthController {
     let clientId = dto.client_id;
     let clientSecret = dto.client_secret;
 
-    if (authHeader?.startsWith('Basic ')) {
-      const decoded = Buffer.from(authHeader.slice(6), 'base64').toString();
+    if (authHeader?.match(/^basic /i)) {
+      const encoded = authHeader.slice(authHeader.indexOf(' ') + 1);
+      const decoded = Buffer.from(encoded, 'base64').toString();
       const colon = decoded.indexOf(':');
       if (colon < 1) {
         throw new UnauthorizedException('Malformed Basic authorization header');
