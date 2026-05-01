@@ -120,6 +120,15 @@ async function bootstrap() {
         },
         'access-token',
       )
+      .addApiKey(
+        {
+          type: 'apiKey',
+          in: 'header',
+          name: 'x-internal-api-key',
+          description: 'Internal API key for admin/automation endpoints',
+        },
+        'internal-api-key',
+      )
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
