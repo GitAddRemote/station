@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
   IsNotEmpty,
+  MinLength,
   IsArray,
   ArrayNotEmpty,
   Matches,
@@ -18,7 +19,7 @@ export class RegisterOauthClientDto {
 
   @ApiProperty({ example: 'super-secret-value', minLength: 32 })
   @IsString()
-  @IsNotEmpty()
+  @MinLength(32)
   clientSecret!: string;
 
   @ApiProperty({ example: ['bot:api'] })

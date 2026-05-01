@@ -429,7 +429,10 @@ export class AuthService {
     return { message: 'Password has been reset successfully' };
   }
 
-  async issueClientToken(client: OauthClient): Promise<{
+  async issueClientToken(
+    client: OauthClient,
+    grantedScopes: string[] = client.scopes,
+  ): Promise<{
     access_token: string;
     token_type: 'Bearer';
     expires_in: number;
@@ -439,7 +442,7 @@ export class AuthService {
     const payload: ClientJwtPayload = {
       sub: client.clientId,
       type: 'client',
-      scopes: client.scopes,
+      scopes: grantedScopes,
       jti,
     };
     const access_token = this.jwtService.sign(payload, {

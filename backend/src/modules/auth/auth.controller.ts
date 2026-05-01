@@ -5,9 +5,11 @@ import {
   UseGuards,
   Request,
   Body,
+  Headers,
   Res,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -65,6 +67,11 @@ const FORGOT_LIMIT = toThrottleInt(
   process.env['AUTH_FORGOT_THROTTLE_LIMIT'],
   5,
 );
+const TOKEN_TTL = toThrottleInt(
+  process.env['AUTH_TOKEN_THROTTLE_TTL_MS'],
+  60_000,
+);
+const TOKEN_LIMIT = toThrottleInt(process.env['AUTH_TOKEN_THROTTLE_LIMIT'], 10);
 
 @ApiTags('auth')
 @Controller('auth')
@@ -87,18 +94,57 @@ export class AuthController {
 
   @ApiOperation({
     summary: 'OAuth 2.0 Client Credentials token endpoint (M2M)',
+    description:
+      'Accepts JSON body or application/x-www-form-urlencoded. ' +
+      'Client credentials may also be supplied via Authorization: Basic <base64(client_id:client_secret)> ' +
+      'with grant_type in the body.',
   })
   @ApiBody({ type: TokenRequestDto })
   @ApiResponse({ status: 200, description: 'Access token issued' })
   @ApiResponse({ status: 401, description: 'Invalid client credentials' })
+  @Throttle({ default: { ttl: TOKEN_TTL, limit: TOKEN_LIMIT } })
   @HttpCode(HttpStatus.OK)
   @Post('token')
-  async token(@Body() dto: TokenRequestDto) {
+  async token(
+    @Body() dto: TokenRequestDto,
+    @Headers('authorization') authHeader?: string,
+  ) {
+    // RFC 6749 §2.3.1: client may authenticate via Authorization: Basic
+    // base64(client_id:client_secret) instead of body parameters.
+    let clientId = dto.client_id;
+    let clientSecret = dto.client_secret;
+
+    if (authHeader?.startsWith('Basic ')) {
+      const decoded = Buffer.from(authHeader.slice(6), 'base64').toString();
+      const colon = decoded.indexOf(':');
+      if (colon < 1) {
+        throw new UnauthorizedException('Malformed Basic authorization header');
+      }
+      clientId = decoded.substring(0, colon);
+      clientSecret = decoded.substring(colon + 1);
+    }
+
     const client = await this.oauthClientsService.validateClient(
-      dto.client_id,
-      dto.client_secret,
+      clientId,
+      clientSecret,
     );
-    return this.authService.issueClientToken(client);
+
+    // Intersect the requested scope with the client's registered scopes.
+    // An absent scope parameter grants the full registered set (RFC 6749 §4.4.2).
+    const requestedScopes = dto.scope
+      ? dto.scope.split(' ').filter(Boolean)
+      : null;
+    const grantedScopes = requestedScopes
+      ? client.scopes.filter((s) => requestedScopes.includes(s))
+      : client.scopes;
+
+    if (requestedScopes && grantedScopes.length === 0) {
+      throw new UnauthorizedException(
+        'Requested scope is not permitted for this client',
+      );
+    }
+
+    return this.authService.issueClientToken(client, grantedScopes);
   }
 
   @ApiOperation({ summary: 'Login user' })

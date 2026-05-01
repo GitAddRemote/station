@@ -172,4 +172,82 @@ describe('OAuth Client Credentials (e2e)', () => {
       })
       .expect(401);
   });
+
+  // ---------------------------------------------------------------------------
+  // 8. Authorization: Basic header is accepted as an alternative to body params
+  // ---------------------------------------------------------------------------
+  it('should accept client credentials via Authorization: Basic header', async () => {
+    const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString(
+      'base64',
+    );
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/token')
+      .set('Authorization', `Basic ${credentials}`)
+      .send({ grant_type: 'client_credentials' })
+      .expect(200);
+
+    expect(res.body.token_type).toBe('Bearer');
+    expect(typeof res.body.access_token).toBe('string');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 9. Requested scope is intersected with the registered scopes
+  // ---------------------------------------------------------------------------
+  it('should mint a token containing only the requested subset of scopes', async () => {
+    // Register a client with two scopes so we can request just one.
+    await oauthClientsService.register(
+      'e2e-multiscope-bot',
+      'e2e-multiscope-secret-value-min-32!!',
+      ['bot:api', 'bot:read'],
+    );
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/token')
+      .send({
+        grant_type: 'client_credentials',
+        client_id: 'e2e-multiscope-bot',
+        client_secret: 'e2e-multiscope-secret-value-min-32!!',
+        scope: 'bot:read',
+      })
+      .expect(200);
+
+    const [, payloadB64] = (res.body.access_token as string).split('.');
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
+    expect(payload.scopes).toEqual(['bot:read']);
+    expect(payload.scopes).not.toContain('bot:api');
+
+    const repo = dataSource.getRepository(OauthClient);
+    await repo.delete({ clientId: 'e2e-multiscope-bot' });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10. Requesting a scope not in the registered set → 401
+  // ---------------------------------------------------------------------------
+  it('should reject a scope not registered for the client', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/token')
+      .send({
+        grant_type: 'client_credentials',
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        scope: 'admin:all',
+      })
+      .expect(401);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 11. Registration rejects a weak secret (< 32 chars)
+  // ---------------------------------------------------------------------------
+  it('should reject registration with a client secret shorter than 32 characters', async () => {
+    await request(app.getHttpServer())
+      .post('/oauth-clients')
+      .set('x-internal-api-key', 'test-internal-key-value-min-32-chars!!')
+      .send({
+        clientId: 'weak-secret-bot',
+        clientSecret: 'short',
+        scopes: ['bot:api'],
+      })
+      .expect(400);
+  });
 });
