@@ -124,6 +124,12 @@ export class AuthController {
       clientSecret = decoded.substring(colon + 1);
     }
 
+    if (!clientId || !clientSecret) {
+      throw new UnauthorizedException(
+        'Client credentials required: supply client_id and client_secret in the body or via Authorization: Basic',
+      );
+    }
+
     const client = await this.oauthClientsService.validateClient(
       clientId,
       clientSecret,

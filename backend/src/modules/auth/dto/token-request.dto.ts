@@ -9,15 +9,17 @@ export class TokenRequestDto {
   })
   grant_type!: string;
 
-  @ApiProperty({ example: 'station-bot' })
+  @ApiProperty({ example: 'station-bot', required: false })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  client_id!: string;
+  client_id?: string;
 
-  @ApiProperty({ example: 'super-secret-value' })
+  @ApiProperty({ example: 'super-secret-value', required: false })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  client_secret!: string;
+  client_secret?: string;
 
   @ApiProperty({ example: 'bot:api', required: false })
   @IsOptional()

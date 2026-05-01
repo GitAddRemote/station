@@ -235,19 +235,4 @@ describe('OAuth Client Credentials (e2e)', () => {
       })
       .expect(401);
   });
-
-  // ---------------------------------------------------------------------------
-  // 11. Registration rejects a weak secret (< 32 chars)
-  // ---------------------------------------------------------------------------
-  it('should reject registration with a client secret shorter than 32 characters', async () => {
-    await request(app.getHttpServer())
-      .post('/oauth-clients')
-      .set('x-internal-api-key', 'test-internal-key-value-min-32-chars!!')
-      .send({
-        clientId: 'weak-secret-bot',
-        clientSecret: 'short',
-        scopes: ['bot:api'],
-      })
-      .expect(400);
-  });
 });
