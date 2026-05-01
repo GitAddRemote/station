@@ -27,13 +27,14 @@ export class InternalApiKeyGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<Request>();
 
-    // Normalize: Express can return string | string[] for a header.
-    const rawHeader =
-      req.headers['x-internal-api-key'] ??
-      req.headers['authorization']?.replace(/^ApiKey\s+/i, '');
-    const provided = Array.isArray(rawHeader)
-      ? rawHeader[0]
-      : (rawHeader ?? '');
+    // Normalize to a single string first — Express can return string | string[].
+    const normalize = (h: string | string[] | undefined): string =>
+      Array.isArray(h) ? (h[0] ?? '') : (h ?? '');
+
+    const apiKeyHeader = normalize(req.headers['x-internal-api-key']);
+    const authorizationHeader = normalize(req.headers['authorization']);
+    const provided =
+      apiKeyHeader || authorizationHeader.replace(/^ApiKey\s+/i, '');
 
     if (
       provided.length !== apiKey.length ||

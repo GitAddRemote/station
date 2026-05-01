@@ -107,8 +107,13 @@ export class AuthController {
   @Post('token')
   async token(
     @Body() dto: TokenRequestDto,
-    @Headers('authorization') authHeader?: string,
+    @Headers('authorization') rawAuthHeader?: string | string[],
   ) {
+    // Normalize: Express can produce string | string[] for a header value.
+    const authHeader = Array.isArray(rawAuthHeader)
+      ? rawAuthHeader[0]
+      : rawAuthHeader;
+
     // RFC 6749 §2.3.1: client may authenticate via Authorization: Basic
     // base64(client_id:client_secret) instead of body parameters.
     let clientId = dto.client_id;
