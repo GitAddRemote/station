@@ -3,7 +3,7 @@
 import 'dotenv/config';
 import './instrument';
 import 'reflect-metadata';
-import { NestFactory, HttpAdapterHost } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -11,8 +11,10 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as figlet from 'figlet';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
+import {
+  HttpExceptionFilter,
+  AllExceptionsFilter,
+} from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -86,12 +88,9 @@ async function bootstrap() {
     }),
   );
 
-  // Sentry filter first: captures 5xx before HttpExceptionFilter formats them.
-  const { httpAdapter } = app.get(HttpAdapterHost);
-  app.useGlobalFilters(
-    new SentryExceptionFilter(httpAdapter),
-    new HttpExceptionFilter(),
-  );
+  // AllExceptionsFilter is registered first (outermost) so it catches anything
+  // HttpExceptionFilter doesn't handle. Both filters capture 5xx in Sentry.
+  app.useGlobalFilters(new AllExceptionsFilter(), new HttpExceptionFilter());
 
   // Swagger/OpenAPI Documentation — development only
   if (!isProduction) {
