@@ -36,8 +36,16 @@ export class OauthClientsService {
     try {
       return await this.repo.save(client);
     } catch (err: unknown) {
-      const pg = err as { code?: string };
-      if (pg.code === '23505') {
+      const isUniqueViolation =
+        err &&
+        typeof err === 'object' &&
+        (('code' in err && err.code === '23505') ||
+          ('driverError' in err &&
+            err.driverError &&
+            typeof err.driverError === 'object' &&
+            'code' in err.driverError &&
+            err.driverError.code === '23505'));
+      if (isUniqueViolation) {
         throw new ConflictException(`Client '${clientId}' already exists`);
       }
       throw new InternalServerErrorException('Failed to register client');
