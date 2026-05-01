@@ -1,8 +1,7 @@
-// instrument.ts initialises Sentry and must be the very first import so the
-// SDK can instrument modules before they are loaded.  dotenv/config follows
-// immediately after so process.env is populated before any NestJS module runs.
-import './instrument';
+// dotenv/config must load before instrument.ts so SENTRY_DSN and
+// SENTRY_RELEASE are in process.env when Sentry.init() runs.
 import 'dotenv/config';
+import './instrument';
 import 'reflect-metadata';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
