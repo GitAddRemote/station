@@ -37,10 +37,7 @@ describe('AppController (e2e)', () => {
       .get('/health')
       .expect(200);
 
-    expect(response.body).toEqual({
-      status: 'ok',
-      timestamp: expect.any(String),
-    });
-    expect(Number.isNaN(Date.parse(response.body.timestamp))).toBe(false);
+    expect(response.body.status).toBe('ok');
+    expect(response.body.info?.database?.status).toBe('up');
   });
 });

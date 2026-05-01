@@ -1,11 +1,10 @@
-// dotenv/config must be the very first import so that process.env is populated
-// before any other module is evaluated.  Module-level code (e.g. decorator
-// arguments and top-level constants) in NestJS modules runs at require() time,
-// which is before bootstrap() — moving the load here ensures .env values are
-// visible to those expressions during local development.
+// instrument.ts initialises Sentry and must be the very first import so the
+// SDK can instrument modules before they are loaded.  dotenv/config follows
+// immediately after so process.env is populated before any NestJS module runs.
+import './instrument';
 import 'dotenv/config';
 import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +13,7 @@ import * as figlet from 'figlet';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -87,8 +87,12 @@ async function bootstrap() {
     }),
   );
 
-  // Global Exception Filter for standardized error responses
-  app.useGlobalFilters(new HttpExceptionFilter());
+  // Sentry filter first: captures 5xx before HttpExceptionFilter formats them.
+  const { httpAdapter } = app.get(HttpAdapterHost);
+  app.useGlobalFilters(
+    new SentryExceptionFilter(httpAdapter),
+    new HttpExceptionFilter(),
+  );
 
   // Swagger/OpenAPI Documentation — development only
   if (!isProduction) {
