@@ -131,9 +131,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 6. Issued token is usable on a protected endpoint (GET /auth/me rejects it
-  //    as expected — it's a client token, not a user token — but the guard
-  //    accepts it on an endpoint protected by ClientAuthGuard)
+  // 6. Issued token has the expected JWT payload and expiry metadata
   // ---------------------------------------------------------------------------
   it('should issue a token whose JWT is valid and carries the correct payload', async () => {
     const tokenRes = await request(app.getHttpServer())
