@@ -28,9 +28,9 @@ export class RegisterOauthClientDto {
   @IsArray()
   @ArrayNotEmpty()
   @IsString({ each: true })
-  @Matches(/^[^,]+$/, {
+  @Matches(/^[^\s,]+$/, {
     each: true,
-    message: 'Each scope must not contain a comma',
+    message: 'Each scope must not contain whitespace or commas',
   })
   scopes!: string[];
 }
