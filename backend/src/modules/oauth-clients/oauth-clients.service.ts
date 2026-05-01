@@ -48,11 +48,8 @@ export class OauthClientsService {
       );
       throw new UnauthorizedException('Invalid client credentials');
     }
-    if (!client.isActive) {
-      throw new UnauthorizedException('Client is inactive');
-    }
     const valid = await this.validateSecret(client, secret);
-    if (!valid) {
+    if (!client.isActive || !valid) {
       throw new UnauthorizedException('Invalid client credentials');
     }
     return client;
