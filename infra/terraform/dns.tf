@@ -51,6 +51,10 @@ resource "linode_domain_record" "status_cname" {
   record_type = "CNAME"
   target      = "stats.uptimerobot.com"
   ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "linode_domain_record" "bot" {
