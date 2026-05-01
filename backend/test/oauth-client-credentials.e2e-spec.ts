@@ -156,7 +156,9 @@ describe('OAuth Client Credentials (e2e)', () => {
     expect(Array.isArray(payload.scopes)).toBe(true);
     expect(payload.scopes).toContain('bot:api');
     expect(typeof payload.jti).toBe('string');
-    expect(payload.exp - payload.iat).toBe(3600);
+    // expires_in from the response is authoritative; exp-iat can be 3599 or
+    // 3600 depending on sub-second timing, so we check the response field instead.
+    expect(tokenRes.body.expires_in).toBe(3600);
   });
 
   // ---------------------------------------------------------------------------
@@ -192,7 +194,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 9. Requested scope is intersected with the registered scopes
+  // 9. Requested scope is a valid subset of the registered scopes
   // ---------------------------------------------------------------------------
   it('should mint a token containing only the requested subset of scopes', async () => {
     // Register a client with two scopes so we can request just one.

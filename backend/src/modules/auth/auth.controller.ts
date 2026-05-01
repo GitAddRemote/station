@@ -135,20 +135,26 @@ export class AuthController {
       clientSecret,
     );
 
-    // Intersect the requested scope with the client's registered scopes.
     // An absent scope parameter grants the full registered set (RFC 6749 §4.4.2).
+    // When a scope parameter is present, every requested scope must be in the
+    // client's registered set — silently dropping unknown scopes would let callers
+    // mint tokens without realising their scope request was partially ignored.
     const requestedScopes = dto.scope
       ? dto.scope.split(' ').filter(Boolean)
       : null;
-    const grantedScopes = requestedScopes
-      ? client.scopes.filter((s) => requestedScopes.includes(s))
-      : client.scopes;
 
-    if (requestedScopes && grantedScopes.length === 0) {
-      throw new UnauthorizedException(
-        'Requested scope is not permitted for this client',
+    if (requestedScopes) {
+      const unauthorized = requestedScopes.filter(
+        (s) => !client.scopes.includes(s),
       );
+      if (unauthorized.length > 0) {
+        throw new UnauthorizedException(
+          'Requested scope is not permitted for this client',
+        );
+      }
     }
+
+    const grantedScopes = requestedScopes ?? client.scopes;
 
     return this.authService.issueClientToken(client, grantedScopes);
   }

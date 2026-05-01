@@ -8,6 +8,12 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { OauthClient } from './oauth-client.entity';
 
+// Precomputed hash of the string "dummy" at cost 12. Used only so that
+// unknown-client requests pay the same bcrypt cost as real ones, preventing
+// timing-based client-ID enumeration.
+const DUMMY_HASH =
+  '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LeKm6H5.RvBo8JXWi';
+
 @Injectable()
 export class OauthClientsService {
   constructor(
@@ -40,21 +46,22 @@ export class OauthClientsService {
   /** Validate credentials end-to-end; throws 401 on any failure. */
   async validateClient(clientId: string, secret: string): Promise<OauthClient> {
     const client = await this.findByClientId(clientId);
-    // Constant-time dummy compare prevents timing-based client enumeration.
-    if (!client) {
-      await bcrypt.compare(
-        secret,
-        '$2b$12$dummyhashfordummypurpose000000000000',
-      );
+
+    // Always run a bcrypt compare — against the real hash when the client exists,
+    // against a dummy hash otherwise — so request timing cannot reveal whether a
+    // client_id is registered or inactive.
+    const hashToCompare = client ? client.clientSecretHash : DUMMY_HASH;
+    let secretValid = false;
+    try {
+      secretValid = await bcrypt.compare(secret, hashToCompare);
+    } catch {
+      // Treat a malformed hash the same as a wrong secret.
+    }
+
+    if (!client || !client.isActive || !secretValid) {
       throw new UnauthorizedException('Invalid client credentials');
     }
-    if (!client.isActive) {
-      throw new UnauthorizedException('Client is inactive');
-    }
-    const valid = await this.validateSecret(client, secret);
-    if (!valid) {
-      throw new UnauthorizedException('Invalid client credentials');
-    }
+
     return client;
   }
 }

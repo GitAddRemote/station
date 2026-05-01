@@ -3,6 +3,7 @@ import {
   IsString,
   IsNotEmpty,
   MinLength,
+  MaxLength,
   IsArray,
   ArrayNotEmpty,
   Matches,
@@ -17,14 +18,19 @@ export class RegisterOauthClientDto {
   })
   clientId!: string;
 
-  @ApiProperty({ example: 'super-secret-value', minLength: 32 })
+  @ApiProperty({ example: 'super-secret-value', minLength: 32, maxLength: 128 })
   @IsString()
   @MinLength(32)
+  @MaxLength(128)
   clientSecret!: string;
 
   @ApiProperty({ example: ['bot:api'] })
   @IsArray()
   @ArrayNotEmpty()
   @IsString({ each: true })
+  @Matches(/^[^,]+$/, {
+    each: true,
+    message: 'Each scope must not contain a comma',
+  })
   scopes!: string[];
 }

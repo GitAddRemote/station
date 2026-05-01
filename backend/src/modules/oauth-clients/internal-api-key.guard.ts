@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { timingSafeEqual } from 'crypto';
 
 /**
  * Guards the admin /oauth-clients endpoint with a static API key supplied via
@@ -25,11 +26,19 @@ export class InternalApiKeyGuard implements CanActivate {
     }
 
     const req = context.switchToHttp().getRequest<Request>();
-    const provided =
+
+    // Normalize: Express can return string | string[] for a header.
+    const rawHeader =
       req.headers['x-internal-api-key'] ??
       req.headers['authorization']?.replace(/^ApiKey\s+/i, '');
+    const provided = Array.isArray(rawHeader)
+      ? rawHeader[0]
+      : (rawHeader ?? '');
 
-    if (provided !== apiKey) {
+    if (
+      provided.length !== apiKey.length ||
+      !timingSafeEqual(Buffer.from(provided), Buffer.from(apiKey))
+    ) {
       throw new UnauthorizedException('Invalid internal API key');
     }
 

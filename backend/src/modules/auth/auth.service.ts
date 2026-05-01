@@ -448,12 +448,13 @@ export class AuthService {
     const access_token = this.jwtService.sign(payload, {
       expiresIn: CLIENT_TTL_SECONDS,
     });
-    // No write needed at issuance — revocation works by SET blacklist:{jti}
-    // which isAccessTokenBlacklisted already checks. We record the JTI in a
-    // client-specific live set so an admin revoke endpoint can enumerate them.
+    // Track live client tokens so a future admin revoke endpoint can enumerate
+    // and invalidate them per client. Key: client-token:{clientId}:{jti}.
+    // Revocation itself uses the existing blacklist:{jti} mechanism checked by
+    // isAccessTokenBlacklisted.
     await this.authSet(
-      `client-token:${jti}`,
-      client.clientId,
+      `client-token:${client.clientId}:${jti}`,
+      '1',
       CLIENT_TTL_SECONDS * 1000,
     );
     return {
