@@ -43,6 +43,16 @@ export class ClientAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token is not a client token');
     }
 
+    if (
+      typeof payload.sub !== 'string' ||
+      !payload.sub ||
+      typeof payload.jti !== 'string' ||
+      !payload.jti ||
+      !Array.isArray(payload.scopes)
+    ) {
+      throw new UnauthorizedException('Token is missing required claims');
+    }
+
     if (await this.authService.isAccessTokenBlacklisted(payload.jti)) {
       throw new UnauthorizedException('Token has been revoked');
     }
@@ -52,9 +62,11 @@ export class ClientAuthGuard implements CanActivate {
   }
 
   private extractToken(req: Request): string | null {
-    const auth = req.headers.authorization;
-    if (auth?.startsWith('Bearer ')) {
-      return auth.slice(7);
+    const auth = Array.isArray(req.headers.authorization)
+      ? req.headers.authorization[0]
+      : req.headers.authorization;
+    if (auth?.match(/^bearer /i)) {
+      return auth.slice(auth.indexOf(' ') + 1).trim();
     }
     return null;
   }

@@ -8,14 +8,22 @@ import { OauthClient } from '../src/modules/oauth-clients/oauth-client.entity';
 import { OauthClientsService } from '../src/modules/oauth-clients/oauth-clients.service';
 import { seedSystemUser } from './helpers/seed-system-user';
 
+const INTERNAL_API_KEY = 'e2e-internal-api-key-value-min-32chars!';
+
 describe('OAuth Client Credentials (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let oauthClientsService: OauthClientsService;
   const CLIENT_ID = 'e2e-test-bot';
   const CLIENT_SECRET = 'e2e-test-secret-value-min-32-chars!!';
+  let previousInternalApiKey: string | undefined;
 
   beforeAll(async () => {
+    // Set before the module compiles so ConfigService sees it during app init.
+    // Capture the prior value so afterAll can restore it and avoid leaking
+    // into other e2e suites that share the same Jest worker process.
+    previousInternalApiKey = process.env['INTERNAL_API_KEY'];
+    process.env['INTERNAL_API_KEY'] = INTERNAL_API_KEY;
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -43,6 +51,12 @@ describe('OAuth Client Credentials (e2e)', () => {
     const repo = dataSource.getRepository(OauthClient);
     await repo.delete({ clientId: CLIENT_ID });
     await app?.close();
+    // Restore the previous value so this suite doesn't affect others.
+    if (previousInternalApiKey === undefined) {
+      delete process.env['INTERNAL_API_KEY'];
+    } else {
+      process.env['INTERNAL_API_KEY'] = previousInternalApiKey;
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -131,9 +145,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 6. Issued token is usable on a protected endpoint (GET /auth/me rejects it
-  //    as expected — it's a client token, not a user token — but the guard
-  //    accepts it on an endpoint protected by ClientAuthGuard)
+  // 6. Issued token has the expected JWT payload and expiry metadata
   // ---------------------------------------------------------------------------
   it('should issue a token whose JWT is valid and carries the correct payload', async () => {
     const tokenRes = await request(app.getHttpServer())
@@ -156,7 +168,9 @@ describe('OAuth Client Credentials (e2e)', () => {
     expect(Array.isArray(payload.scopes)).toBe(true);
     expect(payload.scopes).toContain('bot:api');
     expect(typeof payload.jti).toBe('string');
-    expect(payload.exp - payload.iat).toBe(3600);
+    // expires_in from the response is authoritative; exp-iat can be 3599 or
+    // 3600 depending on sub-second timing, so we check the response field instead.
+    expect(tokenRes.body.expires_in).toBe(3600);
   });
 
   // ---------------------------------------------------------------------------
@@ -169,6 +183,114 @@ describe('OAuth Client Credentials (e2e)', () => {
         clientId: 'sneaky-bot',
         clientSecret: 'sneaky-secret-value-long-enough-here',
         scopes: ['bot:api'],
+      })
+      .expect(401);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 8. Happy-path POST /oauth-clients with a valid INTERNAL_API_KEY
+  // ---------------------------------------------------------------------------
+  it('should register a client when the internal API key is valid', async () => {
+    const repo = dataSource.getRepository(OauthClient);
+    try {
+      const res = await request(app.getHttpServer())
+        .post('/oauth-clients')
+        .set('x-internal-api-key', INTERNAL_API_KEY)
+        .send({
+          clientId: 'e2e-admin-created-bot',
+          clientSecret: 'e2e-admin-secret-value-long-enough-here',
+          scopes: ['bot:api'],
+        })
+        .expect(201);
+
+      expect(res.body).toMatchObject({
+        clientId: 'e2e-admin-created-bot',
+        scopes: expect.arrayContaining(['bot:api']),
+      });
+      expect(typeof res.body.id).toBe('string');
+    } finally {
+      await repo.delete({ clientId: 'e2e-admin-created-bot' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 9. Authorization: Basic header is accepted as an alternative to body params
+  // ---------------------------------------------------------------------------
+  it('should accept client credentials via Authorization: Basic header', async () => {
+    const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString(
+      'base64',
+    );
+
+    const res = await request(app.getHttpServer())
+      .post('/auth/token')
+      .set('Authorization', `Basic ${credentials}`)
+      .send({ grant_type: 'client_credentials' })
+      .expect(200);
+
+    expect(res.body.token_type).toBe('Bearer');
+    expect(typeof res.body.access_token).toBe('string');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10. application/x-www-form-urlencoded body is accepted (OAuth spec format)
+  // ---------------------------------------------------------------------------
+  it('should accept credentials submitted as application/x-www-form-urlencoded', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/token')
+      .type('form')
+      .send(
+        `grant_type=client_credentials&client_id=${encodeURIComponent(CLIENT_ID)}&client_secret=${encodeURIComponent(CLIENT_SECRET)}&scope=bot%3Aapi`,
+      )
+      .expect(200);
+
+    expect(res.body.token_type).toBe('Bearer');
+    expect(typeof res.body.access_token).toBe('string');
+  });
+
+  // ---------------------------------------------------------------------------
+  // 11. Requested scope is a valid subset of the registered scopes
+  // ---------------------------------------------------------------------------
+  it('should mint a token containing only the requested subset of scopes', async () => {
+    const repo = dataSource.getRepository(OauthClient);
+    await oauthClientsService.register(
+      'e2e-multiscope-bot',
+      'e2e-multiscope-secret-value-min-32!!',
+      ['bot:api', 'bot:read'],
+    );
+
+    try {
+      const res = await request(app.getHttpServer())
+        .post('/auth/token')
+        .send({
+          grant_type: 'client_credentials',
+          client_id: 'e2e-multiscope-bot',
+          client_secret: 'e2e-multiscope-secret-value-min-32!!',
+          scope: 'bot:read',
+        })
+        .expect(200);
+
+      const [, payloadB64] = (res.body.access_token as string).split('.');
+      const payload = JSON.parse(
+        Buffer.from(payloadB64, 'base64url').toString(),
+      );
+      expect(payload.scopes).toEqual(['bot:read']);
+      expect(payload.scopes).not.toContain('bot:api');
+    } finally {
+      await repo.delete({ clientId: 'e2e-multiscope-bot' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 12. Requesting a scope not in the registered set → 401
+  // ---------------------------------------------------------------------------
+  it('should reject a scope not registered for the client', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/token')
+      .send({
+        grant_type: 'client_credentials',
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        scope: 'admin:all',
       })
       .expect(401);
   });

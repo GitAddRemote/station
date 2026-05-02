@@ -2,6 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsString,
   IsNotEmpty,
+  MinLength,
+  MaxLength,
   IsArray,
   ArrayNotEmpty,
   Matches,
@@ -16,14 +18,19 @@ export class RegisterOauthClientDto {
   })
   clientId!: string;
 
-  @ApiProperty({ example: 'super-secret-value', minLength: 32 })
+  @ApiProperty({ example: 'super-secret-value', minLength: 32, maxLength: 128 })
   @IsString()
-  @IsNotEmpty()
+  @MinLength(32)
+  @MaxLength(128)
   clientSecret!: string;
 
   @ApiProperty({ example: ['bot:api'] })
   @IsArray()
   @ArrayNotEmpty()
   @IsString({ each: true })
+  @Matches(/^[^\s,]+$/, {
+    each: true,
+    message: 'Each scope must not contain whitespace or commas',
+  })
   scopes!: string[];
 }

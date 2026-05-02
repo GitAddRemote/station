@@ -124,7 +124,7 @@ export const AppDataSource = new DataSource({
     // Refresh tokens moved to Redis — drop the DB table
     DropRefreshTokensTable1777409770542,
 
-    // OAuth M2M client credentials
+    // OAuth 2.0 client credentials
     CreateOauthClientsTable1777647814618,
   ],
   synchronize: false,
