@@ -24,6 +24,7 @@ import { UexOutpost } from './modules/uex/entities/uex-outpost.entity';
 import { UexPoi } from './modules/uex/entities/uex-poi.entity';
 import { UexSyncState } from './modules/uex-sync/uex-sync-state.entity';
 import { UexSyncConfig } from './modules/uex-sync/uex-sync-config.entity';
+import { OauthClient } from './modules/oauth-clients/oauth-client.entity';
 
 import { CreateUsersTable1716956654528 } from './migrations/1716956654528-CreateUsersTable';
 import { CreateOrganizationsRolesAndJunctionTable1730841000000 } from './migrations/1730841000000-CreateOrganizationsRolesAndJunctionTable';
@@ -49,6 +50,7 @@ import { CreateOrgInventoryItemsTable1764964935270 } from './migrations/17649649
 import { AddUserInventoryUniqueIndex1765035000000 } from './migrations/1765035000000-AddUserInventoryUniqueIndex';
 import { AddTokenCleanupIndexes1765038000000 } from './migrations/1765038000000-AddTokenCleanupIndexes';
 import { DropRefreshTokensTable1777409770542 } from './migrations/1777409770542-DropRefreshTokensTable';
+import { CreateOauthClientsTable1777647814618 } from './migrations/1777647814618-CreateOauthClientsTable';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -81,6 +83,7 @@ export const AppDataSource = new DataSource({
     UexPoi,
     UexSyncState,
     UexSyncConfig,
+    OauthClient,
   ],
   migrations: [
     // Core user/org/auth setup
@@ -120,6 +123,9 @@ export const AppDataSource = new DataSource({
 
     // Refresh tokens moved to Redis — drop the DB table
     DropRefreshTokensTable1777409770542,
+
+    // OAuth 2.0 client credentials
+    CreateOauthClientsTable1777647814618,
   ],
   synchronize: false,
 });

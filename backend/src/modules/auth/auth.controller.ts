@@ -5,9 +5,11 @@ import {
   UseGuards,
   Request,
   Body,
+  Headers,
   Res,
   HttpCode,
   HttpStatus,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -29,9 +31,11 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/password-reset.dto';
+import { TokenRequestDto } from './dto/token-request.dto';
 import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
 import { RefreshTokenRequest } from './interfaces/refresh-token-request.interface';
 import { ValidatedUser } from './interfaces/validated-user.interface';
+import { OauthClientsService } from '../oauth-clients/oauth-clients.service';
 
 // Parse throttle config once at module load time.
 // Number() handles numeric strings and NaN from non-numeric input; the
@@ -63,6 +67,11 @@ const FORGOT_LIMIT = toThrottleInt(
   process.env['AUTH_FORGOT_THROTTLE_LIMIT'],
   5,
 );
+const TOKEN_TTL = toThrottleInt(
+  process.env['AUTH_TOKEN_THROTTLE_TTL_MS'],
+  60_000,
+);
+const TOKEN_LIMIT = toThrottleInt(process.env['AUTH_TOKEN_THROTTLE_LIMIT'], 10);
 
 @ApiTags('auth')
 @Controller('auth')
@@ -70,6 +79,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
+    private oauthClientsService: OauthClientsService,
   ) {}
 
   private cookieOptions(maxAge: number) {
@@ -80,6 +90,84 @@ export class AuthController {
       path: '/',
       maxAge,
     };
+  }
+
+  @ApiOperation({
+    summary: 'OAuth 2.0 Client Credentials token endpoint (M2M)',
+    description:
+      'Accepts JSON body or application/x-www-form-urlencoded. ' +
+      'Client credentials may also be supplied via Authorization: Basic <base64(client_id:client_secret)> ' +
+      'with grant_type in the body.',
+  })
+  @ApiBody({ type: TokenRequestDto })
+  @ApiResponse({ status: 200, description: 'Access token issued' })
+  @ApiResponse({ status: 401, description: 'Invalid client credentials' })
+  @Throttle({ default: { ttl: TOKEN_TTL, limit: TOKEN_LIMIT } })
+  @HttpCode(HttpStatus.OK)
+  @Post('token')
+  async token(
+    @Body() dto: TokenRequestDto,
+    @Headers('authorization') rawAuthHeader?: string | string[],
+  ) {
+    // Normalize: Express can produce string | string[] for a header value.
+    const authHeader = Array.isArray(rawAuthHeader)
+      ? rawAuthHeader[0]
+      : rawAuthHeader;
+
+    // RFC 6749 §2.3.1: client may authenticate via Authorization: Basic
+    // base64(client_id:client_secret) instead of body parameters.
+    let clientId = dto.client_id;
+    let clientSecret = dto.client_secret;
+
+    if (authHeader?.match(/^basic /i)) {
+      const encoded = authHeader.slice(authHeader.indexOf(' ') + 1).trim();
+      const decoded = Buffer.from(encoded, 'base64').toString();
+      const colon = decoded.indexOf(':');
+      if (colon < 1) {
+        throw new UnauthorizedException('Malformed Basic authorization header');
+      }
+      clientId = decoded.substring(0, colon);
+      clientSecret = decoded.substring(colon + 1);
+    }
+
+    if (!clientId || !clientSecret) {
+      throw new UnauthorizedException(
+        'Client credentials required: supply client_id and client_secret in the body or via Authorization: Basic',
+      );
+    }
+
+    const client = await this.oauthClientsService.validateClient(
+      clientId,
+      clientSecret,
+    );
+
+    // An absent scope parameter grants the full registered set (RFC 6749 §4.4.2).
+    // When a scope parameter is present, every requested scope must be in the
+    // client's registered set — silently dropping unknown scopes would let callers
+    // mint tokens without realising their scope request was partially ignored.
+    const parsedScopes = dto.scope
+      ? dto.scope.split(' ').filter(Boolean)
+      : null;
+    // Treat a whitespace-only scope string (e.g. scope="+") as absent so it
+    // falls back to the client's full registered set rather than minting an
+    // empty-scope token.
+    const requestedScopes =
+      parsedScopes && parsedScopes.length > 0 ? parsedScopes : null;
+
+    if (requestedScopes) {
+      const unauthorized = requestedScopes.filter(
+        (s) => !client.scopes.includes(s),
+      );
+      if (unauthorized.length > 0) {
+        throw new UnauthorizedException(
+          'Requested scope is not permitted for this client',
+        );
+      }
+    }
+
+    const grantedScopes = requestedScopes ?? client.scopes;
+
+    return this.authService.issueClientToken(client, grantedScopes);
   }
 
   @ApiOperation({ summary: 'Login user' })

@@ -5,6 +5,7 @@ import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
 import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
+import { OauthClientsService } from '../oauth-clients/oauth-clients.service';
 
 describe('AuthController - Password Reset', () => {
   let controller: AuthController;
@@ -40,6 +41,10 @@ describe('AuthController - Password Reset', () => {
           },
         },
         RefreshTokenAuthGuard,
+        {
+          provide: OauthClientsService,
+          useValue: { validateClient: jest.fn(), register: jest.fn() },
+        },
       ],
     }).compile();
 

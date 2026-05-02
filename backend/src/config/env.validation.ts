@@ -60,4 +60,14 @@ export const envValidationSchema = Joi.object({
 
   // Token cleanup scheduler (optional — defaults to 3 AM daily)
   REFRESH_TOKEN_CLEANUP_CRON: Joi.string().default(DEFAULT_CLEANUP_CRON),
+
+  // OAuth M2M — internal API key for the /oauth-clients admin endpoint.
+  // Required in production; optional in development/test.
+  INTERNAL_API_KEY: Joi.string()
+    .min(32)
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.string().min(32).optional().allow(''),
+    }),
 });

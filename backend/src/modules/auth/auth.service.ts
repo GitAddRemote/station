@@ -22,6 +22,8 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ValidatedUser } from './interfaces/validated-user.interface';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { ClientJwtPayload } from './interfaces/client-jwt-payload.interface';
+import { OauthClient } from '../oauth-clients/oauth-client.entity';
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
 
@@ -425,6 +427,41 @@ export class AuthService {
     );
 
     return { message: 'Password has been reset successfully' };
+  }
+
+  async issueClientToken(
+    client: OauthClient,
+    grantedScopes: string[] = client.scopes,
+  ): Promise<{
+    access_token: string;
+    token_type: 'Bearer';
+    expires_in: number;
+  }> {
+    const CLIENT_TTL_SECONDS = 3600;
+    const jti = crypto.randomUUID();
+    const payload: ClientJwtPayload = {
+      sub: client.clientId,
+      type: 'client',
+      scopes: grantedScopes,
+      jti,
+    };
+    const access_token = this.jwtService.sign(payload, {
+      expiresIn: CLIENT_TTL_SECONDS,
+    });
+    // Track live client tokens so a future admin revoke endpoint can enumerate
+    // and invalidate them per client. Key: client-token:{clientId}:{jti}.
+    // Revocation itself uses the existing blacklist:{jti} mechanism checked by
+    // isAccessTokenBlacklisted.
+    await this.authSet(
+      `client-token:${client.clientId}:${jti}`,
+      '1',
+      CLIENT_TTL_SECONDS * 1000,
+    );
+    return {
+      access_token,
+      token_type: 'Bearer',
+      expires_in: CLIENT_TTL_SECONDS,
+    };
   }
 
   async changePassword(
