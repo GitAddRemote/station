@@ -121,12 +121,7 @@ export class AuthController {
 
     if (authHeader?.match(/^basic /i)) {
       const encoded = authHeader.slice(authHeader.indexOf(' ') + 1).trim();
-      let decoded: string;
-      try {
-        decoded = Buffer.from(encoded, 'base64').toString();
-      } catch {
-        throw new UnauthorizedException('Malformed Basic authorization header');
-      }
+      const decoded = Buffer.from(encoded, 'base64').toString();
       const colon = decoded.indexOf(':');
       if (colon < 1) {
         throw new UnauthorizedException('Malformed Basic authorization header');

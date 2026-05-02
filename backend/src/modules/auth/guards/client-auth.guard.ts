@@ -43,6 +43,16 @@ export class ClientAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token is not a client token');
     }
 
+    if (
+      typeof payload.sub !== 'string' ||
+      !payload.sub ||
+      typeof payload.jti !== 'string' ||
+      !payload.jti ||
+      !Array.isArray(payload.scopes)
+    ) {
+      throw new UnauthorizedException('Token is missing required claims');
+    }
+
     if (await this.authService.isAccessTokenBlacklisted(payload.jti)) {
       throw new UnauthorizedException('Token has been revoked');
     }
