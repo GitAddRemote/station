@@ -65,7 +65,7 @@ export const envValidationSchema = Joi.object({
   SENTRY_DSN: Joi.string().uri().optional().allow(''),
   SENTRY_RELEASE: Joi.string().optional().allow(''),
 
-  // Log aggregation — optional; when absent Vector does not ship logs.
+  // Log aggregation — optional; when absent the guard_token filter in vector.toml drops all events before the sink.
   LOGTAIL_SOURCE_TOKEN: Joi.string().optional().allow(''),
 
   // OAuth M2M — internal API key for the /oauth-clients admin endpoint.

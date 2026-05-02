@@ -2,17 +2,33 @@
 type = "docker_logs"
 include_containers = ["station-backend-1"]
 
+[transforms.parse_pino]
+type = "remap"
+inputs = ["docker_logs"]
+source = '''
+parsed, err = parse_json(.message)
+if err == null {
+  . = merge(., parsed)
+}
+'''
+
 [transforms.filter_level]
 type = "filter"
-inputs = ["docker_logs"]
-# Pino level numbers: 30=info, 40=warn, 50=error, 60=fatal
+inputs = ["parse_pino"]
+# Pino level numbers: 40=warn, 50=error, 60=fatal
 # Only ship warn+ to stay within Logtail free tier (1 GB/month)
-condition = '.message != null && (.message | contains("\"level\":40") || .message | contains("\"level\":50") || .message | contains("\"level\":60"))'
+condition = 'exists(.level) && is_integer(.level) && .level >= 40'
+
+[transforms.guard_token]
+type = "filter"
+inputs = ["filter_level"]
+# Drop all events when LOGTAIL_SOURCE_TOKEN is not configured
+condition = '"${LOGTAIL_SOURCE_TOKEN:-}" != ""'
 
 [sinks.logtail]
 type = "http"
-inputs = ["filter_level"]
+inputs = ["guard_token"]
 uri = "https://in.logtail.com"
 encoding.codec = "json"
 auth.strategy = "bearer"
-auth.token = "${LOGTAIL_SOURCE_TOKEN}"
+auth.token = "${LOGTAIL_SOURCE_TOKEN:-}"
