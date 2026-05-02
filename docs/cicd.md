@@ -49,7 +49,7 @@ Store these secrets in both the `staging` and `production` GitHub environments u
 | `BACKUP_HEALTHCHECK_URL` | Production backup healthcheck URL; can be blank in staging |
 | `UEX_API_KEY`            | Optional UEX upstream API key                              |
 
-See [infra/docs/secrets.md](/tmp/station-issue-128/infra/docs/secrets.md) for the full inventory and rotation procedures.
+See [infra/docs/secrets.md](../infra/docs/secrets.md) for the full inventory and rotation procedures.
 
 ## Staging
 
