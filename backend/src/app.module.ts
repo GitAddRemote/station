@@ -46,7 +46,7 @@ if (!isTest) {
         level: isTest
           ? 'silent'
           : process.env.NODE_ENV === 'production'
-            ? 'warn'
+            ? 'info'
             : 'debug',
         autoLogging: true,
         redact: ['req.headers.authorization', 'req.body.password'],

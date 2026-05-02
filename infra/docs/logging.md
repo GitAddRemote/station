@@ -3,55 +3,41 @@
 ## Architecture
 
 ```
-NestJS (pino-http) → Docker stdout → Vector → Logtail
+NestJS (pino-http) → Docker stdout
 ```
 
-The backend writes structured JSON logs to stdout via `pino-http`. Docker captures stdout from the container. Vector reads Docker logs, parses the pino JSON, filters by severity, and ships matching lines to Logtail over HTTPS.
+The backend writes structured JSON logs to stdout via `pino-http`. Docker captures stdout from each container. Log shipping to a centralised store (Grafana Loki) is planned as a follow-up.
 
 ## Log levels
 
-| Environment | Level shipped | Rationale                                          |
-| ----------- | ------------- | -------------------------------------------------- |
-| production  | warn+         | Keeps volume within Logtail free tier (1 GB/month) |
-| development | debug+        | Full verbosity for local troubleshooting           |
-| test        | silent        | No output during test runs                         |
+| Environment | Level  | Rationale                                    |
+| ----------- | ------ | -------------------------------------------- |
+| production  | info+  | Full request context without debug verbosity |
+| development | debug+ | Full verbosity for local troubleshooting     |
+| test        | silent | No output during test runs                   |
 
 Pino numeric levels: `10`=trace, `20`=debug, `30`=info, `40`=warn, `50`=error, `60`=fatal.
 
-In production the app itself emits `warn` and above (set in `LoggerModule.forRoot()`). Vector's `filter_level` transform enforces the same threshold at the pipeline level, so only level 40, 50, and 60 lines are forwarded to Logtail.
+## Structured fields
 
-## Searching logs in Logtail
+Every log line is a JSON object. Key fields emitted by `pino-http`:
 
-Vector parses each pino JSON line into structured fields before shipping, so Logtail receives the pino fields at the top level. Useful filters:
+- `level` — numeric severity
+- `msg` — log message
+- `time` — Unix timestamp (ms)
+- `req.id` — UUID v4 assigned per request
+- `req.method` / `req.url` — HTTP method and path
+- `res.statusCode` — response status
+- `responseTime` — request duration in ms
 
-- **By level**: `level:50` (errors only), `level:40` (warnings)
-- **By URL**: `req.url:/api/auth`
-- **By request ID**: `req.id:<uuid>`
-- **By time range**: use the date picker in the top-right corner
-- **Full-text**: any keyword matches against the `msg` field
+Sensitive fields are redacted before emission: `req.headers.authorization` and `req.body.password` are replaced with `[Redacted]`.
 
-## Temporarily increasing verbosity
+## Viewing logs locally
 
-Because the app level is set to `warn` in production, shipping `info` logs requires updating both the app config and Vector, then redeploying:
+```bash
+# Follow backend logs with pretty printing (pino-pretty active in development)
+pnpm dev:backend
 
-1. In `backend/src/app.module.ts`, change the production pino level from `'warn'` to `'info'`.
-2. In `infra/vector.toml`, change the `filter_level` condition threshold from `40` to `30`.
-3. Redeploy the backend and restart Vector.
-4. Revert both changes and redeploy again when done.
-
-## Free tier limits
-
-- **Ingestion**: 1 GB/month
-- **Retention**: 3 days
-- **Alert budget**: apply source-level sampling in `vector.toml` if approaching the limit
-
-## Alert setup
-
-Recommended alert in Logtail → Alerts → New Alert:
-
-- **Name**: Error spike
-- **Query**: `level:50`
-- **Condition**: count > 10 in last 5 minutes
-- **Action**: email your on-call address or team alias
-
-This fires when the error rate spikes, which typically indicates a deployment regression or upstream outage.
+# Raw JSON from a running container
+docker compose logs -f backend
+```

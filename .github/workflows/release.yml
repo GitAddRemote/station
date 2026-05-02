@@ -208,7 +208,6 @@ jobs:
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
           B2_BUCKET: ${{ secrets.B2_BUCKET }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          LOGTAIL_SOURCE_TOKEN: ${{ secrets.LOGTAIL_SOURCE_TOKEN }}
           BACKUP_HEALTHCHECK_URL: ${{ secrets.BACKUP_HEALTHCHECK_URL }}
           UEX_API_KEY: ${{ secrets.UEX_API_KEY }}
         run: |
@@ -240,7 +239,6 @@ jobs:
           AUTH_FORGOT_THROTTLE_LIMIT=5
           SENTRY_DSN=${SENTRY_DSN}
           SENTRY_RELEASE=${GITHUB_SHA}
-          LOGTAIL_SOURCE_TOKEN=${LOGTAIL_SOURCE_TOKEN}
           B2_ACCOUNT_ID=${B2_ACCOUNT_ID}
           B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
           B2_BUCKET=${B2_BUCKET}
@@ -347,7 +345,6 @@ jobs:
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
           B2_BUCKET: ${{ secrets.B2_BUCKET }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          LOGTAIL_SOURCE_TOKEN: ${{ secrets.LOGTAIL_SOURCE_TOKEN }}
           BACKUP_HEALTHCHECK_URL: ${{ secrets.BACKUP_HEALTHCHECK_URL }}
           UEX_API_KEY: ${{ secrets.UEX_API_KEY }}
         run: |
@@ -379,7 +376,6 @@ jobs:
           AUTH_FORGOT_THROTTLE_LIMIT=5
           SENTRY_DSN=${SENTRY_DSN}
           SENTRY_RELEASE=${GITHUB_SHA}
-          LOGTAIL_SOURCE_TOKEN=${LOGTAIL_SOURCE_TOKEN}
           B2_ACCOUNT_ID=${B2_ACCOUNT_ID}
           B2_APPLICATION_KEY=${B2_APPLICATION_KEY}
           B2_BUCKET=${B2_BUCKET}

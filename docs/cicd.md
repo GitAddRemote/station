@@ -27,28 +27,27 @@ The deploy jobs use GitHub environment-scoped secrets and recreate `/opt/station
 
 Store these secrets in both the `staging` and `production` GitHub environments unless otherwise noted:
 
-| Secret | Description |
-| --- | --- |
-| `VPS_HOST` | VPS public IP or hostname |
-| `VPS_USER` | SSH user, expected to be `deploy` |
-| `VPS_SSH_KEY` | Private SSH key for the `deploy` user |
-| `VPS_KNOWN_HOSTS` | Pinned SSH host key entries for the deploy target |
-| `DATABASE_HOST` | For the current compose stack, use `postgres` |
-| `DATABASE_PORT` | For the current compose stack, use `5432` |
-| `DATABASE_USER` | Database role used by the backend |
-| `DATABASE_PASSWORD` | Database password |
-| `DATABASE_NAME` | Database name |
-| `JWT_SECRET` | JWT signing secret, minimum 32 characters |
-| `REDIS_PASSWORD` | Redis auth password |
-| `ALLOWED_ORIGIN` | Frontend origin allowed by backend CORS |
-| `FRONTEND_URL` | Frontend base URL used in password-reset links |
-| `B2_ACCOUNT_ID` | Backblaze B2 account id |
-| `B2_APPLICATION_KEY` | Backblaze B2 application key |
-| `B2_BUCKET` | Backblaze B2 bucket name |
-| `SENTRY_DSN` | Sentry DSN for backend error reporting |
-| `LOGTAIL_SOURCE_TOKEN` | Logtail ingestion token |
+| Secret                   | Description                                                |
+| ------------------------ | ---------------------------------------------------------- |
+| `VPS_HOST`               | VPS public IP or hostname                                  |
+| `VPS_USER`               | SSH user, expected to be `deploy`                          |
+| `VPS_SSH_KEY`            | Private SSH key for the `deploy` user                      |
+| `VPS_KNOWN_HOSTS`        | Pinned SSH host key entries for the deploy target          |
+| `DATABASE_HOST`          | For the current compose stack, use `postgres`              |
+| `DATABASE_PORT`          | For the current compose stack, use `5432`                  |
+| `DATABASE_USER`          | Database role used by the backend                          |
+| `DATABASE_PASSWORD`      | Database password                                          |
+| `DATABASE_NAME`          | Database name                                              |
+| `JWT_SECRET`             | JWT signing secret, minimum 32 characters                  |
+| `REDIS_PASSWORD`         | Redis auth password                                        |
+| `ALLOWED_ORIGIN`         | Frontend origin allowed by backend CORS                    |
+| `FRONTEND_URL`           | Frontend base URL used in password-reset links             |
+| `B2_ACCOUNT_ID`          | Backblaze B2 account id                                    |
+| `B2_APPLICATION_KEY`     | Backblaze B2 application key                               |
+| `B2_BUCKET`              | Backblaze B2 bucket name                                   |
+| `SENTRY_DSN`             | Sentry DSN for backend error reporting                     |
 | `BACKUP_HEALTHCHECK_URL` | Production backup healthcheck URL; can be blank in staging |
-| `UEX_API_KEY` | Optional UEX upstream API key |
+| `UEX_API_KEY`            | Optional UEX upstream API key                              |
 
 See [infra/docs/secrets.md](/tmp/station-issue-128/infra/docs/secrets.md) for the full inventory and rotation procedures.
 
