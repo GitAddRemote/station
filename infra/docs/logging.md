@@ -20,7 +20,9 @@ Pino numeric levels: `10`=trace, `20`=debug, `30`=info, `40`=warn, `50`=error, `
 
 ## Structured fields
 
-Every log line is a JSON object. Key fields emitted by `pino-http`:
+In production, each log line is a JSON object written to stdout. In development, `pino-pretty` transforms the same JSON into human-readable coloured output — the underlying data is identical, only the presentation differs.
+
+Key fields emitted by `pino-http`:
 
 - `level` — numeric severity
 - `msg` — log message
@@ -30,7 +32,7 @@ Every log line is a JSON object. Key fields emitted by `pino-http`:
 - `res.statusCode` — response status
 - `responseTime` — request duration in ms
 
-Sensitive fields are redacted before emission: `req.headers.authorization` and `req.body.password` are replaced with `[Redacted]`.
+Redaction: `req.headers.authorization` is actively redacted on every request. `req.body.password` is listed in the redact config as a safety guard, but `pino-http` does not serialize the request body by default so it will not appear in logs unless body logging is explicitly enabled.
 
 ## Viewing logs locally
 
