@@ -1,14 +1,16 @@
 import { Strategy } from 'passport-local';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { AuthService } from './auth.service';
 import { User } from '../users/user.entity';
 
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
-  private readonly logger = new Logger(LocalStrategy.name);
-
-  constructor(private readonly authService: AuthService) {
+  constructor(
+    private readonly logger: Logger,
+    private readonly authService: AuthService,
+  ) {
     super({
       usernameField: 'username', // in case you're using email instead
       passwordField: 'password',

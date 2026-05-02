@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 import { CustomThrottlerGuard } from './common/guards/throttler.guard';
 import { redisStore } from 'cache-manager-redis-yet';
 import { UsersModule } from './modules/users/users.module';
@@ -39,6 +40,22 @@ if (!isTest) {
 
 @Module({
   imports: [
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: isTest
+          ? 'silent'
+          : process.env.NODE_ENV === 'production'
+            ? 'warn'
+            : 'debug',
+        autoLogging: true,
+        redact: ['req.headers.authorization', 'req.body.password'],
+        genReqId: () => crypto.randomUUID(),
+        transport:
+          !isTest && process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty' }
+            : undefined,
+      },
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: envValidationSchema,

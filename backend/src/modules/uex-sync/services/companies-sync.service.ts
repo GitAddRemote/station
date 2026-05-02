@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UexCompany } from '../../uex/entities/uex-company.entity';
@@ -18,9 +19,8 @@ export interface SyncResult {
 
 @Injectable()
 export class CompaniesSyncService {
-  private readonly logger = new Logger(CompaniesSyncService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(UexCompany)
     private readonly companyRepository: Repository<UexCompany>,
     private readonly uexClient: UEXCompaniesClient,

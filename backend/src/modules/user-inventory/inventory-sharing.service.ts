@@ -3,8 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
-  Logger,
 } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
@@ -13,9 +13,8 @@ import { ShareItemDto } from './dto/share-item.dto';
 
 @Injectable()
 export class InventorySharingService {
-  private readonly logger = new Logger(InventorySharingService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(UserInventoryItem)
     private readonly inventoryRepository: Repository<UserInventoryItem>,
     @InjectRepository(InventoryAuditLog)

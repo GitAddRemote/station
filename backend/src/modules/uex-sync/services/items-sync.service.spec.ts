@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from 'nestjs-pino';
 import { ItemsSyncService } from './items-sync.service';
 import { UexItem } from '../../uex/entities/uex-item.entity';
 import { UexCategory } from '../../uex/entities/uex-category.entity';
@@ -66,6 +67,15 @@ describe('ItemsSyncService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ItemsSyncService,
+        {
+          provide: Logger,
+          useValue: {
+            log: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
         {
           provide: getRepositoryToken(UexItem),
           useValue: mockItemRepository,

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Location, LocationType } from './entities/location.entity';
@@ -21,9 +22,8 @@ export interface PopulationResult {
 
 @Injectable()
 export class LocationPopulationService {
-  private readonly logger = new Logger(LocationPopulationService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(Location)
     private readonly locationRepository: Repository<Location>,
     @InjectRepository(Game)

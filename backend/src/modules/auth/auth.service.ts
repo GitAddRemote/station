@@ -18,7 +18,7 @@ import * as crypto from 'crypto';
 import { User } from '../users/user.entity';
 import { UserDto } from '../users/dto/user.dto';
 import { PasswordReset } from './password-reset.entity';
-import { Logger } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { ValidatedUser } from './interfaces/validated-user.interface';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -41,11 +41,11 @@ const REFRESH_TTL_MS = REFRESH_TTL_SECONDS * 1000;
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
   private readonly dummyHash =
     '$2b$10$CwTycUXWue0Thq9StjUM0uJ8WZ0p/7eJYJg6eW9j5Cnz4Gf5Eme1e';
 
   constructor(
+    private readonly logger: Logger,
     private usersService: UsersService,
     private systemUserService: SystemUserService,
     private jwtService: JwtService,

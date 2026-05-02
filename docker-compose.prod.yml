@@ -71,6 +71,17 @@ services:
       retries: 3
       start_period: 5s
 
+  vector:
+    image: timberio/vector:0.39-alpine
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infra/vector.toml:/etc/vector/vector.toml:ro
+    environment:
+      LOGTAIL_SOURCE_TOKEN: ${LOGTAIL_SOURCE_TOKEN:-}
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   redis_aof:

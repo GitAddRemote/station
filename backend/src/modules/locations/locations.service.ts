@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Location, LocationType } from './entities/location.entity';
@@ -15,10 +16,10 @@ import { createHash } from 'crypto';
 
 @Injectable()
 export class LocationsService {
-  private readonly logger = new Logger(LocationsService.name);
   private populatingLocations = false;
 
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(Location)
     private readonly locationRepository: Repository<Location>,
     private readonly locationPopulationService: LocationPopulationService,

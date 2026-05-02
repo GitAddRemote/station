@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { CategoriesSyncService } from '../services/categories-sync.service';
@@ -7,9 +8,8 @@ import { LocationsSyncService } from '../services/locations-sync.service';
 
 @Injectable()
 export class UEXSyncScheduler {
-  private readonly logger = new Logger(UEXSyncScheduler.name);
-
   constructor(
+    private readonly logger: Logger,
     private readonly categoriesSync: CategoriesSyncService,
     private readonly itemsSync: ItemsSyncService,
     private readonly locationsSync: LocationsSyncService,

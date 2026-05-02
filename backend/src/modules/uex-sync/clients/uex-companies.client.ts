@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -28,11 +29,11 @@ export interface UEXCompanyFilters {
 
 @Injectable()
 export class UEXCompaniesClient {
-  private readonly logger = new Logger(UEXCompaniesClient.name);
   private readonly baseUrl: string;
   private readonly timeout: number;
 
   constructor(
+    private readonly logger: Logger,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
