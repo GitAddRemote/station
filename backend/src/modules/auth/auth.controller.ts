@@ -145,9 +145,14 @@ export class AuthController {
     // When a scope parameter is present, every requested scope must be in the
     // client's registered set — silently dropping unknown scopes would let callers
     // mint tokens without realising their scope request was partially ignored.
-    const requestedScopes = dto.scope
+    const parsedScopes = dto.scope
       ? dto.scope.split(' ').filter(Boolean)
       : null;
+    // Treat a whitespace-only scope string (e.g. scope="+") as absent so it
+    // falls back to the client's full registered set rather than minting an
+    // empty-scope token.
+    const requestedScopes =
+      parsedScopes && parsedScopes.length > 0 ? parsedScopes : null;
 
     if (requestedScopes) {
       const unauthorized = requestedScopes.filter(

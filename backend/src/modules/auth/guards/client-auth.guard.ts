@@ -52,9 +52,11 @@ export class ClientAuthGuard implements CanActivate {
   }
 
   private extractToken(req: Request): string | null {
-    const auth = req.headers.authorization;
-    if (auth?.startsWith('Bearer ')) {
-      return auth.slice(7);
+    const auth = Array.isArray(req.headers.authorization)
+      ? req.headers.authorization[0]
+      : req.headers.authorization;
+    if (auth?.match(/^bearer /i)) {
+      return auth.slice(auth.indexOf(' ') + 1);
     }
     return null;
   }

@@ -31,10 +31,7 @@ export class InternalApiKeyGuard implements CanActivate {
     const normalize = (h: string | string[] | undefined): string =>
       Array.isArray(h) ? (h[0] ?? '') : (h ?? '');
 
-    const apiKeyHeader = normalize(req.headers['x-internal-api-key']);
-    const authorizationHeader = normalize(req.headers['authorization']);
-    const provided =
-      apiKeyHeader || authorizationHeader.replace(/^ApiKey\s+/i, '');
+    const provided = normalize(req.headers['x-internal-api-key']);
 
     const providedBuf = Buffer.from(provided);
     const apiKeyBuf = Buffer.from(apiKey);

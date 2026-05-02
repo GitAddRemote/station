@@ -8,6 +8,10 @@ import { OauthClient } from '../src/modules/oauth-clients/oauth-client.entity';
 import { OauthClientsService } from '../src/modules/oauth-clients/oauth-clients.service';
 import { seedSystemUser } from './helpers/seed-system-user';
 
+// Set before the module compiles so ConfigService sees it during app init.
+const INTERNAL_API_KEY = 'e2e-internal-api-key-value-min-32chars!';
+process.env['INTERNAL_API_KEY'] = INTERNAL_API_KEY;
+
 describe('OAuth Client Credentials (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
@@ -174,7 +178,33 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 8. Authorization: Basic header is accepted as an alternative to body params
+  // 8. Happy-path POST /oauth-clients with a valid INTERNAL_API_KEY
+  // ---------------------------------------------------------------------------
+  it('should register a client when the internal API key is valid', async () => {
+    const repo = dataSource.getRepository(OauthClient);
+    try {
+      const res = await request(app.getHttpServer())
+        .post('/oauth-clients')
+        .set('x-internal-api-key', INTERNAL_API_KEY)
+        .send({
+          clientId: 'e2e-admin-created-bot',
+          clientSecret: 'e2e-admin-secret-value-long-enough-here',
+          scopes: ['bot:api'],
+        })
+        .expect(201);
+
+      expect(res.body).toMatchObject({
+        clientId: 'e2e-admin-created-bot',
+        scopes: expect.arrayContaining(['bot:api']),
+      });
+      expect(typeof res.body.id).toBe('string');
+    } finally {
+      await repo.delete({ clientId: 'e2e-admin-created-bot' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 9. Authorization: Basic header is accepted as an alternative to body params
   // ---------------------------------------------------------------------------
   it('should accept client credentials via Authorization: Basic header', async () => {
     const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString(
@@ -192,7 +222,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 9. application/x-www-form-urlencoded body is accepted (OAuth spec format)
+  // 10. application/x-www-form-urlencoded body is accepted (OAuth spec format)
   // ---------------------------------------------------------------------------
   it('should accept credentials submitted as application/x-www-form-urlencoded', async () => {
     const res = await request(app.getHttpServer())
@@ -208,7 +238,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 10. Requested scope is a valid subset of the registered scopes
+  // 11. Requested scope is a valid subset of the registered scopes
   // ---------------------------------------------------------------------------
   it('should mint a token containing only the requested subset of scopes', async () => {
     const repo = dataSource.getRepository(OauthClient);
@@ -241,7 +271,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 11. Requesting a scope not in the registered set → 401
+  // 12. Requesting a scope not in the registered set → 401
   // ---------------------------------------------------------------------------
   it('should reject a scope not registered for the client', async () => {
     await request(app.getHttpServer())
