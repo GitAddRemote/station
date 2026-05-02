@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from 'nestjs-pino';
 import { LocationsSyncService } from './locations-sync.service';
 import { UexStarSystem } from '../../uex/entities/uex-star-system.entity';
 import { UexPlanet } from '../../uex/entities/uex-planet.entity';
@@ -66,6 +67,15 @@ describe('LocationsSyncService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LocationsSyncService,
+        {
+          provide: Logger,
+          useValue: {
+            log: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
         {
           provide: getRepositoryToken(UexStarSystem),
           useValue: mockStarSystemRepository,

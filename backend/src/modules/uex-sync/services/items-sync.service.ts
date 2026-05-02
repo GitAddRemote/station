@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -30,7 +31,6 @@ export interface CategorySyncResult {
 
 @Injectable()
 export class ItemsSyncService {
-  private readonly logger = new Logger(ItemsSyncService.name);
   private readonly batchSize: number;
   private readonly concurrentCategories: number;
   private readonly maxRetries: number;
@@ -38,6 +38,7 @@ export class ItemsSyncService {
   private readonly rateLimitPauseMs: number;
 
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(UexItem)
     private readonly itemRepository: Repository<UexItem>,
     @InjectRepository(UexCategory)

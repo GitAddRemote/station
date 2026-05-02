@@ -1,4 +1,5 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -6,11 +7,11 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class SystemUserService implements OnModuleInit {
-  private readonly logger = new Logger(SystemUserService.name);
   private systemUserId: number | null = null;
   private readonly SYSTEM_USER_ID = 1; // Reserved ID for system user
 
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(User)
     private usersRepository: Repository<User>,
   ) {}

@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, OnApplicationBootstrap, Optional } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,9 +10,8 @@ import { DEFAULT_CLEANUP_CRON } from './token-cleanup.constants';
 
 @Injectable()
 export class TokenCleanupService implements OnApplicationBootstrap {
-  private readonly logger = new Logger(TokenCleanupService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(PasswordReset)
     private readonly passwordResetRepository: Repository<PasswordReset>,
     private readonly configService: ConfigService,

@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
@@ -12,9 +13,8 @@ import {
 
 @Injectable()
 export class UserInventoryService {
-  private readonly logger = new Logger(UserInventoryService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(UserInventoryItem)
     private readonly inventoryRepository: Repository<UserInventoryItem>,
   ) {}

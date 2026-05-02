@@ -1,4 +1,5 @@
-import { Injectable, Logger, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, IsNull } from 'typeorm';
 import { UexSyncState, SyncStatus } from './uex-sync-state.entity';
@@ -21,10 +22,10 @@ export interface SyncResult {
 
 @Injectable()
 export class UexSyncService {
-  private readonly logger = new Logger(UexSyncService.name);
   private readonly LOCK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(UexSyncState)
     private syncStateRepository: Repository<UexSyncState>,
     @InjectRepository(UexSyncConfig)

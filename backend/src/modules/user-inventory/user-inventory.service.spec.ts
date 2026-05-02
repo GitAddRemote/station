@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { UserInventoryService } from './user-inventory.service';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
 import {
@@ -82,6 +83,15 @@ describe('UserInventoryService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserInventoryService,
+        {
+          provide: Logger,
+          useValue: {
+            log: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
         {
           provide: getRepositoryToken(UserInventoryItem),
           useValue: {

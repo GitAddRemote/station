@@ -6,28 +6,27 @@ Station writes runtime environment files to the VPS during each deploy. Secrets 
 
 Use GitHub repository environments for `staging` and `production`. Store the following environment-scoped secrets in each environment:
 
-| Secret | staging | production | Notes |
-| --- | --- | --- | --- |
-| `VPS_HOST` | Yes | Yes | VPS public IP or hostname. Can be the same value in both environments. |
-| `VPS_USER` | Yes | Yes | Deploy user, typically `deploy`. |
-| `VPS_SSH_KEY` | Yes | Yes | Private SSH key for the deploy user. |
-| `VPS_KNOWN_HOSTS` | Yes | Yes | Pinned host key entries for the deploy target. |
-| `DATABASE_HOST` | Yes | Yes | For the current compose stack, use `postgres`. |
-| `DATABASE_PORT` | Yes | Yes | For the current compose stack, use `5432`. |
-| `DATABASE_USER` | Yes | Yes | Database role used by the backend and Postgres container bootstrap. |
-| `DATABASE_PASSWORD` | Yes | Yes | Generate with `openssl rand -base64 32`. |
-| `DATABASE_NAME` | Yes | Yes | Example: `stationDb` / `stationStagingDb`. |
-| `JWT_SECRET` | Yes | Yes | Generate with `openssl rand -base64 48`. Minimum 32 characters. |
-| `REDIS_PASSWORD` | Yes | Yes | Generate with `openssl rand -base64 24`. |
-| `ALLOWED_ORIGIN` | Yes | Yes | `https://staging.station.drdnt.org` / `https://station.drdnt.org`. |
-| `FRONTEND_URL` | Yes | Yes | Used in password-reset links. Should match the frontend URL. |
-| `B2_ACCOUNT_ID` | Optional | Yes | Needed for production PostgreSQL backups to Backblaze B2. |
-| `B2_APPLICATION_KEY` | Optional | Yes | Needed for production PostgreSQL backups to Backblaze B2. |
-| `B2_BUCKET` | Optional | Yes | Example: `station-backups`. |
-| `SENTRY_DSN` | Optional | Optional | Needed once Sentry is enabled. |
-| `LOGTAIL_SOURCE_TOKEN` | Optional | Optional | Needed once log aggregation is enabled. |
+| Secret                   | staging  | production  | Notes                                                                    |
+| ------------------------ | -------- | ----------- | ------------------------------------------------------------------------ |
+| `VPS_HOST`               | Yes      | Yes         | VPS public IP or hostname. Can be the same value in both environments.   |
+| `VPS_USER`               | Yes      | Yes         | Deploy user, typically `deploy`.                                         |
+| `VPS_SSH_KEY`            | Yes      | Yes         | Private SSH key for the deploy user.                                     |
+| `VPS_KNOWN_HOSTS`        | Yes      | Yes         | Pinned host key entries for the deploy target.                           |
+| `DATABASE_HOST`          | Yes      | Yes         | For the current compose stack, use `postgres`.                           |
+| `DATABASE_PORT`          | Yes      | Yes         | For the current compose stack, use `5432`.                               |
+| `DATABASE_USER`          | Yes      | Yes         | Database role used by the backend and Postgres container bootstrap.      |
+| `DATABASE_PASSWORD`      | Yes      | Yes         | Generate with `openssl rand -base64 32`.                                 |
+| `DATABASE_NAME`          | Yes      | Yes         | Example: `stationDb` / `stationStagingDb`.                               |
+| `JWT_SECRET`             | Yes      | Yes         | Generate with `openssl rand -base64 48`. Minimum 32 characters.          |
+| `REDIS_PASSWORD`         | Yes      | Yes         | Generate with `openssl rand -base64 24`.                                 |
+| `ALLOWED_ORIGIN`         | Yes      | Yes         | `https://staging.station.drdnt.org` / `https://station.drdnt.org`.       |
+| `FRONTEND_URL`           | Yes      | Yes         | Used in password-reset links. Should match the frontend URL.             |
+| `B2_ACCOUNT_ID`          | Optional | Yes         | Needed for production PostgreSQL backups to Backblaze B2.                |
+| `B2_APPLICATION_KEY`     | Optional | Yes         | Needed for production PostgreSQL backups to Backblaze B2.                |
+| `B2_BUCKET`              | Optional | Yes         | Example: `station-backups`.                                              |
+| `SENTRY_DSN`             | Optional | Optional    | Needed once Sentry is enabled.                                           |
 | `BACKUP_HEALTHCHECK_URL` | Optional | Recommended | Production backup dead-man switch URL. Leave blank in staging if unused. |
-| `UEX_API_KEY` | Optional | Optional | Leave blank unless the upstream API requires it. |
+| `UEX_API_KEY`            | Optional | Optional    | Leave blank unless the upstream API requires it.                         |
 
 ## Deploy-Time Environment Files
 

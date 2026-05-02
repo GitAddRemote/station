@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -43,7 +44,6 @@ export interface LocationsSyncResult {
 
 @Injectable()
 export class LocationsSyncService {
-  private readonly logger = new Logger(LocationsSyncService.name);
   private readonly maxRetries: number;
   private readonly backoffBase: number;
   private readonly pauseBetweenEndpointsMs: number;
@@ -60,6 +60,7 @@ export class LocationsSyncService {
   ];
 
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(UexStarSystem)
     private readonly starSystemRepository: Repository<UexStarSystem>,
     @InjectRepository(UexPlanet)

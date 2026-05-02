@@ -12,6 +12,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -77,6 +78,15 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        {
+          provide: Logger,
+          useValue: {
+            log: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
         { provide: UsersService, useValue: mockUsersService },
         { provide: SystemUserService, useValue: mockSystemUserService },
         { provide: JwtService, useValue: mockJwtService },

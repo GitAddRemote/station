@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Logger } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { LocationPopulationService } from './location-population.service';
 import { SystemUserService } from '../users/system-user.service';
 import { Location } from './entities/location.entity';
@@ -35,6 +35,15 @@ describe('LocationPopulationService', () => {
     module = await Test.createTestingModule({
       providers: [
         LocationPopulationService,
+        {
+          provide: Logger,
+          useValue: {
+            log: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
         {
           provide: getRepositoryToken(Location),
           useValue: {
@@ -121,11 +130,6 @@ describe('LocationPopulationService', () => {
 
     service = module.get<LocationPopulationService>(LocationPopulationService);
     gameRepository = module.get<Repository<Game>>(getRepositoryToken(Game));
-
-    // Suppress logger output during tests
-    jest.spyOn(Logger.prototype, 'log').mockImplementation();
-    jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-    jest.spyOn(Logger.prototype, 'error').mockImplementation();
   });
 
   afterEach(() => {

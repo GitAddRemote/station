@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role } from '../../modules/roles/role.entity';
@@ -11,9 +12,8 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class DatabaseSeederService {
-  private readonly logger = new Logger(DatabaseSeederService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(Role)
     private rolesRepository: Repository<Role>,
     @InjectRepository(Organization)
