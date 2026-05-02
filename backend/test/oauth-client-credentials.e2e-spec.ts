@@ -8,9 +8,7 @@ import { OauthClient } from '../src/modules/oauth-clients/oauth-client.entity';
 import { OauthClientsService } from '../src/modules/oauth-clients/oauth-clients.service';
 import { seedSystemUser } from './helpers/seed-system-user';
 
-// Set before the module compiles so ConfigService sees it during app init.
 const INTERNAL_API_KEY = 'e2e-internal-api-key-value-min-32chars!';
-process.env['INTERNAL_API_KEY'] = INTERNAL_API_KEY;
 
 describe('OAuth Client Credentials (e2e)', () => {
   let app: INestApplication;
@@ -18,8 +16,14 @@ describe('OAuth Client Credentials (e2e)', () => {
   let oauthClientsService: OauthClientsService;
   const CLIENT_ID = 'e2e-test-bot';
   const CLIENT_SECRET = 'e2e-test-secret-value-min-32-chars!!';
+  let previousInternalApiKey: string | undefined;
 
   beforeAll(async () => {
+    // Set before the module compiles so ConfigService sees it during app init.
+    // Capture the prior value so afterAll can restore it and avoid leaking
+    // into other e2e suites that share the same Jest worker process.
+    previousInternalApiKey = process.env['INTERNAL_API_KEY'];
+    process.env['INTERNAL_API_KEY'] = INTERNAL_API_KEY;
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -47,6 +51,12 @@ describe('OAuth Client Credentials (e2e)', () => {
     const repo = dataSource.getRepository(OauthClient);
     await repo.delete({ clientId: CLIENT_ID });
     await app?.close();
+    // Restore the previous value so this suite doesn't affect others.
+    if (previousInternalApiKey === undefined) {
+      delete process.env['INTERNAL_API_KEY'];
+    } else {
+      process.env['INTERNAL_API_KEY'] = previousInternalApiKey;
+    }
   });
 
   // ---------------------------------------------------------------------------

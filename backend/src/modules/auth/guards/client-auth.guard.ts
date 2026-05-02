@@ -56,7 +56,7 @@ export class ClientAuthGuard implements CanActivate {
       ? req.headers.authorization[0]
       : req.headers.authorization;
     if (auth?.match(/^bearer /i)) {
-      return auth.slice(auth.indexOf(' ') + 1);
+      return auth.slice(auth.indexOf(' ') + 1).trim();
     }
     return null;
   }
