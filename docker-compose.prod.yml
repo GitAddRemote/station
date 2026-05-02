@@ -1,6 +1,7 @@
 services:
   backend:
     image: ghcr.io/gitaddremote/station-backend:${STATION_VERSION:-latest}
+    container_name: station-backend
     restart: unless-stopped
     env_file:
       - .env.production

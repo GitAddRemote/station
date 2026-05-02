@@ -98,7 +98,7 @@ station/
 
 ### Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20
 - pnpm >= 8
 - Docker & Docker Compose (for PostgreSQL and Redis)
 

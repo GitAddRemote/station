@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Module, DynamicModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -49,7 +50,7 @@ if (!isTest) {
             : 'debug',
         autoLogging: true,
         redact: ['req.headers.authorization', 'req.body.password'],
-        genReqId: () => crypto.randomUUID(),
+        genReqId: () => randomUUID(),
         transport:
           !isTest && process.env.NODE_ENV !== 'production'
             ? { target: 'pino-pretty' }

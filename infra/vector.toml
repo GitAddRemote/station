@@ -1,6 +1,8 @@
 [sources.docker_logs]
 type = "docker_logs"
-include_containers = ["station-backend-1"]
+# Match by Compose service label so the name is stable regardless of project
+# name or scale index (docker-compose.prod.yml sets container_name as a fallback)
+include_label_groups = [{ "com.docker.compose.service" = "backend" }]
 
 [transforms.parse_pino]
 type = "remap"
@@ -9,6 +11,10 @@ source = '''
 parsed, err = parse_json(.message)
 if err == null {
   . = merge(., parsed)
+} else {
+  # Non-JSON line (NestJS startup banner, console.*, plain stderr) — forward as warn
+  .level = 40
+  .msg = .message
 }
 '''
 
@@ -17,7 +23,7 @@ type = "filter"
 inputs = ["parse_pino"]
 # Pino level numbers: 40=warn, 50=error, 60=fatal
 # Only ship warn+ to stay within Logtail free tier (1 GB/month)
-condition = 'exists(.level) && is_integer(.level) && .level >= 40'
+condition = 'is_integer(.level) && .level >= 40'
 
 [transforms.guard_token]
 type = "filter"
