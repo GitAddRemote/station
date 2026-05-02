@@ -45,6 +45,18 @@ resource "linode_domain_record" "station" {
   }
 }
 
+resource "linode_domain_record" "status_cname" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "status"
+  record_type = "CNAME"
+  target      = "stats.uptimerobot.com"
+  ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "linode_domain_record" "bot" {
   domain_id   = linode_domain.drdnt_org.id
   name        = "bot"

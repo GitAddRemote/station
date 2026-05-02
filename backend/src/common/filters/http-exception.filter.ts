@@ -6,6 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/nestjs';
 
 interface HttpExceptionResponse {
   message?: string | string[];
@@ -21,6 +22,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
+
+    // Capture server errors in Sentry; 4xx are client errors, not app bugs.
+    if (status >= 500) {
+      Sentry.captureException(exception);
+    }
 
     let message: string | string[] = 'An error occurred';
     let errors: unknown = undefined;
@@ -61,6 +67,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    // All non-HttpException errors are unhandled — always capture in Sentry.
+    if (!(exception instanceof HttpException) || status >= 500) {
+      Sentry.captureException(exception);
+    }
 
     const message =
       exception instanceof HttpException
