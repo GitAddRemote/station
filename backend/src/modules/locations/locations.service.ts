@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Location, LocationType } from './entities/location.entity';
@@ -19,7 +19,8 @@ export class LocationsService {
   private populatingLocations = false;
 
   constructor(
-    private readonly logger: Logger,
+    @InjectPinoLogger(LocationsService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(Location)
     private readonly locationRepository: Repository<Location>,
     private readonly locationPopulationService: LocationPopulationService,
@@ -167,7 +168,7 @@ export class LocationsService {
 
     const saved = await this.locationRepository.save(location);
 
-    this.logger.log(`Created location ${saved.id}: ${saved.displayName}`);
+    this.logger.info(`Created location ${saved.id}: ${saved.displayName}`);
 
     return this.toDto(saved);
   }
@@ -185,7 +186,7 @@ export class LocationsService {
 
     const saved = await this.locationRepository.save(location);
 
-    this.logger.log(`Updated location ${saved.id}: ${saved.displayName}`);
+    this.logger.info(`Updated location ${saved.id}: ${saved.displayName}`);
 
     return this.toDto(saved);
   }
@@ -200,7 +201,7 @@ export class LocationsService {
 
     await this.locationRepository.save(location);
 
-    this.logger.log(`Deleted location ${id}`);
+    this.logger.info(`Deleted location ${id}`);
   }
 
   private async ensureLocationsPopulated(gameId: number): Promise<void> {

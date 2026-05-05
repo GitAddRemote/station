@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Logger } from 'nestjs-pino';
+import { getLoggerToken } from 'nestjs-pino';
 import { SystemUserService } from './system-user.service';
 import { User } from './user.entity';
 
@@ -26,9 +26,9 @@ describe('SystemUserService', () => {
       providers: [
         SystemUserService,
         {
-          provide: Logger,
+          provide: getLoggerToken(SystemUserService.name),
           useValue: {
-            log: jest.fn(),
+            info: jest.fn(),
             warn: jest.fn(),
             error: jest.fn(),
             debug: jest.fn(),

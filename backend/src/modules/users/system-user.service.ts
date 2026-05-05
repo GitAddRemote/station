@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -11,14 +11,15 @@ export class SystemUserService implements OnModuleInit {
   private readonly SYSTEM_USER_ID = 1; // Reserved ID for system user
 
   constructor(
-    private readonly logger: Logger,
+    @InjectPinoLogger(SystemUserService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(User)
     private usersRepository: Repository<User>,
   ) {}
 
   async onModuleInit(): Promise<void> {
     // Cache system user ID at startup
-    this.logger.log('Initializing system user service...');
+    this.logger.info('Initializing system user service...');
 
     let systemUser = await this.usersRepository.findOne({
       where: { id: this.SYSTEM_USER_ID, isSystemUser: true },
@@ -40,7 +41,7 @@ export class SystemUserService implements OnModuleInit {
     }
 
     this.systemUserId = systemUser.id;
-    this.logger.log(`System user initialized with ID: ${this.systemUserId}`);
+    this.logger.info(`System user initialized with ID: ${this.systemUserId}`);
   }
 
   private async createSystemUser(): Promise<User> {

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -28,7 +28,8 @@ export class CategoriesSyncService {
   private readonly backoffBase: number;
 
   constructor(
-    private readonly logger: Logger,
+    @InjectPinoLogger(CategoriesSyncService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(UexCategory)
     private readonly categoryRepository: Repository<UexCategory>,
     private readonly uexClient: UEXCategoriesClient,
@@ -60,11 +61,11 @@ export class CategoriesSyncService {
 
       if (useDelta && syncDecision.lastSyncAt) {
         filters.date_modified = syncDecision.lastSyncAt;
-        this.logger.log(
+        this.logger.info(
           `Using delta sync with lastSyncAt: ${syncDecision.lastSyncAt.toISOString()}`,
         );
       } else {
-        this.logger.log(`Using full sync. Reason: ${syncDecision.reason}`);
+        this.logger.info(`Using full sync. Reason: ${syncDecision.reason}`);
       }
 
       // Fetch with retry logic
@@ -87,7 +88,7 @@ export class CategoriesSyncService {
         durationMs,
       });
 
-      this.logger.log(
+      this.logger.info(
         `Categories sync completed: ${useDelta ? 'delta' : 'full'} mode, ` +
           `created: ${result.created}, updated: ${result.updated}, ` +
           `deleted: ${result.deleted}, duration: ${durationMs}ms`,
@@ -224,7 +225,7 @@ export class CategoriesSyncService {
           deleted = result.affected || 0;
 
           if (deleted > 0) {
-            this.logger.log(`Marked ${deleted} categories as deleted`);
+            this.logger.info(`Marked ${deleted} categories as deleted`);
           }
         }
       },

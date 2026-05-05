@@ -4,7 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { PasswordReset } from './password-reset.entity';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
-import { Logger } from 'nestjs-pino';
+import { getLoggerToken } from 'nestjs-pino';
 
 const INVALID_CRON_EXPRESSIONS = new Set(['not-a-valid-cron']);
 jest.mock('cron', () => ({
@@ -50,9 +50,9 @@ describe('TokenCleanupService', () => {
       providers: [
         TokenCleanupService,
         {
-          provide: Logger,
+          provide: getLoggerToken(TokenCleanupService.name),
           useValue: {
-            log: jest.fn(),
+            info: jest.fn(),
             warn: jest.fn(),
             error: jest.fn(),
             debug: jest.fn(),

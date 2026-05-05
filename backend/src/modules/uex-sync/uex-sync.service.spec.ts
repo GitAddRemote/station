@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { getLoggerToken } from 'nestjs-pino';
 import { UexSyncService } from './uex-sync.service';
 import { UexSyncState, SyncStatus } from './uex-sync-state.entity';
 import { UexSyncConfig } from './uex-sync-config.entity';
@@ -29,9 +29,9 @@ describe('UexSyncService', () => {
       providers: [
         UexSyncService,
         {
-          provide: Logger,
+          provide: getLoggerToken(UexSyncService.name),
           useValue: {
-            log: jest.fn(),
+            info: jest.fn(),
             warn: jest.fn(),
             error: jest.fn(),
             debug: jest.fn(),

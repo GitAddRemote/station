@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Logger } from 'nestjs-pino';
+import { getLoggerToken } from 'nestjs-pino';
 import { Repository } from 'typeorm';
 import { DatabaseSeederService } from './database-seeder.service';
 import { Role } from '../../modules/roles/role.entity';
@@ -22,7 +22,7 @@ describe('DatabaseSeederService', () => {
   let userOrgRolesRepository: Repository<UserOrganizationRole>;
   let gamesRepository: Repository<Game>;
   const mockLogger = {
-    log: jest.fn(),
+    info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
@@ -68,7 +68,7 @@ describe('DatabaseSeederService', () => {
   };
 
   beforeEach(async () => {
-    mockLogger.log.mockClear();
+    mockLogger.info.mockClear();
     mockLogger.warn.mockClear();
     mockLogger.error.mockClear();
     mockLogger.debug.mockClear();
@@ -78,7 +78,7 @@ describe('DatabaseSeederService', () => {
       providers: [
         DatabaseSeederService,
         {
-          provide: Logger,
+          provide: getLoggerToken(DatabaseSeederService.name),
           useValue: mockLogger,
         },
         {

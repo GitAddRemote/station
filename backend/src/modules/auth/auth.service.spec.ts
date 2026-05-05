@@ -12,7 +12,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { getLoggerToken } from 'nestjs-pino';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -79,9 +79,9 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         {
-          provide: Logger,
+          provide: getLoggerToken(AuthService.name),
           useValue: {
-            log: jest.fn(),
+            info: jest.fn(),
             warn: jest.fn(),
             error: jest.fn(),
             debug: jest.fn(),

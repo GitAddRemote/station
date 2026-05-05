@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UexCompany } from '../../uex/entities/uex-company.entity';
@@ -20,7 +20,8 @@ export interface SyncResult {
 @Injectable()
 export class CompaniesSyncService {
   constructor(
-    private readonly logger: Logger,
+    @InjectPinoLogger(CompaniesSyncService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(UexCompany)
     private readonly companyRepository: Repository<UexCompany>,
     private readonly uexClient: UEXCompaniesClient,
@@ -68,7 +69,7 @@ export class CompaniesSyncService {
         syncMode: 'full',
       });
 
-      this.logger.log(
+      this.logger.info(
         `Companies sync completed: created ${result.created}, updated ${result.updated}, duration ${durationMs}ms`,
       );
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -38,7 +38,8 @@ export class ItemsSyncService {
   private readonly rateLimitPauseMs: number;
 
   constructor(
-    private readonly logger: Logger,
+    @InjectPinoLogger(ItemsSyncService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(UexItem)
     private readonly itemRepository: Repository<UexItem>,
     @InjectRepository(UexCategory)
@@ -104,7 +105,7 @@ export class ItemsSyncService {
         };
       }
 
-      this.logger.log(
+      this.logger.info(
         `Starting items sync: ${useDelta ? 'delta' : 'full'} mode, ` +
           `${categories.length} categories to process`,
       );
@@ -145,7 +146,7 @@ export class ItemsSyncService {
         durationMs,
       });
 
-      this.logger.log(
+      this.logger.info(
         `Items sync completed: ${useDelta ? 'delta' : 'full'} mode, ` +
           `created: ${totalResult.created}, updated: ${totalResult.updated}, ` +
           `deleted: ${deleted}, duration: ${durationMs}ms`,
@@ -253,7 +254,7 @@ export class ItemsSyncService {
       companySet,
     );
 
-    this.logger.log(
+    this.logger.info(
       `Synced ${items.length} items for category ${category.name}: ` +
         `created: ${result.created}, updated: ${result.updated}`,
     );

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { getLoggerToken } from 'nestjs-pino';
 import { LocationsService } from './locations.service';
 import { Location, LocationType } from './entities/location.entity';
 import {
@@ -69,9 +69,9 @@ describe('LocationsService', () => {
       providers: [
         LocationsService,
         {
-          provide: Logger,
+          provide: getLoggerToken(LocationsService.name),
           useValue: {
-            log: jest.fn(),
+            info: jest.fn(),
             warn: jest.fn(),
             error: jest.fn(),
             debug: jest.fn(),

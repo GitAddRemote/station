@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Logger } from 'nestjs-pino';
+import { getLoggerToken } from 'nestjs-pino';
 import { LocationsSyncService } from './locations-sync.service';
 import { UexStarSystem } from '../../uex/entities/uex-star-system.entity';
 import { UexPlanet } from '../../uex/entities/uex-planet.entity';
@@ -68,9 +68,9 @@ describe('LocationsSyncService', () => {
       providers: [
         LocationsSyncService,
         {
-          provide: Logger,
+          provide: getLoggerToken(LocationsSyncService.name),
           useValue: {
-            log: jest.fn(),
+            info: jest.fn(),
             warn: jest.fn(),
             error: jest.fn(),
             debug: jest.fn(),

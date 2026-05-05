@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -60,7 +60,8 @@ export class LocationsSyncService {
   ];
 
   constructor(
-    private readonly logger: Logger,
+    @InjectPinoLogger(LocationsSyncService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(UexStarSystem)
     private readonly starSystemRepository: Repository<UexStarSystem>,
     @InjectRepository(UexPlanet)
@@ -100,13 +101,13 @@ export class LocationsSyncService {
     let totalUpdated = 0;
     let totalDeleted = 0;
 
-    this.logger.log('Starting full locations sync');
+    this.logger.info('Starting full locations sync');
 
     for (let i = 0; i < this.syncOrder.length; i++) {
       const endpoint = this.syncOrder[i];
 
       try {
-        this.logger.log(
+        this.logger.info(
           `Syncing ${endpoint} (${i + 1}/${this.syncOrder.length})`,
         );
 
@@ -122,7 +123,7 @@ export class LocationsSyncService {
         totalUpdated += result.updated;
         totalDeleted += result.deleted;
 
-        this.logger.log(
+        this.logger.info(
           `Completed ${endpoint}: created ${result.created}, updated ${result.updated}, deleted ${result.deleted}`,
         );
 
@@ -140,7 +141,7 @@ export class LocationsSyncService {
 
     const totalDurationMs = Date.now() - startTime;
 
-    this.logger.log(
+    this.logger.info(
       `Full locations sync completed: ` +
         `total created: ${totalCreated}, updated: ${totalUpdated}, ` +
         `deleted: ${totalDeleted}, duration: ${totalDurationMs}ms`,
@@ -171,11 +172,11 @@ export class LocationsSyncService {
 
       if (useDelta && syncDecision.lastSyncAt) {
         filters.date_modified = syncDecision.lastSyncAt;
-        this.logger.log(
+        this.logger.info(
           `Using delta sync for ${endpoint} with lastSyncAt: ${syncDecision.lastSyncAt.toISOString()}`,
         );
       } else {
-        this.logger.log(
+        this.logger.info(
           `Using full sync for ${endpoint}. Reason: ${syncDecision.reason}`,
         );
       }

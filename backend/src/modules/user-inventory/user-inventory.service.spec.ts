@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { getLoggerToken } from 'nestjs-pino';
 import { UserInventoryService } from './user-inventory.service';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
 import {
@@ -84,9 +84,9 @@ describe('UserInventoryService', () => {
       providers: [
         UserInventoryService,
         {
-          provide: Logger,
+          provide: getLoggerToken(UserInventoryService.name),
           useValue: {
-            log: jest.fn(),
+            info: jest.fn(),
             warn: jest.fn(),
             error: jest.fn(),
             debug: jest.fn(),

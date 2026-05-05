@@ -49,7 +49,11 @@ if (!isTest) {
             ? 'info'
             : 'debug',
         autoLogging: true,
-        redact: ['req.headers.authorization', 'req.body.password'],
+        redact: [
+          'req.headers.authorization',
+          'req.headers.cookie',
+          'req.body.password',
+        ],
         genReqId: () => randomUUID(),
         transport:
           !isTest && process.env.NODE_ENV !== 'production'
