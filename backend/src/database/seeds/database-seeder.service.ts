@@ -40,7 +40,7 @@ export class DatabaseSeederService {
 
       this.logger.info('✅ Database seeding completed successfully!');
     } catch (error) {
-      this.logger.error('❌ Database seeding failed:', error);
+      this.logger.error({ err: error }, '❌ Database seeding failed');
       throw error;
     }
   }
@@ -140,7 +140,7 @@ export class DatabaseSeederService {
         isActive: true,
       });
       await this.usersRepository.save(user);
-      this.logger.info('  ✓ Created test user: demo (password: password123)');
+      this.logger.info('  ✓ Created test user: demo');
     } else {
       this.logger.info('  ⊙ Test user already exists');
     }

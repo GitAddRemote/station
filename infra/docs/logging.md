@@ -32,7 +32,7 @@ Key fields emitted by `pino-http`:
 - `res.statusCode` — response status
 - `responseTime` — request duration in ms
 
-Redaction: `req.headers.authorization` is actively redacted on every request. `req.body.password` is listed in the redact config as a safety guard, but `pino-http` does not serialize the request body by default so it will not appear in logs unless body logging is explicitly enabled.
+Redaction: `req.headers.authorization` and `req.headers.cookie` are actively redacted on every request — cookies carry the auth tokens in this app and will never appear in logs. `req.body.password` is listed in the redact config as a safety guard, but `pino-http` does not serialize the request body by default so it will not appear in logs unless body logging is explicitly enabled.
 
 ## Viewing logs locally
 

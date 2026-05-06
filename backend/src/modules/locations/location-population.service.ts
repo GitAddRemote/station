@@ -66,7 +66,7 @@ export class LocationPopulationService {
     results.push(await this.populateOutposts(game.id));
     results.push(await this.populatePOI(game.id));
 
-    this.logger.info('Location population completed', { results });
+    this.logger.info({ results }, 'Location population completed');
 
     return results;
   }
