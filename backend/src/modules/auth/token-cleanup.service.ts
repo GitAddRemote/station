@@ -90,10 +90,7 @@ export class TokenCleanupService implements OnApplicationBootstrap {
         .execute();
       resetDeleted = affected ?? 0;
     } catch (error) {
-      this.logger.error(
-        'Password reset cleanup failed',
-        error instanceof Error ? error.stack : String(error),
-      );
+      this.logger.error({ err: error }, 'Password reset cleanup failed');
     }
 
     const duration = Date.now() - start;

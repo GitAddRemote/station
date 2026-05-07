@@ -46,14 +46,7 @@ export class UEXSyncScheduler {
           `deleted: ${result.deleted}, duration: ${result.durationMs}ms`,
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error(
-        `Scheduled categories sync failed: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error({ err: error }, 'Scheduled categories sync failed');
       // Error already recorded in sync state by service
       // Add alerting here if needed
     }
@@ -88,14 +81,7 @@ export class UEXSyncScheduler {
           `deleted: ${result.deleted}, duration: ${result.durationMs}ms`,
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error(
-        `Scheduled items sync failed: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error({ err: error }, 'Scheduled items sync failed');
       // Error already recorded in sync state by service
       // Add alerting here if needed
     }
@@ -130,14 +116,7 @@ export class UEXSyncScheduler {
           `deleted: ${result.totalDeleted}, duration: ${result.totalDurationMs}ms`,
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error(
-        `Scheduled locations sync failed: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error({ err: error }, 'Scheduled locations sync failed');
       // Error already recorded in sync state by service
       // Add alerting here if needed
     }

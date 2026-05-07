@@ -240,10 +240,7 @@ export class UexSyncService {
 
     await this.updateSyncState(endpointName, updates);
 
-    this.logger.error(
-      `Sync failed for ${endpointName}: ${error.message}`,
-      error.stack,
-    );
+    this.logger.error({ err: error }, `Sync failed for ${endpointName}`);
   }
 
   async getStaleEndpoints(

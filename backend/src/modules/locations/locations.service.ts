@@ -218,8 +218,8 @@ export class LocationsService {
       await this.locationPopulationService.populateAllLocations();
     } catch (error) {
       this.logger.error(
+        { err: error },
         'Failed to populate locations from UEX data',
-        error as Error,
       );
     } finally {
       this.populatingLocations = false;
