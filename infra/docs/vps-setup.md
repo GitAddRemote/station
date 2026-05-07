@@ -55,3 +55,103 @@ groups                    # should NOT include 'docker'
 ## Reproducing on a fresh VPS
 
 `bootstrap-vps.sh` is fully automated. Prerequisites, linger, rootless install, and service enable/start are all handled. After the script completes, verify with the commands above.
+
+---
+
+## Migrating an existing VPS to rootless Docker
+
+Use these steps when Docker is already running on a VPS (e.g. station-bot is live) and you need to move the deploy user's containers from the root daemon to rootless without data loss. Expected downtime: 2–3 minutes.
+
+### Phase 1 — Install prerequisites (no downtime)
+
+**As root:**
+
+```bash
+apt install -y uidmap dbus-user-session
+loginctl enable-linger deploy
+```
+
+### Phase 2 — Install rootless Docker (no downtime)
+
+**As deploy (new SSH session):**
+
+```bash
+curl -fsSL https://get.docker.com/rootless | sh
+```
+
+### Phase 3 — Dump postgres data (no downtime)
+
+**As deploy — do NOT source .bashrc yet, commands must reach the root daemon:**
+
+```bash
+set -a; source /opt/station-bot/.env.production; set +a
+docker exec station-bot-postgres pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > /tmp/station_bot_backup.sql
+echo "Dump size: $(wc -c < /tmp/station_bot_backup.sql) bytes"
+```
+
+### Phase 4 — Cut over to rootless (downtime starts)
+
+**As deploy:**
+
+```bash
+# Bring down root-daemon containers
+cd /opt/station-bot
+docker compose -f docker-compose.prod.yml down
+
+# Activate rootless in this session
+export PATH=${HOME}/bin:${PATH}
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
+
+# Enable and start rootless service
+systemctl --user enable docker
+systemctl --user start docker
+
+# Confirm rootless is active
+docker info | grep -i rootless
+```
+
+### Phase 5 — Restore data and bring services back up (downtime ends)
+
+**As deploy:**
+
+```bash
+# Make DOCKER_HOST permanent
+cat >> ~/.bashrc << 'RCEOF'
+
+# rootless docker
+export PATH=${HOME}/bin:${PATH}
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
+RCEOF
+
+# Start postgres under rootless daemon
+cd /opt/station-bot
+docker compose -f docker-compose.prod.yml up -d postgres
+
+# Wait for healthy
+until docker compose -f docker-compose.prod.yml ps | grep -q "healthy"; do sleep 2; done
+
+# Restore data
+docker exec -i station-bot-postgres psql -U "${POSTGRES_USER}" "${POSTGRES_DB}" < /tmp/station_bot_backup.sql
+
+# Start the bot
+docker compose -f docker-compose.prod.yml up -d discord-bot
+
+# Verify
+docker compose -f docker-compose.prod.yml ps
+docker logs station-bot --tail 20
+```
+
+### Phase 6 — Remove docker group access (only after confirming services are healthy)
+
+**As root:**
+
+```bash
+gpasswd -d deploy docker
+```
+
+**As deploy (fresh SSH session to confirm clean environment):**
+
+```bash
+docker compose -f /opt/station-bot/docker-compose.prod.yml ps
+groups  # docker should not appear
+```
