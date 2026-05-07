@@ -73,6 +73,10 @@ runuser -l "${DEPLOY_USER}" -c "curl -fsSL https://get.docker.com/rootless | sh"
 # Enable and start the rootless Docker service for the deploy user.
 runuser -l "${DEPLOY_USER}" -c "systemctl --user enable docker && systemctl --user start docker"
 
+# Remove the deploy user from the docker group if they were added by a
+# previous bootstrap run (rootless Docker requires no group membership).
+gpasswd -d "${DEPLOY_USER}" docker 2>/dev/null || true
+
 install -d -m 700 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" "${DEPLOY_HOME}/.ssh"
 touch "${DEPLOY_HOME}/.ssh/authorized_keys"
 chmod 600 "${DEPLOY_HOME}/.ssh/authorized_keys"
