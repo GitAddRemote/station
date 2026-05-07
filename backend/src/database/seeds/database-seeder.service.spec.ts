@@ -226,8 +226,8 @@ describe('DatabaseSeederService', () => {
       await expect(service.seedAll()).rejects.toThrow('Database error');
 
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        '❌ Database seeding failed:',
-        expect.any(Error),
+        { err: expect.any(Error) },
+        '❌ Database seeding failed',
       );
     });
   });
