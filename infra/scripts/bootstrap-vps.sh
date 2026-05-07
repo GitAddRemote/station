@@ -47,7 +47,23 @@ if ! id -u "${DEPLOY_USER}" >/dev/null 2>&1; then
   useradd -m -s /bin/bash "${DEPLOY_USER}"
 fi
 
-usermod -aG docker "${DEPLOY_USER}"
+# Grant the deploy user narrowed sudo access to docker compose only.
+# This is intentionally NOT docker group membership — the docker group is
+# root-equivalent because it allows unrestricted access to the Docker socket.
+# The sudoers entry below limits the deploy user to docker compose operations
+# and docker exec (for pg_dump/psql backups), preventing privilege escalation.
+#
+# Preferred alternative: rootless Docker (see infra/docs/vps-setup.md).
+# If the VPS kernel supports user namespaces, switch to rootless Docker and
+# remove this sudoers entry — the deploy scripts already use `sudo docker`
+# which becomes a no-op when the user owns their own Docker daemon.
+SUDOERS_FILE="/etc/sudoers.d/deploy-docker"
+cat > "${SUDOERS_FILE}" << 'SUDOEOF'
+deploy ALL=(ALL) NOPASSWD: /usr/bin/docker compose *
+deploy ALL=(ALL) NOPASSWD: /usr/bin/docker exec *
+SUDOEOF
+chmod 440 "${SUDOERS_FILE}"
+visudo -c -f "${SUDOERS_FILE}"
 
 install -d -m 700 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" "${DEPLOY_HOME}/.ssh"
 touch "${DEPLOY_HOME}/.ssh/authorized_keys"
@@ -83,5 +99,5 @@ echo "Bootstrap complete."
 echo "- Install Nginx configs from infra/nginx/ into /etc/nginx/sites-available/"
 echo "- Enable the sites and reload Nginx."
 echo "- Run infra/scripts/issue-certs.sh once DNS is live."
-echo "- Confirm the deploy user can SSH and run Docker commands without sudo."
+echo "- Confirm the deploy user can SSH and run: sudo docker compose ps"
 echo "- Configure B2 secrets and verify /opt/station/rclone.conf is written during deploy."
