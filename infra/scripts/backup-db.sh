@@ -36,7 +36,7 @@ trap 'rm -f "${BACKUP_FILE}"' EXIT
 
 echo "${LOG_PREFIX} Starting backup at ${TIMESTAMP} (${LABEL})"
 
-sudo docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
   pg_dump -U "${DATABASE_USER}" -d "${DATABASE_NAME}" \
   | gzip > "${BACKUP_FILE}"
 

@@ -2,83 +2,56 @@
 
 ## Overview
 
-The deploy SSH key lives in GitHub Secrets and is used on every deployment. If it were leaked, the attacker should only be able to run deploy-related Docker commands — nothing else. This document covers how the deploy user's Docker access is constrained.
+The deploy SSH key lives in GitHub Secrets and is used on every deployment. If it were leaked, the attacker should only be able to run deploy-related Docker operations — nothing more. This is achieved with rootless Docker: the deploy user runs their own Docker daemon entirely within their user namespace, with no root socket and no docker group membership. A compromised key cannot escalate to root or affect any other service on the host.
 
-The deploy scripts use `sudo docker compose` / `sudo docker exec`. The sudoers file at `/etc/sudoers.d/deploy-docker` permits only those two subcommands and nothing else. The deploy user is **not** in the `docker` group — group membership grants unrestricted access to the Docker socket, which is root-equivalent.
+## Approach: rootless Docker
 
-## Current approach: narrowed sudoers (Option B)
+The deploy user's Docker daemon runs unprivileged inside a user namespace. There is no `/var/run/docker.sock` accessible to the deploy user — the socket lives at `/run/user/<uid>/docker.sock` and is owned entirely by that user.
 
-`bootstrap-vps.sh` writes `/etc/sudoers.d/deploy-docker`:
+`bootstrap-vps.sh` handles the full setup:
 
-```
-deploy ALL=(ALL) NOPASSWD: /usr/bin/docker compose *
-deploy ALL=(ALL) NOPASSWD: /usr/bin/docker exec *
-```
+- Installs `uidmap` and `dbus-user-session` prerequisites
+- Enables linger so the deploy user's systemd session persists without an active login
+- Sets `DOCKER_HOST` and `PATH` in `~deploy/.bashrc`
+- Installs rootless Docker via `curl -fsSL https://get.docker.com/rootless | sh` (run as the deploy user)
+- Enables and starts the `docker` systemd user service
 
-**What this allows:**
+The deploy scripts (`deploy.sh`, `backup-db.sh`, etc.) call `docker compose` directly — no `sudo` required.
 
-- `sudo docker compose ...` — all compose operations (pull, up, down, ps, exec, stop, start)
-- `sudo docker exec ...` — direct exec into containers (used by backup/restore scripts)
+## Pre-check results (recorded 2026-05-07)
 
-**What this blocks:**
+| Check                                         | Result                                  |
+| --------------------------------------------- | --------------------------------------- |
+| `/proc/sys/kernel/unprivileged_userns_clone`  | `1` ✓                                   |
+| `newuidmap` installed                         | No — installed via `uidmap` apt package |
+| `unshare --user sh -c "echo namespaces work"` | `namespaces work` ✓                     |
 
-- `docker run`, `docker rm`, `docker network rm`, `docker system prune`, and everything else
-- Any direct access to the Docker socket (`/var/run/docker.sock`)
+## Verification
 
-### Verification
-
-```bash
-# As the deploy user — should succeed:
-sudo docker compose -f /opt/station/docker-compose.prod.yml ps
-
-# As the deploy user — should be denied:
-sudo apt install anything
-sudo rm -rf /opt
-docker ps   # no docker group, no socket access
-```
-
----
-
-## Preferred upgrade: rootless Docker (Option A)
-
-If the VPS kernel supports user namespaces, rootless Docker is the cleaner solution — the Docker daemon itself runs as the deploy user, so no root socket exists at all.
-
-### Pre-check
-
-SSH in as the deploy user and run:
+After running `bootstrap-vps.sh`, SSH in as the deploy user and confirm:
 
 ```bash
-curl -fsSL https://get.docker.com/rootless | sh --dry-run
-```
+# Docker daemon is running
+systemctl --user status docker
 
-If the output is clean, proceed. If it reports missing `newuidmap` or kernel namespace support, stay on Option B.
-
-### Installation (as the deploy user)
-
-```bash
-curl -fsSL https://get.docker.com/rootless | sh
-
-echo 'export PATH=/home/deploy/bin:$PATH' >> ~/.bashrc
-echo 'export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock' >> ~/.bashrc
-source ~/.bashrc
-
-loginctl enable-linger deploy
-systemctl --user enable docker
-systemctl --user start docker
-
+# Docker works without sudo or docker group
 docker run hello-world
+
+# No root socket access
+ls /var/run/docker.sock   # deploy user should get permission denied
+groups                    # should NOT include 'docker'
 ```
 
-### After switching to rootless
+## Security properties
 
-1. Remove the sudoers file: `sudo rm /etc/sudoers.d/deploy-docker`
-2. Strip the `sudo` prefix from all deploy scripts (`deploy.sh`, `deploy-staging.sh`, `backup-db.sh`, `restore-db.sh`, `staging-up.sh`, `staging-down.sh`)
-3. Update `bootstrap-vps.sh` to replace the sudoers block with the rootless install steps
-4. Re-run `loginctl enable-linger deploy` and `systemctl --user enable docker` to survive reboots
+| Capability                     | Before (docker group) | After (rootless) |
+| ------------------------------ | --------------------- | ---------------- |
+| Run containers                 | ✓                     | ✓                |
+| Access root Docker socket      | ✓ (root-equivalent)   | ✗                |
+| Escalate to root via Docker    | ✓                     | ✗                |
+| Affect other users' containers | ✓                     | ✗                |
+| Survive deploy key compromise  | ✗                     | ✓                |
 
-### Verification
+## Reproducing on a fresh VPS
 
-```bash
-systemctl --user status docker   # should show active (running)
-docker run hello-world           # should succeed without sudo
-```
+`bootstrap-vps.sh` is fully automated. Prerequisites, linger, rootless install, and service enable/start are all handled. After the script completes, verify with the commands above.

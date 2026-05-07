@@ -13,7 +13,7 @@ STATION_ROOT="/opt/station"
 apt update
 apt upgrade -y
 
-apt install -y ca-certificates curl gnupg lsb-release cron logrotate rclone
+apt install -y ca-certificates curl gnupg lsb-release cron logrotate rclone uidmap dbus-user-session
 
 install -m 0755 -d /etc/apt/keyrings
 if [ ! -f /etc/apt/keyrings/docker.asc ]; then
@@ -47,23 +47,31 @@ if ! id -u "${DEPLOY_USER}" >/dev/null 2>&1; then
   useradd -m -s /bin/bash "${DEPLOY_USER}"
 fi
 
-# Grant the deploy user narrowed sudo access to docker compose only.
-# This is intentionally NOT docker group membership — the docker group is
-# root-equivalent because it allows unrestricted access to the Docker socket.
-# The sudoers entry below limits the deploy user to docker compose operations
-# and docker exec (for pg_dump/psql backups), preventing privilege escalation.
-#
-# Preferred alternative: rootless Docker (see infra/docs/vps-setup.md).
-# If the VPS kernel supports user namespaces, switch to rootless Docker and
-# remove this sudoers entry — the deploy scripts already use `sudo docker`
-# which becomes a no-op when the user owns their own Docker daemon.
-SUDOERS_FILE="/etc/sudoers.d/deploy-docker"
-cat > "${SUDOERS_FILE}" << 'SUDOEOF'
-deploy ALL=(ALL) NOPASSWD: /usr/bin/docker compose *
-deploy ALL=(ALL) NOPASSWD: /usr/bin/docker exec *
-SUDOEOF
-chmod 440 "${SUDOERS_FILE}"
-visudo -c -f "${SUDOERS_FILE}"
+# Rootless Docker: install and configure for the deploy user.
+# The deploy user runs their own Docker daemon — no root socket, no docker
+# group membership, no sudo required for docker commands. A leaked deploy
+# SSH key cannot escalate to root or affect the host system.
+loginctl enable-linger "${DEPLOY_USER}"
+
+DEPLOY_UID=$(id -u "${DEPLOY_USER}")
+
+# Set DOCKER_HOST and PATH in the deploy user's shell so rootless Docker is
+# used automatically on SSH login and in cron.
+BASHRC="${DEPLOY_HOME}/.bashrc"
+if ! grep -q 'rootless docker' "${BASHRC}" 2>/dev/null; then
+  cat >> "${BASHRC}" << RCEOF
+
+# rootless docker
+export PATH=\${HOME}/bin:\${PATH}
+export DOCKER_HOST=unix:///run/user/${DEPLOY_UID}/docker.sock
+RCEOF
+fi
+
+# Install rootless Docker as the deploy user.
+runuser -l "${DEPLOY_USER}" -c "curl -fsSL https://get.docker.com/rootless | sh"
+
+# Enable and start the rootless Docker service for the deploy user.
+runuser -l "${DEPLOY_USER}" -c "systemctl --user enable docker && systemctl --user start docker"
 
 install -d -m 700 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" "${DEPLOY_HOME}/.ssh"
 touch "${DEPLOY_HOME}/.ssh/authorized_keys"
@@ -99,5 +107,6 @@ echo "Bootstrap complete."
 echo "- Install Nginx configs from infra/nginx/ into /etc/nginx/sites-available/"
 echo "- Enable the sites and reload Nginx."
 echo "- Run infra/scripts/issue-certs.sh once DNS is live."
-echo "- Confirm the deploy user can SSH and run: sudo docker compose ps"
+echo "- Confirm rootless Docker: ssh deploy@host 'docker run hello-world'"
+echo "- Confirm systemctl: ssh deploy@host 'systemctl --user status docker'"
 echo "- Configure B2 secrets and verify /opt/station/rclone.conf is written during deploy."
