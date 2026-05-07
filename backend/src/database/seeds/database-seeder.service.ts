@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Role } from '../../modules/roles/role.entity';
@@ -11,9 +12,9 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class DatabaseSeederService {
-  private readonly logger = new Logger(DatabaseSeederService.name);
-
   constructor(
+    @InjectPinoLogger(DatabaseSeederService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(Role)
     private rolesRepository: Repository<Role>,
     @InjectRepository(Organization)
@@ -27,7 +28,7 @@ export class DatabaseSeederService {
   ) {}
 
   async seedAll(): Promise<void> {
-    this.logger.log('🌱 Starting database seeding...');
+    this.logger.info('🌱 Starting database seeding...');
 
     try {
       // Seed in order of dependencies
@@ -37,15 +38,15 @@ export class DatabaseSeederService {
       await this.seedTestUser();
       await this.seedUserOrganizationRoles();
 
-      this.logger.log('✅ Database seeding completed successfully!');
+      this.logger.info('✅ Database seeding completed successfully!');
     } catch (error) {
-      this.logger.error('❌ Database seeding failed:', error);
+      this.logger.error({ err: error }, '❌ Database seeding failed');
       throw error;
     }
   }
 
   private async seedGames(): Promise<void> {
-    this.logger.log('Seeding games...');
+    this.logger.info('Seeding games...');
 
     const games = [
       {
@@ -72,15 +73,15 @@ export class DatabaseSeederService {
       if (!existingGame) {
         const game = this.gamesRepository.create(gameData);
         await this.gamesRepository.save(game);
-        this.logger.log(`  ✓ Created game: ${game.name}`);
+        this.logger.info(`  ✓ Created game: ${game.name}`);
       } else {
-        this.logger.log(`  ⊙ Game already exists: ${gameData.name}`);
+        this.logger.info(`  ⊙ Game already exists: ${gameData.name}`);
       }
     }
   }
 
   private async seedRoles(): Promise<void> {
-    this.logger.log('Seeding roles...');
+    this.logger.info('Seeding roles...');
 
     for (const roleData of defaultRoles) {
       const existingRole = await this.rolesRepository.findOne({
@@ -90,15 +91,15 @@ export class DatabaseSeederService {
       if (!existingRole) {
         const role = this.rolesRepository.create(roleData);
         await this.rolesRepository.save(role);
-        this.logger.log(`  ✓ Created role: ${role.name}`);
+        this.logger.info(`  ✓ Created role: ${role.name}`);
       } else {
-        this.logger.log(`  ⊙ Role already exists: ${roleData.name}`);
+        this.logger.info(`  ⊙ Role already exists: ${roleData.name}`);
       }
     }
   }
 
   private async seedTestOrganization(): Promise<void> {
-    this.logger.log('Seeding test organization...');
+    this.logger.info('Seeding test organization...');
 
     const existingOrg = await this.organizationsRepository.findOne({
       where: { name: 'Demo Organization' },
@@ -117,14 +118,14 @@ export class DatabaseSeederService {
         gameId: starCitizen!.id,
       });
       await this.organizationsRepository.save(organization);
-      this.logger.log(`  ✓ Created organization: ${organization.name}`);
+      this.logger.info(`  ✓ Created organization: ${organization.name}`);
     } else {
-      this.logger.log('  ⊙ Test organization already exists');
+      this.logger.info('  ⊙ Test organization already exists');
     }
   }
 
   private async seedTestUser(): Promise<void> {
-    this.logger.log('Seeding test user...');
+    this.logger.info('Seeding test user...');
 
     const existingUser = await this.usersRepository.findOne({
       where: { username: 'demo' },
@@ -139,14 +140,14 @@ export class DatabaseSeederService {
         isActive: true,
       });
       await this.usersRepository.save(user);
-      this.logger.log('  ✓ Created test user: demo (password: password123)');
+      this.logger.info('  ✓ Created test user: demo');
     } else {
-      this.logger.log('  ⊙ Test user already exists');
+      this.logger.info('  ⊙ Test user already exists');
     }
   }
 
   private async seedUserOrganizationRoles(): Promise<void> {
-    this.logger.log('Seeding user-organization-role assignments...');
+    this.logger.info('Seeding user-organization-role assignments...');
 
     const user = await this.usersRepository.findOne({
       where: { username: 'demo' },
@@ -174,11 +175,13 @@ export class DatabaseSeederService {
           roleId: ownerRole.id,
         });
         await this.userOrgRolesRepository.save(assignment);
-        this.logger.log(
+        this.logger.info(
           `  ✓ Assigned "${ownerRole.name}" role to "${user.username}" in "${organization.name}"`,
         );
       } else {
-        this.logger.log('  ⊙ User-organization-role assignment already exists');
+        this.logger.info(
+          '  ⊙ User-organization-role assignment already exists',
+        );
       }
     } else {
       this.logger.warn(

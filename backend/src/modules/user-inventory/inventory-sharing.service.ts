@@ -3,8 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
-  Logger,
 } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
@@ -13,9 +13,9 @@ import { ShareItemDto } from './dto/share-item.dto';
 
 @Injectable()
 export class InventorySharingService {
-  private readonly logger = new Logger(InventorySharingService.name);
-
   constructor(
+    @InjectPinoLogger(InventorySharingService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(UserInventoryItem)
     private readonly inventoryRepository: Repository<UserInventoryItem>,
     @InjectRepository(InventoryAuditLog)
@@ -80,7 +80,7 @@ export class InventorySharingService {
         item.dateModified = new Date();
         await manager.save(UserInventoryItem, item);
 
-        this.logger.log(
+        this.logger.info(
           `User ${userId} shared item ${itemId} (full quantity: ${quantity}) with org ${orgId}`,
         );
       } else if (quantity < Number(item.quantity)) {
@@ -110,7 +110,7 @@ export class InventorySharingService {
 
         await manager.save(UserInventoryItem, newItem);
 
-        this.logger.log(
+        this.logger.info(
           `User ${userId} split item ${itemId}: kept ${item.quantity}, shared ${quantity} with org ${orgId} as new item`,
         );
       } else {
@@ -169,7 +169,7 @@ export class InventorySharingService {
 
       await manager.save(InventoryAuditLog, auditLog);
 
-      this.logger.log(
+      this.logger.info(
         `User ${userId} unshared item ${itemId} from org ${orgId}`,
       );
     });

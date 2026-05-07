@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Logger } from '@nestjs/common';
+import { getLoggerToken } from 'nestjs-pino';
 import { Repository } from 'typeorm';
 import { DatabaseSeederService } from './database-seeder.service';
 import { Role } from '../../modules/roles/role.entity';
@@ -21,9 +21,13 @@ describe('DatabaseSeederService', () => {
   let usersRepository: Repository<User>;
   let userOrgRolesRepository: Repository<UserOrganizationRole>;
   let gamesRepository: Repository<Game>;
-  let loggerLogSpy: jest.SpyInstance;
-  let loggerWarnSpy: jest.SpyInstance;
-  let loggerErrorSpy: jest.SpyInstance;
+  const mockLogger = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  };
+  let loggerErrorSpy: jest.Mock;
 
   const mockGame = {
     id: 1,
@@ -63,32 +67,20 @@ describe('DatabaseSeederService', () => {
     roleId: 1,
   };
 
-  beforeAll(() => {
-    loggerLogSpy = jest
-      .spyOn(Logger.prototype, 'log')
-      .mockImplementation(() => undefined);
-    loggerWarnSpy = jest
-      .spyOn(Logger.prototype, 'warn')
-      .mockImplementation(() => undefined);
-    loggerErrorSpy = jest
-      .spyOn(Logger.prototype, 'error')
-      .mockImplementation(() => undefined);
-  });
-
-  afterAll(() => {
-    loggerLogSpy.mockRestore();
-    loggerWarnSpy.mockRestore();
-    loggerErrorSpy.mockRestore();
-  });
-
   beforeEach(async () => {
-    loggerLogSpy.mockClear();
-    loggerWarnSpy.mockClear();
-    loggerErrorSpy.mockClear();
+    mockLogger.info.mockClear();
+    mockLogger.warn.mockClear();
+    mockLogger.error.mockClear();
+    mockLogger.debug.mockClear();
+    loggerErrorSpy = mockLogger.error;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DatabaseSeederService,
+        {
+          provide: getLoggerToken(DatabaseSeederService.name),
+          useValue: mockLogger,
+        },
         {
           provide: getRepositoryToken(Role),
           useValue: {
@@ -234,8 +226,8 @@ describe('DatabaseSeederService', () => {
       await expect(service.seedAll()).rejects.toThrow('Database error');
 
       expect(loggerErrorSpy).toHaveBeenCalledWith(
-        '❌ Database seeding failed:',
-        expect.any(Error),
+        { err: expect.any(Error) },
+        '❌ Database seeding failed',
       );
     });
   });

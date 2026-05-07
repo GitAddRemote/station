@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -28,11 +29,12 @@ export interface UEXCompanyFilters {
 
 @Injectable()
 export class UEXCompaniesClient {
-  private readonly logger = new Logger(UEXCompaniesClient.name);
   private readonly baseUrl: string;
   private readonly timeout: number;
 
   constructor(
+    @InjectPinoLogger(UEXCompaniesClient.name)
+    private readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
@@ -55,7 +57,7 @@ export class UEXCompaniesClient {
       params.is_vehicle_manufacturer = String(filters.is_vehicle_manufacturer);
     }
 
-    this.logger.log(
+    this.logger.info(
       `Fetching companies from UEX API with filters: ${JSON.stringify(params)}`,
     );
 
@@ -78,7 +80,7 @@ export class UEXCompaniesClient {
       }
 
       const companies = response.data.data || [];
-      this.logger.log(`Fetched ${companies.length} companies from UEX API`);
+      this.logger.info(`Fetched ${companies.length} companies from UEX API`);
 
       return companies;
     } catch (error: unknown) {

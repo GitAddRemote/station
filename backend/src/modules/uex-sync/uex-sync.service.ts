@@ -1,4 +1,5 @@
-import { Injectable, Logger, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, IsNull } from 'typeorm';
 import { UexSyncState, SyncStatus } from './uex-sync-state.entity';
@@ -21,10 +22,11 @@ export interface SyncResult {
 
 @Injectable()
 export class UexSyncService {
-  private readonly logger = new Logger(UexSyncService.name);
   private readonly LOCK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor(
+    @InjectPinoLogger(UexSyncService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(UexSyncState)
     private syncStateRepository: Repository<UexSyncState>,
     @InjectRepository(UexSyncConfig)
@@ -68,7 +70,7 @@ export class UexSyncService {
       );
     }
 
-    this.logger.log(`Acquired sync lock for endpoint: ${endpointName}`);
+    this.logger.info(`Acquired sync lock for endpoint: ${endpointName}`);
   }
 
   async releaseSyncLock(endpointName: string): Promise<void> {
@@ -77,7 +79,7 @@ export class UexSyncService {
       { syncStatus: SyncStatus.IDLE },
     );
 
-    this.logger.log(`Released sync lock for endpoint: ${endpointName}`);
+    this.logger.info(`Released sync lock for endpoint: ${endpointName}`);
   }
 
   async shouldUseDeltaSync(endpointName: string): Promise<SyncDecision> {
@@ -150,7 +152,7 @@ export class UexSyncService {
   ): Promise<void> {
     await this.syncStateRepository.update({ endpointName }, updates);
 
-    this.logger.log(
+    this.logger.info(
       `Updated sync state for ${endpointName}: ${JSON.stringify(updates)}`,
     );
   }
@@ -214,7 +216,7 @@ export class UexSyncService {
 
     await this.updateSyncState(endpointName, updates);
 
-    this.logger.log(
+    this.logger.info(
       `Sync completed successfully for ${endpointName}: ${result.syncMode} mode, ` +
         `created: ${result.recordsCreated}, updated: ${result.recordsUpdated}, ` +
         `deleted: ${result.recordsDeleted}, duration: ${result.durationMs}ms`,
@@ -238,10 +240,7 @@ export class UexSyncService {
 
     await this.updateSyncState(endpointName, updates);
 
-    this.logger.error(
-      `Sync failed for ${endpointName}: ${error.message}`,
-      error.stack,
-    );
+    this.logger.error({ err: error }, `Sync failed for ${endpointName}`);
   }
 
   async getStaleEndpoints(
@@ -296,6 +295,6 @@ export class UexSyncService {
       });
     }
 
-    this.logger.log(`Initialized sync tracking for endpoint: ${endpointName}`);
+    this.logger.info(`Initialized sync tracking for endpoint: ${endpointName}`);
   }
 }

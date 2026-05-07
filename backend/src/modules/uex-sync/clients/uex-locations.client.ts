@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -96,7 +97,6 @@ export interface UEXLocationFilters {
 
 @Injectable()
 export class UEXLocationsClient {
-  private readonly logger = new Logger(UEXLocationsClient.name);
   private readonly baseUrl: string;
   private readonly timeout: number;
 
@@ -111,6 +111,8 @@ export class UEXLocationsClient {
   };
 
   constructor(
+    @InjectPinoLogger(UEXLocationsClient.name)
+    private readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
@@ -170,7 +172,7 @@ export class UEXLocationsClient {
       params.date_modified = filters.date_modified.toISOString();
     }
 
-    this.logger.log(
+    this.logger.info(
       `Fetching ${endpoint} from UEX API with filters: ${JSON.stringify(params)}`,
     );
 
@@ -194,7 +196,7 @@ export class UEXLocationsClient {
       }
 
       const locations = response.data.data || [];
-      this.logger.log(`Fetched ${locations.length} ${endpoint} from UEX API`);
+      this.logger.info(`Fetched ${locations.length} ${endpoint} from UEX API`);
 
       return locations;
     } catch (error: unknown) {

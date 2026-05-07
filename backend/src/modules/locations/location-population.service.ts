@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Location, LocationType } from './entities/location.entity';
@@ -21,9 +22,9 @@ export interface PopulationResult {
 
 @Injectable()
 export class LocationPopulationService {
-  private readonly logger = new Logger(LocationPopulationService.name);
-
   constructor(
+    @InjectPinoLogger(LocationPopulationService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(Location)
     private readonly locationRepository: Repository<Location>,
     @InjectRepository(Game)
@@ -47,7 +48,7 @@ export class LocationPopulationService {
   ) {}
 
   async populateAllLocations(): Promise<PopulationResult[]> {
-    this.logger.log('Starting location population from UEX data');
+    this.logger.info('Starting location population from UEX data');
 
     const results: PopulationResult[] = [];
 
@@ -65,7 +66,7 @@ export class LocationPopulationService {
     results.push(await this.populateOutposts(game.id));
     results.push(await this.populatePOI(game.id));
 
-    this.logger.log('Location population completed', { results });
+    this.logger.info({ results }, 'Location population completed');
 
     return results;
   }

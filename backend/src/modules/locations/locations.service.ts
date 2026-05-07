@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Location, LocationType } from './entities/location.entity';
@@ -15,10 +16,11 @@ import { createHash } from 'crypto';
 
 @Injectable()
 export class LocationsService {
-  private readonly logger = new Logger(LocationsService.name);
   private populatingLocations = false;
 
   constructor(
+    @InjectPinoLogger(LocationsService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(Location)
     private readonly locationRepository: Repository<Location>,
     private readonly locationPopulationService: LocationPopulationService,
@@ -166,7 +168,7 @@ export class LocationsService {
 
     const saved = await this.locationRepository.save(location);
 
-    this.logger.log(`Created location ${saved.id}: ${saved.displayName}`);
+    this.logger.info(`Created location ${saved.id}: ${saved.displayName}`);
 
     return this.toDto(saved);
   }
@@ -184,7 +186,7 @@ export class LocationsService {
 
     const saved = await this.locationRepository.save(location);
 
-    this.logger.log(`Updated location ${saved.id}: ${saved.displayName}`);
+    this.logger.info(`Updated location ${saved.id}: ${saved.displayName}`);
 
     return this.toDto(saved);
   }
@@ -199,7 +201,7 @@ export class LocationsService {
 
     await this.locationRepository.save(location);
 
-    this.logger.log(`Deleted location ${id}`);
+    this.logger.info(`Deleted location ${id}`);
   }
 
   private async ensureLocationsPopulated(gameId: number): Promise<void> {
@@ -216,8 +218,8 @@ export class LocationsService {
       await this.locationPopulationService.populateAllLocations();
     } catch (error) {
       this.logger.error(
+        { err: error },
         'Failed to populate locations from UEX data',
-        error as Error,
       );
     } finally {
       this.populatingLocations = false;

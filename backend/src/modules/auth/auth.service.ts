@@ -18,7 +18,7 @@ import * as crypto from 'crypto';
 import { User } from '../users/user.entity';
 import { UserDto } from '../users/dto/user.dto';
 import { PasswordReset } from './password-reset.entity';
-import { Logger } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { ValidatedUser } from './interfaces/validated-user.interface';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -41,11 +41,12 @@ const REFRESH_TTL_MS = REFRESH_TTL_SECONDS * 1000;
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
   private readonly dummyHash =
     '$2b$10$CwTycUXWue0Thq9StjUM0uJ8WZ0p/7eJYJg6eW9j5Cnz4Gf5Eme1e';
 
   constructor(
+    @InjectPinoLogger(AuthService.name)
+    private readonly logger: PinoLogger,
     private usersService: UsersService,
     private systemUserService: SystemUserService,
     private jwtService: JwtService,
@@ -393,7 +394,7 @@ export class AuthService {
       used: false,
     });
 
-    this.logger.log(`Password reset requested for user ID: ${user.id}`);
+    this.logger.info(`Password reset requested for user ID: ${user.id}`);
 
     return successMessage;
   }
@@ -422,7 +423,7 @@ export class AuthService {
 
     await this.passwordResetRepository.update(resetToken.id, { used: true });
 
-    this.logger.log(
+    this.logger.info(
       `Password reset successful for user ID: ${resetToken.userId}`,
     );
 
@@ -486,7 +487,7 @@ export class AuthService {
 
     await this.usersService.updatePassword(userId, hashedPassword);
 
-    this.logger.log(`Password changed successfully for user ID: ${userId}`);
+    this.logger.info(`Password changed successfully for user ID: ${userId}`);
 
     return { message: 'Password changed successfully' };
   }

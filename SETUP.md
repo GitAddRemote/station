@@ -6,7 +6,7 @@ This guide will help you get the Station application up and running.
 
 Before starting, ensure you have:
 
-- ✅ Node.js >= 18 installed (`node --version`)
+- ✅ Node.js >= 20 installed (`node --version`)
 - ✅ pnpm >= 8 installed (`pnpm --version`)
 - ✅ Docker and Docker Compose installed (`docker --version` && `docker-compose --version`)
 

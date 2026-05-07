@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
@@ -12,9 +13,9 @@ import {
 
 @Injectable()
 export class UserInventoryService {
-  private readonly logger = new Logger(UserInventoryService.name);
-
   constructor(
+    @InjectPinoLogger(UserInventoryService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(UserInventoryItem)
     private readonly inventoryRepository: Repository<UserInventoryItem>,
   ) {}
@@ -174,11 +175,11 @@ export class UserInventoryService {
     );
 
     if (merged) {
-      this.logger.log(
+      this.logger.info(
         `Merged inventory item ${saved.id} for user ${userId}: added ${createDto.quantity} to item ${createDto.uexItemId} at location ${createDto.locationId}`,
       );
     } else {
-      this.logger.log(
+      this.logger.info(
         `Created inventory item ${saved.id} for user ${userId}: ${createDto.quantity}x item ${createDto.uexItemId}`,
       );
     }
@@ -198,7 +199,7 @@ export class UserInventoryService {
 
     const saved = await this.inventoryRepository.save(item);
 
-    this.logger.log(`Updated inventory item ${saved.id} for user ${userId}`);
+    this.logger.info(`Updated inventory item ${saved.id} for user ${userId}`);
 
     return this.findById(saved.id, userId);
   }
@@ -212,7 +213,7 @@ export class UserInventoryService {
 
     await this.inventoryRepository.save(item);
 
-    this.logger.log(`Deleted inventory item ${id} for user ${userId}`);
+    this.logger.info(`Deleted inventory item ${id} for user ${userId}`);
   }
 
   async getSummary(

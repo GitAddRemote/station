@@ -1,9 +1,5 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, OnApplicationBootstrap, Optional } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -14,9 +10,9 @@ import { DEFAULT_CLEANUP_CRON } from './token-cleanup.constants';
 
 @Injectable()
 export class TokenCleanupService implements OnApplicationBootstrap {
-  private readonly logger = new Logger(TokenCleanupService.name);
-
   constructor(
+    @InjectPinoLogger(TokenCleanupService.name)
+    private readonly logger: PinoLogger,
     @InjectRepository(PasswordReset)
     private readonly passwordResetRepository: Repository<PasswordReset>,
     private readonly configService: ConfigService,
@@ -70,7 +66,7 @@ export class TokenCleanupService implements OnApplicationBootstrap {
 
     this.schedulerRegistry.addCronJob('tokenCleanup', job);
     job.start();
-    this.logger.log(`Token cleanup cron registered: ${effectiveExpression}`);
+    this.logger.info(`Token cleanup cron registered: ${effectiveExpression}`);
   }
 
   async cleanupExpiredTokens(): Promise<void> {
@@ -82,7 +78,7 @@ export class TokenCleanupService implements OnApplicationBootstrap {
     }
 
     const start = Date.now();
-    this.logger.log('Starting expired/revoked token cleanup');
+    this.logger.info('Starting expired/revoked token cleanup');
     const now = new Date();
 
     let resetDeleted = 0;
@@ -94,14 +90,11 @@ export class TokenCleanupService implements OnApplicationBootstrap {
         .execute();
       resetDeleted = affected ?? 0;
     } catch (error) {
-      this.logger.error(
-        'Password reset cleanup failed',
-        error instanceof Error ? error.stack : String(error),
-      );
+      this.logger.error({ err: error }, 'Password reset cleanup failed');
     }
 
     const duration = Date.now() - start;
-    this.logger.log(
+    this.logger.info(
       `Token cleanup complete in ${duration}ms — deleted ${resetDeleted} password reset(s)`,
     );
   }

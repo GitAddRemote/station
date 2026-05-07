@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { CategoriesSyncService } from '../services/categories-sync.service';
@@ -7,9 +8,9 @@ import { LocationsSyncService } from '../services/locations-sync.service';
 
 @Injectable()
 export class UEXSyncScheduler {
-  private readonly logger = new Logger(UEXSyncScheduler.name);
-
   constructor(
+    @InjectPinoLogger(UEXSyncScheduler.name)
+    private readonly logger: PinoLogger,
     private readonly categoriesSync: CategoriesSyncService,
     private readonly itemsSync: ItemsSyncService,
     private readonly locationsSync: LocationsSyncService,
@@ -31,28 +32,21 @@ export class UEXSyncScheduler {
     );
 
     if (!syncEnabled || !categoriesSyncEnabled) {
-      this.logger.log('Categories sync is disabled via configuration');
+      this.logger.info('Categories sync is disabled via configuration');
       return;
     }
 
-    this.logger.log('Starting scheduled categories sync');
+    this.logger.info('Starting scheduled categories sync');
 
     try {
       const result = await this.categoriesSync.syncCategories();
-      this.logger.log(
+      this.logger.info(
         `Scheduled categories sync completed successfully: ` +
           `created: ${result.created}, updated: ${result.updated}, ` +
           `deleted: ${result.deleted}, duration: ${result.durationMs}ms`,
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error(
-        `Scheduled categories sync failed: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error({ err: error }, 'Scheduled categories sync failed');
       // Error already recorded in sync state by service
       // Add alerting here if needed
     }
@@ -73,28 +67,21 @@ export class UEXSyncScheduler {
     );
 
     if (!syncEnabled || !itemsSyncEnabled) {
-      this.logger.log('Items sync is disabled via configuration');
+      this.logger.info('Items sync is disabled via configuration');
       return;
     }
 
-    this.logger.log('Starting scheduled items sync');
+    this.logger.info('Starting scheduled items sync');
 
     try {
       const result = await this.itemsSync.syncItems();
-      this.logger.log(
+      this.logger.info(
         `Scheduled items sync completed successfully: ` +
           `created: ${result.created}, updated: ${result.updated}, ` +
           `deleted: ${result.deleted}, duration: ${result.durationMs}ms`,
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error(
-        `Scheduled items sync failed: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error({ err: error }, 'Scheduled items sync failed');
       // Error already recorded in sync state by service
       // Add alerting here if needed
     }
@@ -115,28 +102,21 @@ export class UEXSyncScheduler {
     );
 
     if (!syncEnabled || !locationsSyncEnabled) {
-      this.logger.log('Locations sync is disabled via configuration');
+      this.logger.info('Locations sync is disabled via configuration');
       return;
     }
 
-    this.logger.log('Starting scheduled locations sync');
+    this.logger.info('Starting scheduled locations sync');
 
     try {
       const result = await this.locationsSync.syncAllLocations();
-      this.logger.log(
+      this.logger.info(
         `Scheduled locations sync completed successfully: ` +
           `total created: ${result.totalCreated}, updated: ${result.totalUpdated}, ` +
           `deleted: ${result.totalDeleted}, duration: ${result.totalDurationMs}ms`,
       );
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
-      this.logger.error(
-        `Scheduled locations sync failed: ${errorMessage}`,
-        errorStack,
-      );
+      this.logger.error({ err: error }, 'Scheduled locations sync failed');
       // Error already recorded in sync state by service
       // Add alerting here if needed
     }

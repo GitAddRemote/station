@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -33,11 +34,12 @@ export interface UEXItemFilters {
 
 @Injectable()
 export class UEXItemsClient {
-  private readonly logger = new Logger(UEXItemsClient.name);
   private readonly baseUrl: string;
   private readonly timeout: number;
 
   constructor(
+    @InjectPinoLogger(UEXItemsClient.name)
+    private readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
@@ -60,7 +62,7 @@ export class UEXItemsClient {
       params.date_modified = filters.date_modified.toISOString();
     }
 
-    this.logger.log(
+    this.logger.info(
       `Fetching items for category ${categoryId} from UEX API with filters: ${JSON.stringify(params)}`,
     );
 
@@ -84,7 +86,7 @@ export class UEXItemsClient {
       }
 
       const items = response.data.data || [];
-      this.logger.log(
+      this.logger.info(
         `Fetched ${items.length} items for category ${categoryId} from UEX API`,
       );
 
@@ -118,7 +120,7 @@ export class UEXItemsClient {
       params.date_modified = filters.date_modified.toISOString();
     }
 
-    this.logger.log(
+    this.logger.info(
       `Fetching all items from UEX API with filters: ${JSON.stringify(params)}`,
     );
 
@@ -142,7 +144,7 @@ export class UEXItemsClient {
       }
 
       const items = response.data.data || [];
-      this.logger.log(`Fetched ${items.length} items from UEX API`);
+      this.logger.info(`Fetched ${items.length} items from UEX API`);
 
       return items;
     } catch (error: unknown) {

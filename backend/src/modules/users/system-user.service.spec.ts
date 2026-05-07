@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { getLoggerToken } from 'nestjs-pino';
 import { SystemUserService } from './system-user.service';
 import { User } from './user.entity';
 
@@ -24,6 +25,15 @@ describe('SystemUserService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SystemUserService,
+        {
+          provide: getLoggerToken(SystemUserService.name),
+          useValue: {
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
         {
           provide: getRepositoryToken(User),
           useValue: mockRepository,

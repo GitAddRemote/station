@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -25,11 +26,12 @@ export interface UEXCategoryFilters {
 
 @Injectable()
 export class UEXCategoriesClient {
-  private readonly logger = new Logger(UEXCategoriesClient.name);
   private readonly baseUrl: string;
   private readonly timeout: number;
 
   constructor(
+    @InjectPinoLogger(UEXCategoriesClient.name)
+    private readonly logger: PinoLogger,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
@@ -53,7 +55,7 @@ export class UEXCategoriesClient {
       params.date_modified = filters.date_modified.toISOString();
     }
 
-    this.logger.log(
+    this.logger.info(
       `Fetching categories from UEX API with filters: ${JSON.stringify(params)}`,
     );
 
@@ -77,7 +79,7 @@ export class UEXCategoriesClient {
       }
 
       const categories = response.data.data || [];
-      this.logger.log(`Fetched ${categories.length} categories from UEX API`);
+      this.logger.info(`Fetched ${categories.length} categories from UEX API`);
 
       return categories;
     } catch (error: unknown) {
