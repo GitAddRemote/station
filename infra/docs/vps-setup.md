@@ -54,7 +54,7 @@ groups                    # should NOT include 'docker'
 
 ## Reproducing on a fresh VPS
 
-`bootstrap-vps.sh` is fully automated. Prerequisites, linger, rootless install, and service enable/start are all handled. After the script completes, verify with the commands above.
+`bootstrap-vps.sh` is fully automated. Prerequisites, linger, AppArmor profile (Ubuntu 24.04+), rootless install, and service enable/start are all handled. After the script completes, verify with the commands above.
 
 ---
 
@@ -84,7 +84,8 @@ curl -fsSL https://get.docker.com/rootless | sh
 **As deploy — do NOT source .bashrc yet, commands must reach the root daemon:**
 
 ```bash
-set -a; source /opt/station-bot/.env.production; set +a
+POSTGRES_USER=$(grep '^POSTGRES_USER=' /opt/station-bot/.env.production | cut -d= -f2)
+POSTGRES_DB=$(grep '^POSTGRES_DB=' /opt/station-bot/.env.production | cut -d= -f2)
 docker exec station-bot-postgres pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > /tmp/station_bot_backup.sql
 echo "Dump size: $(wc -c < /tmp/station_bot_backup.sql) bytes"
 ```

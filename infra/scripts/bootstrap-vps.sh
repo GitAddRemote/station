@@ -54,20 +54,41 @@ fi
 # cannot escalate to root or affect the host system.
 loginctl enable-linger "${DEPLOY_USER}"
 
-DEPLOY_UID=$(id -u "${DEPLOY_USER}")
-
 # Set DOCKER_HOST and PATH in the deploy user's shell so rootless Docker is
-# used automatically on SSH login and in cron.
+# used automatically on interactive/login SSH sessions. Non-interactive shells
+# (cron, CI) must set DOCKER_HOST themselves — the deploy/backup scripts do this.
 BASHRC="${DEPLOY_HOME}/.bashrc"
 if ! grep -q 'rootless docker' "${BASHRC}" 2>/dev/null; then
-  cat >> "${BASHRC}" << RCEOF
+  cat >> "${BASHRC}" << 'RCEOF'
 
 # rootless docker
-export PATH=\${HOME}/bin:\${PATH}
-export DOCKER_HOST=unix:///run/user/${DEPLOY_UID}/docker.sock
+export PATH=${HOME}/bin:${PATH}
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 RCEOF
 fi
 chown "${DEPLOY_USER}:${DEPLOY_USER}" "${BASHRC}"
+
+# Ubuntu 24.04+ restricts unprivileged user namespaces via AppArmor; rootlesskit
+# requires an explicit profile to create user namespaces.
+APPARMOR_RESTRICT="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+if [ -f "${APPARMOR_RESTRICT}" ] && [ "$(cat "${APPARMOR_RESTRICT}")" = "1" ]; then
+  ROOTLESSKIT_PROFILE="/etc/apparmor.d/home.deploy.bin.rootlesskit"
+  if [ ! -f "${ROOTLESSKIT_PROFILE}" ]; then
+    cat > "${ROOTLESSKIT_PROFILE}" << 'AAEOF'
+# ref: https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
+abi <abi/4.0>,
+include <tunables/global>
+
+/home/deploy/bin/rootlesskit flags=(unconfined) {
+  userns,
+
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/home.deploy.bin.rootlesskit>
+}
+AAEOF
+    systemctl restart apparmor.service
+  fi
+fi
 
 # Install rootless Docker as the deploy user.
 runuser -l "${DEPLOY_USER}" -c "curl -fsSL https://get.docker.com/rootless | sh"
