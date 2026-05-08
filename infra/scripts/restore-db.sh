@@ -15,6 +15,8 @@ RCLONE_CONFIG_FILE="${STATION_ROOT}/rclone.conf"
 LOG_PREFIX="[restore]"
 BACKUP_PATH="$1"
 LOCAL_FILE="/tmp/restore_$(date +%s).sql.gz"
+DOCKER_HOST="${DOCKER_HOST:-unix:///run/user/$(id -u)/docker.sock}"
+export DOCKER_HOST
 
 if [ ! -f "${ENV_FILE}" ]; then
   echo "${LOG_PREFIX} Missing ${ENV_FILE}" >&2

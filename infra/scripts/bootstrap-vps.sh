@@ -48,9 +48,10 @@ if ! id -u "${DEPLOY_USER}" >/dev/null 2>&1; then
 fi
 
 # Rootless Docker: install and configure for the deploy user.
-# The deploy user runs their own Docker daemon — no root socket, no docker
-# group membership, no sudo required for docker commands. A leaked deploy
-# SSH key cannot escalate to root or affect the host system.
+# The deploy user runs their own Docker daemon with no access to the root
+# Docker socket (which still exists at /var/run/docker.sock for system use),
+# no docker group membership, and no sudo required. A leaked deploy SSH key
+# cannot escalate to root or affect the host system.
 loginctl enable-linger "${DEPLOY_USER}"
 
 DEPLOY_UID=$(id -u "${DEPLOY_USER}")
@@ -66,6 +67,7 @@ export PATH=\${HOME}/bin:\${PATH}
 export DOCKER_HOST=unix:///run/user/${DEPLOY_UID}/docker.sock
 RCEOF
 fi
+chown "${DEPLOY_USER}:${DEPLOY_USER}" "${BASHRC}"
 
 # Install rootless Docker as the deploy user.
 runuser -l "${DEPLOY_USER}" -c "curl -fsSL https://get.docker.com/rootless | sh"

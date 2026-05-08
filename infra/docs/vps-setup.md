@@ -20,11 +20,11 @@ The deploy scripts (`deploy.sh`, `backup-db.sh`, etc.) call `docker compose` dir
 
 ## Pre-check results (recorded 2026-05-07)
 
-| Check                                         | Result                                  |
-| --------------------------------------------- | --------------------------------------- |
-| `/proc/sys/kernel/unprivileged_userns_clone`  | `1` ✓                                   |
-| `newuidmap` installed                         | No — installed via `uidmap` apt package |
-| `unshare --user sh -c "echo namespaces work"` | `namespaces work` ✓                     |
+| Check                                         | Result                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `/proc/sys/kernel/unprivileged_userns_clone`  | `1` ✓                                                              |
+| `newuidmap` installed                         | Not pre-installed — provided by `uidmap` package (installed above) |
+| `unshare --user sh -c "echo namespaces work"` | `namespaces work` ✓                                                |
 
 ## Verification
 
