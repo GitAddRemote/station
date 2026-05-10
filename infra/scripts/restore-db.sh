@@ -28,15 +28,16 @@ if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
   exit 1
 fi
 
-DATABASE_USER="$(grep '^DATABASE_USER=' "${ENV_FILE}" | cut -d= -f2-)"
-DATABASE_NAME="$(grep '^DATABASE_NAME=' "${ENV_FILE}" | cut -d= -f2-)"
-B2_BUCKET="$(grep '^B2_BUCKET=' "${ENV_FILE}" | cut -d= -f2-)"
+DATABASE_USER="$(grep '^DATABASE_USER=' "${ENV_FILE}" | cut -d= -f2- || true)"
+DATABASE_NAME="$(grep '^DATABASE_NAME=' "${ENV_FILE}" | cut -d= -f2- || true)"
+B2_BUCKET="$(grep '^B2_BUCKET=' "${ENV_FILE}" | cut -d= -f2- || true)"
 
 : "${DATABASE_USER:?DATABASE_USER is required}"
 : "${DATABASE_NAME:?DATABASE_NAME is required}"
 : "${B2_BUCKET:?B2_BUCKET is required}"
 
 export RCLONE_CONFIG="${RCLONE_CONFIG_FILE}"
+trap 'rm -f "${LOCAL_FILE}"' EXIT
 
 echo "${LOG_PREFIX} Downloading ${BACKUP_PATH} from b2:${B2_BUCKET}"
 rclone copyto "b2:${B2_BUCKET}/${BACKUP_PATH}" "${LOCAL_FILE}" \
@@ -53,5 +54,4 @@ gunzip -c "${LOCAL_FILE}" | docker compose --env-file "${ENV_FILE}" -f "${COMPOS
   psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}"
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" start backend
 
-rm -f "${LOCAL_FILE}"
 echo "${LOG_PREFIX} Restore complete"

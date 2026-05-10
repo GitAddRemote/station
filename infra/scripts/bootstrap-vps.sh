@@ -92,7 +92,23 @@ AAEOF
 fi
 
 # Install rootless Docker as the deploy user.
-runuser -l "${DEPLOY_USER}" -c "curl -fsSL https://get.docker.com/rootless | sh"
+# If dockerd is already running rootless and healthy, skip the install.
+# If a partial install is detected (binary present but daemon not healthy),
+# clean up before retrying so the installer does not get stuck.
+if runuser -l "${DEPLOY_USER}" -c "systemctl --user is-active docker >/dev/null 2>&1"; then
+  echo "Rootless Docker already active for ${DEPLOY_USER} — skipping install."
+else
+  if runuser -l "${DEPLOY_USER}" -c "[ -f \"\${HOME}/bin/dockerd\" ]"; then
+    echo "Partial rootless install detected — cleaning up before retry."
+    runuser -l "${DEPLOY_USER}" -c "
+      systemctl --user stop docker 2>/dev/null || true
+      \"\${HOME}/bin/dockerd-rootless-setuptool.sh\" uninstall -f 2>/dev/null || true
+      rm -f \"\${HOME}/bin/dockerd\"
+      rm -rf \"\${HOME}/.local/share/docker\"
+    "
+  fi
+  runuser -l "${DEPLOY_USER}" -c "curl -fsSL https://get.docker.com/rootless | sh"
+fi
 
 # Enable and start the rootless Docker service for the deploy user.
 runuser -l "${DEPLOY_USER}" -c "systemctl --user enable docker && systemctl --user start docker"

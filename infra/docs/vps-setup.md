@@ -81,12 +81,12 @@ curl -fsSL https://get.docker.com/rootless | sh
 
 ### Phase 3 — Dump postgres data (no downtime)
 
-**As deploy — do NOT source .bashrc yet, commands must reach the root daemon:**
+**As deploy — explicitly target the root daemon; the rootless installer may have switched the CLI context:**
 
 ```bash
 POSTGRES_USER=$(grep '^POSTGRES_USER=' /opt/station-bot/.env.production | cut -d= -f2)
 POSTGRES_DB=$(grep '^POSTGRES_DB=' /opt/station-bot/.env.production | cut -d= -f2)
-docker exec station-bot-postgres pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > /tmp/station_bot_backup.sql
+DOCKER_HOST=unix:///var/run/docker.sock docker exec station-bot-postgres pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > /tmp/station_bot_backup.sql
 echo "Dump size: $(wc -c < /tmp/station_bot_backup.sql) bytes"
 ```
 
@@ -131,8 +131,8 @@ docker compose -f docker-compose.prod.yml up -d postgres
 # Wait for healthy
 until docker compose -f docker-compose.prod.yml ps | grep -q "healthy"; do sleep 2; done
 
-# Restore data
-docker exec -i station-bot-postgres psql -U "${POSTGRES_USER}" "${POSTGRES_DB}" < /tmp/station_bot_backup.sql
+# Restore data (DOCKER_HOST already set to rootless socket above)
+DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock docker exec -i station-bot-postgres psql -U "${POSTGRES_USER}" "${POSTGRES_DB}" < /tmp/station_bot_backup.sql
 
 # Start the bot
 docker compose -f docker-compose.prod.yml up -d discord-bot
