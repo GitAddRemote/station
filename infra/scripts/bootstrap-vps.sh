@@ -72,18 +72,19 @@ chown "${DEPLOY_USER}:${DEPLOY_USER}" "${BASHRC}"
 # requires an explicit profile to create user namespaces.
 APPARMOR_RESTRICT="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 if [ -f "${APPARMOR_RESTRICT}" ] && [ "$(cat "${APPARMOR_RESTRICT}")" = "1" ]; then
-  ROOTLESSKIT_PROFILE="/etc/apparmor.d/home.deploy.bin.rootlesskit"
+  PROFILE_SLUG="$(echo "${DEPLOY_HOME}/bin/rootlesskit" | sed 's|^/||; s|/|.|g')"
+  ROOTLESSKIT_PROFILE="/etc/apparmor.d/${PROFILE_SLUG}"
   if [ ! -f "${ROOTLESSKIT_PROFILE}" ]; then
-    cat > "${ROOTLESSKIT_PROFILE}" << 'AAEOF'
+    cat > "${ROOTLESSKIT_PROFILE}" << AAEOF
 # ref: https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
 abi <abi/4.0>,
 include <tunables/global>
 
-/home/deploy/bin/rootlesskit flags=(unconfined) {
+${DEPLOY_HOME}/bin/rootlesskit flags=(unconfined) {
   userns,
 
   # Site-specific additions and overrides. See local/README for details.
-  include if exists <local/home.deploy.bin.rootlesskit>
+  include if exists <local/${PROFILE_SLUG}>
 }
 AAEOF
     systemctl restart apparmor.service
