@@ -55,15 +55,15 @@ fi
 # cannot escalate to root or access other users' containers via Docker.
 loginctl enable-linger "${DEPLOY_USER}"
 
-# Set DOCKER_HOST and PATH in the deploy user's shell so rootless Docker is
-# used automatically on interactive/login SSH sessions. Non-interactive shells
+# Set DOCKER_HOST in the deploy user's shell so rootless Docker is used
+# automatically on interactive/login SSH sessions. Non-interactive shells
 # (cron, CI) must set DOCKER_HOST themselves — the deploy/backup scripts do this.
+# PATH does not need ~/bin since docker-ce-rootless-extras installs to /usr/bin.
 BASHRC="${DEPLOY_HOME}/.bashrc"
 if ! grep -q 'rootless docker' "${BASHRC}" 2>/dev/null; then
   cat >> "${BASHRC}" << 'RCEOF'
 
 # rootless docker
-export PATH=${HOME}/bin:${PATH}
 export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 RCEOF
 fi
@@ -73,7 +73,10 @@ chown "${DEPLOY_USER}:${DEPLOY_USER}" "${BASHRC}"
 # requires an explicit profile to create user namespaces.
 APPARMOR_RESTRICT="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 if [ -f "${APPARMOR_RESTRICT}" ] && [ "$(cat "${APPARMOR_RESTRICT}")" = "1" ]; then
-  PROFILE_SLUG="$(echo "${DEPLOY_HOME}/bin/rootlesskit" | sed 's|^/||; s|/|.|g')"
+  # Resolve the actual rootlesskit binary path — with docker-ce-rootless-extras
+  # installed via APT, it lives at /usr/bin/rootlesskit, not ~/bin/rootlesskit.
+  ROOTLESSKIT_BIN="$(command -v rootlesskit)"
+  PROFILE_SLUG="$(echo "${ROOTLESSKIT_BIN}" | sed 's|^/||; s|/|.|g')"
   ROOTLESSKIT_PROFILE="/etc/apparmor.d/${PROFILE_SLUG}"
   if [ ! -f "${ROOTLESSKIT_PROFILE}" ]; then
     cat > "${ROOTLESSKIT_PROFILE}" << AAEOF
@@ -81,7 +84,7 @@ if [ -f "${APPARMOR_RESTRICT}" ] && [ "$(cat "${APPARMOR_RESTRICT}")" = "1" ]; t
 abi <abi/4.0>,
 include <tunables/global>
 
-${DEPLOY_HOME}/bin/rootlesskit flags=(unconfined) {
+${ROOTLESSKIT_BIN} flags=(unconfined) {
   userns,
 
   # Site-specific additions and overrides. See local/README for details.
@@ -99,12 +102,11 @@ fi
 if runuser -l "${DEPLOY_USER}" -c "systemctl --user is-active docker >/dev/null 2>&1"; then
   echo "Rootless Docker already active for ${DEPLOY_USER} — skipping install."
 else
-  if runuser -l "${DEPLOY_USER}" -c "[ -f \"\${HOME}/bin/dockerd\" ]"; then
+  if runuser -l "${DEPLOY_USER}" -c "[ -f \"\${HOME}/.config/systemd/user/docker.service\" ]"; then
     echo "Partial rootless install detected — cleaning up before retry."
     runuser -l "${DEPLOY_USER}" -c "
       systemctl --user stop docker 2>/dev/null || true
-      \"\${HOME}/bin/dockerd-rootless-setuptool.sh\" uninstall -f 2>/dev/null || true
-      rm -f \"\${HOME}/bin/dockerd\"
+      dockerd-rootless-setuptool.sh uninstall -f 2>/dev/null || true
       rm -rf \"\${HOME}/.local/share/docker\"
     "
   fi

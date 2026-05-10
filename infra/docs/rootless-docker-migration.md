@@ -39,16 +39,21 @@ loginctl enable-linger deploy
 
 ## AppArmor profile
 
-Ubuntu 24.04 sets `/proc/sys/kernel/apparmor_restrict_unprivileged_userns=1` by default, which blocks rootlesskit from creating user namespaces. An explicit AppArmor profile is required to allow it:
+Ubuntu 24.04 sets `/proc/sys/kernel/apparmor_restrict_unprivileged_userns=1` by default, which blocks rootlesskit from creating user namespaces. An explicit AppArmor profile is required to allow it.
+
+With `docker-ce-rootless-extras` installed via APT, `rootlesskit` lives at `/usr/bin/rootlesskit`. Resolve the path dynamically so the profile filename and binary path stay correct regardless of install method:
 
 ```bash
-cat <<EOT | sudo tee "/etc/apparmor.d/home.deploy.bin.rootlesskit"
+ROOTLESSKIT_BIN="$(command -v rootlesskit)"
+PROFILE_SLUG="$(echo "${ROOTLESSKIT_BIN}" | sed 's|^/||; s|/|.|g')"
+
+sudo tee "/etc/apparmor.d/${PROFILE_SLUG}" <<EOT
 abi <abi/4.0>,
 include <tunables/global>
 
-/home/deploy/bin/rootlesskit flags=(unconfined) {
+${ROOTLESSKIT_BIN} flags=(unconfined) {
   userns,
-  include if exists <local/home.deploy.bin.rootlesskit>
+  include if exists <local/${PROFILE_SLUG}>
 }
 EOT
 sudo systemctl restart apparmor.service

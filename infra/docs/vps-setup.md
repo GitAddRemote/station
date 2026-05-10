@@ -90,8 +90,8 @@ dockerd-rootless-setuptool.sh install
 **As deploy — explicitly target the root daemon; the rootless installer may have switched the CLI context:**
 
 ```bash
-POSTGRES_USER=$(grep '^POSTGRES_USER=' /opt/station-bot/.env.production | cut -d= -f2)
-POSTGRES_DB=$(grep '^POSTGRES_DB=' /opt/station-bot/.env.production | cut -d= -f2)
+POSTGRES_USER=$(grep '^POSTGRES_USER=' /opt/station-bot/.env.production | cut -d= -f2-)
+POSTGRES_DB=$(grep '^POSTGRES_DB=' /opt/station-bot/.env.production | cut -d= -f2-)
 DOCKER_HOST=unix:///var/run/docker.sock docker exec station-bot-postgres pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > /tmp/station_bot_backup.sql
 echo "Dump size: $(wc -c < /tmp/station_bot_backup.sql) bytes"
 ```
@@ -105,8 +105,7 @@ echo "Dump size: $(wc -c < /tmp/station_bot_backup.sql) bytes"
 cd /opt/station-bot
 docker compose -f docker-compose.prod.yml down
 
-# Activate rootless in this session
-export PATH=${HOME}/bin:${PATH}
+# Activate rootless in this session (PATH unchanged — APT install uses /usr/bin)
 export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 
 # Enable and start rootless service
@@ -122,11 +121,10 @@ docker info | grep -i rootless
 **As deploy:**
 
 ```bash
-# Make DOCKER_HOST permanent
+# Make DOCKER_HOST permanent (PATH unchanged — APT install uses /usr/bin)
 cat >> ~/.bashrc << 'RCEOF'
 
 # rootless docker
-export PATH=${HOME}/bin:${PATH}
 export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 RCEOF
 
