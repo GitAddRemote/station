@@ -10,10 +10,10 @@ The deploy user's Docker daemon runs unprivileged inside a user namespace. There
 
 `bootstrap-vps.sh` handles the full setup:
 
-- Installs `uidmap` and `dbus-user-session` prerequisites
+- Installs `uidmap`, `dbus-user-session`, and `docker-ce-rootless-extras` prerequisites
 - Enables linger so the deploy user's systemd session persists without an active login
 - Sets `DOCKER_HOST` and `PATH` in `~deploy/.bashrc`
-- Installs rootless Docker via `curl -fsSL https://get.docker.com/rootless | sh` (run as the deploy user)
+- Installs rootless Docker via `dockerd-rootless-setuptool.sh install` (ships with `docker-ce-rootless-extras`, no remote script execution)
 - Enables and starts the `docker` systemd user service
 
 The deploy scripts (`deploy.sh`, `backup-db.sh`, etc.) call `docker compose` directly — no `sudo` required.
@@ -73,10 +73,16 @@ loginctl enable-linger deploy
 
 ### Phase 2 — Install rootless Docker (no downtime)
 
+**As root — install the APT package that ships the setup tool:**
+
+```bash
+apt install -y docker-ce-rootless-extras
+```
+
 **As deploy (new SSH session):**
 
 ```bash
-curl -fsSL https://get.docker.com/rootless | sh
+dockerd-rootless-setuptool.sh install
 ```
 
 ### Phase 3 — Dump postgres data (no downtime)

@@ -62,10 +62,12 @@ This grants rootlesskit permission to use user namespaces without granting broad
 
 See the full runbook in [`vps-setup.md`](./vps-setup.md#migrating-an-existing-vps-to-rootless-docker).
 
+> **Install method:** use `apt install docker-ce-rootless-extras` (already signed and pinned to the Docker APT repo) then `dockerd-rootless-setuptool.sh install` as the deploy user. This avoids `curl | sh`. The post-mortem below references the old `curl | sh` path as historical context for what was run during the original migration.
+
 Summary:
 
-1. Install prerequisites as root (no downtime)
-2. Install rootless Docker as deploy (no downtime)
+1. Install prerequisites + `docker-ce-rootless-extras` as root (no downtime)
+2. Run `dockerd-rootless-setuptool.sh install` as deploy (no downtime)
 3. `pg_dump` while root daemon still running (no downtime)
 4. `docker compose down`, activate rootless in session, start rootless daemon (downtime starts)
 5. Write `.bashrc`, start postgres under rootless, restore data, start bot (downtime ends ~2 min)

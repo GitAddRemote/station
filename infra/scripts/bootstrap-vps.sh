@@ -32,6 +32,7 @@ apt update
 apt install -y \
   docker-ce \
   docker-ce-cli \
+  docker-ce-rootless-extras \
   containerd.io \
   docker-buildx-plugin \
   docker-compose-plugin \
@@ -107,7 +108,8 @@ else
       rm -rf \"\${HOME}/.local/share/docker\"
     "
   fi
-  runuser -l "${DEPLOY_USER}" -c "curl -fsSL https://get.docker.com/rootless | sh"
+  # Use the APT-installed setup tool — no remote script execution needed.
+  runuser -l "${DEPLOY_USER}" -c "dockerd-rootless-setuptool.sh install"
 fi
 
 # Enable and start the rootless Docker service for the deploy user.
