@@ -51,7 +51,7 @@ fi
 # The deploy user runs their own Docker daemon with no access to the root
 # Docker socket (which still exists at /var/run/docker.sock for system use),
 # no docker group membership, and no sudo required. A leaked deploy SSH key
-# cannot escalate to root or affect the host system.
+# cannot escalate to root or access other users' containers via Docker.
 loginctl enable-linger "${DEPLOY_USER}"
 
 # Set DOCKER_HOST and PATH in the deploy user's shell so rootless Docker is

@@ -28,9 +28,9 @@ if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
   exit 1
 fi
 
-set -a
-source "${ENV_FILE}"
-set +a
+DATABASE_USER="$(grep '^DATABASE_USER=' "${ENV_FILE}" | cut -d= -f2-)"
+DATABASE_NAME="$(grep '^DATABASE_NAME=' "${ENV_FILE}" | cut -d= -f2-)"
+B2_BUCKET="$(grep '^B2_BUCKET=' "${ENV_FILE}" | cut -d= -f2-)"
 
 : "${DATABASE_USER:?DATABASE_USER is required}"
 : "${DATABASE_NAME:?DATABASE_NAME is required}"

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The deploy SSH key lives in GitHub Secrets and is used on every deployment. If it were leaked, the attacker should only be able to run deploy-related Docker operations — nothing more. This is achieved with rootless Docker: the deploy user runs their own Docker daemon entirely within their user namespace, with no root socket and no docker group membership. A compromised key cannot escalate to root or affect any other service on the host.
+The deploy SSH key lives in GitHub Secrets and is used on every deployment. If it were leaked, the attacker should only be able to run deploy-related Docker operations — nothing more. This is achieved with rootless Docker: the deploy user runs their own Docker daemon entirely within their user namespace, with no root socket and no docker group membership. A compromised key cannot escalate to root or access other users' containers via Docker — though the deploy user can still affect resources they own (files, CPU, memory).
 
 ## Approach: rootless Docker
 
