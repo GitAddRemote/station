@@ -37,7 +37,15 @@ B2_BUCKET="$(grep '^B2_BUCKET=' "${ENV_FILE}" | cut -d= -f2- || true)"
 : "${B2_BUCKET:?B2_BUCKET is required}"
 
 export RCLONE_CONFIG="${RCLONE_CONFIG_FILE}"
-trap 'rm -f "${LOCAL_FILE}"' EXIT
+BACKEND_STOPPED=0
+cleanup() {
+  rm -f "${LOCAL_FILE}"
+  if [ "${BACKEND_STOPPED}" -eq 1 ]; then
+    echo "${LOG_PREFIX} Ensuring backend is started after exit..." >&2
+    docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" start backend || true
+  fi
+}
+trap cleanup EXIT
 
 echo "${LOG_PREFIX} Downloading ${BACKUP_PATH} from b2:${B2_BUCKET}"
 rclone copyto "b2:${B2_BUCKET}/${BACKUP_PATH}" "${LOCAL_FILE}" \
@@ -50,8 +58,10 @@ echo "${LOG_PREFIX} Starting in 5 seconds. Press Ctrl+C to abort."
 sleep 5
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop backend
+BACKEND_STOPPED=1
 gunzip -c "${LOCAL_FILE}" | docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
   psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}"
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" start backend
+BACKEND_STOPPED=0
 
 echo "${LOG_PREFIX} Restore complete"
