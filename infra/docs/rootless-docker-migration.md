@@ -10,7 +10,7 @@
 
 The `docker` group is root-equivalent. Any process that can reach `/var/run/docker.sock` can mount the host filesystem, run privileged containers, and escalate to root. If the deploy SSH key were ever leaked, an attacker would have had full root access to the host.
 
-Rootless Docker runs the daemon entirely inside the deploy user's own namespace. The socket lives at `/run/user/<uid>/docker.sock` and is inaccessible to other non-root users. A compromised deploy key can only affect the deploy user's containers — it cannot escalate to root or access other users' containers via Docker.
+Rootless Docker runs the daemon entirely inside the deploy user's own namespace. The socket lives at `/run/user/<uid>/docker.sock` and is inaccessible to other non-root users. A compromised deploy key cannot escalate to root or access other users' containers via Docker — the blast radius is limited to the deploy user's own namespace and resources.
 
 ---
 
