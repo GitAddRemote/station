@@ -95,17 +95,22 @@ AAEOF
   fi
 fi
 
+# XDG_RUNTIME_DIR must be set explicitly when invoking systemctl --user via
+# runuser; without it systemctl cannot reach the user's D-Bus/systemd instance.
+DEPLOY_UID="$(id -u "${DEPLOY_USER}")"
+DEPLOY_XDG="XDG_RUNTIME_DIR=/run/user/${DEPLOY_UID}"
+
 # Install rootless Docker as the deploy user.
 # If dockerd is already running rootless and healthy, skip the install.
-# If a partial install is detected (binary present but daemon not healthy),
+# If a partial install is detected (service file exists but daemon not healthy),
 # clean up before retrying so the installer does not get stuck.
-if runuser -l "${DEPLOY_USER}" -c "systemctl --user is-active docker >/dev/null 2>&1"; then
+if runuser -l "${DEPLOY_USER}" -c "${DEPLOY_XDG} systemctl --user is-active docker >/dev/null 2>&1"; then
   echo "Rootless Docker already active for ${DEPLOY_USER} — skipping install."
 else
   if runuser -l "${DEPLOY_USER}" -c "[ -f \"\${HOME}/.config/systemd/user/docker.service\" ]"; then
     echo "Partial rootless install detected — cleaning up before retry."
     runuser -l "${DEPLOY_USER}" -c "
-      systemctl --user stop docker 2>/dev/null || true
+      ${DEPLOY_XDG} systemctl --user stop docker 2>/dev/null || true
       dockerd-rootless-setuptool.sh uninstall -f 2>/dev/null || true
       rm -rf \"\${HOME}/.local/share/docker\"
     "
@@ -115,7 +120,7 @@ else
 fi
 
 # Enable and start the rootless Docker service for the deploy user.
-runuser -l "${DEPLOY_USER}" -c "systemctl --user enable docker && systemctl --user start docker"
+runuser -l "${DEPLOY_USER}" -c "${DEPLOY_XDG} systemctl --user enable docker && ${DEPLOY_XDG} systemctl --user start docker"
 
 # Remove the deploy user from the docker group if they were added by a
 # previous bootstrap run (rootless Docker requires no group membership).
