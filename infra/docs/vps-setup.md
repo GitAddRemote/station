@@ -12,7 +12,7 @@ The deploy user's Docker daemon runs unprivileged inside a user namespace. There
 
 - Installs `uidmap`, `dbus-user-session`, and `docker-ce-rootless-extras` prerequisites
 - Enables linger so the deploy user's systemd session persists without an active login
-- Sets `DOCKER_HOST` and `PATH` in `~deploy/.bashrc`
+- Sets `DOCKER_HOST` in `~deploy/.bashrc` (no PATH change needed — APT install uses `/usr/bin`)
 - Installs rootless Docker via `dockerd-rootless-setuptool.sh install` (ships with `docker-ce-rootless-extras`, no remote script execution)
 - Enables and starts the `docker` systemd user service
 

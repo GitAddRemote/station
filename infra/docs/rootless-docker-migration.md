@@ -107,8 +107,8 @@ No change to the deployment workflow. SSH in as deploy, run the usual docker com
 **Fix:** Extract only the needed variables directly:
 
 ```bash
-POSTGRES_USER=$(grep '^POSTGRES_USER=' .env.production | cut -d= -f2)
-POSTGRES_DB=$(grep '^POSTGRES_DB=' .env.production | cut -d= -f2)
+POSTGRES_USER=$(grep '^POSTGRES_USER=' .env.production | cut -d= -f2-)
+POSTGRES_DB=$(grep '^POSTGRES_DB=' .env.production | cut -d= -f2-)
 ```
 
 **Lesson:** `set -a; source` assumes every non-comment line is a valid variable assignment. It's brittle against env files written for human readability. Either enforce strict `KEY=value` formatting in env files, or extract specific variables when sourcing them in scripts.
