@@ -26,6 +26,8 @@ Rootless Docker runs the daemon entirely inside the deploy user's own namespace.
 
 ## Prerequisites installed
 
+> **Historical record:** these are the packages installed during the original migration, which used `curl | sh`. The recommended install method now also includes `docker-ce-rootless-extras` — see the install method note in [Migration steps](#migration-steps-for-reference-on-future-vps).
+
 ```bash
 apt install -y uidmap dbus-user-session
 loginctl enable-linger deploy
@@ -143,14 +145,15 @@ curl -fsSL https://get.docker.com/rootless | FORCE_ROOTLESS_INSTALL=1 sh
 
 **What happened:** After the AppArmor fix, the installer detected the partial installation from the first failed attempt and refused to proceed.
 
-**Fix:** Clean up the partial install before retrying:
+**Fix:** Clean up the partial install before retrying. With the APT-based install (`docker-ce-rootless-extras`), `dockerd-rootless-setuptool.sh` is in `/usr/bin` and `dockerd` is not placed in `~/bin`:
 
 ```bash
-systemctl --user stop docker
-/home/deploy/bin/dockerd-rootless-setuptool.sh uninstall -f
-rm -f /home/deploy/bin/dockerd
-rm -rf /home/deploy/.local/share/docker
+systemctl --user stop docker 2>/dev/null || true
+dockerd-rootless-setuptool.sh uninstall -f 2>/dev/null || true
+rm -rf ~/.local/share/docker
 ```
+
+> **Note:** The original migration used `curl | sh` which installed binaries to `~/bin/`. If cleaning up an old curl-based install, also run `rm -f ~/bin/dockerd ~/bin/dockerd-rootless-setuptool.sh`.
 
 **Lesson:** The rootless Docker installer is not idempotent when a previous run failed partway through. Always clean up before retrying a failed install.
 
