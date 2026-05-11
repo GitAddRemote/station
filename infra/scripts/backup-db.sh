@@ -7,6 +7,8 @@ ENV_FILE="${STATION_ROOT}/.env.production"
 COMPOSE_FILE="${STATION_ROOT}/docker-compose.prod.yml"
 RCLONE_CONFIG_FILE="${STATION_ROOT}/rclone.conf"
 LOG_PREFIX="[backup]"
+DOCKER_HOST="${DOCKER_HOST:-unix:///run/user/$(id -u)/docker.sock}"
+export DOCKER_HOST
 
 if [ ! -f "${ENV_FILE}" ]; then
   echo "${LOG_PREFIX} Missing ${ENV_FILE}" >&2
@@ -18,9 +20,10 @@ if [ ! -f "${RCLONE_CONFIG_FILE}" ]; then
   exit 1
 fi
 
-set -a
-source "${ENV_FILE}"
-set +a
+DATABASE_USER="$(grep '^DATABASE_USER=' "${ENV_FILE}" | cut -d= -f2- || true)"
+DATABASE_NAME="$(grep '^DATABASE_NAME=' "${ENV_FILE}" | cut -d= -f2- || true)"
+B2_BUCKET="$(grep '^B2_BUCKET=' "${ENV_FILE}" | cut -d= -f2- || true)"
+BACKUP_HEALTHCHECK_URL="$(grep '^BACKUP_HEALTHCHECK_URL=' "${ENV_FILE}" | cut -d= -f2- || true)"
 
 : "${DATABASE_USER:?DATABASE_USER is required}"
 : "${DATABASE_NAME:?DATABASE_NAME is required}"

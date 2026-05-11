@@ -1,0 +1,162 @@
+# VPS Setup — Deploy User Hardening
+
+## Overview
+
+The deploy SSH key lives in GitHub Secrets and is used on every deployment. If it were leaked, the attacker would have SSH access as the deploy user and could run arbitrary Docker containers within the deploy user's namespace. The key hardening property is that they cannot escalate to root or access other users' containers via Docker: the deploy user runs their own Docker daemon entirely within their user namespace, with no access to the root Docker socket and no docker group membership.
+
+## Approach: rootless Docker
+
+The deploy user's Docker daemon runs unprivileged inside a user namespace. There is no `/var/run/docker.sock` accessible to the deploy user — the socket lives at `/run/user/<uid>/docker.sock` and is owned entirely by that user.
+
+`bootstrap-vps.sh` handles the full setup:
+
+- Installs `uidmap`, `dbus-user-session`, and `docker-ce-rootless-extras` prerequisites
+- Enables linger so the deploy user's systemd session persists without an active login
+- Sets `DOCKER_HOST` in `~deploy/.bashrc` (no PATH change needed — APT install uses `/usr/bin`)
+- Installs rootless Docker via `dockerd-rootless-setuptool.sh install` (ships with `docker-ce-rootless-extras`, no remote script execution)
+- Enables and starts the `docker` systemd user service
+
+The deploy scripts (`deploy.sh`, `backup-db.sh`, etc.) call `docker compose` directly — no `sudo` required.
+
+## Pre-check results (recorded 2026-05-07)
+
+| Check                                         | Result                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `/proc/sys/kernel/unprivileged_userns_clone`  | `1` ✓                                                              |
+| `newuidmap` installed                         | Not pre-installed — provided by `uidmap` package (installed above) |
+| `unshare --user sh -c "echo namespaces work"` | `namespaces work` ✓                                                |
+
+## Verification
+
+After running `bootstrap-vps.sh`, SSH in as the deploy user and confirm:
+
+```bash
+# Docker daemon is running
+systemctl --user status docker
+
+# Docker works without sudo or docker group
+docker run hello-world
+
+# No root socket access
+ls /var/run/docker.sock   # deploy user should get permission denied
+groups                    # should NOT include 'docker'
+```
+
+## Security properties
+
+| Capability                     | Before (docker group) | After (rootless) |
+| ------------------------------ | --------------------- | ---------------- |
+| Run containers                 | ✓                     | ✓                |
+| Access root Docker socket      | ✓ (root-equivalent)   | ✗                |
+| Escalate to root via Docker    | ✓                     | ✗                |
+| Affect other users' containers | ✓                     | ✗                |
+| Blast radius of leaked key     | Full host (root)      | Deploy user only |
+
+## Reproducing on a fresh VPS
+
+`bootstrap-vps.sh` is fully automated. Prerequisites, linger, AppArmor profile (Ubuntu 24.04+), rootless install, and service enable/start are all handled. After the script completes, verify with the commands above.
+
+---
+
+## Migrating an existing VPS to rootless Docker
+
+Use these steps when Docker is already running on a VPS (e.g. station-bot is live) and you need to move the deploy user's containers from the root daemon to rootless without data loss. Expected downtime: 2–3 minutes.
+
+### Phase 1 — Install prerequisites (no downtime)
+
+**As root:**
+
+```bash
+apt install -y uidmap dbus-user-session
+loginctl enable-linger deploy
+```
+
+### Phase 2 — Install rootless Docker (no downtime)
+
+**As root — install the APT package that ships the setup tool:**
+
+```bash
+apt install -y docker-ce-rootless-extras
+```
+
+**As deploy (new SSH session):**
+
+```bash
+dockerd-rootless-setuptool.sh install
+```
+
+### Phase 3 — Dump postgres data (no downtime)
+
+**As deploy — explicitly target the root daemon; the rootless installer may have switched the CLI context:**
+
+```bash
+POSTGRES_USER=$(grep '^POSTGRES_USER=' /opt/station-bot/.env.production | cut -d= -f2-)
+POSTGRES_DB=$(grep '^POSTGRES_DB=' /opt/station-bot/.env.production | cut -d= -f2-)
+DOCKER_HOST=unix:///var/run/docker.sock docker exec station-bot-postgres pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > /tmp/station_bot_backup.sql
+echo "Dump size: $(wc -c < /tmp/station_bot_backup.sql) bytes"
+```
+
+### Phase 4 — Cut over to rootless (downtime starts)
+
+**As deploy:**
+
+```bash
+# Bring down root-daemon containers
+cd /opt/station-bot
+docker compose -f docker-compose.prod.yml down
+
+# Activate rootless in this session (PATH unchanged — APT install uses /usr/bin)
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
+
+# Enable and start rootless service
+systemctl --user enable docker
+systemctl --user start docker
+
+# Confirm rootless is active
+docker info | grep -i rootless
+```
+
+### Phase 5 — Restore data and bring services back up (downtime ends)
+
+**As deploy:**
+
+```bash
+# Make DOCKER_HOST permanent (PATH unchanged — APT install uses /usr/bin)
+cat >> ~/.bashrc << 'RCEOF'
+
+# rootless docker
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
+RCEOF
+
+# Start postgres under rootless daemon
+cd /opt/station-bot
+docker compose -f docker-compose.prod.yml up -d postgres
+
+# Wait for healthy
+until docker compose -f docker-compose.prod.yml ps | grep -q "healthy"; do sleep 2; done
+
+# Restore data (DOCKER_HOST already set to rootless socket above)
+DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock docker exec -i station-bot-postgres psql -U "${POSTGRES_USER}" "${POSTGRES_DB}" < /tmp/station_bot_backup.sql
+
+# Start the bot
+docker compose -f docker-compose.prod.yml up -d discord-bot
+
+# Verify
+docker compose -f docker-compose.prod.yml ps
+docker logs station-bot --tail 20
+```
+
+### Phase 6 — Remove docker group access (only after confirming services are healthy)
+
+**As root:**
+
+```bash
+gpasswd -d deploy docker
+```
+
+**As deploy (fresh SSH session to confirm clean environment):**
+
+```bash
+docker compose -f /opt/station-bot/docker-compose.prod.yml ps
+groups  # docker should not appear
+```

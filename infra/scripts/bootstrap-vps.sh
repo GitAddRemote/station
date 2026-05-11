@@ -13,7 +13,7 @@ STATION_ROOT="/opt/station"
 apt update
 apt upgrade -y
 
-apt install -y ca-certificates curl gnupg lsb-release cron logrotate rclone
+apt install -y ca-certificates curl gnupg lsb-release cron logrotate rclone uidmap dbus-user-session
 
 install -m 0755 -d /etc/apt/keyrings
 if [ ! -f /etc/apt/keyrings/docker.asc ]; then
@@ -32,6 +32,7 @@ apt update
 apt install -y \
   docker-ce \
   docker-ce-cli \
+  docker-ce-rootless-extras \
   containerd.io \
   docker-buildx-plugin \
   docker-compose-plugin \
@@ -47,7 +48,83 @@ if ! id -u "${DEPLOY_USER}" >/dev/null 2>&1; then
   useradd -m -s /bin/bash "${DEPLOY_USER}"
 fi
 
-usermod -aG docker "${DEPLOY_USER}"
+# Rootless Docker: install and configure for the deploy user.
+# The deploy user runs their own Docker daemon with no access to the root
+# Docker socket (which still exists at /var/run/docker.sock for system use),
+# no docker group membership, and no sudo required. A leaked deploy SSH key
+# cannot escalate to root or access other users' containers via Docker.
+loginctl enable-linger "${DEPLOY_USER}"
+
+# Set DOCKER_HOST in the deploy user's shell so rootless Docker is used
+# automatically on interactive/login SSH sessions. Non-interactive shells
+# (cron, CI) must set DOCKER_HOST themselves — the deploy/backup scripts do this.
+# PATH does not need ~/bin since docker-ce-rootless-extras installs to /usr/bin.
+BASHRC="${DEPLOY_HOME}/.bashrc"
+if ! grep -q 'rootless docker' "${BASHRC}" 2>/dev/null; then
+  cat >> "${BASHRC}" << 'RCEOF'
+
+# rootless docker
+export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
+RCEOF
+fi
+chown "${DEPLOY_USER}:${DEPLOY_USER}" "${BASHRC}"
+
+# Ubuntu 24.04+ restricts unprivileged user namespaces via AppArmor; rootlesskit
+# requires an explicit profile to create user namespaces.
+APPARMOR_RESTRICT="/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
+if [ -f "${APPARMOR_RESTRICT}" ] && [ "$(cat "${APPARMOR_RESTRICT}")" = "1" ]; then
+  # Resolve the actual rootlesskit binary path — with docker-ce-rootless-extras
+  # installed via APT, it lives at /usr/bin/rootlesskit, not ~/bin/rootlesskit.
+  ROOTLESSKIT_BIN="$(command -v rootlesskit)"
+  PROFILE_SLUG="$(echo "${ROOTLESSKIT_BIN}" | sed 's|^/||; s|/|.|g')"
+  ROOTLESSKIT_PROFILE="/etc/apparmor.d/${PROFILE_SLUG}"
+  if [ ! -f "${ROOTLESSKIT_PROFILE}" ]; then
+    cat > "${ROOTLESSKIT_PROFILE}" << AAEOF
+# ref: https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
+abi <abi/4.0>,
+include <tunables/global>
+
+${ROOTLESSKIT_BIN} flags=(unconfined) {
+  userns,
+
+  # Site-specific additions and overrides. See local/README for details.
+  include if exists <local/${PROFILE_SLUG}>
+}
+AAEOF
+    systemctl restart apparmor.service
+  fi
+fi
+
+# XDG_RUNTIME_DIR must be set explicitly when invoking systemctl --user via
+# runuser; without it systemctl cannot reach the user's D-Bus/systemd instance.
+DEPLOY_UID="$(id -u "${DEPLOY_USER}")"
+DEPLOY_XDG="XDG_RUNTIME_DIR=/run/user/${DEPLOY_UID}"
+
+# Install rootless Docker as the deploy user.
+# If dockerd is already running rootless and healthy, skip the install.
+# If a partial install is detected (service file exists but daemon not healthy),
+# clean up before retrying so the installer does not get stuck.
+if runuser -l "${DEPLOY_USER}" -c "${DEPLOY_XDG} systemctl --user is-active docker >/dev/null 2>&1"; then
+  echo "Rootless Docker already active for ${DEPLOY_USER} — skipping install."
+else
+  if runuser -l "${DEPLOY_USER}" -c "[ -f \"\${HOME}/.config/systemd/user/docker.service\" ]"; then
+    echo "Partial rootless install detected — cleaning up before retry."
+    runuser -l "${DEPLOY_USER}" -c "
+      ${DEPLOY_XDG} systemctl --user stop docker 2>/dev/null || true
+      dockerd-rootless-setuptool.sh uninstall -f 2>/dev/null || true
+      rm -rf \"\${HOME}/.local/share/docker\"
+    "
+  fi
+  # Use the APT-installed setup tool — no remote script execution needed.
+  runuser -l "${DEPLOY_USER}" -c "dockerd-rootless-setuptool.sh install"
+fi
+
+# Enable and start the rootless Docker service for the deploy user.
+runuser -l "${DEPLOY_USER}" -c "${DEPLOY_XDG} systemctl --user enable docker && ${DEPLOY_XDG} systemctl --user start docker"
+
+# Remove the deploy user from the docker group if they were added by a
+# previous bootstrap run (rootless Docker requires no group membership).
+gpasswd -d "${DEPLOY_USER}" docker 2>/dev/null || true
 
 install -d -m 700 -o "${DEPLOY_USER}" -g "${DEPLOY_USER}" "${DEPLOY_HOME}/.ssh"
 touch "${DEPLOY_HOME}/.ssh/authorized_keys"
@@ -83,5 +160,6 @@ echo "Bootstrap complete."
 echo "- Install Nginx configs from infra/nginx/ into /etc/nginx/sites-available/"
 echo "- Enable the sites and reload Nginx."
 echo "- Run infra/scripts/issue-certs.sh once DNS is live."
-echo "- Confirm the deploy user can SSH and run Docker commands without sudo."
+echo "- Confirm rootless Docker: ssh deploy@host 'docker run hello-world'"
+echo "- Confirm systemctl: ssh deploy@host 'systemctl --user status docker'"
 echo "- Configure B2 secrets and verify /opt/station/rclone.conf is written during deploy."
