@@ -57,8 +57,8 @@ echo "${LOG_PREFIX} WARNING: if you need a clean replacement, drop and recreate 
 echo "${LOG_PREFIX} Starting in 5 seconds. Press Ctrl+C to abort."
 sleep 5
 
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop backend
 BACKEND_STOPPED=1
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop backend
 gunzip -c "${LOCAL_FILE}" | docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
   psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}"
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" start backend
