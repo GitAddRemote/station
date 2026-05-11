@@ -17,7 +17,7 @@ Rootless Docker runs the daemon entirely inside the deploy user's own namespace.
 ## What changed
 
 - Rootless Docker daemon installed and running as the `deploy` user via `systemd --user`
-- `DOCKER_HOST` and `PATH` written to `~deploy/.bashrc` so interactive sessions use the rootless socket automatically
+- `DOCKER_HOST` written to `~deploy/.bashrc` so interactive sessions use the rootless socket automatically (no PATH change needed — APT install uses `/usr/bin`)
 - `deploy` removed from the `docker` group
 - All containers (postgres, discord-bot) migrated to the rootless daemon with data intact
 - Postgres data preserved via `pg_dump` / `psql` restore across daemons
