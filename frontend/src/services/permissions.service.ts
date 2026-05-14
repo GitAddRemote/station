@@ -10,13 +10,6 @@ export const OrgPermission = {
 
 export type OrgPermission = (typeof OrgPermission)[keyof typeof OrgPermission];
 
-const getAuthHeader = () => {
-  const token = localStorage.getItem('access_token');
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-};
-
 export const permissionsService = {
   async getUserPermissions(
     userId: number,
@@ -24,9 +17,7 @@ export const permissionsService = {
   ): Promise<OrgPermission[]> {
     const response = await axios.get(
       `${API_URL}/permissions/user/${userId}/organization/${organizationId}`,
-      {
-        headers: getAuthHeader(),
-      },
+      { withCredentials: true },
     );
     const permissions = response.data?.permissions;
     return Array.isArray(permissions) ? permissions : [];

@@ -1,13 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '../config/api';
 
-const getAuthHeader = () => {
-  const token = localStorage.getItem('access_token');
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-};
-
 export interface CatalogItem {
   id: number;
   uexId: number;
@@ -44,14 +37,14 @@ export const uexService = {
   ): Promise<CatalogSearchResponse> {
     const response = await axios.get(`${API_URL}/api/uex/items`, {
       params,
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
     return response.data;
   },
 
   async getStarSystems(): Promise<StarSystem[]> {
     const response = await axios.get(`${API_URL}/api/uex/star-systems`, {
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
     return response.data;
   },

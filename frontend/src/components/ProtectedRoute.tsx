@@ -1,14 +1,18 @@
+import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
+import { API_URL } from '../config/api';
 
 const ProtectedRoute = () => {
-  const token = localStorage.getItem('access_token');
+  const [authed, setAuthed] = useState<boolean | null>(null);
 
-  if (!token) {
-    // Redirect to login if no token found
-    return <Navigate to="/login" replace />;
-  }
+  useEffect(() => {
+    fetch(`${API_URL}/auth/me`, { credentials: 'include' })
+      .then((res) => setAuthed(res.ok))
+      .catch(() => setAuthed(false));
+  }, []);
 
-  // If token exists, render the child routes
+  if (authed === null) return null;
+  if (!authed) return <Navigate to="/login" replace />;
   return <Outlet />;
 };
 

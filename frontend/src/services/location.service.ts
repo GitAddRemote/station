@@ -1,13 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '../config/api';
 
-const getAuthHeader = () => {
-  const token = localStorage.getItem('access_token');
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-};
-
 export interface LocationRecord {
   id: string;
   gameId: number;
@@ -36,7 +29,7 @@ export const locationService = {
   }): Promise<LocationRecord[]> {
     const response = await axios.get(`${API_URL}/api/locations`, {
       params,
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
     return response.data;
   },
@@ -47,10 +40,8 @@ export const locationService = {
   }): Promise<StorableLocationsResponse> {
     const response = await axios.get(`${API_URL}/api/locations/storable`, {
       params: { gameId: params.gameId },
-      headers: {
-        ...getAuthHeader(),
-        ...(params.etag ? { 'If-None-Match': params.etag } : {}),
-      },
+      headers: params.etag ? { 'If-None-Match': params.etag } : {},
+      withCredentials: true,
       validateStatus: (status) => status === 200 || status === 304,
     });
 
