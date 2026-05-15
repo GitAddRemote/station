@@ -66,11 +66,14 @@ const Dashboard = () => {
   };
 
   const handleLogout = async () => {
-    await fetch(`${API_URL}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-    navigate('/login');
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } finally {
+      navigate('/login');
+    }
   };
 
   const handleProfile = () => {
