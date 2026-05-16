@@ -93,7 +93,9 @@ export class DatabaseSeederService {
         await this.rolesRepository.save(role);
         this.logger.info(`  ✓ Created role: ${role.name}`);
       } else {
-        this.logger.info(`  ⊙ Role already exists: ${roleData.name}`);
+        existingRole.permissions = roleData.permissions ?? {};
+        await this.rolesRepository.save(existingRole);
+        this.logger.info(`  ✓ Updated permissions for role: ${roleData.name}`);
       }
     }
   }
