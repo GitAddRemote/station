@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Role } from '../../modules/roles/role.entity';
 import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
@@ -15,6 +17,8 @@ export class DatabaseSeederService {
   constructor(
     @InjectPinoLogger(DatabaseSeederService.name)
     private readonly logger: PinoLogger,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
     @InjectRepository(Role)
     private rolesRepository: Repository<Role>,
     @InjectRepository(Organization)
@@ -83,6 +87,8 @@ export class DatabaseSeederService {
   private async seedRoles(): Promise<void> {
     this.logger.info('Seeding roles...');
 
+    let permissionsUpdated = false;
+
     for (const roleData of defaultRoles) {
       const existingRole = await this.rolesRepository.findOne({
         where: { name: roleData.name },
@@ -93,10 +99,19 @@ export class DatabaseSeederService {
         await this.rolesRepository.save(role);
         this.logger.info(`  ✓ Created role: ${role.name}`);
       } else {
-        existingRole.permissions = roleData.permissions ?? {};
+        existingRole.permissions = {
+          ...existingRole.permissions,
+          ...roleData.permissions,
+        };
         await this.rolesRepository.save(existingRole);
         this.logger.info(`  ✓ Updated permissions for role: ${roleData.name}`);
+        permissionsUpdated = true;
       }
+    }
+
+    if (permissionsUpdated) {
+      await this.cacheManager.clear();
+      this.logger.info('  ✓ Cleared permission cache');
     }
   }
 

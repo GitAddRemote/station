@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getLoggerToken } from 'nestjs-pino';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Repository } from 'typeorm';
 import { DatabaseSeederService } from './database-seeder.service';
 import { Role } from '../../modules/roles/role.entity';
@@ -8,6 +9,8 @@ import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
 import { Game } from '../../modules/games/game.entity';
+import { OrgPermission } from '../../modules/permissions/permissions.constants';
+import { defaultRoles } from './roles.seed';
 
 // Mock bcrypt module
 jest.mock('bcrypt', () => ({
@@ -26,6 +29,9 @@ describe('DatabaseSeederService', () => {
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
+  };
+  const mockCacheManager = {
+    clear: jest.fn().mockResolvedValue(undefined),
   };
   let loggerErrorSpy: jest.Mock;
 
@@ -72,6 +78,7 @@ describe('DatabaseSeederService', () => {
     mockLogger.warn.mockClear();
     mockLogger.error.mockClear();
     mockLogger.debug.mockClear();
+    mockCacheManager.clear.mockClear();
     loggerErrorSpy = mockLogger.error;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -80,6 +87,10 @@ describe('DatabaseSeederService', () => {
         {
           provide: getLoggerToken(DatabaseSeederService.name),
           useValue: mockLogger,
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: mockCacheManager,
         },
         {
           provide: getRepositoryToken(Role),
@@ -192,12 +203,15 @@ describe('DatabaseSeederService', () => {
       await expect(service.seedAll()).resolves.toBeUndefined();
     });
 
-    it('should handle existing data gracefully', async () => {
+    it('should update role permissions and clear cache when roles already exist', async () => {
       jest
         .spyOn(gamesRepository, 'findOne')
         .mockResolvedValue(mockGame as unknown as Game);
       jest
         .spyOn(rolesRepository, 'findOne')
+        .mockResolvedValue(mockRole as unknown as Role);
+      jest
+        .spyOn(rolesRepository, 'save')
         .mockResolvedValue(mockRole as unknown as Role);
       jest
         .spyOn(organizationsRepository, 'findOne')
@@ -212,10 +226,71 @@ describe('DatabaseSeederService', () => {
       await expect(service.seedAll()).resolves.toBeUndefined();
 
       expect(gamesRepository.save).not.toHaveBeenCalled();
-      expect(rolesRepository.save).not.toHaveBeenCalled();
+      expect(rolesRepository.save).toHaveBeenCalled();
       expect(organizationsRepository.save).not.toHaveBeenCalled();
       expect(usersRepository.save).not.toHaveBeenCalled();
       expect(userOrgRolesRepository.save).not.toHaveBeenCalled();
+      expect(mockCacheManager.clear).toHaveBeenCalled();
+    });
+
+    it('should seed roles with correct OrgPermission keys', async () => {
+      const savedRoles: Partial<Role>[] = [];
+
+      jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(null);
+      jest
+        .spyOn(rolesRepository, 'create')
+        .mockImplementation((data) => data as Role);
+      jest.spyOn(rolesRepository, 'save').mockImplementation(async (role) => {
+        savedRoles.push(role as Partial<Role>);
+        return role as Role;
+      });
+
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGame as unknown as Game);
+      jest
+        .spyOn(gamesRepository, 'create')
+        .mockReturnValue(mockGame as unknown as Game);
+      jest
+        .spyOn(gamesRepository, 'save')
+        .mockResolvedValue(mockGame as unknown as Game);
+      jest.spyOn(organizationsRepository, 'findOne').mockResolvedValue(null);
+      jest
+        .spyOn(organizationsRepository, 'create')
+        .mockReturnValue(mockOrganization as unknown as Organization);
+      jest
+        .spyOn(organizationsRepository, 'save')
+        .mockResolvedValue(mockOrganization as unknown as Organization);
+      jest.spyOn(usersRepository, 'findOne').mockResolvedValue(null);
+      jest
+        .spyOn(usersRepository, 'create')
+        .mockReturnValue(mockUser as unknown as User);
+      jest
+        .spyOn(usersRepository, 'save')
+        .mockResolvedValue(mockUser as unknown as User);
+      jest.spyOn(userOrgRolesRepository, 'findOne').mockResolvedValue(null);
+      jest
+        .spyOn(userOrgRolesRepository, 'create')
+        .mockReturnValue(mockUserOrgRole as unknown as UserOrganizationRole);
+      jest
+        .spyOn(userOrgRolesRepository, 'save')
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
+
+      await service.seedAll();
+
+      const validPermissionKeys = new Set(Object.values(OrgPermission));
+      const seededRoleNames = savedRoles.map((r) => r.name);
+
+      expect(seededRoleNames).toEqual(
+        expect.arrayContaining(defaultRoles.map((r) => r.name)),
+      );
+
+      for (const role of savedRoles) {
+        const keys = Object.keys(role.permissions ?? {});
+        for (const key of keys) {
+          expect(validPermissionKeys).toContain(key);
+        }
+      }
     });
 
     it('should throw error on failure', async () => {
