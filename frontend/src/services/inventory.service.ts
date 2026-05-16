@@ -105,13 +105,6 @@ const buildInventoryQuery = (params: InventorySearchParams) => {
   return query;
 };
 
-const getAuthHeader = () => {
-  const token = localStorage.getItem('access_token');
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-};
-
 const buildOrgInventoryQuery = (params: {
   gameId: number;
   uexItemId?: number;
@@ -154,7 +147,7 @@ export const inventoryService = {
   ): Promise<InventoryListResponse> {
     const response = await axios.get(`${API_URL}/api/inventory`, {
       params: buildInventoryQuery(params),
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
     return response.data;
   },
@@ -164,7 +157,7 @@ export const inventoryService = {
    */
   async getCategories(): Promise<InventoryCategory[]> {
     const response = await axios.get(`${API_URL}/api/uex/categories`, {
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
     return response.data;
   },
@@ -176,7 +169,7 @@ export const inventoryService = {
     const response = await axios.get(
       `${API_URL}/api/inventory/summary/${gameId}`,
       {
-        headers: getAuthHeader(),
+        withCredentials: true,
       },
     );
     return response.data;
@@ -192,7 +185,7 @@ export const inventoryService = {
     >,
   ): Promise<InventoryItem> {
     const response = await axios.post(`${API_URL}/api/inventory`, item, {
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
     return response.data;
   },
@@ -208,7 +201,7 @@ export const inventoryService = {
       `${API_URL}/api/inventory/${id}`,
       updates,
       {
-        headers: getAuthHeader(),
+        withCredentials: true,
       },
     );
     return response.data;
@@ -219,7 +212,7 @@ export const inventoryService = {
    */
   async deleteItem(id: string): Promise<void> {
     await axios.delete(`${API_URL}/api/inventory/${id}`, {
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
   },
 
@@ -231,7 +224,7 @@ export const inventoryService = {
       `${API_URL}/api/inventory/${itemId}/share`,
       { orgId, quantity },
       {
-        headers: getAuthHeader(),
+        withCredentials: true,
       },
     );
   },
@@ -241,7 +234,7 @@ export const inventoryService = {
    */
   async unshareItem(itemId: string) {
     await axios.delete(`${API_URL}/api/inventory/${itemId}/share`, {
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
   },
 
@@ -254,7 +247,7 @@ export const inventoryService = {
     const response = await axios.get(
       `${API_URL}/user-organization-roles/user/${userId}/organizations`,
       {
-        headers: getAuthHeader(),
+        withCredentials: true,
       },
     );
     return response.data;
@@ -282,7 +275,7 @@ export const inventoryService = {
   ): Promise<InventoryListResponse> {
     const response = await axios.get(`${API_URL}/api/orgs/${orgId}/inventory`, {
       params: buildOrgInventoryQuery(params),
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
 
     return response.data;
@@ -309,7 +302,7 @@ export const inventoryService = {
     const response = await axios.post(
       `${API_URL}/api/orgs/${orgId}/inventory`,
       item,
-      { headers: getAuthHeader() },
+      { withCredentials: true },
     );
     return response.data;
   },
@@ -325,7 +318,7 @@ export const inventoryService = {
     const response = await axios.put(
       `${API_URL}/api/orgs/${orgId}/inventory/${id}`,
       updates,
-      { headers: getAuthHeader() },
+      { withCredentials: true },
     );
     return response.data;
   },
@@ -335,7 +328,7 @@ export const inventoryService = {
    */
   async deleteOrgItem(orgId: number, id: string): Promise<void> {
     await axios.delete(`${API_URL}/api/orgs/${orgId}/inventory/${id}`, {
-      headers: getAuthHeader(),
+      withCredentials: true,
     });
   },
 };

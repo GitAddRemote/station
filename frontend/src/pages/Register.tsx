@@ -33,27 +33,21 @@ const Register = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ username, password, email }),
       });
 
       if (registerResponse.ok) {
-        // Auto-login after successful registration
         const loginResponse = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include',
           body: JSON.stringify({ username, password }),
         });
 
         if (loginResponse.ok) {
-          const data = await loginResponse.json();
-
-          // Store tokens
-          localStorage.setItem('access_token', data.access_token);
-          localStorage.setItem('refresh_token', data.refresh_token);
-
-          // Redirect to dashboard
           navigate('/dashboard');
         } else {
           // Registration succeeded but login failed, redirect to login page

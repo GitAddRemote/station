@@ -44,17 +44,11 @@ const Login = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
 
       if (response.ok) {
-        const data = await response.json();
-
-        // Store tokens
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-
-        // Redirect to dashboard
         navigate('/dashboard');
       } else {
         const errorData = await response.json();

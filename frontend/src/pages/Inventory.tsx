@@ -440,10 +440,15 @@ const InventoryPage = () => {
     [],
   );
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } finally {
+      navigate('/login');
+    }
   };
 
   const closeActionMenu = () => {
@@ -479,11 +484,8 @@ const InventoryPage = () => {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const token = localStorage.getItem('access_token');
       const response = await fetch(`${API_URL}/users/profile`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
 
       if (!response.ok) {
