@@ -263,7 +263,8 @@ describe('DatabaseSeederService', () => {
         .spyOn(gamesRepository, 'findOne')
         .mockResolvedValue(mockGame as unknown as Game);
 
-      // Return the exact seed permissions for each role so no change is detected.
+      // Return the exact seed permissions AND description for each role so no
+      // change is detected and the idempotency path skips save entirely.
       jest
         .spyOn(rolesRepository, 'findOne')
         .mockImplementation(async (opts) => {
@@ -272,6 +273,7 @@ describe('DatabaseSeederService', () => {
           return {
             ...mockRole,
             name,
+            description: seedRole?.description ?? mockRole.description,
             permissions: { ...(seedRole?.permissions ?? {}) },
           } as unknown as Role;
         });

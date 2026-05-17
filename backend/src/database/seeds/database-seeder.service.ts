@@ -29,6 +29,9 @@ const LEGACY_PERMISSION_KEYS = new Set<string>([
   'canManageSettings',
   'canViewSettings',
 ]);
+// Bare key pattern — no Keyv namespace prefix is configured in app.module.ts,
+// so permission keys are stored as-is in Redis. If a namespace is ever added,
+// this pattern must be updated to match (e.g. 'namespace:permissions:user:*').
 const PERMISSION_CACHE_PATTERN = 'permissions:user:*';
 
 @Injectable()
@@ -127,22 +130,30 @@ export class DatabaseSeederService {
         );
         const merged = { ...sanitizedExisting, ...roleData.permissions };
 
-        // Only save if permissions actually changed (idempotency).
         // Use key-sorted stringify because JSONB does not preserve key order,
         // so a naive stringify can differ even for semantically equal objects.
         const sortedKeys = (obj: Record<string, unknown>) =>
           JSON.stringify(obj, Object.keys(obj).sort());
-        if (sortedKeys(existingRole.permissions ?? {}) !== sortedKeys(merged)) {
-          existingRole.permissions = merged;
+        const permissionsChanged =
+          sortedKeys(existingRole.permissions ?? {}) !== sortedKeys(merged);
+        const descriptionChanged =
+          roleData.description !== undefined &&
+          existingRole.description !== roleData.description;
+
+        if (permissionsChanged || descriptionChanged) {
+          if (permissionsChanged) {
+            existingRole.permissions = merged;
+          }
+          if (descriptionChanged) {
+            existingRole.description = roleData.description!;
+          }
           await this.rolesRepository.save(existingRole);
-          this.logger.info(
-            `  ✓ Updated permissions for role: ${roleData.name}`,
-          );
-          permissionsUpdated = true;
+          this.logger.info(`  ✓ Updated role: ${roleData.name}`);
+          if (permissionsChanged) {
+            permissionsUpdated = true;
+          }
         } else {
-          this.logger.info(
-            `  ⊙ Permissions unchanged for role: ${roleData.name}`,
-          );
+          this.logger.info(`  ⊙ Role unchanged: ${roleData.name}`);
         }
       }
     }

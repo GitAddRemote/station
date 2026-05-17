@@ -1,7 +1,10 @@
 import { Role } from '../../modules/roles/role.entity';
 import { DEFAULT_ROLE_PERMISSIONS } from '../../modules/permissions/permissions.constants';
 
-const ROLE_DESCRIPTIONS: Record<string, string> = {
+// Typed against DEFAULT_ROLE_PERMISSIONS so TypeScript fails at compile time
+// if a new default role is added without a corresponding description.
+type DefaultRoleName = keyof typeof DEFAULT_ROLE_PERMISSIONS;
+const ROLE_DESCRIPTIONS: Record<DefaultRoleName, string> = {
   Owner:
     'Full inventory access. Can view, edit, and administer organization inventory and member shared items.',
   Admin:
@@ -14,19 +17,13 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   Viewer: 'Read-only access. Can only view organization inventory.',
 };
 
-export const defaultRoles: Partial<Role>[] = Object.entries(
-  DEFAULT_ROLE_PERMISSIONS,
-)
-  .filter(
-    (
-      entry,
-    ): entry is [
-      keyof typeof ROLE_DESCRIPTIONS,
-      (typeof DEFAULT_ROLE_PERMISSIONS)[string],
-    ] => entry[0] in ROLE_DESCRIPTIONS,
-  )
-  .map(([name, permissions]) => ({
-    name,
-    description: ROLE_DESCRIPTIONS[name],
-    permissions,
-  }));
+export const defaultRoles: Partial<Role>[] = (
+  Object.entries(DEFAULT_ROLE_PERMISSIONS) as [
+    DefaultRoleName,
+    (typeof DEFAULT_ROLE_PERMISSIONS)[DefaultRoleName],
+  ][]
+).map(([name, permissions]) => ({
+  name,
+  description: ROLE_DESCRIPTIONS[name],
+  permissions,
+}));
