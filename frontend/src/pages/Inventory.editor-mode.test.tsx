@@ -475,7 +475,7 @@ describe('Inventory editor mode inline controls', () => {
     );
   });
 
-  it('hides the org add flow when org permissions do not include edit/admin', async () => {
+  it('hides the add button for view-only org users but still shows org inventory', async () => {
     mockGetUserOrganizations.mockResolvedValue([
       {
         id: 1,
@@ -502,14 +502,16 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.click(await screen.findByText('Test Org'));
 
     await waitFor(() =>
-      expect(
-        screen.getByText(
-          'You do not have permission to add items to this organization.',
-        ),
-      ).toBeInTheDocument(),
+      expect(screen.getByText('Test Org')).toBeInTheDocument(),
     );
+
     expect(
       screen.queryByRole('button', { name: 'Add org item' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        'You do not have permission to add items to this organization.',
+      ),
     ).not.toBeInTheDocument();
   });
 

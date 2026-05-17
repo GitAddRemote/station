@@ -264,7 +264,7 @@ const InventoryPage = () => {
   }, [density]);
 
   useEffect(() => {
-    if (orgOptions.length === 0 || selectedOrgId === null) return;
+    if (selectedOrgId === null) return;
     const isValidOrg = orgOptions.some((org) => org.id === selectedOrgId);
     if (!isValidOrg) {
       setSelectedOrgId(null);
