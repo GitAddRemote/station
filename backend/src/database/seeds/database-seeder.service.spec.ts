@@ -299,7 +299,9 @@ describe('DatabaseSeederService', () => {
 
     it('should preserve custom (non-legacy) permission keys when merging', async () => {
       const ownerSeedData = defaultRoles.find((r) => r.name === 'Owner')!;
-      const customKey = OrgPermission.CAN_VIEW_ORG_INVENTORY; // valid non-legacy key
+      // Use a key that is not in the seed matrix for Owner so it cannot be
+      // overwritten by the merge and truly exercises the custom-key path.
+      const customKey = 'custom:guild:officer' as unknown as OrgPermission;
 
       jest
         .spyOn(gamesRepository, 'findOne')
@@ -312,8 +314,8 @@ describe('DatabaseSeederService', () => {
             permissions: {
               // Legacy key — should be stripped.
               canViewOrganization: true,
-              // Custom valid key — should be preserved.
-              [customKey]: false,
+              // Unknown custom key — should be preserved.
+              [customKey]: true,
             },
           }) as unknown as Role,
       );
@@ -336,13 +338,65 @@ describe('DatabaseSeederService', () => {
       const savedOwner = saveSpy.mock.calls[0][0] as Partial<Role>;
       // Legacy key must be gone.
       expect(savedOwner.permissions).not.toHaveProperty('canViewOrganization');
-      // Custom key must survive (seed value wins if it also defines this key,
-      // so just assert the key is present).
-      expect(savedOwner.permissions).toHaveProperty(customKey);
+      // Unknown custom key must survive.
+      expect(savedOwner.permissions).toHaveProperty(customKey, true);
       // Seed permissions are applied on top.
       expect(savedOwner.permissions).toEqual(
         expect.objectContaining(ownerSeedData.permissions),
       );
+    });
+
+    it('should use targeted Redis SCAN/DEL when a Redis store is present', async () => {
+      const matchedKeys = [
+        'permissions:user:1:org:1',
+        'permissions:user:2:org:1',
+      ];
+      const mockRedisClient = {
+        scanIterator: jest
+          .fn()
+          .mockImplementation(() => matchedKeys[Symbol.iterator]()),
+        del: jest.fn().mockResolvedValue(undefined),
+      };
+      const mockRedisStore = { store: { client: mockRedisClient } };
+
+      // Temporarily add a Redis-like store to the cache manager.
+      (mockCacheManager as { stores: unknown[] }).stores = [mockRedisStore];
+
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGame as unknown as Game);
+      jest.spyOn(rolesRepository, 'findOne').mockImplementation(
+        async () =>
+          ({
+            ...mockRole,
+            permissions: { canViewOrganization: true },
+          }) as unknown as Role,
+      );
+      jest
+        .spyOn(rolesRepository, 'save')
+        .mockImplementation(async (role) => role as Role);
+      jest
+        .spyOn(organizationsRepository, 'findOne')
+        .mockResolvedValue(mockOrganization as unknown as Organization);
+      jest
+        .spyOn(usersRepository, 'findOne')
+        .mockResolvedValue(mockUser as unknown as User);
+      jest
+        .spyOn(userOrgRolesRepository, 'findOne')
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
+
+      await service.seedAll();
+
+      expect(mockRedisClient.scanIterator).toHaveBeenCalledWith({
+        MATCH: 'permissions:user:*',
+        COUNT: 100,
+      });
+      expect(mockRedisClient.del).toHaveBeenCalledWith(matchedKeys);
+      // Global clear must NOT be called when Redis store handles it.
+      expect(mockCacheManager.clear).not.toHaveBeenCalled();
+
+      // Restore empty stores for subsequent tests.
+      (mockCacheManager as { stores: unknown[] }).stores = [];
     });
 
     it('should seed roles with correct OrgPermission keys and per-role permission values', async () => {

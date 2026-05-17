@@ -154,10 +154,15 @@ export class DatabaseSeederService {
   private async invalidatePermissionCache(): Promise<void> {
     // cache-manager v7 exposes backing stores via `cacheManager.stores` (Keyv[]).
     // Each Keyv wraps a store adapter; for cache-manager-redis-yet the adapter
-    // exposes `.client` (the ioredis/node-redis client) which supports KEYS/DEL.
+    // exposes `.client` (the node-redis 4.x client).
+    // Use SCAN (non-blocking cursor iteration) instead of KEYS to avoid stalling
+    // Redis on large keyspaces. node-redis 4.x del() takes an array, not variadic args.
     type RedisClient = {
-      keys?: (pattern: string) => Promise<string[]>;
-      del?: (...keys: string[]) => Promise<unknown>;
+      scanIterator?: (opts: {
+        MATCH: string;
+        COUNT: number;
+      }) => AsyncIterable<string>;
+      del?: (keys: string[]) => Promise<unknown>;
     };
     type KeyvLike = { store?: { client?: RedisClient } };
 
@@ -167,10 +172,16 @@ export class DatabaseSeederService {
     let invalidated = false;
     for (const keyv of stores) {
       const client = keyv.store?.client;
-      if (client?.keys && client?.del) {
-        const keys = await client.keys(PERMISSION_CACHE_PATTERN);
+      if (client?.scanIterator && client?.del) {
+        const keys: string[] = [];
+        for await (const key of client.scanIterator({
+          MATCH: PERMISSION_CACHE_PATTERN,
+          COUNT: 100,
+        })) {
+          keys.push(key);
+        }
         if (keys.length > 0) {
-          await client.del(...keys);
+          await client.del(keys);
         }
         invalidated = true;
       }
