@@ -173,6 +173,7 @@ const InventoryPage = () => {
   const [orgPermissionsError, setOrgPermissionsError] = useState<string | null>(
     null,
   );
+  const permissionsFetchedForOrgId = useRef<number | null>(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -465,6 +466,14 @@ const InventoryPage = () => {
     [],
   );
 
+  const canViewOrgInventory = useMemo(
+    () =>
+      orgPermissions.includes(OrgPermission.CAN_VIEW_ORG_INVENTORY) ||
+      orgPermissions.includes(OrgPermission.CAN_EDIT_ORG_INVENTORY) ||
+      orgPermissions.includes(OrgPermission.CAN_ADMIN_ORG_INVENTORY),
+    [orgPermissions],
+  );
+
   const canManageOrgInventory = useMemo(
     () =>
       orgPermissions.includes(OrgPermission.CAN_EDIT_ORG_INVENTORY) ||
@@ -588,6 +597,11 @@ const InventoryPage = () => {
       const offset = page * rowsPerPage;
 
       if (isOrgMode && selectedOrgId) {
+        if (orgPermissionsLoading || !canViewOrgInventory) {
+          setItems([]);
+          setTotalCount(0);
+          return;
+        }
         const data = await inventoryService.getOrgInventory(selectedOrgId, {
           gameId: GAME_ID,
           search: debouncedSearch || undefined,
@@ -653,6 +667,8 @@ const InventoryPage = () => {
     user,
     isOrgMode,
     selectedOrgId,
+    orgPermissionsLoading,
+    canViewOrgInventory,
     filters.categoryId,
     filters.locationId,
     filters.sharedOnly,
@@ -879,9 +895,11 @@ const InventoryPage = () => {
     if (viewMode !== 'org' || !user?.userId || !selectedOrgId) {
       setOrgPermissions([]);
       setOrgPermissionsError(null);
+      permissionsFetchedForOrgId.current = null;
       return;
     }
     let isMounted = true;
+    permissionsFetchedForOrgId.current = null;
     setOrgPermissionsLoading(true);
     permissionsService
       .getUserPermissions(user.userId, selectedOrgId)
@@ -889,6 +907,7 @@ const InventoryPage = () => {
         if (isMounted) {
           setOrgPermissions(permissions);
           setOrgPermissionsError(null);
+          permissionsFetchedForOrgId.current = selectedOrgId;
         }
       })
       .catch((err) => {
@@ -907,6 +926,26 @@ const InventoryPage = () => {
       isMounted = false;
     };
   }, [viewMode, user?.userId, selectedOrgId]);
+
+  useEffect(() => {
+    if (
+      viewMode === 'org' &&
+      selectedOrgId !== null &&
+      !orgPermissionsLoading &&
+      !orgPermissionsError &&
+      permissionsFetchedForOrgId.current === selectedOrgId &&
+      !canViewOrgInventory
+    ) {
+      setViewMode('personal');
+      setSelectedOrgId(null);
+    }
+  }, [
+    viewMode,
+    selectedOrgId,
+    orgPermissionsLoading,
+    orgPermissionsError,
+    canViewOrgInventory,
+  ]);
 
   useEffect(() => {
     if (user) {
@@ -2171,15 +2210,6 @@ const InventoryPage = () => {
                     autoFocusSearch
                     disabled={inventoryBusy}
                   />
-                  {viewMode === 'org' &&
-                    selectedOrgId &&
-                    !canManageOrgInventory &&
-                    !orgPermissionsLoading && (
-                      <Alert severity="info" sx={{ mt: 2 }}>
-                        You do not have permission to add items to this
-                        organization.
-                      </Alert>
-                    )}
                   {orgPermissionsError && (
                     <Alert severity="warning" sx={{ mt: 2 }}>
                       {orgPermissionsError}
