@@ -20,11 +20,13 @@ export enum OrgPermission {
 
 /**
  * Default role permission mappings
+ *
+ * Declared without an explicit wide type so `keyof typeof DEFAULT_ROLE_PERMISSIONS`
+ * resolves to the literal union of role name strings rather than `string`.
+ * The `satisfies` clause still enforces that every value is a complete
+ * `Record<OrgPermission, boolean>`, giving both narrowing and type-safety.
  */
-export const DEFAULT_ROLE_PERMISSIONS: Record<
-  string,
-  Record<OrgPermission, boolean>
-> = {
+export const DEFAULT_ROLE_PERMISSIONS = {
   Owner: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
@@ -61,7 +63,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: false,
   },
-};
+} satisfies Record<string, Record<OrgPermission, boolean>>;
 
 /**
  * Permission descriptions for documentation and UI

@@ -1,8 +1,10 @@
 import { Role } from '../../modules/roles/role.entity';
 import { DEFAULT_ROLE_PERMISSIONS } from '../../modules/permissions/permissions.constants';
 
-// Typed against DEFAULT_ROLE_PERMISSIONS so TypeScript fails at compile time
-// if a new default role is added without a corresponding description.
+// `keyof typeof DEFAULT_ROLE_PERMISSIONS` is now a literal union of role names
+// (not `string`) because the constant uses `satisfies` without a wide type
+// annotation. TypeScript will fail to compile if a new role is added to
+// DEFAULT_ROLE_PERMISSIONS without a matching entry here.
 type DefaultRoleName = keyof typeof DEFAULT_ROLE_PERMISSIONS;
 const ROLE_DESCRIPTIONS: Record<DefaultRoleName, string> = {
   Owner:

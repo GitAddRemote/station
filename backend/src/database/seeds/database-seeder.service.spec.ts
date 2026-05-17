@@ -258,6 +258,50 @@ describe('DatabaseSeederService', () => {
       );
     });
 
+    it('should update description without clearing cache when only description differs', async () => {
+      const ownerSeedData = defaultRoles.find((r) => r.name === 'Owner')!;
+
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGame as unknown as Game);
+
+      // Return roles with correct permissions but a stale description.
+      jest
+        .spyOn(rolesRepository, 'findOne')
+        .mockImplementation(async (opts) => {
+          const name = (opts as { where: { name: string } }).where.name;
+          const seedRole = defaultRoles.find((r) => r.name === name);
+          return {
+            ...mockRole,
+            name,
+            description: 'Stale legacy description',
+            permissions: { ...(seedRole?.permissions ?? {}) },
+          } as unknown as Role;
+        });
+
+      const saveSpy = jest
+        .spyOn(rolesRepository, 'save')
+        .mockImplementation(async (role) => role as Role);
+      jest
+        .spyOn(organizationsRepository, 'findOne')
+        .mockResolvedValue(mockOrganization as unknown as Organization);
+      jest
+        .spyOn(usersRepository, 'findOne')
+        .mockResolvedValue(mockUser as unknown as User);
+      jest
+        .spyOn(userOrgRolesRepository, 'findOne')
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
+
+      await service.seedAll();
+
+      // Save must have been called to patch the description.
+      expect(saveSpy).toHaveBeenCalled();
+      const savedOwner = saveSpy.mock.calls[0][0] as Partial<Role>;
+      expect(savedOwner.description).toBe(ownerSeedData.description);
+      // Permissions did not change so cache must NOT be cleared.
+      expect(mockCacheManager.clear).not.toHaveBeenCalled();
+    });
+
     it('should not save or clear cache when permissions are already up to date', async () => {
       jest
         .spyOn(gamesRepository, 'findOne')
