@@ -35,6 +35,9 @@ describe('DatabaseSeederService', () => {
   };
   const mockCacheManager = {
     clear: jest.fn().mockResolvedValue(undefined),
+    // cache-manager v7: stores is an array of Keyv instances. No Redis client
+    // in unit tests, so the code falls back to cacheManager.clear().
+    stores: [],
   };
   let loggerErrorSpy: jest.Mock;
 
@@ -292,6 +295,54 @@ describe('DatabaseSeederService', () => {
 
       expect(rolesRepository.save).not.toHaveBeenCalled();
       expect(mockCacheManager.clear).not.toHaveBeenCalled();
+    });
+
+    it('should preserve custom (non-legacy) permission keys when merging', async () => {
+      const ownerSeedData = defaultRoles.find((r) => r.name === 'Owner')!;
+      const customKey = OrgPermission.CAN_VIEW_ORG_INVENTORY; // valid non-legacy key
+
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGame as unknown as Game);
+
+      jest.spyOn(rolesRepository, 'findOne').mockImplementation(
+        async () =>
+          ({
+            ...mockRole,
+            permissions: {
+              // Legacy key — should be stripped.
+              canViewOrganization: true,
+              // Custom valid key — should be preserved.
+              [customKey]: false,
+            },
+          }) as unknown as Role,
+      );
+
+      const saveSpy = jest
+        .spyOn(rolesRepository, 'save')
+        .mockImplementation(async (role) => role as Role);
+      jest
+        .spyOn(organizationsRepository, 'findOne')
+        .mockResolvedValue(mockOrganization as unknown as Organization);
+      jest
+        .spyOn(usersRepository, 'findOne')
+        .mockResolvedValue(mockUser as unknown as User);
+      jest
+        .spyOn(userOrgRolesRepository, 'findOne')
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
+
+      await service.seedAll();
+
+      const savedOwner = saveSpy.mock.calls[0][0] as Partial<Role>;
+      // Legacy key must be gone.
+      expect(savedOwner.permissions).not.toHaveProperty('canViewOrganization');
+      // Custom key must survive (seed value wins if it also defines this key,
+      // so just assert the key is present).
+      expect(savedOwner.permissions).toHaveProperty(customKey);
+      // Seed permissions are applied on top.
+      expect(savedOwner.permissions).toEqual(
+        expect.objectContaining(ownerSeedData.permissions),
+      );
     });
 
     it('should seed roles with correct OrgPermission keys and per-role permission values', async () => {
