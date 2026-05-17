@@ -233,7 +233,14 @@ export class DatabaseSeederService {
     }
 
     if (!invalidated) {
-      await this.cacheManager.clear();
+      // No Redis-backed store was found — the running backend may be using an
+      // in-memory cache (USE_REDIS_CACHE=false or Redis unavailable). In-memory
+      // caches are per-process: this seeder process cannot reach the backend's
+      // cache instance. Stale permission entries will expire naturally at TTL
+      // (15 min) or be cleared on backend restart.
+      this.logger.warn(
+        '  ⚠️  No Redis store found — backend in-memory permission cache cannot be invalidated from this process. Restart the backend or wait for TTL expiry.',
+      );
     }
   }
 

@@ -32,9 +32,9 @@ describe('DatabaseSeederService', () => {
   };
   const mockCacheManager = {
     clear: jest.fn().mockResolvedValue(undefined),
-    // cache-manager v7: stores is an array of Keyv instances. No Redis client
-    // in unit tests, so the code falls back to cacheManager.clear().
-    stores: [],
+    // cache-manager v7: stores is an array of Keyv instances. Tests use an
+    // empty array (no Redis) so the seeder logs a warning instead of clearing.
+    stores: [] as unknown[],
   };
   let loggerErrorSpy: jest.Mock;
 
@@ -207,7 +207,7 @@ describe('DatabaseSeederService', () => {
       await expect(service.seedAll()).resolves.toBeUndefined();
     });
 
-    it('should update role permissions and clear cache when roles already exist', async () => {
+    it('should update role permissions and warn when no Redis store is available', async () => {
       const ownerSeedData = defaultRoles.find((r) => r.name === 'Owner')!;
 
       jest
@@ -247,7 +247,12 @@ describe('DatabaseSeederService', () => {
       expect(organizationsRepository.save).not.toHaveBeenCalled();
       expect(usersRepository.save).not.toHaveBeenCalled();
       expect(userOrgRolesRepository.save).not.toHaveBeenCalled();
-      expect(mockCacheManager.clear).toHaveBeenCalled();
+      // No Redis store — must warn, not call clear() (which only clears the
+      // seeder's own throwaway cache, not the running backend's).
+      expect(mockCacheManager.clear).not.toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('No Redis store found'),
+      );
 
       // The first saved role is Owner — assert legacy keys were stripped and seed
       // permissions were applied correctly.
