@@ -526,7 +526,26 @@ const InventoryPage = () => {
         id: entry.organization?.id ?? entry.organizationId,
         name: entry.organization?.name ?? `Org #${entry.organizationId}`,
       }));
-      setOrgOptions(mapped);
+      const viewableOrgs = (
+        await Promise.all(
+          mapped.map(async (org) => {
+            try {
+              const perms = await permissionsService.getUserPermissions(
+                userId,
+                org.id,
+              );
+              const canView =
+                perms.includes(OrgPermission.CAN_VIEW_ORG_INVENTORY) ||
+                perms.includes(OrgPermission.CAN_EDIT_ORG_INVENTORY) ||
+                perms.includes(OrgPermission.CAN_ADMIN_ORG_INVENTORY);
+              return canView ? org : null;
+            } catch {
+              return null;
+            }
+          }),
+        )
+      ).filter((org): org is { id: number; name: string } => org !== null);
+      setOrgOptions(viewableOrgs);
     } catch (err) {
       console.error('Error loading organizations', err);
     }
@@ -928,26 +947,6 @@ const InventoryPage = () => {
       isMounted = false;
     };
   }, [viewMode, user?.userId, selectedOrgId]);
-
-  useEffect(() => {
-    if (
-      viewMode === 'org' &&
-      selectedOrgId !== null &&
-      !orgPermissionsLoading &&
-      !orgPermissionsError &&
-      permissionsFetchedForOrgId.current === selectedOrgId &&
-      !canViewOrgInventory
-    ) {
-      setViewMode('personal');
-      setSelectedOrgId(null);
-    }
-  }, [
-    viewMode,
-    selectedOrgId,
-    orgPermissionsLoading,
-    orgPermissionsError,
-    canViewOrgInventory,
-  ]);
 
   useEffect(() => {
     if (user) {
