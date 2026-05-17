@@ -597,7 +597,7 @@ const InventoryPage = () => {
       const offset = page * rowsPerPage;
 
       if (isOrgMode && selectedOrgId) {
-        if (orgPermissionsLoading || !canViewOrgInventory) {
+        if (orgPermissionsLoading || permissionsFetchedForOrgId.current !== selectedOrgId || !canViewOrgInventory) {
           setItems([]);
           setTotalCount(0);
           if (initialLoading) setInitialLoading(false);
