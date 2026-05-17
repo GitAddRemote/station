@@ -20,6 +20,8 @@ const LEGACY_ROLE_DESCRIPTIONS = new Set<string>([
   'Administrative access. Can manage users and settings.',
   'Standard member access. Can view and participate.',
   'Read-only access. Can only view information.',
+  // Seeded by migration 1764961461064-SeedInventoryManagerRole
+  'Manages organization inventory with full permissions for viewing, editing, and administering items',
 ]);
 
 // Known legacy camelCase keys introduced before the OrgPermission enum. Only
@@ -186,12 +188,14 @@ export class DatabaseSeederService {
     }
 
     if (permissionsUpdated) {
-      await this.invalidatePermissionCache();
-      this.logger.info('  ✓ Cleared permission cache');
+      const cacheCleared = await this.invalidatePermissionCache();
+      if (cacheCleared) {
+        this.logger.info('  ✓ Cleared permission cache');
+      }
     }
   }
 
-  private async invalidatePermissionCache(): Promise<void> {
+  private async invalidatePermissionCache(): Promise<boolean> {
     // cache-manager v7 exposes backing stores via `cacheManager.stores` (Keyv[]).
     // Each Keyv wraps a store adapter; for cache-manager-redis-yet the adapter
     // exposes `.client` (the node-redis 4.x client).
@@ -242,6 +246,8 @@ export class DatabaseSeederService {
         '  ⚠️  No Redis store found — backend in-memory permission cache cannot be invalidated from this process. Restart the backend or wait for TTL expiry.',
       );
     }
+
+    return invalidated;
   }
 
   private async seedTestOrganization(): Promise<void> {

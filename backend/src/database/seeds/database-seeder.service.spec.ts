@@ -571,7 +571,7 @@ describe('DatabaseSeederService', () => {
       ).toBe(false);
     });
 
-    it('should not overwrite a user-customized role description', async () => {
+    it('should not overwrite a user-customized role description when permissions are current', async () => {
       const customDescription = 'Custom org-specific description set by admin';
 
       jest
@@ -586,7 +586,6 @@ describe('DatabaseSeederService', () => {
           return {
             ...mockRole,
             name,
-            // Not a legacy description and not the current seed text — custom.
             description: customDescription,
             permissions: { ...(seedRole?.permissions ?? {}) },
           } as unknown as Role;
@@ -607,10 +606,53 @@ describe('DatabaseSeederService', () => {
 
       await service.seedAll();
 
-      // Permissions are up to date so no save should occur.
       expect(saveSpy).not.toHaveBeenCalled();
-      // The custom description must be untouched.
       expect(mockCacheManager.clear).not.toHaveBeenCalled();
+    });
+
+    it('should update stale permissions but preserve a custom description', async () => {
+      const customDescription = 'Custom org-specific description set by admin';
+      const ownerSeedData = defaultRoles.find((r) => r.name === 'Owner')!;
+
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGame as unknown as Game);
+
+      jest.spyOn(rolesRepository, 'findOne').mockImplementation(
+        async () =>
+          ({
+            ...mockRole,
+            // Stale permissions — will trigger a save.
+            permissions: { canViewOrganization: true },
+            // Custom description — must survive the save untouched.
+            description: customDescription,
+          }) as unknown as Role,
+      );
+
+      const saveSpy = jest
+        .spyOn(rolesRepository, 'save')
+        .mockImplementation(async (role) => role as Role);
+      jest
+        .spyOn(organizationsRepository, 'findOne')
+        .mockResolvedValue(mockOrganization as unknown as Organization);
+      jest
+        .spyOn(usersRepository, 'findOne')
+        .mockResolvedValue(mockUser as unknown as User);
+      jest
+        .spyOn(userOrgRolesRepository, 'findOne')
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
+
+      await service.seedAll();
+
+      // Role must have been saved (permissions were stale).
+      expect(saveSpy).toHaveBeenCalled();
+      const savedOwner = saveSpy.mock.calls[0][0] as Partial<Role>;
+      // Permissions must be updated to current seed values.
+      expect(savedOwner.permissions).toEqual(
+        expect.objectContaining(ownerSeedData.permissions),
+      );
+      // Custom description must be preserved — not overwritten by seed text.
+      expect(savedOwner.description).toBe(customDescription);
     });
 
     it('should skip demo data seeding in production', async () => {
