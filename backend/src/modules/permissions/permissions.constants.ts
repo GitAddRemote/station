@@ -70,7 +70,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
  */
 export const PERMISSION_DESCRIPTIONS: Record<OrgPermission, string> = {
   [OrgPermission.CAN_VIEW_ORG_INVENTORY]:
-    'View organization-owned inventory and member-shared items',
+    'View organization-owned inventory items',
   [OrgPermission.CAN_EDIT_ORG_INVENTORY]:
     'Create, update, and delete organization inventory items',
   [OrgPermission.CAN_ADMIN_ORG_INVENTORY]:
