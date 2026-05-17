@@ -343,11 +343,12 @@ describe('DatabaseSeederService', () => {
       );
     });
 
-    it('should use targeted Redis SCAN/DEL when a Redis store is present', async () => {
-      const matchedKeys = [
-        'permissions:user:1:org:1',
-        'permissions:user:2:org:1',
-      ];
+    it('should use targeted Redis SCAN/DEL in batches when a Redis store is present', async () => {
+      // Simulate 150 matched keys so two DEL batches are issued (100 + 50).
+      const matchedKeys = Array.from(
+        { length: 150 },
+        (_, i) => `permissions:user:${i}:org:1`,
+      );
       const mockRedisClient = {
         scanIterator: jest
           .fn()
@@ -356,7 +357,6 @@ describe('DatabaseSeederService', () => {
       };
       const mockRedisStore = { store: { client: mockRedisClient } };
 
-      // Temporarily add a Redis-like store to the cache manager.
       (mockCacheManager as { stores: unknown[] }).stores = [mockRedisStore];
 
       jest
@@ -388,11 +388,18 @@ describe('DatabaseSeederService', () => {
         MATCH: 'permissions:user:*',
         COUNT: 100,
       });
-      expect(mockRedisClient.del).toHaveBeenCalledWith(matchedKeys);
-      // Global clear must NOT be called when Redis store handles it.
+      // Two batches: first 100 keys, then the remaining 50.
+      expect(mockRedisClient.del).toHaveBeenCalledTimes(2);
+      expect(mockRedisClient.del).toHaveBeenNthCalledWith(
+        1,
+        matchedKeys.slice(0, 100),
+      );
+      expect(mockRedisClient.del).toHaveBeenNthCalledWith(
+        2,
+        matchedKeys.slice(100),
+      );
       expect(mockCacheManager.clear).not.toHaveBeenCalled();
 
-      // Restore empty stores for subsequent tests.
       (mockCacheManager as { stores: unknown[] }).stores = [];
     });
 
@@ -462,31 +469,26 @@ describe('DatabaseSeederService', () => {
         savedRoles.map((r) => [r.name, r.permissions]),
       );
 
-      // Owner and Admin: full access
-      expect(byName['Owner']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
-        true,
-      );
-      expect(byName['Owner']?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
-        true,
-      );
-      expect(byName['Owner']?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
-        true,
-      );
-      expect(
-        byName['Owner']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
-      ).toBe(true);
-      expect(byName['Admin']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
-        true,
-      );
-      expect(byName['Admin']?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
-        true,
-      );
-      expect(byName['Admin']?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
-        true,
-      );
-      expect(
-        byName['Admin']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
-      ).toBe(true);
+      // Full-access roles: Owner, Admin, Director, Inventory Manager
+      for (const roleName of [
+        'Owner',
+        'Admin',
+        'Director',
+        'Inventory Manager',
+      ]) {
+        expect(byName[roleName]?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
+          true,
+        );
+        expect(byName[roleName]?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
+          true,
+        );
+        expect(byName[roleName]?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
+          true,
+        );
+        expect(
+          byName[roleName]?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
+        ).toBe(true);
+      }
 
       // Member: can view and view shared, but not edit or admin
       expect(byName['Member']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(

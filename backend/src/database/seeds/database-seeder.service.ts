@@ -171,19 +171,24 @@ export class DatabaseSeederService {
     const stores: KeyvLike[] =
       (this.cacheManager as unknown as { stores?: KeyvLike[] }).stores ?? [];
 
+    const BATCH_SIZE = 100;
     let invalidated = false;
     for (const keyv of stores) {
       const client = keyv.store?.client;
       if (client?.scanIterator && client?.del) {
-        const keys: string[] = [];
+        let batch: string[] = [];
         for await (const key of client.scanIterator({
           MATCH: PERMISSION_CACHE_PATTERN,
-          COUNT: 100,
+          COUNT: BATCH_SIZE,
         })) {
-          keys.push(key);
+          batch.push(key);
+          if (batch.length >= BATCH_SIZE) {
+            await client.del(batch);
+            batch = [];
+          }
         }
-        if (keys.length > 0) {
-          await client.del(keys);
+        if (batch.length > 0) {
+          await client.del(batch);
         }
         invalidated = true;
       }

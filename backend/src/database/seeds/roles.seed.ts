@@ -3,10 +3,15 @@ import { DEFAULT_ROLE_PERMISSIONS } from '../../modules/permissions/permissions.
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   Owner:
-    'Full access to organization. Can delete organization and manage all settings.',
-  Admin: 'Administrative access. Can manage users and settings.',
-  Member: 'Standard member access. Can view and participate.',
-  Viewer: 'Read-only access. Can only view information.',
+    'Full inventory access. Can view, edit, and administer organization inventory and member shared items.',
+  Admin:
+    'Full inventory access. Can view, edit, and administer organization inventory and member shared items.',
+  Director:
+    'Full inventory access. Can view, edit, and administer organization inventory and member shared items.',
+  'Inventory Manager':
+    'Full inventory access. Can view, edit, and administer organization inventory and member shared items.',
+  Member: 'Standard member access. Can view inventory and member shared items.',
+  Viewer: 'Read-only access. Can only view organization inventory.',
 };
 
 export const defaultRoles: Partial<Role>[] = Object.entries(
