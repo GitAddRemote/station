@@ -9,8 +9,12 @@ import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
 import { Game } from '../../modules/games/game.entity';
+import { OrgPermission } from '../../modules/permissions/permissions.constants';
 import { defaultRoles } from './roles.seed';
 import * as bcrypt from 'bcrypt';
+
+const VALID_PERMISSION_KEYS = new Set<string>(Object.values(OrgPermission));
+const PERMISSION_CACHE_PATTERN = 'permissions:user:*';
 
 @Injectable()
 export class DatabaseSeederService {
@@ -99,19 +103,59 @@ export class DatabaseSeederService {
         await this.rolesRepository.save(role);
         this.logger.info(`  ✓ Created role: ${role.name}`);
       } else {
-        existingRole.permissions = {
-          ...existingRole.permissions,
-          ...roleData.permissions,
-        };
-        await this.rolesRepository.save(existingRole);
-        this.logger.info(`  ✓ Updated permissions for role: ${roleData.name}`);
-        permissionsUpdated = true;
+        // Strip legacy/invalid keys from existing permissions, then merge seed permissions.
+        const sanitizedExisting = Object.fromEntries(
+          Object.entries(existingRole.permissions ?? {}).filter(([k]) =>
+            VALID_PERMISSION_KEYS.has(k),
+          ),
+        );
+        const merged = { ...sanitizedExisting, ...roleData.permissions };
+
+        // Only save if permissions actually changed (idempotency).
+        if (
+          JSON.stringify(existingRole.permissions) !== JSON.stringify(merged)
+        ) {
+          existingRole.permissions = merged;
+          await this.rolesRepository.save(existingRole);
+          this.logger.info(
+            `  ✓ Updated permissions for role: ${roleData.name}`,
+          );
+          permissionsUpdated = true;
+        } else {
+          this.logger.info(
+            `  ⊙ Permissions unchanged for role: ${roleData.name}`,
+          );
+        }
       }
     }
 
     if (permissionsUpdated) {
-      await this.cacheManager.clear();
+      await this.invalidatePermissionCache();
       this.logger.info('  ✓ Cleared permission cache');
+    }
+  }
+
+  private async invalidatePermissionCache(): Promise<void> {
+    // Attempt targeted invalidation of only permission keys to avoid evicting
+    // unrelated cached data (games, orgs, etc.) from the shared Redis database.
+    const store = (
+      this.cacheManager as unknown as {
+        store?: {
+          client?: {
+            keys?: (pattern: string) => Promise<string[]>;
+            del?: (...keys: string[]) => Promise<unknown>;
+          };
+        };
+      }
+    ).store;
+    const client = store?.client;
+    if (client?.keys && client?.del) {
+      const keys = await client.keys(PERMISSION_CACHE_PATTERN);
+      if (keys.length > 0) {
+        await client.del(...keys);
+      }
+    } else {
+      await this.cacheManager.clear();
     }
   }
 

@@ -9,7 +9,10 @@ import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
 import { Game } from '../../modules/games/game.entity';
-import { OrgPermission } from '../../modules/permissions/permissions.constants';
+import {
+  OrgPermission,
+  DEFAULT_ROLE_PERMISSIONS,
+} from '../../modules/permissions/permissions.constants';
 import { defaultRoles } from './roles.seed';
 
 // Mock bcrypt module
@@ -204,15 +207,28 @@ describe('DatabaseSeederService', () => {
     });
 
     it('should update role permissions and clear cache when roles already exist', async () => {
+      const ownerSeedData = defaultRoles.find((r) => r.name === 'Owner')!;
+
       jest
         .spyOn(gamesRepository, 'findOne')
         .mockResolvedValue(mockGame as unknown as Game);
-      jest
-        .spyOn(rolesRepository, 'findOne')
-        .mockResolvedValue(mockRole as unknown as Role);
-      jest
+
+      // Return a role with legacy camelCase keys for every findOne call so all
+      // existing-role paths exercise the strip-and-merge logic.
+      jest.spyOn(rolesRepository, 'findOne').mockImplementation(
+        async () =>
+          ({
+            ...mockRole,
+            permissions: {
+              canViewOrganization: true,
+              canInviteUsers: true,
+            },
+          }) as unknown as Role,
+      );
+
+      const saveSpy = jest
         .spyOn(rolesRepository, 'save')
-        .mockResolvedValue(mockRole as unknown as Role);
+        .mockImplementation(async (role) => role as Role);
       jest
         .spyOn(organizationsRepository, 'findOne')
         .mockResolvedValue(mockOrganization as unknown as Organization);
@@ -231,9 +247,54 @@ describe('DatabaseSeederService', () => {
       expect(usersRepository.save).not.toHaveBeenCalled();
       expect(userOrgRolesRepository.save).not.toHaveBeenCalled();
       expect(mockCacheManager.clear).toHaveBeenCalled();
+
+      // The first saved role is Owner — assert legacy keys were stripped and seed
+      // permissions were applied correctly.
+      const savedOwner = saveSpy.mock.calls[0][0] as Partial<Role>;
+      expect(savedOwner.permissions).not.toHaveProperty('canViewOrganization');
+      expect(savedOwner.permissions).not.toHaveProperty('canInviteUsers');
+      expect(savedOwner.permissions).toEqual(
+        expect.objectContaining(ownerSeedData.permissions),
+      );
     });
 
-    it('should seed roles with correct OrgPermission keys', async () => {
+    it('should not save or clear cache when permissions are already up to date', async () => {
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGame as unknown as Game);
+
+      // Return the exact seed permissions for each role so no change is detected.
+      jest
+        .spyOn(rolesRepository, 'findOne')
+        .mockImplementation(async (opts) => {
+          const name = (opts as { where: { name: string } }).where.name;
+          const seedRole = defaultRoles.find((r) => r.name === name);
+          return {
+            ...mockRole,
+            name,
+            permissions: { ...(seedRole?.permissions ?? {}) },
+          } as unknown as Role;
+        });
+      jest
+        .spyOn(rolesRepository, 'save')
+        .mockImplementation(async (role) => role as Role);
+      jest
+        .spyOn(organizationsRepository, 'findOne')
+        .mockResolvedValue(mockOrganization as unknown as Organization);
+      jest
+        .spyOn(usersRepository, 'findOne')
+        .mockResolvedValue(mockUser as unknown as User);
+      jest
+        .spyOn(userOrgRolesRepository, 'findOne')
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
+
+      await expect(service.seedAll()).resolves.toBeUndefined();
+
+      expect(rolesRepository.save).not.toHaveBeenCalled();
+      expect(mockCacheManager.clear).not.toHaveBeenCalled();
+    });
+
+    it('should seed roles with correct OrgPermission keys and per-role permission values', async () => {
       const savedRoles: Partial<Role>[] = [];
 
       jest.spyOn(rolesRepository, 'findOne').mockResolvedValue(null);
@@ -285,12 +346,42 @@ describe('DatabaseSeederService', () => {
         expect.arrayContaining(defaultRoles.map((r) => r.name)),
       );
 
+      // All permission keys must be valid OrgPermission enum values.
       for (const role of savedRoles) {
         const keys = Object.keys(role.permissions ?? {});
         for (const key of keys) {
           expect(validPermissionKeys).toContain(key);
         }
       }
+
+      // Per-role permission values must match DEFAULT_ROLE_PERMISSIONS exactly
+      // to prevent privilege escalation (e.g. Viewer/Member gaining edit/admin).
+      for (const role of savedRoles) {
+        const expected = DEFAULT_ROLE_PERMISSIONS[role.name!];
+        if (expected) {
+          expect(role.permissions).toEqual(expected);
+        }
+      }
+
+      // Restricted roles must not have elevated permissions.
+      const memberRole = savedRoles.find((r) => r.name === 'Member');
+      const viewerRole = savedRoles.find((r) => r.name === 'Viewer');
+
+      expect(
+        memberRole?.permissions?.[OrgPermission.CAN_EDIT_ORG_INVENTORY],
+      ).toBe(false);
+      expect(
+        memberRole?.permissions?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY],
+      ).toBe(false);
+      expect(
+        viewerRole?.permissions?.[OrgPermission.CAN_EDIT_ORG_INVENTORY],
+      ).toBe(false);
+      expect(
+        viewerRole?.permissions?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY],
+      ).toBe(false);
+      expect(
+        viewerRole?.permissions?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
+      ).toBe(false);
     });
 
     it('should throw error on failure', async () => {

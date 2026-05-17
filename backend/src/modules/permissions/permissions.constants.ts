@@ -25,13 +25,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
   string,
   Record<OrgPermission, boolean>
 > = {
-  Member: {
+  Owner: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
-    [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
-    [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
+    [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
+    [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
   },
-  'Inventory Manager': {
+  Admin: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
@@ -43,11 +43,23 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
   },
-  Admin: {
+  'Inventory Manager': {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
+  },
+  Member: {
+    [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
+    [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
+    [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
+    [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
+  },
+  Viewer: {
+    [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
+    [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
+    [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
+    [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: false,
   },
 };
 
