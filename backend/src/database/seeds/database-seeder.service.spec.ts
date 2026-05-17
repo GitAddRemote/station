@@ -266,7 +266,8 @@ describe('DatabaseSeederService', () => {
         .spyOn(gamesRepository, 'findOne')
         .mockResolvedValue(mockGame as unknown as Game);
 
-      // Return roles with correct permissions but a stale description.
+      // Return roles with correct permissions but a known legacy description
+      // that the seeder is allowed to replace.
       jest
         .spyOn(rolesRepository, 'findOne')
         .mockImplementation(async (opts) => {
@@ -275,7 +276,8 @@ describe('DatabaseSeederService', () => {
           return {
             ...mockRole,
             name,
-            description: 'Stale legacy description',
+            description:
+              'Full access to organization. Can delete organization and manage all settings.',
             permissions: { ...(seedRole?.permissions ?? {}) },
           } as unknown as Role;
         });
@@ -562,6 +564,86 @@ describe('DatabaseSeederService', () => {
       expect(
         byName['Viewer']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
       ).toBe(false);
+    });
+
+    it('should not overwrite a user-customized role description', async () => {
+      const customDescription = 'Custom org-specific description set by admin';
+
+      jest
+        .spyOn(gamesRepository, 'findOne')
+        .mockResolvedValue(mockGame as unknown as Game);
+
+      jest
+        .spyOn(rolesRepository, 'findOne')
+        .mockImplementation(async (opts) => {
+          const name = (opts as { where: { name: string } }).where.name;
+          const seedRole = defaultRoles.find((r) => r.name === name);
+          return {
+            ...mockRole,
+            name,
+            // Not a legacy description and not the current seed text — custom.
+            description: customDescription,
+            permissions: { ...(seedRole?.permissions ?? {}) },
+          } as unknown as Role;
+        });
+
+      const saveSpy = jest
+        .spyOn(rolesRepository, 'save')
+        .mockImplementation(async (role) => role as Role);
+      jest
+        .spyOn(organizationsRepository, 'findOne')
+        .mockResolvedValue(mockOrganization as unknown as Organization);
+      jest
+        .spyOn(usersRepository, 'findOne')
+        .mockResolvedValue(mockUser as unknown as User);
+      jest
+        .spyOn(userOrgRolesRepository, 'findOne')
+        .mockResolvedValue(mockUserOrgRole as unknown as UserOrganizationRole);
+
+      await service.seedAll();
+
+      // Permissions are up to date so no save should occur.
+      expect(saveSpy).not.toHaveBeenCalled();
+      // The custom description must be untouched.
+      expect(mockCacheManager.clear).not.toHaveBeenCalled();
+    });
+
+    it('should skip demo data seeding in production', async () => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      try {
+        jest
+          .spyOn(gamesRepository, 'findOne')
+          .mockResolvedValue(mockGame as unknown as Game);
+        jest
+          .spyOn(rolesRepository, 'findOne')
+          .mockImplementation(async (opts) => {
+            const name = (opts as { where: { name: string } }).where.name;
+            const seedRole = defaultRoles.find((r) => r.name === name);
+            return {
+              ...mockRole,
+              name,
+              description: seedRole?.description ?? mockRole.description,
+              permissions: { ...(seedRole?.permissions ?? {}) },
+            } as unknown as Role;
+          });
+        jest
+          .spyOn(rolesRepository, 'save')
+          .mockImplementation(async (role) => role as Role);
+
+        await service.seedAll();
+
+        // Demo-data repositories must never be touched in production.
+        expect(organizationsRepository.findOne).not.toHaveBeenCalled();
+        expect(usersRepository.findOne).not.toHaveBeenCalled();
+        expect(userOrgRolesRepository.findOne).not.toHaveBeenCalled();
+        expect(organizationsRepository.save).not.toHaveBeenCalled();
+        expect(usersRepository.save).not.toHaveBeenCalled();
+        expect(userOrgRolesRepository.save).not.toHaveBeenCalled();
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
     });
 
     it('should throw error on failure', async () => {

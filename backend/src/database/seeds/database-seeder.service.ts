@@ -12,6 +12,16 @@ import { Game } from '../../modules/games/game.entity';
 import { defaultRoles } from './roles.seed';
 import * as bcrypt from 'bcrypt';
 
+// Known legacy descriptions seeded before the inventory-focused rewrite. Only
+// these values are replaced on reseed — any other description is treated as
+// a user customization and left untouched.
+const LEGACY_ROLE_DESCRIPTIONS = new Set<string>([
+  'Full access to organization. Can delete organization and manage all settings.',
+  'Administrative access. Can manage users and settings.',
+  'Standard member access. Can view and participate.',
+  'Read-only access. Can only view information.',
+]);
+
 // Known legacy camelCase keys introduced before the OrgPermission enum. Only
 // these are stripped on merge — unknown custom keys are preserved.
 const LEGACY_PERMISSION_KEYS = new Set<string>([
@@ -58,12 +68,20 @@ export class DatabaseSeederService {
     this.logger.info('🌱 Starting database seeding...');
 
     try {
-      // Seed in order of dependencies
+      // Always safe to run in any environment
       await this.seedGames();
       await this.seedRoles();
-      await this.seedTestOrganization();
-      await this.seedTestUser();
-      await this.seedUserOrganizationRoles();
+
+      // Demo credentials must never be created in production
+      if (process.env.NODE_ENV !== 'production') {
+        await this.seedTestOrganization();
+        await this.seedTestUser();
+        await this.seedUserOrganizationRoles();
+      } else {
+        this.logger.info(
+          '⊙ Skipping demo data seeding in production environment',
+        );
+      }
 
       this.logger.info('✅ Database seeding completed successfully!');
     } catch (error) {
@@ -137,9 +155,17 @@ export class DatabaseSeederService {
           JSON.stringify(obj, Object.keys(obj).sort());
         const permissionsChanged =
           sortedKeys(existingRole.permissions ?? {}) !== sortedKeys(merged);
+        // Only update the description if it is a known legacy seeded value or
+        // still matches the current seed text (i.e. was never customized).
+        // Any other description is treated as a user customization and preserved.
+        const isReplaceableDescription =
+          existingRole.description !== undefined &&
+          (LEGACY_ROLE_DESCRIPTIONS.has(existingRole.description) ||
+            existingRole.description === roleData.description);
         const descriptionChanged =
           roleData.description !== undefined &&
-          existingRole.description !== roleData.description;
+          existingRole.description !== roleData.description &&
+          isReplaceableDescription;
 
         if (permissionsChanged || descriptionChanged) {
           if (permissionsChanged) {
