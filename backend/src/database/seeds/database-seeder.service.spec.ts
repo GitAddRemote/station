@@ -9,10 +9,7 @@ import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
 import { Game } from '../../modules/games/game.entity';
-import {
-  OrgPermission,
-  DEFAULT_ROLE_PERMISSIONS,
-} from '../../modules/permissions/permissions.constants';
+import { OrgPermission } from '../../modules/permissions/permissions.constants';
 import { defaultRoles } from './roles.seed';
 
 // Mock bcrypt module
@@ -459,33 +456,64 @@ describe('DatabaseSeederService', () => {
         }
       }
 
-      // Per-role permission values must match DEFAULT_ROLE_PERMISSIONS exactly
-      // to prevent privilege escalation (e.g. Viewer/Member gaining edit/admin).
-      for (const role of savedRoles) {
-        const expected = DEFAULT_ROLE_PERMISSIONS[role.name!];
-        if (expected) {
-          expect(role.permissions).toEqual(expected);
-        }
-      }
+      // Independent per-role assertions — hardcoded so a bug in the seed matrix
+      // itself (e.g. Owner losing view access, Viewer gaining edit) is caught.
+      const byName = Object.fromEntries(
+        savedRoles.map((r) => [r.name, r.permissions]),
+      );
 
-      // Restricted roles must not have elevated permissions.
-      const memberRole = savedRoles.find((r) => r.name === 'Member');
-      const viewerRole = savedRoles.find((r) => r.name === 'Viewer');
+      // Owner and Admin: full access
+      expect(byName['Owner']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
+        true,
+      );
+      expect(byName['Owner']?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
+        true,
+      );
+      expect(byName['Owner']?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
+        true,
+      );
+      expect(
+        byName['Owner']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
+      ).toBe(true);
+      expect(byName['Admin']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
+        true,
+      );
+      expect(byName['Admin']?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
+        true,
+      );
+      expect(byName['Admin']?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
+        true,
+      );
+      expect(
+        byName['Admin']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
+      ).toBe(true);
 
+      // Member: can view and view shared, but not edit or admin
+      expect(byName['Member']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
+        true,
+      );
+      expect(byName['Member']?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
+        false,
+      );
+      expect(byName['Member']?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
+        false,
+      );
       expect(
-        memberRole?.permissions?.[OrgPermission.CAN_EDIT_ORG_INVENTORY],
-      ).toBe(false);
+        byName['Member']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
+      ).toBe(true);
+
+      // Viewer: can only view inventory, nothing else
+      expect(byName['Viewer']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
+        true,
+      );
+      expect(byName['Viewer']?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
+        false,
+      );
+      expect(byName['Viewer']?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
+        false,
+      );
       expect(
-        memberRole?.permissions?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY],
-      ).toBe(false);
-      expect(
-        viewerRole?.permissions?.[OrgPermission.CAN_EDIT_ORG_INVENTORY],
-      ).toBe(false);
-      expect(
-        viewerRole?.permissions?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY],
-      ).toBe(false);
-      expect(
-        viewerRole?.permissions?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
+        byName['Viewer']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
       ).toBe(false);
     });
 

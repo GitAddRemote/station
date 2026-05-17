@@ -128,9 +128,11 @@ export class DatabaseSeederService {
         const merged = { ...sanitizedExisting, ...roleData.permissions };
 
         // Only save if permissions actually changed (idempotency).
-        if (
-          JSON.stringify(existingRole.permissions) !== JSON.stringify(merged)
-        ) {
+        // Use key-sorted stringify because JSONB does not preserve key order,
+        // so a naive stringify can differ even for semantically equal objects.
+        const sortedKeys = (obj: Record<string, unknown>) =>
+          JSON.stringify(obj, Object.keys(obj).sort());
+        if (sortedKeys(existingRole.permissions ?? {}) !== sortedKeys(merged)) {
           existingRole.permissions = merged;
           await this.rolesRepository.save(existingRole);
           this.logger.info(
