@@ -131,6 +131,10 @@ const InventoryPage = () => {
   const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>(
     [],
   );
+  const [allOrgOptions, setAllOrgOptions] = useState<
+    { id: number; name: string }[]
+  >([]);
+  const orgsLoaded = useRef(false);
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(() =>
     readStoredOrgId(),
   );
@@ -264,7 +268,7 @@ const InventoryPage = () => {
   }, [density]);
 
   useEffect(() => {
-    if (selectedOrgId === null) return;
+    if (!orgsLoaded.current || selectedOrgId === null) return;
     const isValidOrg = orgOptions.some((org) => org.id === selectedOrgId);
     if (!isValidOrg) {
       setSelectedOrgId(null);
@@ -526,6 +530,7 @@ const InventoryPage = () => {
         id: entry.organization?.id ?? entry.organizationId,
         name: entry.organization?.name ?? `Org #${entry.organizationId}`,
       }));
+      setAllOrgOptions(mapped);
       const viewableOrgs = (
         await Promise.all(
           mapped.map(async (org) => {
@@ -546,6 +551,7 @@ const InventoryPage = () => {
         )
       ).filter((org): org is { id: number; name: string } => org !== null);
       setOrgOptions(viewableOrgs);
+      orgsLoaded.current = true;
     } catch (err) {
       console.error('Error loading organizations', err);
     }
@@ -1849,7 +1855,7 @@ const InventoryPage = () => {
                     )
                   }
                 >
-                  {orgOptions.map((org) => (
+                  {allOrgOptions.map((org) => (
                     <MenuItem key={org.id} value={org.id}>
                       {org.name}
                     </MenuItem>
