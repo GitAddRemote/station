@@ -30,8 +30,9 @@ const LEGACY_PERMISSION_KEYS = new Set<string>([
   'canViewSettings',
 ]);
 // Bare key pattern — no Keyv namespace prefix is configured in app.module.ts,
-// so permission keys are stored as-is in Redis. If a namespace is ever added,
-// this pattern must be updated to match (e.g. 'namespace:permissions:user:*').
+// so permission keys are stored as-is in Redis. TTL is 15 min (900000ms) per
+// PermissionsService. If a namespace is ever added, this pattern must be
+// updated to match (e.g. 'namespace:permissions:user:*').
 const PERMISSION_CACHE_PATTERN = 'permissions:user:*';
 
 @Injectable()

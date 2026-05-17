@@ -82,6 +82,7 @@ describe('DatabaseSeederService', () => {
     mockLogger.error.mockClear();
     mockLogger.debug.mockClear();
     mockCacheManager.clear.mockClear();
+    (mockCacheManager as { stores: unknown[] }).stores = [];
     loggerErrorSpy = mockLogger.error;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -445,8 +446,6 @@ describe('DatabaseSeederService', () => {
         matchedKeys.slice(100),
       );
       expect(mockCacheManager.clear).not.toHaveBeenCalled();
-
-      (mockCacheManager as { stores: unknown[] }).stores = [];
     });
 
     it('should seed roles with correct OrgPermission keys and per-role permission values', async () => {
