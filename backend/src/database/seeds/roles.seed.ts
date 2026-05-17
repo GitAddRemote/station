@@ -1,84 +1,32 @@
 import { Role } from '../../modules/roles/role.entity';
+import { DEFAULT_ROLE_PERMISSIONS } from '../../modules/permissions/permissions.constants';
 
-export const defaultRoles: Partial<Role>[] = [
-  {
-    name: 'Owner',
-    description:
-      'Full access to organization. Can delete organization and manage all settings.',
-    permissions: {
-      // Organization management
-      canDeleteOrganization: true,
-      canEditOrganization: true,
-      canViewOrganization: true,
+// `keyof typeof DEFAULT_ROLE_PERMISSIONS` is now a literal union of role names
+// (not `string`) because the constant uses `satisfies` without a wide type
+// annotation. TypeScript will fail to compile if a new role is added to
+// DEFAULT_ROLE_PERMISSIONS without a matching entry here.
+type DefaultRoleName = keyof typeof DEFAULT_ROLE_PERMISSIONS;
+const ROLE_DESCRIPTIONS: Record<DefaultRoleName, string> = {
+  Owner:
+    'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
+  Admin:
+    'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
+  Director:
+    'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
+  'Inventory Manager':
+    'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
+  Member:
+    'Standard member access. Can view organization inventory and member shared items.',
+  Viewer: 'Read-only access. Can only view organization inventory.',
+};
 
-      // User management
-      canInviteUsers: true,
-      canRemoveUsers: true,
-      canEditUserRoles: true,
-      canViewUsers: true,
-
-      // Role management
-      canCreateRoles: true,
-      canEditRoles: true,
-      canDeleteRoles: true,
-      canViewRoles: true,
-
-      // Settings
-      canManageSettings: true,
-      canViewSettings: true,
-    },
-  },
-  {
-    name: 'Admin',
-    description: 'Administrative access. Can manage users and settings.',
-    permissions: {
-      // Organization management
-      canEditOrganization: true,
-      canViewOrganization: true,
-
-      // User management
-      canInviteUsers: true,
-      canRemoveUsers: true,
-      canEditUserRoles: true,
-      canViewUsers: true,
-
-      // Role management
-      canViewRoles: true,
-
-      // Settings
-      canManageSettings: true,
-      canViewSettings: true,
-    },
-  },
-  {
-    name: 'Member',
-    description: 'Standard member access. Can view and participate.',
-    permissions: {
-      // Organization management
-      canViewOrganization: true,
-
-      // User management
-      canViewUsers: true,
-
-      // Role management
-      canViewRoles: true,
-
-      // Settings
-      canViewSettings: true,
-    },
-  },
-  {
-    name: 'Viewer',
-    description: 'Read-only access. Can only view information.',
-    permissions: {
-      // Organization management
-      canViewOrganization: true,
-
-      // User management
-      canViewUsers: true,
-
-      // Settings
-      canViewSettings: true,
-    },
-  },
-];
+export const defaultRoles: Partial<Role>[] = (
+  Object.entries(DEFAULT_ROLE_PERMISSIONS) as [
+    DefaultRoleName,
+    (typeof DEFAULT_ROLE_PERMISSIONS)[DefaultRoleName],
+  ][]
+).map(([name, permissions]) => ({
+  name,
+  description: ROLE_DESCRIPTIONS[name],
+  permissions,
+}));

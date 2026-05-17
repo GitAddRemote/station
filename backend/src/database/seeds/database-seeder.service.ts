@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { Role } from '../../modules/roles/role.entity';
 import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
@@ -10,11 +12,48 @@ import { Game } from '../../modules/games/game.entity';
 import { defaultRoles } from './roles.seed';
 import * as bcrypt from 'bcrypt';
 
+// Known legacy descriptions seeded before the inventory-focused rewrite. Only
+// these values are replaced on reseed — any other description is treated as
+// a user customization and left untouched.
+const LEGACY_ROLE_DESCRIPTIONS = new Set<string>([
+  'Full access to organization. Can delete organization and manage all settings.',
+  'Administrative access. Can manage users and settings.',
+  'Standard member access. Can view and participate.',
+  'Read-only access. Can only view information.',
+  // Seeded by migration 1764961461064-SeedInventoryManagerRole
+  'Manages organization inventory with full permissions for viewing, editing, and administering items',
+]);
+
+// Known legacy camelCase keys introduced before the OrgPermission enum. Only
+// these are stripped on merge — unknown custom keys are preserved.
+const LEGACY_PERMISSION_KEYS = new Set<string>([
+  'canDeleteOrganization',
+  'canEditOrganization',
+  'canViewOrganization',
+  'canInviteUsers',
+  'canRemoveUsers',
+  'canEditUserRoles',
+  'canViewUsers',
+  'canCreateRoles',
+  'canEditRoles',
+  'canDeleteRoles',
+  'canViewRoles',
+  'canManageSettings',
+  'canViewSettings',
+]);
+// Bare key pattern — no Keyv namespace prefix is configured in app.module.ts,
+// so permission keys are stored as-is in Redis. TTL is 15 min (900000ms) per
+// PermissionsService. If a namespace is ever added, this pattern must be
+// updated to match (e.g. 'namespace:permissions:user:*').
+const PERMISSION_CACHE_PATTERN = 'permissions:user:*';
+
 @Injectable()
 export class DatabaseSeederService {
   constructor(
     @InjectPinoLogger(DatabaseSeederService.name)
     private readonly logger: PinoLogger,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
     @InjectRepository(Role)
     private rolesRepository: Repository<Role>,
     @InjectRepository(Organization)
@@ -31,12 +70,20 @@ export class DatabaseSeederService {
     this.logger.info('🌱 Starting database seeding...');
 
     try {
-      // Seed in order of dependencies
+      // Always safe to run in any environment
       await this.seedGames();
       await this.seedRoles();
-      await this.seedTestOrganization();
-      await this.seedTestUser();
-      await this.seedUserOrganizationRoles();
+
+      // Demo credentials must never be created in production
+      if (process.env.NODE_ENV !== 'production') {
+        await this.seedTestOrganization();
+        await this.seedTestUser();
+        await this.seedUserOrganizationRoles();
+      } else {
+        this.logger.info(
+          '⊙ Skipping demo data seeding in production environment',
+        );
+      }
 
       this.logger.info('✅ Database seeding completed successfully!');
     } catch (error) {
@@ -83,6 +130,8 @@ export class DatabaseSeederService {
   private async seedRoles(): Promise<void> {
     this.logger.info('Seeding roles...');
 
+    let permissionsUpdated = false;
+
     for (const roleData of defaultRoles) {
       const existingRole = await this.rolesRepository.findOne({
         where: { name: roleData.name },
@@ -93,9 +142,112 @@ export class DatabaseSeederService {
         await this.rolesRepository.save(role);
         this.logger.info(`  ✓ Created role: ${role.name}`);
       } else {
-        this.logger.info(`  ⊙ Role already exists: ${roleData.name}`);
+        // Strip only known legacy camelCase keys from existing permissions;
+        // unknown custom keys are preserved and carried forward.
+        const sanitizedExisting = Object.fromEntries(
+          Object.entries(existingRole.permissions ?? {}).filter(
+            ([k]) => !LEGACY_PERMISSION_KEYS.has(k),
+          ),
+        );
+        const merged = { ...sanitizedExisting, ...roleData.permissions };
+
+        // Use key-sorted stringify because JSONB does not preserve key order,
+        // so a naive stringify can differ even for semantically equal objects.
+        const sortedKeys = (obj: Record<string, unknown>) =>
+          JSON.stringify(obj, Object.keys(obj).sort());
+        const permissionsChanged =
+          sortedKeys(existingRole.permissions ?? {}) !== sortedKeys(merged);
+        // Only update the description if it is a known legacy seeded value or
+        // still matches the current seed text (i.e. was never customized).
+        // Any other description is treated as a user customization and preserved.
+        const isReplaceableDescription =
+          existingRole.description !== undefined &&
+          (LEGACY_ROLE_DESCRIPTIONS.has(existingRole.description) ||
+            existingRole.description === roleData.description);
+        const descriptionChanged =
+          roleData.description !== undefined &&
+          existingRole.description !== roleData.description &&
+          isReplaceableDescription;
+
+        if (permissionsChanged || descriptionChanged) {
+          if (permissionsChanged) {
+            existingRole.permissions = merged;
+          }
+          if (descriptionChanged) {
+            existingRole.description = roleData.description!;
+          }
+          await this.rolesRepository.save(existingRole);
+          this.logger.info(`  ✓ Updated role: ${roleData.name}`);
+          if (permissionsChanged) {
+            permissionsUpdated = true;
+          }
+        } else {
+          this.logger.info(`  ⊙ Role unchanged: ${roleData.name}`);
+        }
       }
     }
+
+    if (permissionsUpdated) {
+      const cacheCleared = await this.invalidatePermissionCache();
+      if (cacheCleared) {
+        this.logger.info('  ✓ Cleared permission cache');
+      }
+    }
+  }
+
+  private async invalidatePermissionCache(): Promise<boolean> {
+    // cache-manager v7 exposes backing stores via `cacheManager.stores` (Keyv[]).
+    // Each Keyv wraps a store adapter; for cache-manager-redis-yet the adapter
+    // exposes `.client` (the node-redis 4.x client).
+    // Use SCAN (non-blocking cursor iteration) instead of KEYS to avoid stalling
+    // Redis on large keyspaces. node-redis 4.x del() takes an array, not variadic args.
+    type RedisClient = {
+      scanIterator?: (opts: {
+        MATCH: string;
+        COUNT: number;
+      }) => AsyncIterable<string>;
+      del?: (keys: string[]) => Promise<unknown>;
+    };
+    type KeyvLike = { store?: { client?: RedisClient } };
+
+    const stores: KeyvLike[] =
+      (this.cacheManager as unknown as { stores?: KeyvLike[] }).stores ?? [];
+
+    const BATCH_SIZE = 100;
+    let invalidated = false;
+    for (const keyv of stores) {
+      const client = keyv.store?.client;
+      if (client?.scanIterator && client?.del) {
+        let batch: string[] = [];
+        for await (const key of client.scanIterator({
+          MATCH: PERMISSION_CACHE_PATTERN,
+          COUNT: BATCH_SIZE,
+        })) {
+          batch.push(key);
+          if (batch.length >= BATCH_SIZE) {
+            await client.del(batch);
+            batch = [];
+          }
+        }
+        if (batch.length > 0) {
+          await client.del(batch);
+        }
+        invalidated = true;
+      }
+    }
+
+    if (!invalidated) {
+      // No Redis-backed store was found — the running backend may be using an
+      // in-memory cache (USE_REDIS_CACHE=false or Redis unavailable). In-memory
+      // caches are per-process: this seeder process cannot reach the backend's
+      // cache instance. Stale permission entries will expire naturally at TTL
+      // (15 min) or be cleared on backend restart.
+      this.logger.warn(
+        '  ⚠️  No Redis store found — backend in-memory permission cache cannot be invalidated from this process. Restart the backend or wait for TTL expiry.',
+      );
+    }
+
+    return invalidated;
   }
 
   private async seedTestOrganization(): Promise<void> {
