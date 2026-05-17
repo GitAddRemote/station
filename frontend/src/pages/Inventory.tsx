@@ -131,6 +131,10 @@ const InventoryPage = () => {
   const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>(
     [],
   );
+  const [allOrgOptions, setAllOrgOptions] = useState<
+    { id: number; name: string }[]
+  >([]);
+  const orgsLoaded = useRef(false);
   const [selectedOrgId, setSelectedOrgId] = useState<number | null>(() =>
     readStoredOrgId(),
   );
@@ -173,6 +177,7 @@ const InventoryPage = () => {
   const [orgPermissionsError, setOrgPermissionsError] = useState<string | null>(
     null,
   );
+  const permissionsFetchedForOrgId = useRef<number | null>(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -263,7 +268,7 @@ const InventoryPage = () => {
   }, [density]);
 
   useEffect(() => {
-    if (orgOptions.length === 0 || selectedOrgId === null) return;
+    if (!orgsLoaded.current || selectedOrgId === null) return;
     const isValidOrg = orgOptions.some((org) => org.id === selectedOrgId);
     if (!isValidOrg) {
       setSelectedOrgId(null);
@@ -465,6 +470,14 @@ const InventoryPage = () => {
     [],
   );
 
+  const canViewOrgInventory = useMemo(
+    () =>
+      orgPermissions.includes(OrgPermission.CAN_VIEW_ORG_INVENTORY) ||
+      orgPermissions.includes(OrgPermission.CAN_EDIT_ORG_INVENTORY) ||
+      orgPermissions.includes(OrgPermission.CAN_ADMIN_ORG_INVENTORY),
+    [orgPermissions],
+  );
+
   const canManageOrgInventory = useMemo(
     () =>
       orgPermissions.includes(OrgPermission.CAN_EDIT_ORG_INVENTORY) ||
@@ -517,7 +530,28 @@ const InventoryPage = () => {
         id: entry.organization?.id ?? entry.organizationId,
         name: entry.organization?.name ?? `Org #${entry.organizationId}`,
       }));
-      setOrgOptions(mapped);
+      setAllOrgOptions(mapped);
+      const viewableOrgs = (
+        await Promise.all(
+          mapped.map(async (org) => {
+            try {
+              const perms = await permissionsService.getUserPermissions(
+                userId,
+                org.id,
+              );
+              const canView =
+                perms.includes(OrgPermission.CAN_VIEW_ORG_INVENTORY) ||
+                perms.includes(OrgPermission.CAN_EDIT_ORG_INVENTORY) ||
+                perms.includes(OrgPermission.CAN_ADMIN_ORG_INVENTORY);
+              return canView ? org : null;
+            } catch {
+              return null;
+            }
+          }),
+        )
+      ).filter((org): org is { id: number; name: string } => org !== null);
+      setOrgOptions(viewableOrgs);
+      orgsLoaded.current = true;
     } catch (err) {
       console.error('Error loading organizations', err);
     }
@@ -588,6 +622,13 @@ const InventoryPage = () => {
       const offset = page * rowsPerPage;
 
       if (isOrgMode && selectedOrgId) {
+        if (orgPermissionsLoading || permissionsFetchedForOrgId.current !== selectedOrgId || !canViewOrgInventory) {
+          setItems([]);
+          setTotalCount(0);
+          if (initialLoading) setInitialLoading(false);
+          setRefreshing(false);
+          return;
+        }
         const data = await inventoryService.getOrgInventory(selectedOrgId, {
           gameId: GAME_ID,
           search: debouncedSearch || undefined,
@@ -653,6 +694,8 @@ const InventoryPage = () => {
     user,
     isOrgMode,
     selectedOrgId,
+    orgPermissionsLoading,
+    canViewOrgInventory,
     filters.categoryId,
     filters.locationId,
     filters.sharedOnly,
@@ -879,9 +922,11 @@ const InventoryPage = () => {
     if (viewMode !== 'org' || !user?.userId || !selectedOrgId) {
       setOrgPermissions([]);
       setOrgPermissionsError(null);
+      permissionsFetchedForOrgId.current = null;
       return;
     }
     let isMounted = true;
+    permissionsFetchedForOrgId.current = null;
     setOrgPermissionsLoading(true);
     permissionsService
       .getUserPermissions(user.userId, selectedOrgId)
@@ -889,6 +934,7 @@ const InventoryPage = () => {
         if (isMounted) {
           setOrgPermissions(permissions);
           setOrgPermissionsError(null);
+          permissionsFetchedForOrgId.current = selectedOrgId;
         }
       })
       .catch((err) => {
@@ -1809,7 +1855,7 @@ const InventoryPage = () => {
                     )
                   }
                 >
-                  {orgOptions.map((org) => (
+                  {allOrgOptions.map((org) => (
                     <MenuItem key={org.id} value={org.id}>
                       {org.name}
                     </MenuItem>
@@ -2171,15 +2217,6 @@ const InventoryPage = () => {
                     autoFocusSearch
                     disabled={inventoryBusy}
                   />
-                  {viewMode === 'org' &&
-                    selectedOrgId &&
-                    !canManageOrgInventory &&
-                    !orgPermissionsLoading && (
-                      <Alert severity="info" sx={{ mt: 2 }}>
-                        You do not have permission to add items to this
-                        organization.
-                      </Alert>
-                    )}
                   {orgPermissionsError && (
                     <Alert severity="warning" sx={{ mt: 2 }}>
                       {orgPermissionsError}
