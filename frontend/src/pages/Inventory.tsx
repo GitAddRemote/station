@@ -600,6 +600,8 @@ const InventoryPage = () => {
         if (orgPermissionsLoading || !canViewOrgInventory) {
           setItems([]);
           setTotalCount(0);
+          if (initialLoading) setInitialLoading(false);
+          setRefreshing(false);
           return;
         }
         const data = await inventoryService.getOrgInventory(selectedOrgId, {
