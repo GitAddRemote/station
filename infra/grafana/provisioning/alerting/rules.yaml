@@ -21,7 +21,7 @@ groups:
                 type: loki
                 uid: loki-default
               editorMode: code
-              expr: 'sum(count_over_time({service="backend"} | json | level >= 50 [5m]))'
+              expr: 'sum(count_over_time({compose_project="station", service="backend"} | json | level >= 50 [5m]))'
               instant: false
               legendFormat: error count
               queryType: range
@@ -56,7 +56,7 @@ groups:
               type: threshold
         noDataState: OK
         execErrState: Error
-        for: 1m
+        for: 0s
         annotations:
           description: >-
             {{ $values.A.Value | printf "%.0f" }} error-level log entries (pino level >= 50)
@@ -82,7 +82,7 @@ groups:
                 type: loki
                 uid: loki-default
               editorMode: code
-              expr: 'sum(count_over_time({service="backend"} [10m]))'
+              expr: 'sum(count_over_time({compose_project="station", service="backend"} [10m]))'
               instant: false
               legendFormat: log count
               queryType: range
