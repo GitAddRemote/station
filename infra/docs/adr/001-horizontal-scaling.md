@@ -120,8 +120,9 @@ Steps:
    - name: Deploy to VPS-2
      run: ssh deploy@${{ secrets.VPS_HOST_2 }} "cd /opt/station && STATION_VERSION=${VERSION} bash infra/scripts/deploy.sh"
    ```
-5. Provision a Linode NodeBalancer in Terraform. The NodeBalancer must front **Nginx on each VPS** (not the Docker containers directly) to preserve host-based routing — Nginx on each VPS maps `api.drdnt.org → :3001` and `station.drdnt.org → :3000`. Configure the NodeBalancer with a single backend port (443) pointing to both VPS instances; TLS termination remains at Nginx.
-6. Update the `api` and `station` DNS A records in Terraform to point to the NodeBalancer IP instead of VPS-1
+5. Issue TLS certificates on VPS-2 before adding it as a NodeBalancer backend. A freshly bootstrapped VPS-2 has no Let's Encrypt certificates for `api.drdnt.org` or `station.drdnt.org`. Run certbot on VPS-2 while its IP is temporarily pointed to by the DNS records (or use the `--standalone` authenticator with the DNS temporarily pointed at VPS-2), then restore DNS to VPS-1 until the NodeBalancer is ready. Alternatively, sync the certificate files and private keys from VPS-1 to VPS-2 and configure auto-renewal on both nodes before adding VPS-2 to the load balancer.
+6. Provision a Linode NodeBalancer in Terraform. The NodeBalancer must front **Nginx on each VPS** (not the Docker containers directly) to preserve host-based routing — Nginx on each VPS maps `api.drdnt.org → :3001` and `station.drdnt.org → :3000`. Configure the NodeBalancer with a single backend port (443) pointing to both VPS instances; TLS termination remains at Nginx.
+7. Update the `api` and `station` DNS A records in Terraform to point to the NodeBalancer IP instead of VPS-1
 
 **No backend or frontend code changes required.** The app is already stateless.
 

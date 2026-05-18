@@ -32,6 +32,9 @@ The bootstrap script references companion scripts via `$(dirname "$0")`, so it m
 ```bash
 ssh root@<vps-ip>
 
+# git is not pre-installed on a fresh Linode image; install it first
+apt update && apt install -y git
+
 # Clone the repo so companion scripts (setup-swap.sh, logrotate config) are present
 git clone https://github.com/GitAddRemote/station.git /opt/station
 
@@ -77,9 +80,7 @@ certbot --nginx -d api.drdnt.org -d station.drdnt.org -d bot.drdnt.org
 
 ### 4. Configure GitHub Secrets
 
-In the GitHub repository settings, create both a `staging` and a `production` environment and add all secrets listed in [docs/cicd.md](cicd.md) and [infra/docs/secrets.md](../infra/docs/secrets.md) to each. The deploy workflow runs staging first; production is gated on the staging health check passing.
-
-Include `INTERNAL_API_KEY` (min 32 chars; the backend validation schema requires it in production — generate with `openssl rand -base64 32`).
+In the GitHub repository settings, create both a `staging` and a `production` environment. Follow the per-environment requirements in [docs/cicd.md](cicd.md) and [infra/docs/secrets.md](../infra/docs/secrets.md) — several secrets are environment-specific (e.g. Grafana secrets are production-only; B2, Sentry, and UEX keys are optional in staging). The deploy workflow runs staging first; production is gated on the staging health check passing.
 
 ### 5. Start the stateful services on the VPS
 
@@ -98,8 +99,10 @@ cp /dev/stdin .env.staging   # paste your staging env vars, Ctrl-D when done
 cp /dev/stdin .env.production # paste your production env vars, Ctrl-D when done
 chmod 600 .env.staging .env.production
 
-# Bring up all staging services (staging-up.sh does a full `up -d`, including postgres/redis)
-bash infra/scripts/staging-up.sh
+# Bring up staging postgres and redis only — app images haven't been built yet
+# (staging-up.sh would try to pull the backend/frontend images which don't exist yet)
+docker compose --project-name station-staging --env-file .env.staging \
+  -f docker-compose.staging.yml up -d postgres redis
 
 # Bring up production postgres and redis
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d postgres redis
