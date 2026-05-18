@@ -95,16 +95,16 @@ Open **Explore → Loki** in Grafana and use these LogQL queries:
 
 ## Grafana alerting
 
-> **Prerequisite:** This section requires the Grafana/Loki/Promtail stack from PR #172 (merged into `main` as of commit `95f33b3`). Ensure `docker-compose.prod.yml` includes the `loki`, `promtail`, and `grafana` services before these alert rules will evaluate.
+> **Prerequisite:** This section requires the Grafana/Loki/Promtail stack (PR #172). Ensure `docker-compose.prod.yml` includes the `loki`, `promtail`, and `grafana` services before these alert rules will evaluate.
 
 Alert rules, contact points, and notification policies are defined as code in `infra/grafana/provisioning/alerting/` and provisioned automatically on container start — no manual Grafana UI configuration is required.
 
 ### Active alert rules
 
-| Alert                         | Condition                                                      | Severity |
-| ----------------------------- | -------------------------------------------------------------- | -------- |
-| **Backend Error Spike**       | >10 error-level logs (pino `level >= 50`) in a 5-minute window | warning  |
-| **Backend Producing No Logs** | <1 log entry in the last 10 minutes (container may be down)    | critical |
+| Alert                         | Condition                                                                   | Severity |
+| ----------------------------- | --------------------------------------------------------------------------- | -------- |
+| **Backend Error Spike**       | >10 error-level logs (pino `level >= 50`) in a 5-minute window              | warning  |
+| **Backend Producing No Logs** | <1 log entry in a 10-minute window; fires immediately when condition is met | critical |
 
 ### Notification channel
 

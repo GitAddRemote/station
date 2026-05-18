@@ -363,6 +363,7 @@ jobs:
           GF_SMTP_USER: ${{ secrets.GF_SMTP_USER }}
           GF_SMTP_PASSWORD: ${{ secrets.GF_SMTP_PASSWORD }}
         run: |
+          : "${GF_SECURITY_ADMIN_PASSWORD:?GF_SECURITY_ADMIN_PASSWORD secret is required for Grafana}"
           : "${GF_ALERT_EMAIL:?GF_ALERT_EMAIL secret is required for Grafana alerting}"
           : "${GF_SMTP_HOST:?GF_SMTP_HOST secret is required for Grafana alerting}"
           : "${GF_SMTP_USER:?GF_SMTP_USER secret is required for Grafana alerting}"

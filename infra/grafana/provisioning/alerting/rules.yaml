@@ -117,7 +117,7 @@ groups:
               type: threshold
         noDataState: Alerting
         execErrState: Error
-        for: 5m
+        for: 0s
         annotations:
           description: >-
             No logs received from the backend service in the last 10 minutes.
