@@ -93,6 +93,61 @@ Open **Explore → Loki** in Grafana and use these LogQL queries:
 
 ---
 
+## Grafana alerting
+
+> **Prerequisite:** This section requires the Grafana/Loki/Promtail stack (PR #172). Ensure `docker-compose.prod.yml` includes the `loki`, `promtail`, and `grafana` services before these alert rules will evaluate.
+
+Alert rules, contact points, and notification policies are defined as code in `infra/grafana/provisioning/alerting/` and provisioned automatically on container start — no manual Grafana UI configuration is required.
+
+### Active alert rules
+
+| Alert                         | Condition                                                                   | Severity |
+| ----------------------------- | --------------------------------------------------------------------------- | -------- |
+| **Backend Error Spike**       | >10 error-level logs (pino `level >= 50`) in a 5-minute window              | warning  |
+| **Backend Producing No Logs** | <1 log entry in a 10-minute window; fires immediately when condition is met | critical |
+
+### Notification channel
+
+Alerts are sent by email to the address in `GF_ALERT_EMAIL`. SMTP is configured via four production-only GitHub secrets that the release workflow injects into `.env.production` and the Grafana container picks up as environment variables:
+
+| Secret             | Example value          |
+| ------------------ | ---------------------- |
+| `GF_ALERT_EMAIL`   | `oncall@example.com`   |
+| `GF_SMTP_HOST`     | `smtp.example.com:587` |
+| `GF_SMTP_USER`     | `grafana@example.com`  |
+| `GF_SMTP_PASSWORD` | your SMTP password     |
+
+Add all four to the `production` GitHub environment before deploying (see `docs/cicd.md`). The release workflow fails fast if any of them is missing.
+
+Alternatively, replace the email contact point in `contact-points.yaml` with a webhook (e.g., Discord, Slack, PagerDuty) — Grafana supports all standard contact point types. If you switch to a webhook, you can remove the `GF_SMTP_*` secrets and the SMTP environment vars from `docker-compose.prod.yml`.
+
+### Silencing during planned deployments
+
+To suppress alerts during a deploy:
+
+1. Open Grafana → **Alerting → Silences**
+2. Click **Add silence**
+3. Set a duration (e.g., 15 minutes)
+4. Add matcher: `service = backend`
+5. Click **Submit**
+
+The silence expires automatically. No alerts fire during the silence window even if conditions are met.
+
+### Modifying alert rules
+
+Edit `infra/grafana/provisioning/alerting/rules.yaml` and redeploy. Grafana re-reads provisioning files on container restart.
+
+To change the error spike threshold (default: 10 errors / 5 min), update the `evaluator.params` value in the `backend-error-spike` rule:
+
+```yaml
+evaluator:
+  params:
+    - 20 # change this number
+  type: gt
+```
+
+---
+
 ## Infrastructure
 
 | Service  | Image                    | Host bind        | Container port | Data                  |
@@ -120,9 +175,12 @@ sudo nginx -t && sudo systemctl reload nginx
 # 2. Issue TLS certificate
 sudo certbot --nginx -d grafana.drdnt.org
 
-# 3. Add the secret to GitHub (production environment):
+# 3. Add secrets to GitHub (production environment) before the next deploy:
 #    GF_SECURITY_ADMIN_PASSWORD = <strong random password>
-#    Then trigger a deploy so .env.production is rewritten with the new secret.
+#    GF_ALERT_EMAIL = your@email.com
+#    GF_SMTP_HOST   = smtp.example.com:587
+#    GF_SMTP_USER   = grafana@example.com
+#    GF_SMTP_PASSWORD = your-smtp-password
 #
 # Note: DOCKER_HOST_SOCKET does NOT need to be added as a GitHub secret.
 # The release workflow SSHs into the VPS, runs `id -u` to get the deploy
