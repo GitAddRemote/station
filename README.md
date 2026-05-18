@@ -1,250 +1,151 @@
-# Station: Gaming Guild and Organization Portal
+# Station
 
-Station is a modern full-stack monorepo application for managing gaming guilds and organizations with sophisticated role-based access control, member management, and secure authentication.
+Gaming guild and organization management portal. Full-stack TypeScript monorepo — NestJS backend, React frontend, PostgreSQL, Redis.
 
-## 🚀 Tech Stack
+**Live**: [station.drdnt.org](https://station.drdnt.org) | API: [api.drdnt.org](https://api.drdnt.org)
 
-### Frontend
+---
 
-- **React 18** with TypeScript
-- **Vite** for fast development and builds
-- **Material-UI v6** for beautiful, accessible UI components
-- **React Router v6** for client-side routing
-- **Axios** for API communication
+## Production
 
-### Backend
-
-- **NestJS 10** with TypeScript
-- **PostgreSQL** with TypeORM
-- **Redis** for caching (with in-memory fallback)
-- **JWT Authentication** with refresh token rotation
-- **Swagger/OpenAPI** documentation at `/api/docs`
-- **Passport.js** for authentication strategies
-- **bcrypt** for secure password hashing
-
-### DevOps & Infrastructure
-
-- **pnpm** workspace monorepo
-- **Turbo** for fast, cached builds
-- **Docker** & Docker Compose
-- **Kubernetes** manifests for AWS EKS
-- **GitHub Actions** CI/CD pipelines
-- **Husky** pre-commit hooks
-- **lint-staged** for code quality
-- **Monitoring**: Prometheus & Grafana (configs available)
-- **Logging**: ELK Stack (configs available)
-
-## 📁 Project Structure
+### Architecture
 
 ```
-station/
-├── backend/          # NestJS backend application
-├── frontend/         # React + Vite frontend application
-├── k8s/             # Kubernetes deployment manifests
-├── .github/         # GitHub Actions workflows
-└── .husky/          # Git hooks configuration
+Internet
+    │
+ Nginx (TLS)
+    ├── api.drdnt.org      → NestJS backend (Docker, :3001)
+    │                              │
+    │                         PostgreSQL + Redis (Docker)
+    ├── station.drdnt.org  → React frontend (Docker, :3000)
+    └── bot.drdnt.org      → (reserved — Terraform A record + Nginx config managed)
+
+Station-Bot (separate VPS) → api.drdnt.org via OAuth 2.0 Client Credentials
 ```
 
-## 🎯 Key Features
+Full architecture overview: [docs/architecture.md](docs/architecture.md)
 
-### Multi-Role Organization System
+### Deploy
 
-- Users can have multiple roles across multiple organizations
-- Flexible JSONB-based permissions per role
-- Optimized database queries with composite indexes
-- Permission aggregation service with Redis caching
+Push a `release/vX.Y.Z` branch — the workflow derives the version from the branch name:
 
-### Enhanced User Profiles
+```bash
+git checkout -b release/v0.2.0
+git push origin release/v0.2.0
+```
 
-- Extended user profile fields (firstName, lastName, phoneNumber, bio)
-- Profile management API with validation
-- Phone number validation (E.164 format)
+GitHub Actions validates, builds images, pushes to GHCR, takes a pre-deploy backup, deploys via SSH, and creates the git tag. Full pipeline details: [docs/cicd.md](docs/cicd.md)
 
-### Performance & Caching
+### Check service health on the VPS
 
-- Redis-based caching layer for frequently accessed data
-- Automatic cache invalidation on data updates
-- Graceful fallback to in-memory caching
-- TTL-based cache expiration (5min for organization members, 15min for permissions)
+```bash
+ssh deploy@<vps-host>
+export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+docker compose --env-file /opt/station/.env.production -f /opt/station/docker-compose.prod.yml ps
+curl -f https://api.drdnt.org/health && echo OK
+```
 
-### Security
+### Documentation
 
-- JWT access tokens (15-minute expiry)
-- Refresh token rotation (7-day expiry)
-- Secure password hashing with bcrypt
-- Protected API endpoints with JWT guards
-- CORS enabled
-- Standardized error response format
-- Input validation with class-validator
+| Document                                                                             | Contents                                                                              |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| [docs/architecture.md](docs/architecture.md)                                         | System diagram, components, data model, scaling                                       |
+| [docs/deployment.md](docs/deployment.md)                                             | First-time setup, routine deploys, rollback, secrets, common issues                   |
+| [docs/cicd.md](docs/cicd.md)                                                         | Pipeline diagram, required secrets table, staging setup                               |
+| [docs/oauth-m2m.md](docs/oauth-m2m.md)                                               | OAuth 2.0 Client Credentials — curl examples, client registration, security           |
+| [infra/docs/restore.md](infra/docs/restore.md)                                       | PostgreSQL backup restore runbook and quarterly drill log                             |
+| [infra/docs/migration-rollback.md](infra/docs/migration-rollback.md)                 | Migration rollback runbook (fast path + safe path)                                    |
+| [infra/docs/vps-setup.md](infra/docs/vps-setup.md)                                   | Rootless Docker setup and security properties                                         |
+| [infra/docs/adr/001-horizontal-scaling.md](infra/docs/adr/001-horizontal-scaling.md) | Scale-out path: vertical → DB separation → Redis separation → multi-node → Kubernetes |
 
-### Modern UI/UX
+---
 
-- Dark theme with gitaddremote.com inspired styling
-- Medium blue accent color (#4A9EFF) with glowing effects
-- Protected dashboard and profile pages
-- Responsive Material-UI components
-- Enhanced landing page with hero section
-
-### Developer Experience
-
-- Swagger API documentation with bearer auth
-- TypeScript across the stack
-- Hot module replacement with Vite
-- Pre-commit hooks for code quality
-- Monorepo with shared tooling
-- Standardized API response transformation
-
-## 🛠️ Getting Started
+## Local development
 
 ### Prerequisites
 
-- Node.js >= 20
-- pnpm >= 8
-- Docker & Docker Compose (for PostgreSQL and Redis)
+- Node.js 20+
+- pnpm 10+
+- Docker (for PostgreSQL and Redis)
 
-### Quick Start with Docker
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/YourUsername/station.git
-   cd station
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   pnpm install
-   ```
-
-3. **Start infrastructure services (PostgreSQL & Redis)**
-
-   ```bash
-   docker-compose up -d
-   ```
-
-   This starts:
-   - PostgreSQL on port 5433
-   - Redis on port 6379
-
-4. **Set up environment variables**
-
-   The `backend/.env` file should already exist. If not, copy from the example:
-
-   ```bash
-   cp backend/.env.example backend/.env
-   ```
-
-   Default configuration:
-
-   ```env
-   DATABASE_HOST=localhost
-   DATABASE_PORT=5433
-   DATABASE_USER=stationDbUser
-   DATABASE_PASSWORD=stationDbPassword1
-   DATABASE_NAME=stationDb
-   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-   REDIS_HOST=localhost
-   REDIS_PORT=6379
-   PORT=3001
-   APP_NAME=STATION BACKEND
-   ```
-
-5. **Run database migrations**
-   ```bash
-   cd backend
-   pnpm typeorm migration:run -d src/data-source.ts
-   ```
-
-### Development
-
-Run both frontend and backend in development mode:
+### Quick start
 
 ```bash
-# From root directory
+git clone https://github.com/GitAddRemote/station.git
+cd station
+pnpm install
+
+# Start PostgreSQL (port 5433) and Redis (port 6379)
+docker-compose up -d
+
+# Copy and configure backend env
+cp backend/.env.example backend/.env
+
+# Run migrations
+cd backend && pnpm migration:run
+
+# Start both services
+cd ..
 pnpm dev
-
-# Or individually from root:
-pnpm dev:backend          # Backend on http://localhost:3001
-pnpm dev:frontend         # Frontend on http://localhost:5173
-
-# Or from package directories:
-cd backend && pnpm dev    # Backend only
-cd frontend && pnpm dev   # Frontend only
 ```
 
-**Note**: Redis is optional. The application will fall back to in-memory caching if Redis is unavailable.
+- Backend: http://localhost:3001
+- Frontend: http://localhost:5173
+- Swagger: http://localhost:3001/api/docs
 
-### Building for Production
+### Common commands
 
 ```bash
-# Build all packages
-pnpm build
+# From root
+pnpm dev            # start frontend + backend
+pnpm test           # run all tests
+pnpm lint           # lint all packages
+pnpm typecheck      # type-check all packages
+pnpm build          # build all packages
 
-# Build specific package
-cd backend && pnpm build
-cd frontend && pnpm build
+# From backend/
+pnpm migration:run      # run pending migrations
+pnpm migration:revert   # rollback last migration
+pnpm migration:create src/migrations/YourMigrationName
+pnpm seed               # seed test data
+pnpm test:e2e           # E2E tests (requires database running)
 ```
 
-## 📚 API Documentation
+### Stack
 
-Once the backend is running, visit:
+| Layer    | Technology                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------ |
+| Frontend | React 18, TypeScript, Vite, Material-UI v6, React Router v6                                |
+| Backend  | NestJS 10, TypeScript, TypeORM, Passport.js                                                |
+| Database | PostgreSQL 16 (staging/production); local dev uses postgres:13 (root `docker-compose.yml`) |
+| Cache    | Redis 7 (required in production; in-memory fallback for tests only)                        |
+| Auth     | JWT (HttpOnly cookies), refresh token rotation, bcrypt, OAuth 2.0                          |
+| Infra    | Docker Compose, Nginx, Certbot, Linode, Terraform                                          |
+| CI/CD    | GitHub Actions, GHCR                                                                       |
+| Monorepo | pnpm workspaces, Turbo                                                                     |
 
-- **Swagger UI**: http://localhost:3001/api/docs
-- **Frontend**: http://localhost:5173
+---
 
-## 🧪 Testing
+## Authentication
 
-```bash
-# Run all tests
-pnpm test
+### User login
 
-# Backend tests
-cd backend
-pnpm test          # Unit tests
-pnpm test:e2e      # E2E tests
-pnpm test:cov      # Coverage report
+```
+POST /auth/login        → access_token + refresh_token (HttpOnly cookies, 15min / 7 days)
+POST /auth/refresh      → rotate both tokens
+POST /auth/logout       → revoke refresh token, clear cookies
 ```
 
-## 📦 Available Scripts
+### Machine-to-machine (OAuth 2.0)
 
-From root directory:
+```
+POST /auth/token        → Bearer token (1 hour)
+```
 
-- `pnpm dev` - Run all packages in development mode
-- `pnpm build` - Build all packages
-- `pnpm test` - Run tests across all packages
-- `pnpm lint` - Lint all packages
-- `pnpm format` - Format code with Prettier
-- `pnpm typecheck` - Type-check all packages
+See [docs/oauth-m2m.md](docs/oauth-m2m.md) for details and curl examples.
 
-## 🔐 Authentication Flow
+---
 
-1. **Register**: `POST /auth/register`
-2. **Login**: `POST /auth/login` → Returns `access_token` + `refresh_token`
-3. **Access Protected Routes**: Include `Authorization: Bearer <access_token>`
-4. **Refresh Token**: `POST /auth/refresh` with `Authorization: Bearer <refresh_token>`
-5. **Logout**: `POST /auth/logout` → Revokes refresh token
+## License
 
-## 🗄️ Database Schema
-
-- **Users**: User accounts with hashed passwords
-- **Organizations**: Gaming guilds/organizations
-- **Roles**: Role definitions with JSONB permissions
-- **UserOrganizationRoles**: Junction table linking users to organizations with roles
-- **RefreshTokens**: Secure refresh token storage
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
-
-Pre-commit hooks will automatically run linting and formatting.
+MIT — see [LICENSE](LICENSE).

@@ -210,7 +210,9 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           BACKUP_HEALTHCHECK_URL: ${{ secrets.BACKUP_HEALTHCHECK_URL }}
           UEX_API_KEY: ${{ secrets.UEX_API_KEY }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
         run: |
+          : "${INTERNAL_API_KEY:?INTERNAL_API_KEY secret is required for the OAuth client admin endpoint}"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "mkdir -p /opt/station"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "cat > /opt/station/.env.staging <<'ENVEOF'
           NODE_ENV=production
@@ -256,6 +258,7 @@ jobs:
           UEX_RATE_LIMIT_PAUSE_MS=2000
           UEX_ENDPOINTS_PAUSE_MS=2000
           UEX_API_KEY=${UEX_API_KEY}
+          INTERNAL_API_KEY=${INTERNAL_API_KEY}
           STATION_VERSION=staging
           ENVEOF
           chmod 600 /opt/station/.env.staging"
@@ -362,17 +365,19 @@ jobs:
           GF_SMTP_HOST: ${{ secrets.GF_SMTP_HOST }}
           GF_SMTP_USER: ${{ secrets.GF_SMTP_USER }}
           GF_SMTP_PASSWORD: ${{ secrets.GF_SMTP_PASSWORD }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
         run: |
           : "${GF_SECURITY_ADMIN_PASSWORD:?GF_SECURITY_ADMIN_PASSWORD secret is required for Grafana}"
           : "${GF_ALERT_EMAIL:?GF_ALERT_EMAIL secret is required for Grafana alerting}"
           : "${GF_SMTP_HOST:?GF_SMTP_HOST secret is required for Grafana alerting}"
           : "${GF_SMTP_USER:?GF_SMTP_USER secret is required for Grafana alerting}"
           : "${GF_SMTP_PASSWORD:?GF_SMTP_PASSWORD secret is required for Grafana alerting}"
+          : "${INTERNAL_API_KEY:?INTERNAL_API_KEY secret is required for the OAuth client admin endpoint}"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "mkdir -p /opt/station"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "cat > /opt/station/.env.production <<'ENVEOF'
           NODE_ENV=production
           PORT=3001
-          APP_NAME=STATION BACKEND
+          APP_NAME=\"STATION BACKEND\"
           JWT_SECRET=${JWT_SECRET}
           ALLOWED_ORIGIN=${ALLOWED_ORIGIN}
           FRONTEND_URL=${FRONTEND_URL}
@@ -420,6 +425,7 @@ jobs:
           GF_SMTP_PASSWORD=${GF_SMTP_PASSWORD}
           DOCKER_HOST_SOCKET=${DOCKER_HOST_SOCKET}
           STATION_VERSION=${{ needs.build-and-push.outputs.version }}
+          INTERNAL_API_KEY=${INTERNAL_API_KEY}
           ENVEOF
           chmod 600 /opt/station/.env.production"
 
@@ -460,9 +466,8 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
-            "cd /opt/station && export RCLONE_CONFIG=/opt/station/rclone.conf && \
-             source /opt/station/.env.production && \
-             rclone ls \"b2:${B2_BUCKET}/postgres/\" | grep \"pre-deploy-${GITHUB_SHA::7}\\.sql.gz\""
+            "B2_BUCKET=\$(grep ^B2_BUCKET= /opt/station/.env.production | cut -d= -f2) && \
+             RCLONE_CONFIG=/opt/station/rclone.conf rclone ls \"b2:\${B2_BUCKET}/postgres/\" | grep \"pre-deploy-${GITHUB_SHA::7}\\.sql.gz\""
 
       - name: Deploy production
         env:
