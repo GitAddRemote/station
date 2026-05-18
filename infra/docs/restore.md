@@ -76,8 +76,12 @@ docker run --rm -d \
   -e POSTGRES_DB="${DATABASE_NAME}" \
   postgres:16-alpine
 
-# Wait for it to be ready
-sleep 5
+# Wait for Postgres to be ready (up to 30 s)
+for i in $(seq 1 30); do
+  docker exec station-restore-drill pg_isready -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -q && break
+  [ "$i" -eq 30 ] && { echo "Postgres did not become ready in 30 s"; docker stop station-restore-drill; exit 1; }
+  sleep 1
+done
 
 # Restore into it
 gunzip -c /tmp/restore.sql.gz | \

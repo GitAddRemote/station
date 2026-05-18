@@ -47,6 +47,6 @@ For the full procedure — including how to list and download backups, run a zer
 | Scenario                                       | Action                                                                                                                           |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Rows accidentally deleted (schema intact)      | Live restore — [infra/docs/restore.md §4b](../infra/docs/restore.md#4b-live-restore--production-only-for-actual-data-loss)       |
-| Bad migration / schema corruption              | Check migration rollback first (`pnpm migration:revert`); if that fails, live restore                                            |
+| Bad migration / schema corruption              | Check migration rollback first (`cd /opt/station/backend && pnpm migration:revert`); if that fails, live restore                 |
 | Disk failure / volume deleted                  | Provision new VPS → bootstrap → live restore — [infra/docs/restore.md §6](../infra/docs/restore.md#6-decision-tree)              |
 | Confirming backups are valid (quarterly drill) | Restore drill — [infra/docs/restore.md §4a](../infra/docs/restore.md#4a-restore-drill--throwaway-container-zero-production-risk) |
