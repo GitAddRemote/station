@@ -27,28 +27,25 @@ Terraform creates the VPS. Note the public IP from the output.
 
 ### 2. Bootstrap the VPS
 
-Run the bootstrap script from your **local checkout** — the repo does not exist on the VPS yet, so the script must be piped over SSH:
+The bootstrap script references companion scripts via `$(dirname "$0")`, so it must be run from within the repository — not piped over SSH. Clone the repo as root first (temporary), run bootstrap, then hand ownership to the deploy user:
 
 ```bash
-# From your local clone of this repository:
-export DEPLOY_SSH_PUBLIC_KEY="ssh-ed25519 AAAA... your-deploy-public-key"
-DEPLOY_SSH_PUBLIC_KEY="${DEPLOY_SSH_PUBLIC_KEY}" \
-  ssh root@<vps-ip> 'bash -s' < infra/scripts/bootstrap-vps.sh
-```
+ssh root@<vps-ip>
 
-`bootstrap-vps.sh` reads `DEPLOY_SSH_PUBLIC_KEY` from the environment to populate `authorized_keys` for the `deploy` user. Without it the authorized_keys file is created empty and SSH deploys will fail.
-
-The script installs rootless Docker, sets up the `deploy` user, enables linger, starts the rootless Docker daemon, and creates `/opt/station` with `deploy` ownership. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties.
-
-Clone the repository **as the deploy user** after bootstrap completes, so all files are `deploy`-owned from the start:
-
-```bash
-ssh deploy@<vps-ip>
+# Clone the repo so companion scripts (setup-swap.sh, logrotate config) are present
 git clone https://github.com/GitAddRemote/station.git /opt/station
+
+# bootstrap-vps.sh reads DEPLOY_SSH_PUBLIC_KEY to populate authorized_keys.
+# Without it, authorized_keys is created empty and SSH deploys will fail.
+export DEPLOY_SSH_PUBLIC_KEY="ssh-ed25519 AAAA... your-deploy-public-key"
+bash /opt/station/infra/scripts/bootstrap-vps.sh
+
+# Hand ownership of the repo to the deploy user (bootstrap created /opt/station
+# with deploy ownership, but the git clone above was run as root)
+chown -R deploy:deploy /opt/station
 ```
 
-> If the repo was already cloned as root before bootstrap, fix ownership before deploying:
-> `chown -R deploy:deploy /opt/station`
+The script installs rootless Docker, sets up the `deploy` user, enables linger, starts the rootless Docker daemon, and sets `/opt/station` and `/opt/station/logs` to `deploy` ownership. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties.
 
 ### 3. Set up Nginx and TLS
 
@@ -68,7 +65,7 @@ nginx -t && systemctl reload nginx
 certbot --nginx -d api.drdnt.org -d station.drdnt.org -d bot.drdnt.org
 
 # staging.* and grafana.drdnt.org are NOT in infra/terraform/dns.tf yet.
-# Add their A records to dns.tf and re-run `terraform apply` before step 5, then:
+# Add their A records to dns.tf and re-run `terraform apply` before step 6, then:
 # certbot --nginx -d staging.api.drdnt.org -d staging.station.drdnt.org -d grafana.drdnt.org
 ```
 
@@ -76,7 +73,7 @@ certbot --nginx -d api.drdnt.org -d station.drdnt.org -d bot.drdnt.org
 > before gating production. `staging.api.drdnt.org` must resolve and have a valid TLS certificate
 > before you push the first release branch. Add `staging.api.drdnt.org` and
 > `staging.station.drdnt.org` A records to `infra/terraform/dns.tf` and run `terraform apply`,
-> then run the `certbot` command above, before triggering the first deploy in step 5.
+> then run the `certbot` command above, before triggering the first deploy in step 6.
 
 ### 4. Configure GitHub Secrets
 
@@ -86,16 +83,29 @@ Include `INTERNAL_API_KEY` (min 32 chars; the backend validation schema requires
 
 ### 5. Start the stateful services on the VPS
 
-The deploy scripts use `--no-deps backend frontend` — they do not start PostgreSQL or Redis. The pre-deploy backup step also runs `docker compose exec postgres`, which will fail if that container has never been started. Before triggering the first deploy, SSH in as the `deploy` user and bring up the stateful services:
+The deploy scripts use `--no-deps backend frontend` — they do not start PostgreSQL or Redis. The pre-deploy backup step also runs `docker compose exec postgres`, which will fail if PostgreSQL has never been started. Additionally, `.env.production` and `.env.staging` do not exist until the workflow writes them — so they must be seeded manually before the first deploy.
+
+SSH in as the `deploy` user and bootstrap both stacks:
 
 ```bash
 ssh deploy@<vps-ip>
 export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 cd /opt/station
+
+# Create minimal env files from your GitHub Secrets values
+# (the workflow will overwrite these on every subsequent deploy)
+cp /dev/stdin .env.staging   # paste your staging env vars, Ctrl-D when done
+cp /dev/stdin .env.production # paste your production env vars, Ctrl-D when done
+chmod 600 .env.staging .env.production
+
+# Bring up all staging services (staging-up.sh does a full `up -d`, including postgres/redis)
+bash infra/scripts/staging-up.sh
+
+# Bring up production postgres and redis
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d postgres redis
 ```
 
-Wait for postgres to report healthy before proceeding (`docker compose ... ps`).
+Wait for both postgres containers to report healthy before proceeding (`docker compose ... ps`).
 
 ### 6. Trigger the first deploy
 

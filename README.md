@@ -47,16 +47,16 @@ curl -f https://api.drdnt.org/health && echo OK
 
 ### Documentation
 
-| Document                                                                             | Contents                                                                    |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| [docs/architecture.md](docs/architecture.md)                                         | System diagram, components, data model, scaling                             |
-| [docs/deployment.md](docs/deployment.md)                                             | First-time setup, routine deploys, rollback, secrets, common issues         |
-| [docs/cicd.md](docs/cicd.md)                                                         | Pipeline diagram, required secrets table, staging setup                     |
-| [docs/oauth-m2m.md](docs/oauth-m2m.md)                                               | OAuth 2.0 Client Credentials — curl examples, client registration, security |
-| [infra/docs/restore.md](infra/docs/restore.md)                                       | PostgreSQL backup restore runbook and quarterly drill log                   |
-| [infra/docs/migration-rollback.md](infra/docs/migration-rollback.md)                 | Migration rollback runbook (fast path + safe path)                          |
-| [infra/docs/vps-setup.md](infra/docs/vps-setup.md)                                   | Rootless Docker setup and security properties                               |
-| [infra/docs/adr/001-horizontal-scaling.md](infra/docs/adr/001-horizontal-scaling.md) | Scale-out path: vertical → DB separation → multi-node → Kubernetes          |
+| Document                                                                             | Contents                                                                              |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| [docs/architecture.md](docs/architecture.md)                                         | System diagram, components, data model, scaling                                       |
+| [docs/deployment.md](docs/deployment.md)                                             | First-time setup, routine deploys, rollback, secrets, common issues                   |
+| [docs/cicd.md](docs/cicd.md)                                                         | Pipeline diagram, required secrets table, staging setup                               |
+| [docs/oauth-m2m.md](docs/oauth-m2m.md)                                               | OAuth 2.0 Client Credentials — curl examples, client registration, security           |
+| [infra/docs/restore.md](infra/docs/restore.md)                                       | PostgreSQL backup restore runbook and quarterly drill log                             |
+| [infra/docs/migration-rollback.md](infra/docs/migration-rollback.md)                 | Migration rollback runbook (fast path + safe path)                                    |
+| [infra/docs/vps-setup.md](infra/docs/vps-setup.md)                                   | Rootless Docker setup and security properties                                         |
+| [infra/docs/adr/001-horizontal-scaling.md](infra/docs/adr/001-horizontal-scaling.md) | Scale-out path: vertical → DB separation → Redis separation → multi-node → Kubernetes |
 
 ---
 
