@@ -86,7 +86,7 @@ done
 # Restore into it
 gunzip -c /tmp/restore.sql.gz | \
   docker exec -i station-restore-drill \
-    psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}"
+    psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -v ON_ERROR_STOP=1
 
 # Verify key tables (adjust if schema has changed)
 docker exec station-restore-drill \

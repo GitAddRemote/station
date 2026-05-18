@@ -60,7 +60,7 @@ sleep 5
 BACKEND_STOPPED=1
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" stop backend
 gunzip -c "${LOCAL_FILE}" | docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
-  psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}"
+  psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -v ON_ERROR_STOP=1
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" start backend
 BACKEND_STOPPED=0
 
