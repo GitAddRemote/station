@@ -210,6 +210,7 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           BACKUP_HEALTHCHECK_URL: ${{ secrets.BACKUP_HEALTHCHECK_URL }}
           UEX_API_KEY: ${{ secrets.UEX_API_KEY }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
         run: |
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "mkdir -p /opt/station"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "cat > /opt/station/.env.staging <<'ENVEOF'
@@ -256,6 +257,7 @@ jobs:
           UEX_RATE_LIMIT_PAUSE_MS=2000
           UEX_ENDPOINTS_PAUSE_MS=2000
           UEX_API_KEY=${UEX_API_KEY}
+          INTERNAL_API_KEY=${INTERNAL_API_KEY}
           STATION_VERSION=staging
           ENVEOF
           chmod 600 /opt/station/.env.staging"

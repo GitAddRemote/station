@@ -92,7 +92,7 @@ Steps:
 5. Update `docker-compose.prod.yml`: remove the `redis` service block, the `redis_aof` volume, and the `depends_on.redis` entry from the `backend` service
 6. Redeploy; remove the `redis_aof` volume from the VPS: `docker volume rm station_redis_aof`
 
-### Step 3 — Add second app server + NodeBalancer (trigger: CPU/memory saturated after Steps 0–1)
+### Step 3 — Add second app server + NodeBalancer (trigger: CPU/memory saturated after Steps 0–2)
 
 Architecture after Step 3:
 

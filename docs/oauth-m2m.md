@@ -83,9 +83,12 @@ Tokens expire after **1 hour**. The `expires_in` value is in seconds.
 
 ```json
 {
+  "success": false,
   "statusCode": 401,
-  "message": "Invalid client credentials",
-  "error": "Unauthorized"
+  "timestamp": "2026-05-18T12:00:00.000Z",
+  "path": "/auth/token",
+  "method": "POST",
+  "message": "Invalid client credentials"
 }
 ```
 
