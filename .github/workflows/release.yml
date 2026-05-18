@@ -328,10 +328,20 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
+      - name: Resolve deploy user UID on VPS
+        id: vps_uid
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          UID_VAL="$(ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" 'id -u')"
+          echo "docker_socket=/run/user/${UID_VAL}/docker.sock" >> "$GITHUB_OUTPUT"
+
       - name: Write production environment file
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
+          DOCKER_HOST_SOCKET: ${{ steps.vps_uid.outputs.docker_socket }}
           DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
           DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
           DATABASE_USER: ${{ secrets.DATABASE_USER }}
@@ -347,6 +357,7 @@ jobs:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           BACKUP_HEALTHCHECK_URL: ${{ secrets.BACKUP_HEALTHCHECK_URL }}
           UEX_API_KEY: ${{ secrets.UEX_API_KEY }}
+          GF_SECURITY_ADMIN_PASSWORD: ${{ secrets.GF_SECURITY_ADMIN_PASSWORD }}
         run: |
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "mkdir -p /opt/station"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "cat > /opt/station/.env.production <<'ENVEOF'
@@ -393,6 +404,8 @@ jobs:
           UEX_RATE_LIMIT_PAUSE_MS=2000
           UEX_ENDPOINTS_PAUSE_MS=2000
           UEX_API_KEY=${UEX_API_KEY}
+          GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+          DOCKER_HOST_SOCKET=${DOCKER_HOST_SOCKET}
           STATION_VERSION=${{ needs.build-and-push.outputs.version }}
           ENVEOF
           chmod 600 /opt/station/.env.production"
