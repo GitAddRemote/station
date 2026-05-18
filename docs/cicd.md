@@ -50,6 +50,12 @@ Store these secrets in both the `staging` and `production` GitHub environments u
 | `UEX_API_KEY`                | Optional UEX upstream API key                                                                         |
 | `GF_SECURITY_ADMIN_PASSWORD` | **Production only.** Grafana admin password for `grafana.drdnt.org` — Grafana runs in production only |
 
+The following value is **not a GitHub secret** — it is computed at deploy time by SSHing into the VPS and running `id -u`:
+
+| Value                | How it's set                                           | Description                                                                                                        |
+| -------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `DOCKER_HOST_SOCKET` | Computed during deploy (`/run/user/<uid>/docker.sock`) | **Production only.** Rootless Docker socket path for the deploy user; written into `.env.production` automatically |
+
 See [infra/docs/secrets.md](../infra/docs/secrets.md) for the full inventory and rotation procedures.
 
 ## Staging

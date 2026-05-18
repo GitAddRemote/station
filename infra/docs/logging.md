@@ -121,6 +121,11 @@ sudo certbot --nginx -d grafana.drdnt.org
 # 3. Add the secret to GitHub (production environment):
 #    GF_SECURITY_ADMIN_PASSWORD = <strong random password>
 #    Then trigger a deploy so .env.production is rewritten with the new secret.
+#
+# Note: DOCKER_HOST_SOCKET does NOT need to be added as a GitHub secret.
+# The release workflow SSHs into the VPS, runs `id -u` to get the deploy
+# user's UID, and writes the correct socket path into .env.production
+# automatically on every deploy.
 ```
 
 Loki is pre-configured as the default Grafana data source via provisioning — no manual setup required after the containers start.
