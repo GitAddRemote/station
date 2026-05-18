@@ -1,8 +1,176 @@
 # Deployment Runbook
 
+## Prerequisites
+
+Before a first-time deploy you need:
+
+- A Linode account with an API token
+- A domain with DNS managed externally (A records pointing to the VPS IP)
+- A Backblaze B2 account with a bucket and application key
+- A GitHub repository with Actions enabled and a GHCR package registry
+- All GitHub Secrets configured — see [docs/cicd.md](cicd.md) for the full secrets table
+
+---
+
+## First-time setup
+
+### 1. Provision the VPS with Terraform
+
+```bash
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars
+# Fill in linode_token, vps_ip, ssh_public_key, etc.
+terraform init
+terraform apply
+```
+
+Terraform creates the VPS. Note the public IP from the output.
+
+### 2. Bootstrap the VPS
+
+SSH in as root (first login only) and run the bootstrap script:
+
+```bash
+ssh root@<vps-ip>
+# Clone the repo on the VPS
+git clone https://github.com/GitAddRemote/station.git /opt/station
+cd /opt/station
+bash infra/scripts/bootstrap-vps.sh
+```
+
+The script installs rootless Docker, sets up the `deploy` user, enables linger, and starts the rootless Docker daemon. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties.
+
+### 3. Set up Nginx and TLS
+
+```bash
+# As root on the VPS
+apt install -y nginx certbot python3-certbot-nginx
+
+# Copy the per-domain Nginx configs
+for conf in api.drdnt.org station.drdnt.org; do
+  cp /opt/station/infra/nginx/${conf}.conf /etc/nginx/sites-available/${conf}
+  ln -s /etc/nginx/sites-available/${conf} /etc/nginx/sites-enabled/${conf}
+done
+nginx -t && systemctl reload nginx
+
+# Issue TLS certificates
+certbot --nginx -d api.drdnt.org -d station.drdnt.org
+```
+
+### 4. Configure GitHub Secrets
+
+In the GitHub repository settings, create a `production` environment and add all secrets listed in [docs/cicd.md](cicd.md). The deploy workflow writes `.env.production` from these secrets on every deploy.
+
+### 5. Trigger the first deploy
+
+Push a `release/vX.Y.Z` branch to trigger the release workflow:
+
+```bash
+# From your local machine, after bumping package.json
+git checkout -b release/v0.1.0
+git push origin release/v0.1.0
+```
+
+The workflow derives the version from the branch name, validates, builds images, pushes to GHCR, takes a pre-deploy backup, deploys to the VPS, creates the git tag, and verifies the container is running.
+
+---
+
+## Routine deploys
+
+Deploys are triggered by pushing a `release/vX.Y.Z` branch. The version in the branch name must match the version in `package.json`.
+
+```bash
+# Bump version in package.json, then:
+git checkout -b release/v0.2.0
+git push origin release/v0.2.0
+```
+
+What happens in GitHub Actions:
+
+1. Run quality gate (lint, typecheck, tests against Postgres)
+2. Build Docker images and push to GHCR
+3. Write `.env.production` from GitHub Secrets to the VPS
+4. Take a pre-deploy PostgreSQL backup (labelled with the git SHA)
+5. Verify the backup exists in Backblaze B2
+6. Run `deploy.sh` on the VPS (pulls new images, restarts containers — migrations must be run manually before or after if needed)
+7. Verify the backend container is running and healthy
+8. Create a GitHub Release with auto-generated release notes
+
+Watch the workflow: **Actions → Release → [your release branch]**
+
+---
+
+## Rollback
+
+If a deploy goes wrong, redeploy the last known-good tag:
+
+```bash
+# Find the previous release tag on GitHub
+PREVIOUS_TAG="v0.1.9"
+
+# On the VPS (as the deploy user):
+source /opt/station/.env.production
+export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+STATION_VERSION="${PREVIOUS_TAG}" \
+  docker compose \
+    --env-file /opt/station/.env.production \
+    -f /opt/station/docker-compose.prod.yml \
+    up -d
+```
+
+If the rollback involves a bad migration, follow the migration rollback runbook first: [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md).
+
+---
+
+## Secrets management
+
+Secrets live in two places:
+
+| Location                                | Contents                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| GitHub Secrets (production environment) | VPS SSH key, database credentials, JWT secret, Redis password, B2 keys, CORS origins |
+| `/opt/station/.env.production` on VPS   | Written by the deploy workflow from GitHub Secrets on every deploy                   |
+
+The `.env.production` file is created with `chmod 600` and owned by the `deploy` user. It is never committed to the repository.
+
+To rotate a secret:
+
+1. Update it in GitHub Secrets
+2. Trigger a deploy (the file is rewritten on every deploy)
+3. If the secret is a database password or JWT secret, also update it manually on the VPS and restart the backend
+
+See [infra/docs/secrets.md](../infra/docs/secrets.md) for the full inventory and rotation procedures.
+
+---
+
+## Monitoring basics
+
+```bash
+ssh deploy@<vps-host>
+export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+cd /opt/station
+
+# Service status
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+
+# Live logs
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f backend
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f frontend
+
+# Resource usage
+free -h          # memory
+df -h /          # disk
+top              # CPU
+
+# Health endpoint
+curl -f https://api.drdnt.org/health && echo OK
+```
+
+---
+
 ## Backups
 
-Production deploys now create a pre-deploy PostgreSQL backup before the backend rollout starts. Nightly backups also run on the VPS at `03:00` via the `deploy` user's cron.
+Production deploys create a pre-deploy PostgreSQL backup before the backend rollout starts. Nightly backups also run on the VPS at `03:00 UTC` via the `deploy` user's cron.
 
 ### Verify nightly backups
 
@@ -31,10 +199,22 @@ cd /opt/station
 bash infra/scripts/restore-db.sh postgres/202605/20260510_030000_nightly.sql.gz
 ```
 
-The restore script stops the backend, restores into the running production Postgres container, and starts the backend again after the import finishes.
-It replays the SQL dump into the current database. If you need a clean replacement restore, drop and recreate the target database first.
+The restore script stops the backend, restores into the running production Postgres container, and starts the backend again after the import finishes. It replays the SQL dump into the current database. If you need a clean replacement restore, drop and recreate the target database first.
 
 For the full procedure — including how to list and download backups, run a zero-risk restore drill, and verify row counts after a restore — see **[infra/docs/restore.md](../infra/docs/restore.md)**.
+
+---
+
+## Common issues
+
+| Symptom                    | Action                                                                                                   |
+| -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Container crash loop       | `docker compose logs backend --tail=100` — look for startup error, missing env var, or migration failure |
+| Out of memory              | `free -h` — if used >90%, consider adding swap or resizing the VPS                                       |
+| Disk full                  | `df -h /` — prune old Docker images: `docker image prune -f`                                             |
+| TLS cert expired           | `certbot renew --nginx` (normally auto-renewed by systemd timer)                                         |
+| Migration failed           | Follow [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md)                           |
+| Backup not appearing in B2 | Check `tail /opt/station/logs/backup.log`; verify rclone config: `rclone lsd b2:${B2_BUCKET}`            |
 
 ---
 
