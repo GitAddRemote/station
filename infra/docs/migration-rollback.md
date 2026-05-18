@@ -67,10 +67,11 @@ docker exec station-backend-1 sh -c \
   "cd /app && node node_modules/.bin/typeorm migration:revert -d dist/data-source.js"
 
 # If the backend container is not running, start it temporarily with the current image:
+source /opt/station/.env.production
 docker run --rm \
   --env-file /opt/station/.env.production \
   --network station_default \
-  ghcr.io/gitaddremote/station-backend:latest \
+  ghcr.io/gitaddremote/station-backend:${STATION_VERSION} \
   sh -c "node node_modules/.bin/typeorm migration:revert -d dist/data-source.js"
 ```
 
@@ -144,7 +145,7 @@ export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 
 PREVIOUS_TAG="v0.1.9"   # replace with the actual previous tag
 
-BOT_IMAGE_TAG="${PREVIOUS_TAG}" \
+STATION_VERSION="${PREVIOUS_TAG}" \
   docker compose \
     --env-file /opt/station/.env.production \
     -f /opt/station/docker-compose.prod.yml \
