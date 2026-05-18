@@ -15,9 +15,9 @@ Internet
     │
  Nginx (TLS)
     ├── api.drdnt.org      → NestJS backend (Docker, :3001)
+    │                              │
+    │                         PostgreSQL + Redis (Docker)
     └── station.drdnt.org  → React frontend (Docker, :3000)
-                                   │
-                              PostgreSQL + Redis (Docker)
 
 Station-Bot (separate VPS) → api.drdnt.org via OAuth 2.0 Client Credentials
 ```
@@ -63,7 +63,7 @@ curl -f https://api.drdnt.org/health && echo OK
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 20+
 - pnpm 10+
 - Docker (for PostgreSQL and Redis)
 
@@ -112,16 +112,16 @@ pnpm test:e2e           # E2E tests (requires database running)
 
 ### Stack
 
-| Layer    | Technology                                                          |
-| -------- | ------------------------------------------------------------------- |
-| Frontend | React 18, TypeScript, Vite, Material-UI v6, React Router v6         |
-| Backend  | NestJS 10, TypeScript, TypeORM, Passport.js                         |
-| Database | PostgreSQL 16                                                       |
-| Cache    | Redis 7 (required in production; in-memory fallback for tests only) |
-| Auth     | JWT (HttpOnly cookies), refresh token rotation, bcrypt, OAuth 2.0   |
-| Infra    | Docker Compose, Nginx, Certbot, Linode, Terraform                   |
-| CI/CD    | GitHub Actions, GHCR                                                |
-| Monorepo | pnpm workspaces, Turbo                                              |
+| Layer    | Technology                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------ |
+| Frontend | React 18, TypeScript, Vite, Material-UI v6, React Router v6                                |
+| Backend  | NestJS 10, TypeScript, TypeORM, Passport.js                                                |
+| Database | PostgreSQL 16 (staging/production); local dev uses postgres:13 (root `docker-compose.yml`) |
+| Cache    | Redis 7 (required in production; in-memory fallback for tests only)                        |
+| Auth     | JWT (HttpOnly cookies), refresh token rotation, bcrypt, OAuth 2.0                          |
+| Infra    | Docker Compose, Nginx, Certbot, Linode, Terraform                                          |
+| CI/CD    | GitHub Actions, GHCR                                                                       |
+| Monorepo | pnpm workspaces, Turbo                                                                     |
 
 ---
 

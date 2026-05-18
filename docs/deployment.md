@@ -45,30 +45,32 @@ The script installs rootless Docker, sets up the `deploy` user, enables linger, 
 # As root on the VPS
 apt install -y nginx certbot python3-certbot-nginx
 
-# Copy all Nginx configs (API, frontend, staging, Grafana)
-for conf in api.drdnt.org station.drdnt.org staging.api.drdnt.org staging.station.drdnt.org grafana.drdnt.org; do
+# Copy all Nginx configs managed by Terraform DNS (api, station, bot)
+# Also staging, grafana — add these once their DNS records exist in Terraform
+for conf in api.drdnt.org station.drdnt.org bot.drdnt.org staging.api.drdnt.org staging.station.drdnt.org grafana.drdnt.org; do
   cp /opt/station/infra/nginx/${conf}.conf /etc/nginx/sites-available/${conf}
   ln -s /etc/nginx/sites-available/${conf} /etc/nginx/sites-enabled/${conf}
 done
 nginx -t && systemctl reload nginx
 
-# Issue TLS certificates for all domains
+# Issue TLS certificates — all six domains must resolve before running this
 certbot --nginx \
-  -d api.drdnt.org -d station.drdnt.org \
+  -d api.drdnt.org -d station.drdnt.org -d bot.drdnt.org \
   -d staging.api.drdnt.org -d staging.station.drdnt.org \
   -d grafana.drdnt.org
 ```
 
 ### 4. Configure GitHub Secrets
 
-In the GitHub repository settings, create a `production` environment and add all secrets listed in [docs/cicd.md](cicd.md). The deploy workflow writes `.env.production` from these secrets on every deploy.
+In the GitHub repository settings, create both a `staging` and a `production` environment and add all secrets listed in [docs/cicd.md](cicd.md) and [infra/docs/secrets.md](../infra/docs/secrets.md) to each. The deploy workflow runs staging first; production is gated on the staging health check passing.
+
+Include `INTERNAL_API_KEY` (min 32 chars; the backend validation schema requires it in production — generate with `openssl rand -base64 32`).
 
 ### 5. Trigger the first deploy
 
 Push a `release/vX.Y.Z` branch to trigger the release workflow:
 
 ```bash
-# From your local machine, after bumping package.json
 git checkout -b release/v0.1.0
 git push origin release/v0.1.0
 ```
@@ -82,7 +84,6 @@ The workflow derives the version from the branch name, validates, builds images,
 Deploys are triggered by pushing a `release/vX.Y.Z` branch. The workflow derives the version from the branch name — no `package.json` bump is required by the workflow itself.
 
 ```bash
-# Bump version in package.json, then:
 git checkout -b release/v0.2.0
 git push origin release/v0.2.0
 ```
@@ -135,13 +136,7 @@ Secrets live in two places:
 
 The `.env.production` file is created with `chmod 600` and owned by the `deploy` user. It is never committed to the repository.
 
-To rotate a secret:
-
-1. Update it in GitHub Secrets
-2. Trigger a deploy (the file is rewritten on every deploy)
-3. If the secret is a database password or JWT secret, also update it manually on the VPS and restart the backend
-
-See [infra/docs/secrets.md](../infra/docs/secrets.md) for the full inventory and rotation procedures.
+For per-secret rotation procedures (including safe ordering for database passwords and JWT secrets), see [infra/docs/secrets.md](../infra/docs/secrets.md).
 
 ---
 
@@ -209,14 +204,14 @@ For the full procedure — including how to list and download backups, run a zer
 
 ## Common issues
 
-| Symptom                    | Action                                                                                                   |
-| -------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Container crash loop       | `docker compose logs backend --tail=100` — look for startup error, missing env var, or migration failure |
-| Out of memory              | `free -h` — if used >90%, consider adding swap or resizing the VPS                                       |
-| Disk full                  | `df -h /` — prune old Docker images: `docker image prune -f`                                             |
-| TLS cert expired           | `certbot renew --nginx` (normally auto-renewed by systemd timer)                                         |
-| Migration failed           | Follow [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md)                           |
-| Backup not appearing in B2 | Check `tail /opt/station/logs/backup.log`; verify rclone config: `rclone lsd b2:${B2_BUCKET}`            |
+| Symptom                    | Action                                                                                                                                                         |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Container crash loop       | `docker compose --env-file .env.production -f docker-compose.prod.yml logs backend --tail=100` — look for startup error, missing env var, or migration failure |
+| Out of memory              | `free -h` — if used >90%, consider adding swap or resizing the VPS                                                                                             |
+| Disk full                  | `df -h /` — prune old Docker images: `docker image prune -f`                                                                                                   |
+| TLS cert expired           | `certbot renew --nginx` (normally auto-renewed by systemd timer)                                                                                               |
+| Migration failed           | Follow [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md)                                                                                 |
+| Backup not appearing in B2 | Check `tail /opt/station/logs/backup.log`; verify: `source /opt/station/.env.production && RCLONE_CONFIG=/opt/station/rclone.conf rclone lsd b2:${B2_BUCKET}`  |
 
 ---
 

@@ -93,20 +93,23 @@ Station-Bot uses OAuth 2.0 Client Credentials (RFC 6749 §4.4). See [docs/oauth-
 ## Data model
 
 ```
-users ──────────────────────────────────────────────┐
-  │                                                  │
-  ├── refresh_tokens (revocation tracking)           │
-  ├── password_resets (time-limited reset tokens)    │
-  └── user_organization_role ──── organizations ─────┘
-           │                           │
-           └── roles (JSONB perms)     └── audit_log
-                    │
-                    └── permissions cache (Redis)
+PostgreSQL
+  users ──────────────────────────────────────────────┐
+    │                                                  │
+    ├── password_resets (time-limited reset tokens)    │
+    └── user_organization_role ──── organizations ─────┘
+             │                           │
+             └── roles (JSONB perms)     └── audit_log
 
-oauth_clients (M2M registry, bcrypt secrets)
+  oauth_clients (M2M registry, bcrypt secrets)
+
+Redis
+  refresh:{jti}   → refresh token store / revocation (7-day TTL)
+  session:{sid}   → session state
+  permissions:*   → aggregated permission cache (5–15 min TTL)
 ```
 
-The `permissions` field on `role` is JSONB, allowing flexible per-role permission sets without schema changes. The `permissions` module aggregates all of a user's roles within an organization and caches the result in Redis.
+Refresh tokens were moved from PostgreSQL to Redis (`DropRefreshTokensTable` migration). The `permissions` field on `role` is JSONB, allowing flexible per-role permission sets without schema changes. The `permissions` module aggregates all of a user's roles within an organization and caches the result in Redis.
 
 ---
 

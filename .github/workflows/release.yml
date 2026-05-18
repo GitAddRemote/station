@@ -362,12 +362,14 @@ jobs:
           GF_SMTP_HOST: ${{ secrets.GF_SMTP_HOST }}
           GF_SMTP_USER: ${{ secrets.GF_SMTP_USER }}
           GF_SMTP_PASSWORD: ${{ secrets.GF_SMTP_PASSWORD }}
+          INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
         run: |
           : "${GF_SECURITY_ADMIN_PASSWORD:?GF_SECURITY_ADMIN_PASSWORD secret is required for Grafana}"
           : "${GF_ALERT_EMAIL:?GF_ALERT_EMAIL secret is required for Grafana alerting}"
           : "${GF_SMTP_HOST:?GF_SMTP_HOST secret is required for Grafana alerting}"
           : "${GF_SMTP_USER:?GF_SMTP_USER secret is required for Grafana alerting}"
           : "${GF_SMTP_PASSWORD:?GF_SMTP_PASSWORD secret is required for Grafana alerting}"
+          : "${INTERNAL_API_KEY:?INTERNAL_API_KEY secret is required for the OAuth client admin endpoint}"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "mkdir -p /opt/station"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "cat > /opt/station/.env.production <<'ENVEOF'
           NODE_ENV=production
@@ -420,6 +422,7 @@ jobs:
           GF_SMTP_PASSWORD=${GF_SMTP_PASSWORD}
           DOCKER_HOST_SOCKET=${DOCKER_HOST_SOCKET}
           STATION_VERSION=${{ needs.build-and-push.outputs.version }}
+          INTERNAL_API_KEY=${INTERNAL_API_KEY}
           ENVEOF
           chmod 600 /opt/station/.env.production"
 
