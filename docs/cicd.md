@@ -42,12 +42,12 @@ Store these secrets in both the `staging` and `production` GitHub environments u
 | `REDIS_PASSWORD`             | Redis auth password                                                                                                              |
 | `ALLOWED_ORIGIN`             | Frontend origin allowed by backend CORS                                                                                          |
 | `FRONTEND_URL`               | Frontend base URL used in password-reset links                                                                                   |
-| `B2_ACCOUNT_ID`              | Backblaze B2 account id                                                                                                          |
-| `B2_APPLICATION_KEY`         | Backblaze B2 application key                                                                                                     |
-| `B2_BUCKET`                  | Backblaze B2 bucket name                                                                                                         |
-| `SENTRY_DSN`                 | Sentry DSN for backend error reporting                                                                                           |
-| `BACKUP_HEALTHCHECK_URL`     | Production backup healthcheck URL; can be blank in staging                                                                       |
-| `UEX_API_KEY`                | Optional UEX upstream API key                                                                                                    |
+| `B2_ACCOUNT_ID`              | Backblaze B2 account id. **Required in production** for pre-deploy backups; optional in staging.                                 |
+| `B2_APPLICATION_KEY`         | Backblaze B2 application key. **Required in production**; optional in staging.                                                   |
+| `B2_BUCKET`                  | Backblaze B2 bucket name. **Required in production**; optional in staging.                                                       |
+| `SENTRY_DSN`                 | Sentry DSN for backend error reporting. Optional in both environments; leave blank to disable.                                   |
+| `BACKUP_HEALTHCHECK_URL`     | Dead-man switch URL pinged after each successful backup. **Recommended in production**; can be blank in staging.                 |
+| `UEX_API_KEY`                | UEX upstream API key. Optional in both environments; leave blank if the upstream API does not require it.                        |
 | `INTERNAL_API_KEY`           | Protects the OAuth client registration endpoint. Min 32 chars. Required by backend validation schema when `NODE_ENV=production`. |
 | `GF_SECURITY_ADMIN_PASSWORD` | **Production only.** Grafana admin password for `grafana.drdnt.org` — Grafana runs in production only                            |
 | `GF_ALERT_EMAIL`             | **Production only.** Email address Grafana alert notifications are sent to — Grafana runs in production only                     |
