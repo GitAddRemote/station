@@ -167,7 +167,7 @@ Need to restore?
 │       If that fails → live restore (Section 4b)
 │
 ├─ Disk failure / volume deleted (data AND schema gone)?
-│   └─ Provision new VPS → run bootstrap-vps.sh
+│   └─ Provision new VPS → sudo bash infra/scripts/bootstrap-vps.sh (must run as root)
 │       → copy .env.production and rclone.conf
 │       → live restore (Section 4b) → verify
 │
