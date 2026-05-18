@@ -95,11 +95,11 @@ Open **Explore → Loki** in Grafana and use these LogQL queries:
 
 ## Infrastructure
 
-| Service  | Image                    | Port (internal)  | Data                  |
-| -------- | ------------------------ | ---------------- | --------------------- |
-| Loki     | `grafana/loki:3.4.2`     | `127.0.0.1:3100` | `loki_data` volume    |
-| Promtail | `grafana/promtail:3.4.2` | —                | reads Docker socket   |
-| Grafana  | `grafana/grafana:11.6.1` | `127.0.0.1:3010` | `grafana_data` volume |
+| Service  | Image                    | Host bind        | Container port | Data                  |
+| -------- | ------------------------ | ---------------- | -------------- | --------------------- |
+| Loki     | `grafana/loki:3.4.2`     | `127.0.0.1:3100` | `3100`         | `loki_data` volume    |
+| Promtail | `grafana/promtail:3.4.2` | —                | —              | reads Docker socket   |
+| Grafana  | `grafana/grafana:11.6.1` | `127.0.0.1:3010` | `3000`         | `grafana_data` volume |
 
 Nginx proxies `grafana.drdnt.org → 127.0.0.1:3010`. TLS via Let's Encrypt (same Certbot setup as other subdomains).
 
