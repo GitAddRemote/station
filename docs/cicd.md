@@ -49,6 +49,7 @@ Store these secrets in both the `staging` and `production` GitHub environments u
 | `BACKUP_HEALTHCHECK_URL`     | Production backup healthcheck URL; can be blank in staging                                            |
 | `UEX_API_KEY`                | Optional UEX upstream API key                                                                         |
 | `GF_SECURITY_ADMIN_PASSWORD` | **Production only.** Grafana admin password for `grafana.drdnt.org` — Grafana runs in production only |
+| `GF_ALERT_EMAIL`             | **Production only.** Email address Grafana alert notifications are sent to — Grafana runs in production only |
 
 The following value is **not a GitHub secret** — it is computed at deploy time by SSHing into the VPS and running `id -u`:
 

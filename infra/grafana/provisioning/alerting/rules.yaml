@@ -1,0 +1,129 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: station-backend
+    folder: Station
+    interval: 1m
+    rules:
+      - uid: backend-error-spike
+        title: Backend Error Spike
+        condition: C
+        data:
+          - refId: A
+            queryType: range
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki-default
+            model:
+              datasource:
+                type: loki
+                uid: loki-default
+              editorMode: code
+              expr: 'sum(count_over_time({service="backend"} | json | level >= 50 [5m]))'
+              instant: false
+              legendFormat: error count
+              queryType: range
+              refId: A
+          - refId: C
+            queryType: instant
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 10
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              hide: false
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        annotations:
+          description: >-
+            {{ $values.A.Value | printf "%.0f" }} error-level log entries (pino level >= 50)
+            detected in the last 5 minutes on the backend service.
+          summary: Backend error spike detected
+        labels:
+          service: backend
+          severity: warning
+        isPaused: false
+
+      - uid: backend-no-logs
+        title: Backend Producing No Logs
+        condition: C
+        data:
+          - refId: A
+            queryType: range
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki-default
+            model:
+              datasource:
+                type: loki
+                uid: loki-default
+              editorMode: code
+              expr: 'sum(count_over_time({service="backend"} [10m]))'
+              instant: false
+              legendFormat: log count
+              queryType: range
+              refId: A
+          - refId: C
+            queryType: instant
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              hide: false
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: >-
+            No logs received from the backend service in the last 10 minutes.
+            The container may be down or Promtail may have lost connectivity to Loki.
+          summary: Backend container is not producing logs
+        labels:
+          service: backend
+          severity: critical
+        isPaused: false
