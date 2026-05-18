@@ -13,11 +13,7 @@ tail -f /opt/station/logs/backup.log
 
 ### List backups in Backblaze B2
 
-```bash
-ssh deploy@<vps-host>
-export RCLONE_CONFIG=/opt/station/rclone.conf
-rclone ls "b2:${B2_BUCKET}/postgres/"
-```
+See **[infra/docs/restore.md §2](../infra/docs/restore.md#2-list-available-backups)** for the full listing command, including how to derive `B2_BUCKET` from `.env.production`.
 
 ### Trigger a manual backup
 
