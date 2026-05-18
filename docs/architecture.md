@@ -96,12 +96,12 @@ Station-Bot uses OAuth 2.0 Client Credentials (RFC 6749 §4.4). See [docs/oauth-
 
 ```
 PostgreSQL
-  users ──────────────────────────────────────────────┐
+  user ───────────────────────────────────────────────┐
     │                                                  │
     ├── password_resets (time-limited reset tokens)    │
-    └── user_organization_role ──── organizations ─────┘
+    └── user_organization_role ──── organization ──────┘
              │                           │
-             └── roles (JSONB perms)     └── audit_log
+             └── role (JSONB perms)      └── audit_log
 
   oauth_clients (M2M registry, bcrypt secrets)
 

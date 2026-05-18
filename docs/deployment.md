@@ -27,27 +27,27 @@ Terraform creates the VPS. Note the public IP from the output.
 
 ### 2. Bootstrap the VPS
 
-SSH in as root (first login only) and run the bootstrap script:
+Run the bootstrap script from your **local checkout** — the repo does not exist on the VPS yet, so the script must be piped over SSH:
 
 ```bash
-ssh root@<vps-ip>
-# bootstrap-vps.sh reads DEPLOY_SSH_PUBLIC_KEY to populate authorized_keys for the deploy user.
-# Without it, the deploy user's authorized_keys will be empty and SSH deploys will fail.
+# From your local clone of this repository:
 export DEPLOY_SSH_PUBLIC_KEY="ssh-ed25519 AAAA... your-deploy-public-key"
-bash /opt/station/infra/scripts/bootstrap-vps.sh
+DEPLOY_SSH_PUBLIC_KEY="${DEPLOY_SSH_PUBLIC_KEY}" \
+  ssh root@<vps-ip> 'bash -s' < infra/scripts/bootstrap-vps.sh
 ```
 
-The script installs rootless Docker, sets up the `deploy` user, enables linger, and starts the rootless Docker daemon. It also creates `/opt/station` with `deploy` ownership. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties.
+`bootstrap-vps.sh` reads `DEPLOY_SSH_PUBLIC_KEY` from the environment to populate `authorized_keys` for the `deploy` user. Without it the authorized_keys file is created empty and SSH deploys will fail.
 
-Clone the repository **as the deploy user** after the bootstrap completes, so that all files are deploy-user-owned from the start. SSH deploys and git operations run as `deploy` and will fail if the repo is root-owned.
+The script installs rootless Docker, sets up the `deploy` user, enables linger, starts the rootless Docker daemon, and creates `/opt/station` with `deploy` ownership. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties.
+
+Clone the repository **as the deploy user** after bootstrap completes, so all files are `deploy`-owned from the start:
 
 ```bash
-# After bootstrap, clone as the deploy user:
 ssh deploy@<vps-ip>
 git clone https://github.com/GitAddRemote/station.git /opt/station
 ```
 
-> If the repo was already cloned as root (e.g., to run bootstrap), fix ownership before deploying:
+> If the repo was already cloned as root before bootstrap, fix ownership before deploying:
 > `chown -R deploy:deploy /opt/station`
 
 ### 3. Set up Nginx and TLS
