@@ -1,5 +1,16 @@
 # VPS Setup — Deploy User Hardening
 
+## Instance plan
+
+Production runs on a **Linode 4 GB** instance (`g6-standard-2`, $24/mo). The plan was resized from Linode 2 GB (`g6-standard-1`) in May 2026 to provide headroom for Grafana Loki and Grafana alongside the existing stack.
+
+**To resize** (warm resize via Linode console — Terraform ignores `type` by design):
+
+1. Log in to Linode Cloud Manager
+2. Select the production VPS (`prod-us-ord-station-bot-01`)
+3. Resize → Shared CPU → Linode 4 GB → Warm resize
+4. Verify `/health` returns 200 after the instance comes back
+
 ## Overview
 
 The deploy SSH key lives in GitHub Secrets and is used on every deployment. If it were leaked, the attacker would have SSH access as the deploy user and could run arbitrary Docker containers within the deploy user's namespace. The key hardening property is that they cannot escalate to root or access other users' containers via Docker: the deploy user runs their own Docker daemon entirely within their user namespace, with no access to the root Docker socket and no docker group membership.
