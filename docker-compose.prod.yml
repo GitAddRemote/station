@@ -92,7 +92,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./infra/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
-      - /run/user/1001/docker.sock:/run/user/1001/docker.sock:ro
+      - ${DOCKER_HOST_SOCKET:-/run/user/1001/docker.sock}:/var/run/docker.sock:ro
+      - promtail_positions:/var/promtail
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       loki:
@@ -128,3 +129,4 @@ volumes:
   redis_aof:
   loki_data:
   grafana_data:
+  promtail_positions:

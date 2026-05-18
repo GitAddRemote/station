@@ -3,7 +3,7 @@ server:
   grpc_listen_port: 0
 
 positions:
-  filename: /tmp/positions.yaml
+  filename: /var/promtail/positions.yaml
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
@@ -11,7 +11,7 @@ clients:
 scrape_configs:
   - job_name: station-backend
     docker_sd_configs:
-      - host: unix:///run/user/1001/docker.sock
+      - host: unix:///var/run/docker.sock
         refresh_interval: 5s
         filters:
           - name: label
@@ -29,7 +29,7 @@ scrape_configs:
 
   - job_name: station-frontend
     docker_sd_configs:
-      - host: unix:///run/user/1001/docker.sock
+      - host: unix:///var/run/docker.sock
         refresh_interval: 5s
         filters:
           - name: label
@@ -40,5 +40,7 @@ scrape_configs:
         target_label: container
       - source_labels: [__meta_docker_container_label_com_docker_compose_service]
         target_label: service
+      - source_labels: [__meta_docker_container_label_com_docker_compose_project]
+        target_label: compose_project
       - target_label: job
         replacement: station-frontend
