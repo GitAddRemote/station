@@ -23,7 +23,7 @@ export RCLONE_CONFIG=/opt/station/rclone.conf
 B2_BUCKET="$(grep '^B2_BUCKET=' /opt/station/.env.production | cut -d= -f2-)"
 
 # List all backups, most recent first
-rclone ls "b2:${B2_BUCKET}/postgres/" | sort -k2 -r | head -20
+rclone ls "b2:${B2_BUCKET}" --include "postgres/**" | sort -k2 -r | head -20
 ```
 
 Example output:
