@@ -45,19 +45,20 @@ The script installs rootless Docker, sets up the `deploy` user, enables linger, 
 # As root on the VPS
 apt install -y nginx certbot python3-certbot-nginx
 
-# Copy all Nginx configs managed by Terraform DNS (api, station, bot)
-# Also staging, grafana — add these once their DNS records exist in Terraform
+# Copy all Nginx configs
 for conf in api.drdnt.org station.drdnt.org bot.drdnt.org staging.api.drdnt.org staging.station.drdnt.org grafana.drdnt.org; do
   cp /opt/station/infra/nginx/${conf}.conf /etc/nginx/sites-available/${conf}
   ln -s /etc/nginx/sites-available/${conf} /etc/nginx/sites-enabled/${conf}
 done
 nginx -t && systemctl reload nginx
 
-# Issue TLS certificates — all six domains must resolve before running this
-certbot --nginx \
-  -d api.drdnt.org -d station.drdnt.org -d bot.drdnt.org \
-  -d staging.api.drdnt.org -d staging.station.drdnt.org \
-  -d grafana.drdnt.org
+# Issue TLS certificates for the Terraform-managed domains (api, station, bot
+# all have A records after `terraform apply` in step 1)
+certbot --nginx -d api.drdnt.org -d station.drdnt.org -d bot.drdnt.org
+
+# staging.* and grafana.drdnt.org are NOT in infra/terraform/dns.tf yet.
+# Add their A records to dns.tf and re-run `terraform apply` first, then:
+# certbot --nginx -d staging.api.drdnt.org -d staging.station.drdnt.org -d grafana.drdnt.org
 ```
 
 ### 4. Configure GitHub Secrets
@@ -112,7 +113,6 @@ If a deploy goes wrong, redeploy the last known-good tag:
 PREVIOUS_TAG="v0.1.9"
 
 # On the VPS (as the deploy user):
-source /opt/station/.env.production
 export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 STATION_VERSION="${PREVIOUS_TAG}" \
   docker compose \
@@ -204,14 +204,14 @@ For the full procedure — including how to list and download backups, run a zer
 
 ## Common issues
 
-| Symptom                    | Action                                                                                                                                                         |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Container crash loop       | `docker compose --env-file .env.production -f docker-compose.prod.yml logs backend --tail=100` — look for startup error, missing env var, or migration failure |
-| Out of memory              | `free -h` — if used >90%, consider adding swap or resizing the VPS                                                                                             |
-| Disk full                  | `df -h /` — prune old Docker images: `docker image prune -f`                                                                                                   |
-| TLS cert expired           | `certbot renew --nginx` (normally auto-renewed by systemd timer)                                                                                               |
-| Migration failed           | Follow [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md)                                                                                 |
-| Backup not appearing in B2 | Check `tail /opt/station/logs/backup.log`; verify: `source /opt/station/.env.production && RCLONE_CONFIG=/opt/station/rclone.conf rclone lsd b2:${B2_BUCKET}`  |
+| Symptom                    | Action                                                                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Container crash loop       | `docker compose --env-file .env.production -f docker-compose.prod.yml logs backend --tail=100` — look for startup error, missing env var, or migration failure                                   |
+| Out of memory              | `free -h` — if used >90%, consider adding swap or resizing the VPS                                                                                                                               |
+| Disk full                  | `df -h /` — prune old Docker images: `docker image prune -f`                                                                                                                                     |
+| TLS cert expired           | `certbot renew --nginx` (normally auto-renewed by systemd timer)                                                                                                                                 |
+| Migration failed           | Follow [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md)                                                                                                                   |
+| Backup not appearing in B2 | Check `tail /opt/station/logs/backup.log`; verify: `B2_BUCKET=$(grep ^B2_BUCKET= /opt/station/.env.production \| cut -d= -f2) RCLONE_CONFIG=/opt/station/rclone.conf rclone lsd b2:${B2_BUCKET}` |
 
 ---
 

@@ -212,6 +212,7 @@ jobs:
           UEX_API_KEY: ${{ secrets.UEX_API_KEY }}
           INTERNAL_API_KEY: ${{ secrets.INTERNAL_API_KEY }}
         run: |
+          : "${INTERNAL_API_KEY:?INTERNAL_API_KEY secret is required for the OAuth client admin endpoint}"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "mkdir -p /opt/station"
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "cat > /opt/station/.env.staging <<'ENVEOF'
           NODE_ENV=production
@@ -376,7 +377,7 @@ jobs:
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" "cat > /opt/station/.env.production <<'ENVEOF'
           NODE_ENV=production
           PORT=3001
-          APP_NAME=STATION BACKEND
+          APP_NAME=\"STATION BACKEND\"
           JWT_SECRET=${JWT_SECRET}
           ALLOWED_ORIGIN=${ALLOWED_ORIGIN}
           FRONTEND_URL=${FRONTEND_URL}

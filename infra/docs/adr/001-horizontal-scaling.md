@@ -80,13 +80,15 @@ After this step, the VPS hosts only: backend, frontend, Redis.
 Move Redis to [Upstash](https://upstash.com/) (serverless Redis).
 
 - **Required before Step 3**: both app servers must share a single Redis instance for permission cache consistency and token revocation to work correctly
-- Upstash uses TLS — the current Redis client (`createClient` with plain TCP socket options) will need TLS enabled: add `socket: { tls: true }` to the `createClient` call in `backend/src/modules/auth/auth.module.ts`
+- Upstash uses TLS — the app has **two** Redis clients that both need TLS enabled:
+  - `backend/src/modules/auth/auth.module.ts`: `createClient` with plain `socket: { host, port }` — add `socket: { tls: true }`
+  - `backend/src/app.module.ts`: `redisStore` with plain `socket: { host, port }` — add `socket: { tls: true }` to the `redisStore` options
 - Free tier: 10,000 commands/day; then $0.20/100K commands
 
 Steps:
 
 1. Create an Upstash Redis instance (select the same AWS region closest to your Linode region)
-2. Enable TLS in the Redis client: set `socket.tls = true` in `auth.module.ts`
+2. Enable TLS in both Redis clients: add `socket: { tls: true }` to `auth.module.ts` (`createClient`) and `app.module.ts` (`redisStore`)
 3. The release workflow hardcodes `REDIS_HOST=redis` and `REDIS_PORT=6379` when writing `.env.production` — update the workflow's `Write production environment file` step to use the `REDIS_HOST` and `REDIS_PORT` secrets instead of hardcoded values
 4. Update `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` in GitHub Secrets with the Upstash connection details
 5. Update `docker-compose.prod.yml`: remove the `redis` service block, the `redis_aof` volume, and the `depends_on.redis` entry from the `backend` service

@@ -160,10 +160,11 @@ There is no dedicated revoke endpoint. To revoke a client:
 2. Connect to the database:
    ```bash
    export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
-   source /opt/station/.env.production
+   DB_USER=$(grep ^DATABASE_USER= /opt/station/.env.production | cut -d= -f2)
+   DB_NAME=$(grep ^DATABASE_NAME= /opt/station/.env.production | cut -d= -f2)
    docker compose --env-file /opt/station/.env.production \
      -f /opt/station/docker-compose.prod.yml \
-     exec -T postgres psql -U "${DATABASE_USER}" -d "${DATABASE_NAME}"
+     exec -T postgres psql -U "${DB_USER}" -d "${DB_NAME}"
    ```
 3. Set the client inactive:
    ```sql
