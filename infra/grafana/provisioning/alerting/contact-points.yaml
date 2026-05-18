@@ -7,6 +7,6 @@ contactPoints:
       - uid: station-email
         type: email
         settings:
-          addresses: ${GF_ALERT_EMAIL:?GF_ALERT_EMAIL is required for alerting}
+          addresses: ${GF_ALERT_EMAIL}
           singleEmail: false
         disableResolveMessage: false

@@ -108,9 +108,18 @@ Alert rules, contact points, and notification policies are defined as code in `i
 
 ### Notification channel
 
-Alerts are sent by email to the address in `GF_ALERT_EMAIL`. Grafana uses its built-in SMTP. To receive emails you must also configure SMTP in `GF_SMTP_*` environment variables (host, port, user, password) — see [Grafana SMTP docs](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#smtp).
+Alerts are sent by email to the address in `GF_ALERT_EMAIL`. SMTP is configured via four production-only GitHub secrets that the release workflow injects into `.env.production` and the Grafana container picks up as environment variables:
 
-Alternatively, replace the email contact point in `contact-points.yaml` with a webhook (e.g., Discord, Slack, PagerDuty) — Grafana supports all standard contact point types.
+| Secret             | Example value          |
+| ------------------ | ---------------------- |
+| `GF_ALERT_EMAIL`   | `oncall@example.com`   |
+| `GF_SMTP_HOST`     | `smtp.example.com:587` |
+| `GF_SMTP_USER`     | `grafana@example.com`  |
+| `GF_SMTP_PASSWORD` | your SMTP password     |
+
+Add all four to the `production` GitHub environment before deploying (see `docs/cicd.md`). The release workflow fails fast if any of them is missing.
+
+Alternatively, replace the email contact point in `contact-points.yaml` with a webhook (e.g., Discord, Slack, PagerDuty) — Grafana supports all standard contact point types. If you switch to a webhook, you can remove the `GF_SMTP_*` secrets and the SMTP environment vars from `docker-compose.prod.yml`.
 
 ### Silencing during planned deployments
 
@@ -169,7 +178,9 @@ sudo certbot --nginx -d grafana.drdnt.org
 # 3. Add secrets to GitHub (production environment) before the next deploy:
 #    GF_SECURITY_ADMIN_PASSWORD = <strong random password>
 #    GF_ALERT_EMAIL = your@email.com
-#    GF_SMTP_HOST, GF_SMTP_USER, GF_SMTP_PASSWORD (if using email alerts)
+#    GF_SMTP_HOST   = smtp.example.com:587
+#    GF_SMTP_USER   = grafana@example.com
+#    GF_SMTP_PASSWORD = your-smtp-password
 #
 # Note: DOCKER_HOST_SOCKET does NOT need to be added as a GitHub secret.
 # The release workflow SSHs into the VPS, runs `id -u` to get the deploy
