@@ -162,7 +162,7 @@ Need to restore?
 │       Stop backend → restore → restart → verify (Section 5)
 │
 ├─ Bad migration / schema corruption?
-│   └─ Check infra/docs/migration-rollback.md first
+│   └─ Check backend/docs/database/migrations.md first
 │       TypeORM revert may be faster and safer
 │       If that fails → live restore (Section 4b)
 │
