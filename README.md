@@ -26,7 +26,7 @@ Full architecture overview: [docs/architecture.md](docs/architecture.md)
 
 ### Deploy
 
-Push a `release/vX.Y.Z` branch — the version must match `package.json`:
+Push a `release/vX.Y.Z` branch — the workflow derives the version from the branch name:
 
 ```bash
 git checkout -b release/v0.2.0
@@ -112,16 +112,16 @@ pnpm test:e2e           # E2E tests (requires database running)
 
 ### Stack
 
-| Layer    | Technology                                                        |
-| -------- | ----------------------------------------------------------------- |
-| Frontend | React 18, TypeScript, Vite, Material-UI v6, React Router v6       |
-| Backend  | NestJS 10, TypeScript, TypeORM, Passport.js                       |
-| Database | PostgreSQL 16                                                     |
-| Cache    | Redis 7 (in-memory fallback)                                      |
-| Auth     | JWT (HttpOnly cookies), refresh token rotation, bcrypt, OAuth 2.0 |
-| Infra    | Docker Compose, Nginx, Certbot, Linode, Terraform                 |
-| CI/CD    | GitHub Actions, GHCR                                              |
-| Monorepo | pnpm workspaces, Turbo                                            |
+| Layer    | Technology                                                          |
+| -------- | ------------------------------------------------------------------- |
+| Frontend | React 18, TypeScript, Vite, Material-UI v6, React Router v6         |
+| Backend  | NestJS 10, TypeScript, TypeORM, Passport.js                         |
+| Database | PostgreSQL 16                                                       |
+| Cache    | Redis 7 (required in production; in-memory fallback for tests only) |
+| Auth     | JWT (HttpOnly cookies), refresh token rotation, bcrypt, OAuth 2.0   |
+| Infra    | Docker Compose, Nginx, Certbot, Linode, Terraform                   |
+| CI/CD    | GitHub Actions, GHCR                                                |
+| Monorepo | pnpm workspaces, Turbo                                              |
 
 ---
 

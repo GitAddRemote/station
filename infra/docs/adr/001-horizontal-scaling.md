@@ -70,7 +70,8 @@ Steps:
 2. `pg_dump` current database and restore into the managed instance
 3. Update `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` in GitHub Secrets
 4. Update `docker-compose.prod.yml`: remove the `postgres` service block, the `postgres_data` volume, and the `depends_on.postgres` entry from the `backend` service; then redeploy
-5. Remove the `postgres_data` volume from the VPS: `docker volume rm postgres_data`
+5. Remove the `postgres_data` volume from the VPS. The volume name is prefixed by the Compose project name (`station`), so use: `docker volume rm station_postgres_data`
+6. Update `infra/scripts/backup-db.sh` and `restore-db.sh`: these currently run `docker compose exec -T postgres` — they must be updated to connect to the managed database host directly (e.g. via `psql -h $DATABASE_HOST`) before removing the local postgres service, as the release workflow requires a successful pre-deploy backup.
 
 After this step, the VPS hosts only: backend, frontend, Redis.
 
@@ -79,15 +80,17 @@ After this step, the VPS hosts only: backend, frontend, Redis.
 Move Redis to [Upstash](https://upstash.com/) (serverless Redis).
 
 - **Required before Step 3**: both app servers must share a single Redis instance for permission cache consistency and token revocation to work correctly
-- Upstash is accessed over TLS from anywhere — no VPS-to-VPS private networking needed
+- Upstash uses TLS — the current Redis client (`createClient` with plain TCP socket options) will need TLS enabled: add `socket: { tls: true }` to the `createClient` call in `backend/src/modules/auth/auth.module.ts`
 - Free tier: 10,000 commands/day; then $0.20/100K commands
 
 Steps:
 
 1. Create an Upstash Redis instance (select the same AWS region closest to your Linode region)
-2. Update `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` in GitHub Secrets
-3. Update `docker-compose.prod.yml`: remove the `redis` service block, the `redis_aof` volume, and the `depends_on.redis` entry from the `backend` service
-4. Redeploy
+2. Enable TLS in the Redis client: set `socket.tls = true` in `auth.module.ts`
+3. The release workflow hardcodes `REDIS_HOST=redis` and `REDIS_PORT=6379` when writing `.env.production` — update the workflow's `Write production environment file` step to use the `REDIS_HOST` and `REDIS_PORT` secrets instead of hardcoded values
+4. Update `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` in GitHub Secrets with the Upstash connection details
+5. Update `docker-compose.prod.yml`: remove the `redis` service block, the `redis_aof` volume, and the `depends_on.redis` entry from the `backend` service
+6. Redeploy; remove the `redis_aof` volume from the VPS: `docker volume rm station_redis_aof`
 
 ### Step 3 — Add second app server + NodeBalancer (trigger: CPU/memory saturated after Steps 0–1)
 
@@ -109,13 +112,14 @@ Steps:
 
 1. Provision VPS-2 using Terraform (copy the existing `linode_instance` resource, add `_2` suffix)
 2. Run `bootstrap-vps.sh` on VPS-2
-3. Add VPS-2 as a second deploy target in the release workflow:
+3. Sync the production environment to VPS-2 before deploying: the release workflow writes `.env.production` and `rclone.conf` only to the primary `VPS_HOST`. Update the workflow to also write these files to `VPS_HOST_2`, or add a secrets-sync step before the deploy step.
+4. Add VPS-2 as a second deploy target in the release workflow:
    ```yaml
    - name: Deploy to VPS-2
      run: ssh deploy@${{ secrets.VPS_HOST_2 }} "cd /opt/station && STATION_VERSION=${VERSION} bash infra/scripts/deploy.sh"
    ```
-4. Provision a Linode NodeBalancer in Terraform; add both VPS instances as backends on port 3001 (backend) and port 3000 (frontend) or use path-based routing
-5. Update DNS A records to point to the NodeBalancer IP instead of VPS-1
+5. Provision a Linode NodeBalancer in Terraform. The NodeBalancer must front **Nginx on each VPS** (not the Docker containers directly) to preserve host-based routing — Nginx on each VPS maps `api.drdnt.org → :3001` and `station.drdnt.org → :3000`. Configure the NodeBalancer with a single backend port (443) pointing to both VPS instances; TLS termination remains at Nginx.
+6. Update the `api` and `station` DNS A records in Terraform to point to the NodeBalancer IP instead of VPS-1
 
 **No backend or frontend code changes required.** The app is already stateless.
 

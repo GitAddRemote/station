@@ -115,15 +115,18 @@ curl -s https://api.drdnt.org/some-protected-endpoint \
 The `/oauth-clients` endpoint is protected by an internal API key (`INTERNAL_API_KEY` environment variable). This key is never exposed to the public and is only used from the VPS or during setup.
 
 ```bash
+# Generate a strong secret first (44 chars, satisfies 32-char minimum)
+CLIENT_SECRET=$(openssl rand -base64 32)
+
 # Register station-bot as an OAuth client
 curl -s -X POST https://api.drdnt.org/oauth-clients \
   -H "Content-Type: application/json" \
   -H "X-Internal-Api-Key: ${INTERNAL_API_KEY}" \
-  -d '{
-    "clientId": "station-bot",
-    "clientSecret": "$(openssl rand -base64 32)",
-    "scopes": ["read:inventory", "write:inventory"]
-  }'
+  -d "{
+    \"clientId\": \"station-bot\",
+    \"clientSecret\": \"${CLIENT_SECRET}\",
+    \"scopes\": [\"read:inventory\", \"write:inventory\"]
+  }"
 ```
 
 Response:
@@ -161,7 +164,7 @@ There is no dedicated revoke endpoint. To revoke a client:
    ```
 3. Set the client inactive:
    ```sql
-   UPDATE oauth_clients SET is_active = false WHERE client_id = 'station-bot';
+   UPDATE oauth_clients SET "isActive" = false WHERE "clientId" = 'station-bot';
    ```
 
 Any in-flight tokens issued to that client will remain valid until they expire (maximum 1 hour). Plan revocations accordingly.

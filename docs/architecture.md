@@ -66,7 +66,7 @@ Primary data store. Managed by TypeORM with manual migrations (no `synchronize: 
 
 ### Redis 7
 
-Used for caching aggregated permissions and organization members (5–15 minute TTL). Configured with AOF persistence (`appendfsync everysec`) so cached data survives container restarts. Requires auth (`REDIS_PASSWORD`). The backend falls back to in-memory caching if Redis is unavailable. See [infra/docs/redis.md](../infra/docs/redis.md).
+Used for refresh token storage, JTI blacklisting, and permission caching (5–15 minute TTL). Configured with AOF persistence (`appendfsync everysec`) so cached data survives container restarts. Requires auth (`REDIS_PASSWORD`). **Redis is required in production** — if `USE_REDIS_CACHE=true` (the default) and the Redis connection fails, the backend will throw during startup rather than fall back silently. The in-memory fallback is only for the test environment (`USE_REDIS_CACHE=false`). See [infra/docs/redis.md](../infra/docs/redis.md).
 
 ### Station-Bot
 
@@ -117,7 +117,7 @@ Provisioned with Terraform (Linode provider). See `infra/terraform/` for the mod
 - **VPS**: `g6-standard-2` (4 GB RAM, 2 vCPU, 80 GB SSD) — resizable via Linode Cloud Manager
 - **SSH key**: `deploy` user, rootless Docker, no root access from CI/CD
 - **Backups**: Backblaze B2 via rclone, nightly + pre-deploy
-- **DNS**: Managed externally (not in Terraform); A records point to VPS IP
+- **DNS**: Managed in Terraform (`infra/terraform/dns.tf`) — the `drdnt.org` zone and `api`, `station`, and `bot` A records are all Terraform resources
 
 See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties and [infra/docs/adr/001-horizontal-scaling.md](../infra/docs/adr/001-horizontal-scaling.md) for the documented scale-out path.
 

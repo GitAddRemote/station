@@ -4,8 +4,7 @@
 
 Before a first-time deploy you need:
 
-- A Linode account with an API token
-- A domain with DNS managed externally (A records pointing to the VPS IP)
+- A Linode account with an API token (DNS for `drdnt.org` is managed in Terraform — see `infra/terraform/dns.tf`)
 - A Backblaze B2 account with a bucket and application key
 - A GitHub repository with Actions enabled and a GHCR package registry
 - All GitHub Secrets configured — see [docs/cicd.md](cicd.md) for the full secrets table
@@ -46,15 +45,18 @@ The script installs rootless Docker, sets up the `deploy` user, enables linger, 
 # As root on the VPS
 apt install -y nginx certbot python3-certbot-nginx
 
-# Copy the per-domain Nginx configs
-for conf in api.drdnt.org station.drdnt.org; do
+# Copy all Nginx configs (API, frontend, staging, Grafana)
+for conf in api.drdnt.org station.drdnt.org staging.api.drdnt.org staging.station.drdnt.org grafana.drdnt.org; do
   cp /opt/station/infra/nginx/${conf}.conf /etc/nginx/sites-available/${conf}
   ln -s /etc/nginx/sites-available/${conf} /etc/nginx/sites-enabled/${conf}
 done
 nginx -t && systemctl reload nginx
 
-# Issue TLS certificates
-certbot --nginx -d api.drdnt.org -d station.drdnt.org
+# Issue TLS certificates for all domains
+certbot --nginx \
+  -d api.drdnt.org -d station.drdnt.org \
+  -d staging.api.drdnt.org -d staging.station.drdnt.org \
+  -d grafana.drdnt.org
 ```
 
 ### 4. Configure GitHub Secrets
@@ -77,7 +79,7 @@ The workflow derives the version from the branch name, validates, builds images,
 
 ## Routine deploys
 
-Deploys are triggered by pushing a `release/vX.Y.Z` branch. The version in the branch name must match the version in `package.json`.
+Deploys are triggered by pushing a `release/vX.Y.Z` branch. The workflow derives the version from the branch name — no `package.json` bump is required by the workflow itself.
 
 ```bash
 # Bump version in package.json, then:
@@ -126,10 +128,10 @@ If the rollback involves a bad migration, follow the migration rollback runbook 
 
 Secrets live in two places:
 
-| Location                                | Contents                                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------------------ |
-| GitHub Secrets (production environment) | VPS SSH key, database credentials, JWT secret, Redis password, B2 keys, CORS origins |
-| `/opt/station/.env.production` on VPS   | Written by the deploy workflow from GitHub Secrets on every deploy                   |
+| Location                                | Contents                                                                                                                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub Secrets (production environment) | VPS SSH key, database credentials, JWT secret, Redis password, B2 keys, CORS origins, `INTERNAL_API_KEY` (required — min 32 chars, protects the OAuth client admin endpoint) |
+| `/opt/station/.env.production` on VPS   | Written by the deploy workflow from GitHub Secrets on every deploy                                                                                                           |
 
 The `.env.production` file is created with `chmod 600` and owned by the `deploy` user. It is never committed to the repository.
 
