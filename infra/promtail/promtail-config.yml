@@ -17,6 +17,9 @@ scrape_configs:
           - name: label
             values:
               - com.docker.compose.service=backend
+          - name: label
+            values:
+              - com.docker.compose.project=station
     relabel_configs:
       - source_labels: [__meta_docker_container_name]
         target_label: container
@@ -35,6 +38,9 @@ scrape_configs:
           - name: label
             values:
               - com.docker.compose.service=frontend
+          - name: label
+            values:
+              - com.docker.compose.project=station
     relabel_configs:
       - source_labels: [__meta_docker_container_name]
         target_label: container
