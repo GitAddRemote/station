@@ -71,13 +71,13 @@ Open **Explore → Loki** in Grafana and use these LogQL queries:
 {compose_project="station", service="backend"} | json | responseTime > 500
 
 # Logs for a specific request ID
-{compose_project="station", service="backend"} | json | req_id="<uuid>"
+{compose_project="station", service="backend"} | json req_id="req.id" | req_id="<uuid>"
 
 # 4xx responses
-{compose_project="station", service="backend"} | json | res_statusCode >= 400 | res_statusCode < 500
+{compose_project="station", service="backend"} | json statusCode="res.statusCode" | statusCode >= 400 | statusCode < 500
 
 # 5xx responses
-{compose_project="station", service="backend"} | json | res_statusCode >= 500
+{compose_project="station", service="backend"} | json statusCode="res.statusCode" | statusCode >= 500
 ```
 
 > **Note:** Always include `compose_project="station"` in your label selectors. Staging (`station-staging`) runs on the same VPS and Promtail only scrapes the production project, but including the label makes queries unambiguous and dashboard-safe.
