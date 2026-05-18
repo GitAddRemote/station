@@ -19,7 +19,9 @@ Internet
     │                             │  Redis 7 (Docker, AOF)  │
     │                             └───────────────────────┘
     │
-    └── station.drdnt.org     ──► Station Frontend (Docker, localhost:3000)
+    ├── station.drdnt.org     ──► Station Frontend (Docker, localhost:3000)
+    │
+    └── bot.drdnt.org         ──► (reserved — Terraform A record + Nginx config managed)
 
 
 Station-Bot (separate Linode VPS, own Docker Compose stack)
@@ -27,7 +29,7 @@ Station-Bot (separate Linode VPS, own Docker Compose stack)
     └── POST /auth/token  ──► Station Backend (OAuth 2.0 Client Credentials)
 ```
 
-All services run on a single Linode VPS (4 GB RAM, 2 vCPU) using rootless Docker Compose under the `deploy` user. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for the rootless Docker setup and security properties.
+The core Station web stack (backend, frontend, PostgreSQL, Redis) runs on a single Linode VPS (4 GB RAM, 2 vCPU) using rootless Docker Compose under the `deploy` user. Station-Bot runs on a separate VPS and connects via the API only — it does not share the database. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for the rootless Docker setup and security properties.
 
 ---
 

@@ -17,7 +17,8 @@ Internet
     ├── api.drdnt.org      → NestJS backend (Docker, :3001)
     │                              │
     │                         PostgreSQL + Redis (Docker)
-    └── station.drdnt.org  → React frontend (Docker, :3000)
+    ├── station.drdnt.org  → React frontend (Docker, :3000)
+    └── bot.drdnt.org      → (reserved — Terraform A record + Nginx config managed)
 
 Station-Bot (separate VPS) → api.drdnt.org via OAuth 2.0 Client Credentials
 ```

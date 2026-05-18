@@ -31,16 +31,24 @@ SSH in as root (first login only) and run the bootstrap script:
 
 ```bash
 ssh root@<vps-ip>
-# Clone the repo on the VPS
-git clone https://github.com/GitAddRemote/station.git /opt/station
-cd /opt/station
 # bootstrap-vps.sh reads DEPLOY_SSH_PUBLIC_KEY to populate authorized_keys for the deploy user.
 # Without it, the deploy user's authorized_keys will be empty and SSH deploys will fail.
 export DEPLOY_SSH_PUBLIC_KEY="ssh-ed25519 AAAA... your-deploy-public-key"
-bash infra/scripts/bootstrap-vps.sh
+bash /opt/station/infra/scripts/bootstrap-vps.sh
 ```
 
-The script installs rootless Docker, sets up the `deploy` user, enables linger, and starts the rootless Docker daemon. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties.
+The script installs rootless Docker, sets up the `deploy` user, enables linger, and starts the rootless Docker daemon. It also creates `/opt/station` with `deploy` ownership. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties.
+
+Clone the repository **as the deploy user** after the bootstrap completes, so that all files are deploy-user-owned from the start. SSH deploys and git operations run as `deploy` and will fail if the repo is root-owned.
+
+```bash
+# After bootstrap, clone as the deploy user:
+ssh deploy@<vps-ip>
+git clone https://github.com/GitAddRemote/station.git /opt/station
+```
+
+> If the repo was already cloned as root (e.g., to run bootstrap), fix ownership before deploying:
+> `chown -R deploy:deploy /opt/station`
 
 ### 3. Set up Nginx and TLS
 
@@ -76,7 +84,20 @@ In the GitHub repository settings, create both a `staging` and a `production` en
 
 Include `INTERNAL_API_KEY` (min 32 chars; the backend validation schema requires it in production — generate with `openssl rand -base64 32`).
 
-### 5. Trigger the first deploy
+### 5. Start the stateful services on the VPS
+
+The deploy scripts use `--no-deps backend frontend` — they do not start PostgreSQL or Redis. The pre-deploy backup step also runs `docker compose exec postgres`, which will fail if that container has never been started. Before triggering the first deploy, SSH in as the `deploy` user and bring up the stateful services:
+
+```bash
+ssh deploy@<vps-ip>
+export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
+cd /opt/station
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d postgres redis
+```
+
+Wait for postgres to report healthy before proceeding (`docker compose ... ps`).
+
+### 6. Trigger the first deploy
 
 Push a `release/vX.Y.Z` branch to trigger the release workflow:
 
@@ -213,14 +234,21 @@ For the full procedure — including how to list and download backups, run a zer
 
 ## Common issues
 
-| Symptom                    | Action                                                                                                                                                                                                    |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Container crash loop       | `docker compose --env-file .env.production -f docker-compose.prod.yml logs backend --tail=100` — look for startup error, missing env var, or migration failure                                            |
-| Out of memory              | `free -h` — if used >90%, consider adding swap or resizing the VPS                                                                                                                                        |
-| Disk full                  | `df -h /` — prune old Docker images: `docker image prune -f`                                                                                                                                              |
-| TLS cert expired           | `certbot renew --nginx` (normally auto-renewed by systemd timer)                                                                                                                                          |
-| Migration failed           | Follow [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md)                                                                                                                            |
-| Backup not appearing in B2 | Check `tail /opt/station/logs/backup.log`; verify: `B2_BUCKET=$(grep ^B2_BUCKET= /opt/station/.env.production \| cut -d= -f2)` then `RCLONE_CONFIG=/opt/station/rclone.conf rclone lsd "b2:${B2_BUCKET}"` |
+| Symptom                    | Action                                                                                                                                                         |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Container crash loop       | `docker compose --env-file .env.production -f docker-compose.prod.yml logs backend --tail=100` — look for startup error, missing env var, or migration failure |
+| Out of memory              | `free -h` — if used >90%, consider adding swap or resizing the VPS                                                                                             |
+| Disk full                  | `df -h /` — prune old Docker images: `docker image prune -f`                                                                                                   |
+| TLS cert expired           | `certbot renew --nginx` (normally auto-renewed by systemd timer)                                                                                               |
+| Migration failed           | Follow [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md)                                                                                 |
+| Backup not appearing in B2 | Check `tail /opt/station/logs/backup.log`; then run the B2 verify snippet below                                                                                |
+
+**B2 verify:**
+
+```bash
+B2_BUCKET=$(grep ^B2_BUCKET= /opt/station/.env.production | cut -d= -f2)
+RCLONE_CONFIG=/opt/station/rclone.conf rclone lsd "b2:${B2_BUCKET}"
+```
 
 ---
 

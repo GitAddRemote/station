@@ -112,7 +112,7 @@ Both VPS instances connect to:
 
 Steps:
 
-1. Provision VPS-2 using Terraform (copy the existing `linode_instance` resource, add `_2` suffix)
+1. Provision VPS-2 using Terraform (copy the existing `linode_instance` resource, add `_2` suffix). Also update the `linode_firewall.station` resource in `infra/terraform/main.tf` to include VPS-2 in its `linodes` list — the current config is `linodes = [linode_instance.vps.id]`; extend it to `linodes = [linode_instance.vps.id, linode_instance.vps_2.id]` so VPS-2 is covered by the managed firewall.
 2. Run `bootstrap-vps.sh` on VPS-2
 3. Sync the production environment to VPS-2 before deploying: the release workflow writes `.env.production` and `rclone.conf` only to the primary `VPS_HOST`. Update the workflow to also write these files to `VPS_HOST_2`, or add a secrets-sync step before the deploy step.
 4. Add VPS-2 as a second deploy target in the release workflow:

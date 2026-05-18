@@ -466,9 +466,8 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           ssh -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
-            "cd /opt/station && export RCLONE_CONFIG=/opt/station/rclone.conf && \
-             source /opt/station/.env.production && \
-             rclone ls \"b2:${B2_BUCKET}/postgres/\" | grep \"pre-deploy-${GITHUB_SHA::7}\\.sql.gz\""
+            "B2_BUCKET=\$(grep ^B2_BUCKET= /opt/station/.env.production | cut -d= -f2) && \
+             RCLONE_CONFIG=/opt/station/rclone.conf rclone ls \"b2:\${B2_BUCKET}/postgres/\" | grep \"pre-deploy-${GITHUB_SHA::7}\\.sql.gz\""
 
       - name: Deploy production
         env:
