@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UexService } from './uex.service';
 import { UexCategory } from './entities/uex-category.entity';
+import { UexCommodity } from './entities/uex-commodity.entity';
 import { UexItem } from './entities/uex-item.entity';
 import { UexStarSystem } from './entities/uex-star-system.entity';
 
@@ -46,6 +47,10 @@ describe('UexService', () => {
         {
           provide: getRepositoryToken(UexCategory),
           useValue: mockCategoryRepository,
+        },
+        {
+          provide: getRepositoryToken(UexCommodity),
+          useValue: { createQueryBuilder: jest.fn() },
         },
         {
           provide: getRepositoryToken(UexItem),
