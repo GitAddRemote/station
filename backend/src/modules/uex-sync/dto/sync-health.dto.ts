@@ -21,10 +21,20 @@ export class SyncHealthResponseDto {
 export class SyncTriggerRequestDto {
   @IsOptional()
   @IsArray()
-  @IsIn(['categories', 'items', 'companies', 'locations', 'all'], {
-    each: true,
-  })
-  endpoints?: ('categories' | 'items' | 'companies' | 'locations' | 'all')[];
+  @IsIn(
+    ['categories', 'items', 'companies', 'locations', 'commodities', 'all'],
+    {
+      each: true,
+    },
+  )
+  endpoints?: (
+    | 'categories'
+    | 'items'
+    | 'companies'
+    | 'locations'
+    | 'commodities'
+    | 'all'
+  )[];
 
   @IsOptional()
   @IsBoolean()

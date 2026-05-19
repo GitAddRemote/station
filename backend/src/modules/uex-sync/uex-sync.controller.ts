@@ -9,6 +9,7 @@ import {
 } from './dto/sync-health.dto';
 import { SyncStatus } from './uex-sync-state.entity';
 import { CategoriesSyncService } from './services/categories-sync.service';
+import { CommoditiesSyncService } from './services/commodities-sync.service';
 import { ItemsSyncService } from './services/items-sync.service';
 import { CompaniesSyncService } from './services/companies-sync.service';
 import { LocationsSyncService } from './services/locations-sync.service';
@@ -19,6 +20,7 @@ export class UexSyncController {
   constructor(
     private readonly syncService: UexSyncService,
     private readonly categoriesSyncService: CategoriesSyncService,
+    private readonly commoditiesSyncService: CommoditiesSyncService,
     private readonly itemsSyncService: ItemsSyncService,
     private readonly companiesSyncService: CompaniesSyncService,
     private readonly locationsSyncService: LocationsSyncService,
@@ -122,21 +124,32 @@ export class UexSyncController {
       | 'items'
       | 'companies'
       | 'locations'
+      | 'commodities'
       | 'all'
     )[] =
       body.endpoints && body.endpoints.length > 0
         ? body.endpoints
-        : ['categories', 'companies', 'items', 'locations'];
+        : ['categories', 'companies', 'items', 'commodities', 'locations'];
 
-    const endpoints: Array<'categories' | 'items' | 'companies' | 'locations'> =
+    const endpoints: Array<
+      'categories' | 'items' | 'companies' | 'locations' | 'commodities'
+    > =
       requested.includes('all') || requested.length === 0
-        ? ['categories', 'companies', 'items', 'locations']
+        ? ['categories', 'companies', 'items', 'commodities', 'locations']
         : requested.filter(
-            (e): e is 'categories' | 'items' | 'companies' | 'locations' =>
+            (
+              e,
+            ): e is
+              | 'categories'
+              | 'items'
+              | 'companies'
+              | 'locations'
+              | 'commodities' =>
               e === 'categories' ||
               e === 'items' ||
               e === 'companies' ||
-              e === 'locations',
+              e === 'locations' ||
+              e === 'commodities',
           );
 
     const results: SyncTriggerResultDto[] = [];
@@ -148,6 +161,9 @@ export class UexSyncController {
           | Awaited<
               ReturnType<typeof this.categoriesSyncService.syncCategories>
             >
+          | Awaited<
+              ReturnType<typeof this.commoditiesSyncService.syncCommodities>
+            >
           | Awaited<ReturnType<typeof this.itemsSyncService.syncItems>>
           | Awaited<ReturnType<typeof this.companiesSyncService.syncCompanies>>
           | Awaited<
@@ -156,6 +172,10 @@ export class UexSyncController {
 
         if (endpoint === 'categories') {
           result = await this.categoriesSyncService.syncCategories(
+            body.forceFull,
+          );
+        } else if (endpoint === 'commodities') {
+          result = await this.commoditiesSyncService.syncCommodities(
             body.forceFull,
           );
         } else if (endpoint === 'items') {
