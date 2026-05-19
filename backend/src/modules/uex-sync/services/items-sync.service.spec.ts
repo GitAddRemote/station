@@ -425,6 +425,12 @@ describe('ItemsSyncService', () => {
       // Soft-delete must be skipped when any category had errors
       expect(result.deleted).toBe(0);
       expect(mockQueryBuilder.update).not.toHaveBeenCalled();
+      // Incomplete full sync must NOT advance lastFullSyncAt — record as 'delta'
+      expect(result.syncMode).toBe('delta');
+      expect(mockSyncService.recordSyncSuccess).toHaveBeenCalledWith(
+        'items',
+        expect.objectContaining({ syncMode: 'delta' }),
+      );
     });
 
     it('should parse weight_scu correctly from both string and number', async () => {

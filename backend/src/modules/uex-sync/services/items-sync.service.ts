@@ -125,14 +125,17 @@ export class ItemsSyncService {
       );
 
       let deleted = 0;
+      let fullSyncComplete = !useDelta;
 
       if (!useDelta) {
         const hasErrors = categoryResults.some((r) => r.errors > 0);
         if (hasErrors) {
           this.logger.warn(
             'Skipping soft-delete: one or more categories failed to sync. ' +
-              'Items from failed categories would be incorrectly marked deleted.',
+              'Items from failed categories would be incorrectly marked deleted. ' +
+              'Full sync state will not be advanced so the next run retries a full sync.',
           );
+          fullSyncComplete = false;
         } else {
           const seenUexIds = new Set<number>(
             categoryResults.flatMap((r) => r.seenUexIds),
@@ -143,16 +146,21 @@ export class ItemsSyncService {
 
       const durationMs = Date.now() - startTime;
 
+      // Use syncMode 'full' only when the full sync completed without errors;
+      // otherwise record as 'delta' so lastFullSyncAt is not advanced and the
+      // next scheduled run will attempt a full sync again.
+      const recordedSyncMode = fullSyncComplete ? 'full' : 'delta';
+
       await this.syncService.recordSyncSuccess(endpoint, {
         recordsCreated: totalResult.created,
         recordsUpdated: totalResult.updated,
         recordsDeleted: deleted,
-        syncMode: useDelta ? 'delta' : 'full',
+        syncMode: recordedSyncMode,
         durationMs,
       });
 
       this.logger.info(
-        `Items sync completed: ${useDelta ? 'delta' : 'full'} mode, ` +
+        `Items sync completed: ${recordedSyncMode} mode, ` +
           `created: ${totalResult.created}, updated: ${totalResult.updated}, ` +
           `deleted: ${deleted}, duration: ${durationMs}ms`,
       );
@@ -161,7 +169,7 @@ export class ItemsSyncService {
         ...totalResult,
         deleted,
         durationMs,
-        syncMode: useDelta ? 'delta' : 'full',
+        syncMode: recordedSyncMode,
       };
     } catch (error: unknown) {
       const durationMs = Date.now() - startTime;
