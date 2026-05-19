@@ -27,6 +27,7 @@ export interface CategorySyncResult {
   created: number;
   updated: number;
   errors: number;
+  seenUexIds: number[];
 }
 
 @Injectable()
@@ -54,7 +55,7 @@ export class ItemsSyncService {
     this.batchSize = this.configService.get<number>('UEX_BATCH_SIZE', 100);
     this.concurrentCategories = this.configService.get<number>(
       'UEX_CONCURRENT_CATEGORIES',
-      3,
+      10,
     );
     this.maxRetries = this.configService.get<number>('UEX_RETRY_ATTEMPTS', 3);
     this.backoffBase = this.configService.get<number>(
@@ -74,14 +75,11 @@ export class ItemsSyncService {
     const startTime = Date.now();
 
     try {
-      // Acquire sync lock
       await this.syncService.acquireSyncLock(endpoint);
 
-      // Determine sync mode (delta vs full)
       const syncDecision = await this.syncService.shouldUseDeltaSync(endpoint);
       const useDelta = !forceFull && syncDecision.useDelta;
 
-      // Get all active item categories
       const categories = await this.categoryRepository.find({
         where: {
           deleted: false,
@@ -112,14 +110,12 @@ export class ItemsSyncService {
 
       const companySet = await this.buildCompanySet();
 
-      // Process categories with controlled concurrency
       const categoryResults = await this.processCategoriesInBatches(
         categories,
         useDelta ? syncDecision.lastSyncAt : undefined,
         companySet,
       );
 
-      // Aggregate results
       const totalResult = categoryResults.reduce(
         (acc, r) => ({
           created: acc.created + r.created,
@@ -130,14 +126,15 @@ export class ItemsSyncService {
 
       let deleted = 0;
 
-      // Mark missing items as deleted (full sync only)
       if (!useDelta) {
-        deleted = await this.markMissingItemsAsDeleted();
+        const seenUexIds = new Set<number>(
+          categoryResults.flatMap((r) => r.seenUexIds),
+        );
+        deleted = await this.markMissingItemsAsDeleted(seenUexIds);
       }
 
       const durationMs = Date.now() - startTime;
 
-      // Update sync state
       await this.syncService.recordSyncSuccess(endpoint, {
         recordsCreated: totalResult.created,
         recordsUpdated: totalResult.updated,
@@ -176,7 +173,6 @@ export class ItemsSyncService {
   ): Promise<CategorySyncResult[]> {
     const results: CategorySyncResult[] = [];
 
-    // Process in chunks for controlled concurrency
     for (let i = 0; i < categories.length; i += this.concurrentCategories) {
       const chunk = categories.slice(i, i + this.concurrentCategories);
 
@@ -186,7 +182,6 @@ export class ItemsSyncService {
         ),
       );
 
-      // Process results
       for (let j = 0; j < chunkResults.length; j++) {
         const result = chunkResults[j];
         const category = chunk[j];
@@ -203,16 +198,9 @@ export class ItemsSyncService {
             created: 0,
             updated: 0,
             errors: 1,
+            seenUexIds: [],
           });
         }
-      }
-
-      // Rate limiting: pause between chunks
-      if (i + this.concurrentCategories < categories.length) {
-        this.logger.debug(
-          `Pausing for ${this.rateLimitPauseMs}ms between category batches`,
-        );
-        await this.sleep(this.rateLimitPauseMs);
       }
     }
 
@@ -245,6 +233,7 @@ export class ItemsSyncService {
         created: 0,
         updated: 0,
         errors: 0,
+        seenUexIds: [],
       };
     }
 
@@ -265,6 +254,7 @@ export class ItemsSyncService {
       created: result.created,
       updated: result.updated,
       errors: 0,
+      seenUexIds: items.map((i) => i.id),
     };
   }
 
@@ -280,13 +270,14 @@ export class ItemsSyncService {
       } catch (error: unknown) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        // Don't retry rate limits
         if (error instanceof RateLimitException) {
-          this.logger.warn('Rate limit hit, aborting category sync');
-          throw error;
+          this.logger.warn(
+            `Rate limit hit for category ${categoryId}, pausing ${this.rateLimitPauseMs}ms`,
+          );
+          await this.sleep(this.rateLimitPauseMs);
+          continue;
         }
 
-        // Retry with exponential backoff for server errors
         if (error instanceof UEXServerException) {
           if (attempt < this.maxRetries - 1) {
             const backoffMs = this.backoffBase * Math.pow(2, attempt);
@@ -299,7 +290,6 @@ export class ItemsSyncService {
           }
         }
 
-        // For other errors, throw immediately
         throw error;
       }
     }
@@ -316,97 +306,118 @@ export class ItemsSyncService {
     let created = 0;
     let updated = 0;
 
-    // Process in batches to avoid memory issues
     for (let i = 0; i < items.length; i += this.batchSize) {
       const batch = items.slice(i, i + this.batchSize);
 
-      await this.itemRepository.manager.transaction(
-        async (transactionalEntityManager) => {
-          for (const item of batch) {
-            const existing = await transactionalEntityManager.findOne(UexItem, {
-              where: { uexId: item.id },
-            });
+      const rows = batch.map((item) => {
+        if (item.id_category != null && item.id_category !== categoryId) {
+          this.logger.warn(
+            `Item ${item.id} (${item.name}) returned under category ${categoryId} ` +
+              `but reports id_category=${item.id_category} — using API field`,
+          );
+        }
 
-            if (item.id_category != null && item.id_category !== categoryId) {
-              this.logger.warn(
-                `Item ${item.id} (${item.name}) returned under category ${categoryId} ` +
-                  `but reports id_category=${item.id_category} — using API field`,
-              );
-            }
+        return {
+          uexId: item.id,
+          idCategory: item.id_category ?? categoryId,
+          idCompany:
+            item.id_company && companySet?.has(item.id_company)
+              ? item.id_company
+              : undefined,
+          name: item.name,
+          section: item.section ?? undefined,
+          categoryName: item.category ?? undefined,
+          companyName: item.company_name ?? undefined,
+          size: item.size ?? undefined,
+          starCitizenUuid: item.uuid ?? undefined,
+          weightScu:
+            item.weight_scu != null
+              ? parseFloat(item.weight_scu.toString())
+              : undefined,
+          isCommodity: item.kind === 'commodity',
+          isBuyable: item.is_buyable ?? false,
+          isSellable: item.is_sellable ?? false,
+          active: true,
+          deleted: false,
+          uexDateModified: item.date_modified
+            ? new Date(item.date_modified)
+            : undefined,
+          addedById: systemUserId,
+          modifiedById: systemUserId,
+        };
+      });
 
-            const itemData = {
-              idCategory: item.id_category ?? categoryId,
-              idCompany:
-                item.id_company && companySet?.has(item.id_company)
-                  ? item.id_company
-                  : undefined,
-              name: item.name,
-              section: item.section,
-              categoryName: item.category,
-              companyName: item.company_name,
-              size: item.size,
-              starCitizenUuid: item.uuid,
-              weightScu:
-                item.weight_scu !== undefined && item.weight_scu !== null
-                  ? parseFloat(item.weight_scu.toString())
-                  : undefined,
-              isCommodity: item.kind === 'commodity',
-              isBuyable: item.is_buyable || false,
-              isSellable: item.is_sellable || false,
-              deleted: false,
-              uexDateModified: item.date_modified
-                ? new Date(item.date_modified)
-                : undefined,
-              modifiedById: systemUserId,
-            };
+      const result = await this.itemRepository
+        .createQueryBuilder()
+        .insert()
+        .into(UexItem)
+        .values(rows)
+        .orUpdate(
+          [
+            'id_category',
+            'id_company',
+            'name',
+            'section',
+            'category',
+            'company_name',
+            'size',
+            'star_citizen_uuid',
+            'weight_scu',
+            'is_commodity',
+            'is_buyable',
+            'is_sellable',
+            'deleted',
+            'uex_date_modified',
+            'modified_by',
+          ],
+          ['uex_id'],
+        )
+        .execute();
 
-            if (existing) {
-              // Update existing item
-              await transactionalEntityManager.update(
-                UexItem,
-                { uexId: item.id },
-                itemData,
-              );
-              updated++;
-            } else {
-              // Create new item
-              await transactionalEntityManager.save(UexItem, {
-                uexId: item.id,
-                ...itemData,
-                active: true,
-                addedById: systemUserId,
-              });
-              created++;
-            }
-          }
-        },
-      );
+      // identifiers contains the rows that were inserted (created); affected
+      // covers both inserts and updates so we derive updated from the difference
+      const insertedCount = result.identifiers.filter((r) => r.id).length;
+      const affectedCount = result.raw?.length ?? batch.length;
+      created += insertedCount;
+      updated += affectedCount - insertedCount;
 
       this.logger.debug(
-        `Processed batch ${Math.floor(i / this.batchSize) + 1}/${Math.ceil(items.length / this.batchSize)} ` +
-          `for category ${categoryId}`,
+        `Bulk upserted batch ${Math.floor(i / this.batchSize) + 1}/` +
+          `${Math.ceil(items.length / this.batchSize)} for category ${categoryId}`,
       );
     }
 
     return { created, updated };
   }
 
-  private async markMissingItemsAsDeleted(): Promise<number> {
-    // Mark items as deleted if they belong to active categories
-    // but weren't updated recently (last sync time)
-    // This is tricky - we need to use the last sync time to determine
-    // which items should be marked as deleted
+  private async markMissingItemsAsDeleted(
+    seenUexIds: Set<number>,
+  ): Promise<number> {
+    if (seenUexIds.size === 0) {
+      this.logger.debug(
+        'No items seen in full sync — skipping soft-delete to avoid wiping all data',
+      );
+      return 0;
+    }
 
-    // For now, we'll skip the auto-delete functionality for items
-    // since it's complex to determine which items should be deleted
-    // without tracking which specific items were seen in this sync
-    // This is a known limitation and can be addressed in a future iteration
+    const systemUserId = this.systemUserService.getSystemUserId();
+    const ids = [...seenUexIds];
 
-    this.logger.debug(
-      'Skipping auto-delete for items - not implemented in current version',
-    );
+    const result = await this.itemRepository
+      .createQueryBuilder()
+      .update(UexItem)
+      .set({ deleted: true, active: false, modifiedById: systemUserId })
+      .where('uex_id NOT IN (:...ids)', { ids })
+      .andWhere('deleted = :deleted', { deleted: false })
+      .execute();
 
-    return 0;
+    const deleted = result.affected ?? 0;
+
+    if (deleted > 0) {
+      this.logger.info(`Marked ${deleted} stale items as deleted`);
+    }
+
+    return deleted;
   }
 
   private sleep(ms: number): Promise<void> {
@@ -420,7 +431,7 @@ export class ItemsSyncService {
 
     const set = new Set<number>();
     for (const company of companies) {
-      if (company.uexId !== undefined && company.uexId !== null) {
+      if (company.uexId != null) {
         set.add(company.uexId);
       }
     }
