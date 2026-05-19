@@ -327,7 +327,7 @@ export class ItemsSyncService {
               where: { uexId: item.id },
             });
 
-            if (item.id_category && item.id_category !== categoryId) {
+            if (item.id_category != null && item.id_category !== categoryId) {
               this.logger.warn(
                 `Item ${item.id} (${item.name}) returned under category ${categoryId} ` +
                   `but reports id_category=${item.id_category} — using API field`,
