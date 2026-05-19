@@ -516,6 +516,7 @@ describe('ItemsSyncService', () => {
           kind: 'commodity',
         },
         { id: 101, id_category: 1, name: 'Regular Item', kind: 'item' },
+        { id: 102, id_category: 1, name: 'Delta Item' }, // kind absent — must not default to false
       ];
 
       mockSyncService.shouldUseDeltaSync.mockResolvedValue({
@@ -543,6 +544,10 @@ describe('ItemsSyncService', () => {
       const rows = capturedValues as Array<Record<string, unknown>>;
       expect(rows[0].isCommodity).toBe(true);
       expect(rows[1].isCommodity).toBe(false);
+      // kind absent → undefined so COALESCE preserves the stored DB value
+      expect(rows[2].isCommodity).toBeUndefined();
+      expect(rows[2].isBuyable).toBeUndefined();
+      expect(rows[2].isSellable).toBeUndefined();
     });
 
     it('should not pause between category chunks when no rate limit is hit', async () => {
@@ -596,7 +601,10 @@ describe('ItemsSyncService', () => {
       const conflictSql: string = mockQueryBuilder.onConflict.mock
         .calls[0][0] as string;
 
-      // Nullable fields must use COALESCE so omitted fields don't overwrite stored values
+      // All optional fields must use COALESCE so omitted fields don't overwrite stored values
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.is_commodity/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.is_buyable/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.is_sellable/);
       expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.section/);
       expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.category/);
       expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.company_name/);

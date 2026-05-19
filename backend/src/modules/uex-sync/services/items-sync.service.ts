@@ -344,9 +344,10 @@ export class ItemsSyncService {
             item.weight_scu != null
               ? parseFloat(item.weight_scu.toString())
               : undefined,
-          isCommodity: item.kind === 'commodity',
-          isBuyable: item.is_buyable ?? false,
-          isSellable: item.is_sellable ?? false,
+          isCommodity:
+            item.kind != null ? item.kind === 'commodity' : undefined,
+          isBuyable: item.is_buyable ?? undefined,
+          isSellable: item.is_sellable ?? undefined,
           active: true,
           deleted: false,
           uexDateModified: item.date_modified
@@ -377,12 +378,12 @@ export class ItemsSyncService {
           `("uex_id") DO UPDATE SET
             id_category       = EXCLUDED.id_category,
             name              = EXCLUDED.name,
-            is_commodity      = EXCLUDED.is_commodity,
-            is_buyable        = EXCLUDED.is_buyable,
-            is_sellable       = EXCLUDED.is_sellable,
             active            = EXCLUDED.active,
             deleted           = EXCLUDED.deleted,
             modified_by       = EXCLUDED.modified_by,
+            is_commodity      = COALESCE(EXCLUDED.is_commodity,      uex_items.is_commodity),
+            is_buyable        = COALESCE(EXCLUDED.is_buyable,        uex_items.is_buyable),
+            is_sellable       = COALESCE(EXCLUDED.is_sellable,       uex_items.is_sellable),
             uex_date_modified = COALESCE(EXCLUDED.uex_date_modified, uex_items.uex_date_modified),
             id_company        = COALESCE(EXCLUDED.id_company,        uex_items.id_company),
             section           = COALESCE(EXCLUDED.section,           uex_items.section),
