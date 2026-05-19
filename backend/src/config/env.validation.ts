@@ -51,7 +51,7 @@ export const envValidationSchema = Joi.object({
   UEX_API_BASE_URL: Joi.string().uri().default('https://uexcorp.space/api/2.0'),
   UEX_TIMEOUT_MS: Joi.number().default(60000),
   UEX_BATCH_SIZE: Joi.number().default(100),
-  UEX_CONCURRENT_CATEGORIES: Joi.number().default(3),
+  UEX_CONCURRENT_CATEGORIES: Joi.number().default(10),
   UEX_RETRY_ATTEMPTS: Joi.number().default(3),
   UEX_BACKOFF_BASE_MS: Joi.number().default(1000),
   UEX_RATE_LIMIT_PAUSE_MS: Joi.number().default(2000),
