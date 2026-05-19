@@ -3,12 +3,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UexService } from './uex.service';
 import { UexCategory } from './entities/uex-category.entity';
+import { UexCommodity } from './entities/uex-commodity.entity';
 import { UexItem } from './entities/uex-item.entity';
 import { UexStarSystem } from './entities/uex-star-system.entity';
 
 describe('UexService', () => {
   let service: UexService;
   let itemRepository: Repository<UexItem>;
+  let commodityRepository: Repository<UexCommodity>;
 
   const mockCategoryRepository = {};
   const mockStarSystemRepository = {
@@ -39,6 +41,18 @@ describe('UexService', () => {
     return qb;
   };
 
+  const createCommodityQueryBuilder = (results: unknown[] = [], total = 0) => {
+    const qb: Record<string, jest.Mock> = {
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([results, total]),
+    };
+    return qb;
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,6 +60,10 @@ describe('UexService', () => {
         {
           provide: getRepositoryToken(UexCategory),
           useValue: mockCategoryRepository,
+        },
+        {
+          provide: getRepositoryToken(UexCommodity),
+          useValue: { createQueryBuilder: jest.fn() },
         },
         {
           provide: getRepositoryToken(UexItem),
@@ -63,6 +81,9 @@ describe('UexService', () => {
     service = module.get<UexService>(UexService);
     itemRepository = module.get<Repository<UexItem>>(
       getRepositoryToken(UexItem),
+    );
+    commodityRepository = module.get<Repository<UexCommodity>>(
+      getRepositoryToken(UexCommodity),
     );
   });
 
@@ -195,5 +216,126 @@ describe('UexService', () => {
       'system.deleted = FALSE',
     );
     expect(systems[0].active).toBe(false);
+  });
+
+  describe('searchCommodities', () => {
+    it('should apply base filters and return mapped results', async () => {
+      const mockCommodity = {
+        id: '1',
+        uexId: 42,
+        name: 'Laranite',
+        code: 'LAR',
+        section: 'Minerals',
+        idCategory: 3,
+        isBuyable: true,
+        isSellable: false,
+        isIllegal: null,
+        isFuel: null,
+        priceBuy: '12.50',
+        priceSell: null,
+        scu: '1.00',
+      };
+      const qb = createCommodityQueryBuilder([mockCommodity], 1);
+      (commodityRepository.createQueryBuilder as jest.Mock).mockReturnValue(qb);
+
+      const result = await service.searchCommodities({});
+
+      expect(commodityRepository.createQueryBuilder).toHaveBeenCalledWith(
+        'commodity',
+      );
+      expect(qb.where).toHaveBeenCalledWith('commodity.deleted = FALSE');
+      expect(qb.andWhere).toHaveBeenCalledWith('commodity.active = TRUE');
+      expect(qb.orderBy).toHaveBeenCalledWith('commodity.name', 'ASC');
+
+      expect(result.total).toBe(1);
+      expect(result.commodities[0]).toMatchObject({
+        id: 1,
+        uexId: 42,
+        name: 'Laranite',
+        code: 'LAR',
+        section: 'Minerals',
+        categoryId: 3,
+        isBuyable: true,
+        isSellable: false,
+        isIllegal: false,
+        isFuel: false,
+        priceBuy: 12.5,
+        priceSell: undefined,
+        scu: 1,
+      });
+    });
+
+    it('should apply search, categoryId, and boolean flag filters', async () => {
+      const qb = createCommodityQueryBuilder();
+      (commodityRepository.createQueryBuilder as jest.Mock).mockReturnValue(qb);
+
+      await service.searchCommodities({
+        search: 'gold',
+        categoryId: 7,
+        isBuyable: true,
+        isSellable: false,
+        isIllegal: true,
+        isFuel: false,
+      });
+
+      expect(qb.andWhere).toHaveBeenCalledWith('commodity.name ILIKE :search', {
+        search: '%gold%',
+      });
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'commodity.idCategory = :categoryId',
+        { categoryId: 7 },
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'COALESCE(commodity.isBuyable, FALSE) = :isBuyable',
+        { isBuyable: true },
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'COALESCE(commodity.isSellable, FALSE) = :isSellable',
+        { isSellable: false },
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'COALESCE(commodity.isIllegal, FALSE) = :isIllegal',
+        { isIllegal: true },
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'COALESCE(commodity.isFuel, FALSE) = :isFuel',
+        { isFuel: false },
+      );
+    });
+
+    it('should not apply flag filters when flags are undefined', async () => {
+      const qb = createCommodityQueryBuilder();
+      (commodityRepository.createQueryBuilder as jest.Mock).mockReturnValue(qb);
+
+      await service.searchCommodities({});
+
+      const andWhereCalls = qb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
+      expect(andWhereCalls).not.toContain(expect.stringContaining('isBuyable'));
+      expect(andWhereCalls).not.toContain(
+        expect.stringContaining('isSellable'),
+      );
+    });
+
+    it('should apply default limit and offset', async () => {
+      const qb = createCommodityQueryBuilder();
+      (commodityRepository.createQueryBuilder as jest.Mock).mockReturnValue(qb);
+
+      const result = await service.searchCommodities({});
+
+      expect(qb.take).toHaveBeenCalledWith(25);
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(result.limit).toBe(25);
+      expect(result.offset).toBe(0);
+    });
+
+    it('should cap limit at 100', async () => {
+      const qb = createCommodityQueryBuilder();
+      (commodityRepository.createQueryBuilder as jest.Mock).mockReturnValue(qb);
+
+      const result = await service.searchCommodities({ limit: 200 });
+
+      expect(qb.take).toHaveBeenCalledWith(100);
+      expect(result.limit).toBe(100);
+    });
   });
 });

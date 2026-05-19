@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { UexModule } from './uex.module';
 import {
   UexCategory,
+  UexCommodity,
   UexCompany,
   UexItem,
   UexStarSystem,
@@ -32,6 +33,8 @@ describe('UexModule', () => {
       imports: [UexModule],
     })
       .overrideProvider(getRepositoryToken(UexCategory))
+      .useValue(mockRepository)
+      .overrideProvider(getRepositoryToken(UexCommodity))
       .useValue(mockRepository)
       .overrideProvider(getRepositoryToken(UexCompany))
       .useValue(mockRepository)

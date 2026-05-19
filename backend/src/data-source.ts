@@ -12,6 +12,7 @@ import { Location } from './modules/locations/entities/location.entity';
 import { UserInventoryItem } from './modules/user-inventory/entities/user-inventory-item.entity';
 import { InventoryAuditLog } from './modules/user-inventory/entities/inventory-audit-log.entity';
 import { OrgInventoryItem } from './modules/org-inventory/entities/org-inventory-item.entity';
+import { UexCommodity } from './modules/uex/entities/uex-commodity.entity';
 import { UexItem } from './modules/uex/entities/uex-item.entity';
 import { UexCategory } from './modules/uex/entities/uex-category.entity';
 import { UexCompany } from './modules/uex/entities/uex-company.entity';
@@ -51,6 +52,7 @@ import { AddUserInventoryUniqueIndex1765035000000 } from './migrations/176503500
 import { AddTokenCleanupIndexes1765038000000 } from './migrations/1765038000000-AddTokenCleanupIndexes';
 import { DropRefreshTokensTable1777409770542 } from './migrations/1777409770542-DropRefreshTokensTable';
 import { CreateOauthClientsTable1777647814618 } from './migrations/1777647814618-CreateOauthClientsTable';
+import { CreateUexCommoditiesTable1779219950540 } from './migrations/1779219950540-CreateUexCommoditiesTable';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -71,6 +73,7 @@ export const AppDataSource = new DataSource({
     UserInventoryItem,
     InventoryAuditLog,
     OrgInventoryItem,
+    UexCommodity,
     UexItem,
     UexCategory,
     UexCompany,
@@ -126,6 +129,9 @@ export const AppDataSource = new DataSource({
 
     // OAuth 2.0 client credentials
     CreateOauthClientsTable1777647814618,
+
+    // UEX commodities (depends on uex_categories)
+    CreateUexCommoditiesTable1779219950540,
   ],
   synchronize: false,
 });

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   UexCategory,
+  UexCommodity,
   UexCompany,
   UexItem,
   UexStarSystem,
@@ -19,6 +20,7 @@ import { UexController } from './uex.controller';
   imports: [
     TypeOrmModule.forFeature([
       UexCategory,
+      UexCommodity,
       UexCompany,
       UexItem,
       UexStarSystem,
