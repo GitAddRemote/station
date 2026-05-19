@@ -604,6 +604,7 @@ describe('ItemsSyncService', () => {
       expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.weight_scu/);
       expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.star_citizen_uuid/);
       expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.id_company/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.uex_date_modified/);
     });
   });
 

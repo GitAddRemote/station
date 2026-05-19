@@ -383,14 +383,14 @@ export class ItemsSyncService {
             active            = EXCLUDED.active,
             deleted           = EXCLUDED.deleted,
             modified_by       = EXCLUDED.modified_by,
-            uex_date_modified = EXCLUDED.uex_date_modified,
-            id_company        = COALESCE(EXCLUDED.id_company,   uex_items.id_company),
-            section           = COALESCE(EXCLUDED.section,      uex_items.section),
-            category          = COALESCE(EXCLUDED.category,     uex_items.category),
-            company_name      = COALESCE(EXCLUDED.company_name, uex_items.company_name),
-            size              = COALESCE(EXCLUDED.size,         uex_items.size),
-            star_citizen_uuid = COALESCE(EXCLUDED.star_citizen_uuid, uex_items.star_citizen_uuid),
-            weight_scu        = COALESCE(EXCLUDED.weight_scu,   uex_items.weight_scu)`,
+            uex_date_modified = COALESCE(EXCLUDED.uex_date_modified, uex_items.uex_date_modified),
+            id_company        = COALESCE(EXCLUDED.id_company,        uex_items.id_company),
+            section           = COALESCE(EXCLUDED.section,           uex_items.section),
+            category          = COALESCE(EXCLUDED.category,          uex_items.category),
+            company_name      = COALESCE(EXCLUDED.company_name,      uex_items.company_name),
+            size              = COALESCE(EXCLUDED.size,               uex_items.size),
+            star_citizen_uuid = COALESCE(EXCLUDED.star_citizen_uuid,  uex_items.star_citizen_uuid),
+            weight_scu        = COALESCE(EXCLUDED.weight_scu,         uex_items.weight_scu)`,
         )
         .execute();
 
