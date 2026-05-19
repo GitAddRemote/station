@@ -54,9 +54,11 @@ export class CommoditiesSyncService {
   ): Promise<SyncResult & { syncMode: 'delta' | 'full' }> {
     const endpoint = 'commodities';
     const startTime = Date.now();
+    let lockAcquired = false;
 
     try {
       await this.syncService.acquireSyncLock(endpoint);
+      lockAcquired = true;
 
       const syncDecision = await this.syncService.shouldUseDeltaSync(endpoint);
       const useDelta = !forceFull && syncDecision.useDelta;
@@ -109,7 +111,9 @@ export class CommoditiesSyncService {
       await this.syncService.recordSyncFailure(endpoint, syncError, durationMs);
       throw error;
     } finally {
-      await this.syncService.releaseSyncLock(endpoint);
+      if (lockAcquired) {
+        await this.syncService.releaseSyncLock(endpoint);
+      }
     }
   }
 

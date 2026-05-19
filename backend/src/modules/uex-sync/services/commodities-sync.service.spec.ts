@@ -96,7 +96,10 @@ describe('CommoditiesSyncService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string, defaultValue: unknown) => defaultValue),
+            get: jest.fn((key: string, defaultValue: unknown) => {
+              if (key === 'UEX_BACKOFF_BASE_MS') return 0;
+              return defaultValue;
+            }),
           },
         },
       ],
