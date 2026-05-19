@@ -33,6 +33,7 @@ describe('ItemsSyncService', () => {
       insert: jest.fn().mockReturnThis(),
       into: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
+      onConflict: jest.fn().mockReturnThis(),
       orUpdate: jest.fn().mockReturnThis(),
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
@@ -190,7 +191,7 @@ describe('ItemsSyncService', () => {
       expect(mockSyncService.recordSyncSuccess).toHaveBeenCalled();
       // Bulk upsert should have been called (insert path)
       expect(mockQueryBuilder.insert).toHaveBeenCalled();
-      expect(mockQueryBuilder.orUpdate).toHaveBeenCalled();
+      expect(mockQueryBuilder.onConflict).toHaveBeenCalled();
     });
 
     it('should bulk upsert existing items and report updated count', async () => {
@@ -569,6 +570,43 @@ describe('ItemsSyncService', () => {
     });
   });
 
+  describe('COALESCE conflict update', () => {
+    it('should use COALESCE for nullable optional fields so partial API responses do not wipe existing values', async () => {
+      const mockCategories = [{ uexId: 1, name: 'Weapons' }];
+
+      mockSyncService.shouldUseDeltaSync.mockResolvedValue({
+        useDelta: true,
+        reason: 'DELTA_ELIGIBLE',
+        lastSyncAt: new Date('2025-01-01T00:00:00Z'),
+      });
+
+      mockCategoryRepository.find.mockResolvedValue(mockCategories);
+      mockUexClient.fetchItemsByCategory.mockResolvedValue([
+        // Partial delta response — only id, id_category, name, date_modified present
+        {
+          id: 100,
+          id_category: 1,
+          name: 'Updated Item',
+          date_modified: '2025-06-01T00:00:00Z',
+        },
+      ]);
+
+      await service.syncItems();
+
+      const conflictSql: string = mockQueryBuilder.onConflict.mock
+        .calls[0][0] as string;
+
+      // Nullable fields must use COALESCE so omitted fields don't overwrite stored values
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.section/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.category/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.company_name/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.size/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.weight_scu/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.star_citizen_uuid/);
+      expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.id_company/);
+    });
+  });
+
   describe('upsert reactivation', () => {
     it('should include active in conflict update columns so reappearing items are reactivated', async () => {
       const mockCategories = [{ uexId: 1, name: 'Weapons' }];
@@ -585,12 +623,12 @@ describe('ItemsSyncService', () => {
 
       await service.syncItems();
 
-      // orUpdate must include 'active' so a previously soft-deleted row
+      // onConflict SQL must include 'active' so a previously soft-deleted row
       // (active=false, deleted=true) is fully reactivated on re-sync
-      expect(mockQueryBuilder.orUpdate).toHaveBeenCalledWith(
-        expect.arrayContaining(['active', 'deleted']),
-        expect.anything(),
-      );
+      const conflictSql: string = mockQueryBuilder.onConflict.mock
+        .calls[0][0] as string;
+      expect(conflictSql).toMatch(/\bactive\b/);
+      expect(conflictSql).toMatch(/\bdeleted\b/);
     });
   });
 

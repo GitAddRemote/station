@@ -373,26 +373,24 @@ export class ItemsSyncService {
         .insert()
         .into(UexItem)
         .values(rows)
-        .orUpdate(
-          [
-            'id_category',
-            'id_company',
-            'name',
-            'section',
-            'category',
-            'company_name',
-            'size',
-            'star_citizen_uuid',
-            'weight_scu',
-            'is_commodity',
-            'is_buyable',
-            'is_sellable',
-            'active',
-            'deleted',
-            'uex_date_modified',
-            'modified_by',
-          ],
-          ['uex_id'],
+        .onConflict(
+          `("uex_id") DO UPDATE SET
+            id_category       = EXCLUDED.id_category,
+            name              = EXCLUDED.name,
+            is_commodity      = EXCLUDED.is_commodity,
+            is_buyable        = EXCLUDED.is_buyable,
+            is_sellable       = EXCLUDED.is_sellable,
+            active            = EXCLUDED.active,
+            deleted           = EXCLUDED.deleted,
+            modified_by       = EXCLUDED.modified_by,
+            uex_date_modified = EXCLUDED.uex_date_modified,
+            id_company        = COALESCE(EXCLUDED.id_company,   uex_items.id_company),
+            section           = COALESCE(EXCLUDED.section,      uex_items.section),
+            category          = COALESCE(EXCLUDED.category,     uex_items.category),
+            company_name      = COALESCE(EXCLUDED.company_name, uex_items.company_name),
+            size              = COALESCE(EXCLUDED.size,         uex_items.size),
+            star_citizen_uuid = COALESCE(EXCLUDED.star_citizen_uuid, uex_items.star_citizen_uuid),
+            weight_scu        = COALESCE(EXCLUDED.weight_scu,   uex_items.weight_scu)`,
         )
         .execute();
 
