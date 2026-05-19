@@ -128,25 +128,28 @@ export class UexService {
     }
 
     if (searchDto.isBuyable !== undefined) {
-      queryBuilder.andWhere('commodity.isBuyable = :isBuyable', {
-        isBuyable: searchDto.isBuyable,
-      });
+      queryBuilder.andWhere(
+        'COALESCE(commodity.isBuyable, FALSE) = :isBuyable',
+        { isBuyable: searchDto.isBuyable },
+      );
     }
 
     if (searchDto.isSellable !== undefined) {
-      queryBuilder.andWhere('commodity.isSellable = :isSellable', {
-        isSellable: searchDto.isSellable,
-      });
+      queryBuilder.andWhere(
+        'COALESCE(commodity.isSellable, FALSE) = :isSellable',
+        { isSellable: searchDto.isSellable },
+      );
     }
 
     if (searchDto.isIllegal !== undefined) {
-      queryBuilder.andWhere('commodity.isIllegal = :isIllegal', {
-        isIllegal: searchDto.isIllegal,
-      });
+      queryBuilder.andWhere(
+        'COALESCE(commodity.isIllegal, FALSE) = :isIllegal',
+        { isIllegal: searchDto.isIllegal },
+      );
     }
 
     if (searchDto.isFuel !== undefined) {
-      queryBuilder.andWhere('commodity.isFuel = :isFuel', {
+      queryBuilder.andWhere('COALESCE(commodity.isFuel, FALSE) = :isFuel', {
         isFuel: searchDto.isFuel,
       });
     }

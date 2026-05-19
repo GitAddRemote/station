@@ -8,6 +8,13 @@ import {
   Min,
 } from 'class-validator';
 
+function transformBooleanParam({ value }: { value: unknown }): unknown {
+  if (value === undefined || value === null) return undefined;
+  if (value === 'true' || value === true) return true;
+  if (value === 'false' || value === false) return false;
+  return value;
+}
+
 export class UexCommoditySearchDto {
   @IsString()
   @IsOptional()
@@ -20,22 +27,22 @@ export class UexCommoditySearchDto {
 
   @IsBoolean()
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(transformBooleanParam)
   isBuyable?: boolean;
 
   @IsBoolean()
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(transformBooleanParam)
   isSellable?: boolean;
 
   @IsBoolean()
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(transformBooleanParam)
   isIllegal?: boolean;
 
   @IsBoolean()
   @IsOptional()
-  @Transform(({ value }) => value === 'true' || value === true)
+  @Transform(transformBooleanParam)
   isFuel?: boolean;
 
   @IsInt()
