@@ -489,6 +489,77 @@ describe('ItemsSyncService', () => {
       expect(savedItems[1].weightScu).toBe(2.5);
     });
 
+    it('should use item.id_category from API response, not the loop category ID', async () => {
+      const mockCategories = [{ uexId: 1, name: 'Weapons' }];
+
+      const mockItems = [
+        {
+          id: 100,
+          id_category: 7, // differs from the loop's categoryId (1)
+          name: 'Cross-listed Item',
+        },
+        {
+          id: 101,
+          id_category: 1, // matches — no mismatch
+          name: 'Normal Item',
+        },
+        {
+          id: 102,
+          // id_category absent — should fall back to loop categoryId
+          name: 'No Category Field Item',
+        },
+      ];
+
+      mockSyncService.shouldUseDeltaSync.mockResolvedValue({
+        useDelta: false,
+        reason: 'FIRST_SYNC',
+      });
+
+      mockCategoryRepository.find.mockResolvedValue(mockCategories);
+      mockUexClient.fetchItemsByCategory.mockResolvedValue(mockItems);
+
+      const savedItems: Record<string, unknown>[] = [];
+
+      mockItemRepository.manager.transaction.mockImplementation(
+        async (
+          callback: (manager: Record<string, jest.Mock>) => Promise<unknown>,
+        ) => {
+          const mockManager = {
+            findOne: jest.fn().mockResolvedValue(null),
+            save: jest
+              .fn()
+              .mockImplementation(
+                (_entity: unknown, data: Record<string, unknown>) => {
+                  savedItems.push(data);
+                  return { id: 1 };
+                },
+              ),
+            update: jest.fn(),
+          };
+          return await callback(mockManager);
+        },
+      );
+
+      const loggerWarn = jest.spyOn(
+        (service as unknown as { logger: { warn: jest.Mock } }).logger,
+        'warn',
+      );
+
+      await service.syncItems();
+
+      // Cross-listed item uses id_category from API (7), not loop categoryId (1)
+      expect(savedItems[0].idCategory).toBe(7);
+      // Normal item uses its own id_category (1)
+      expect(savedItems[1].idCategory).toBe(1);
+      // Item without id_category falls back to loop categoryId (1)
+      expect(savedItems[2].idCategory).toBe(1);
+      // Mismatch warning fired for the cross-listed item only
+      expect(loggerWarn).toHaveBeenCalledTimes(1);
+      expect(loggerWarn).toHaveBeenCalledWith(
+        expect.stringContaining('id_category=7'),
+      );
+    });
+
     it('should correctly identify commodities', async () => {
       const mockCategories = [{ uexId: 1, name: 'Commodities' }];
 
