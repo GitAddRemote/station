@@ -6,6 +6,7 @@ import { UexSyncController } from './uex-sync.controller';
 import { UexSyncState } from './uex-sync-state.entity';
 import { UexSyncConfig } from './uex-sync-config.entity';
 import { UexCategory } from '../uex/entities/uex-category.entity';
+import { UexCommodity } from '../uex/entities/uex-commodity.entity';
 import { UexItem } from '../uex/entities/uex-item.entity';
 import { UexStarSystem } from '../uex/entities/uex-star-system.entity';
 import { UexPlanet } from '../uex/entities/uex-planet.entity';
@@ -16,10 +17,12 @@ import { UexOutpost } from '../uex/entities/uex-outpost.entity';
 import { UexPoi } from '../uex/entities/uex-poi.entity';
 import { UexCompany } from '../uex/entities/uex-company.entity';
 import { UEXCategoriesClient } from './clients/uex-categories.client';
+import { UEXCommoditiesClient } from './clients/uex-commodities.client';
 import { UEXItemsClient } from './clients/uex-items.client';
 import { UEXLocationsClient } from './clients/uex-locations.client';
 import { UEXCompaniesClient } from './clients/uex-companies.client';
 import { CategoriesSyncService } from './services/categories-sync.service';
+import { CommoditiesSyncService } from './services/commodities-sync.service';
 import { ItemsSyncService } from './services/items-sync.service';
 import { LocationsSyncService } from './services/locations-sync.service';
 import { CompaniesSyncService } from './services/companies-sync.service';
@@ -32,6 +35,7 @@ import { UsersModule } from '../users/users.module';
       UexSyncState,
       UexSyncConfig,
       UexCategory,
+      UexCommodity,
       UexItem,
       UexStarSystem,
       UexPlanet,
@@ -49,10 +53,12 @@ import { UsersModule } from '../users/users.module';
   providers: [
     UexSyncService,
     UEXCategoriesClient,
+    UEXCommoditiesClient,
     UEXItemsClient,
     UEXLocationsClient,
     UEXCompaniesClient,
     CategoriesSyncService,
+    CommoditiesSyncService,
     ItemsSyncService,
     LocationsSyncService,
     CompaniesSyncService,
@@ -61,6 +67,7 @@ import { UsersModule } from '../users/users.module';
   exports: [
     UexSyncService,
     CategoriesSyncService,
+    CommoditiesSyncService,
     ItemsSyncService,
     LocationsSyncService,
   ],

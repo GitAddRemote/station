@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UexCategory } from './entities/uex-category.entity';
+import { UexCommodity } from './entities/uex-commodity.entity';
 import { UexItem } from './entities/uex-item.entity';
+import { UexCommoditySearchDto } from './dto/uex-commodity-search.dto';
 import { UexItemSearchDto } from './dto/uex-item-search.dto';
 import { UexStarSystem } from './entities/uex-star-system.entity';
 import { UexStarSystemFilterDto } from './dto/uex-star-system-filter.dto';
@@ -12,6 +14,8 @@ export class UexService {
   constructor(
     @InjectRepository(UexCategory)
     private readonly categoryRepository: Repository<UexCategory>,
+    @InjectRepository(UexCommodity)
+    private readonly commodityRepository: Repository<UexCommodity>,
     @InjectRepository(UexItem)
     private readonly itemRepository: Repository<UexItem>,
     @InjectRepository(UexStarSystem)
@@ -79,6 +83,96 @@ export class UexService {
         name: item.name,
         categoryId: item.idCategory || undefined,
         categoryName: item.category?.name || item.categoryName || undefined,
+      })),
+      total,
+      limit,
+      offset,
+    };
+  }
+
+  async searchCommodities(searchDto: UexCommoditySearchDto): Promise<{
+    commodities: Array<{
+      id: number;
+      uexId: number;
+      name: string;
+      code?: string;
+      section?: string;
+      categoryId?: number;
+      isBuyable: boolean;
+      isSellable: boolean;
+      isIllegal: boolean;
+      isFuel: boolean;
+      priceBuy?: number;
+      priceSell?: number;
+      scu?: number;
+    }>;
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const queryBuilder = this.commodityRepository
+      .createQueryBuilder('commodity')
+      .where('commodity.deleted = FALSE')
+      .andWhere('commodity.active = TRUE');
+
+    if (searchDto.search) {
+      queryBuilder.andWhere('commodity.name ILIKE :search', {
+        search: `%${searchDto.search}%`,
+      });
+    }
+
+    if (searchDto.categoryId) {
+      queryBuilder.andWhere('commodity.idCategory = :categoryId', {
+        categoryId: searchDto.categoryId,
+      });
+    }
+
+    if (searchDto.isBuyable !== undefined) {
+      queryBuilder.andWhere('commodity.isBuyable = :isBuyable', {
+        isBuyable: searchDto.isBuyable,
+      });
+    }
+
+    if (searchDto.isSellable !== undefined) {
+      queryBuilder.andWhere('commodity.isSellable = :isSellable', {
+        isSellable: searchDto.isSellable,
+      });
+    }
+
+    if (searchDto.isIllegal !== undefined) {
+      queryBuilder.andWhere('commodity.isIllegal = :isIllegal', {
+        isIllegal: searchDto.isIllegal,
+      });
+    }
+
+    if (searchDto.isFuel !== undefined) {
+      queryBuilder.andWhere('commodity.isFuel = :isFuel', {
+        isFuel: searchDto.isFuel,
+      });
+    }
+
+    const limit = Math.min(searchDto.limit ?? 25, 100);
+    const offset = searchDto.offset ?? 0;
+
+    queryBuilder.orderBy('commodity.name', 'ASC').take(limit).skip(offset);
+
+    const [commodities, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      commodities: commodities.map((c) => ({
+        id: Number(c.id),
+        uexId: c.uexId,
+        name: c.name,
+        code: c.code ?? undefined,
+        section: c.section ?? undefined,
+        categoryId: c.idCategory ?? undefined,
+        isBuyable: c.isBuyable ?? false,
+        isSellable: c.isSellable ?? false,
+        isIllegal: c.isIllegal ?? false,
+        isFuel: c.isFuel ?? false,
+        priceBuy: c.priceBuy != null ? Number(c.priceBuy) : undefined,
+        priceSell: c.priceSell != null ? Number(c.priceSell) : undefined,
+        scu: c.scu != null ? Number(c.scu) : undefined,
       })),
       total,
       limit,

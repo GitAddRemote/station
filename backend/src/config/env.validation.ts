@@ -46,6 +46,7 @@ export const envValidationSchema = Joi.object({
   // booleans; configService.get<boolean>(...) in the scheduler relies on this.
   UEX_SYNC_ENABLED: Joi.boolean().default(false),
   UEX_CATEGORIES_SYNC_ENABLED: Joi.boolean().default(false),
+  UEX_COMMODITIES_SYNC_ENABLED: Joi.boolean().default(false),
   UEX_ITEMS_SYNC_ENABLED: Joi.boolean().default(false),
   UEX_LOCATIONS_SYNC_ENABLED: Joi.boolean().default(false),
   UEX_API_BASE_URL: Joi.string().uri().default('https://uexcorp.space/api/2.0'),

@@ -3,6 +3,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { CategoriesSyncService } from '../services/categories-sync.service';
+import { CommoditiesSyncService } from '../services/commodities-sync.service';
 import { ItemsSyncService } from '../services/items-sync.service';
 import { LocationsSyncService } from '../services/locations-sync.service';
 
@@ -12,6 +13,7 @@ export class UEXSyncScheduler {
     @InjectPinoLogger(UEXSyncScheduler.name)
     private readonly logger: PinoLogger,
     private readonly categoriesSync: CategoriesSyncService,
+    private readonly commoditiesSync: CommoditiesSyncService,
     private readonly itemsSync: ItemsSyncService,
     private readonly locationsSync: LocationsSyncService,
     private readonly configService: ConfigService,
@@ -87,7 +89,40 @@ export class UEXSyncScheduler {
     }
   }
 
-  // Runs daily at 4:00 AM UTC (after items sync)
+  // Runs daily at 3:30 AM UTC (after items sync, before locations sync)
+  @Cron('30 3 * * *', {
+    name: 'sync-uex-commodities',
+  })
+  async scheduledCommoditiesSync(): Promise<void> {
+    const syncEnabled = this.configService.get<boolean>(
+      'UEX_SYNC_ENABLED',
+      true,
+    );
+    const commoditiesSyncEnabled = this.configService.get<boolean>(
+      'UEX_COMMODITIES_SYNC_ENABLED',
+      true,
+    );
+
+    if (!syncEnabled || !commoditiesSyncEnabled) {
+      this.logger.info('Commodities sync is disabled via configuration');
+      return;
+    }
+
+    this.logger.info('Starting scheduled commodities sync');
+
+    try {
+      const result = await this.commoditiesSync.syncCommodities();
+      this.logger.info(
+        `Scheduled commodities sync completed successfully: ` +
+          `created: ${result.created}, updated: ${result.updated}, ` +
+          `deleted: ${result.deleted}, duration: ${result.durationMs}ms`,
+      );
+    } catch (error: unknown) {
+      this.logger.error({ err: error }, 'Scheduled commodities sync failed');
+    }
+  }
+
+  // Runs daily at 4:00 AM UTC (after commodities sync)
   @Cron('0 4 * * *', {
     name: 'sync-uex-locations',
   })
