@@ -544,10 +544,10 @@ describe('ItemsSyncService', () => {
       const rows = capturedValues as Array<Record<string, unknown>>;
       expect(rows[0].isCommodity).toBe(true);
       expect(rows[1].isCommodity).toBe(false);
-      // kind absent → undefined so COALESCE preserves the stored DB value
-      expect(rows[2].isCommodity).toBeUndefined();
-      expect(rows[2].isBuyable).toBeUndefined();
-      expect(rows[2].isSellable).toBeUndefined();
+      // kind absent → null (not undefined/DEFAULT) so COALESCE preserves the stored DB value
+      expect(rows[2].isCommodity).toBeNull();
+      expect(rows[2].isBuyable).toBeNull();
+      expect(rows[2].isSellable).toBeNull();
     });
 
     it('should not pause between category chunks when no rate limit is hit', async () => {

@@ -344,10 +344,9 @@ export class ItemsSyncService {
             item.weight_scu != null
               ? parseFloat(item.weight_scu.toString())
               : undefined,
-          isCommodity:
-            item.kind != null ? item.kind === 'commodity' : undefined,
-          isBuyable: item.is_buyable ?? undefined,
-          isSellable: item.is_sellable ?? undefined,
+          isCommodity: item.kind != null ? item.kind === 'commodity' : null,
+          isBuyable: item.is_buyable ?? null,
+          isSellable: item.is_sellable ?? null,
           active: true,
           deleted: false,
           uexDateModified: item.date_modified

@@ -69,12 +69,12 @@ export class UexItem extends BaseUexEntity {
   })
   weightScu?: number;
 
-  @Column({ name: 'is_commodity', default: false })
-  isCommodity!: boolean;
+  @Column({ name: 'is_commodity', nullable: true, default: false })
+  isCommodity!: boolean | null;
 
-  @Column({ name: 'is_buyable', default: false })
-  isBuyable!: boolean;
+  @Column({ name: 'is_buyable', nullable: true, default: false })
+  isBuyable!: boolean | null;
 
-  @Column({ name: 'is_sellable', default: false })
-  isSellable!: boolean;
+  @Column({ name: 'is_sellable', nullable: true, default: false })
+  isSellable!: boolean | null;
 }
