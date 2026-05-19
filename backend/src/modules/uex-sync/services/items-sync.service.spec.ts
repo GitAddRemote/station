@@ -601,6 +601,8 @@ describe('ItemsSyncService', () => {
       const conflictSql: string = mockQueryBuilder.onConflict.mock
         .calls[0][0] as string;
 
+      // date_modified must be refreshed on every conflict update
+      expect(conflictSql).toMatch(/date_modified\s*=\s*NOW\(\)/);
       // All optional fields must use COALESCE so omitted fields don't overwrite stored values
       expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.is_commodity/);
       expect(conflictSql).toMatch(/COALESCE\(EXCLUDED\.is_buyable/);

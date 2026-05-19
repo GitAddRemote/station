@@ -372,7 +372,8 @@ export class ItemsSyncService {
         .createQueryBuilder()
         .insert()
         .into(UexItem)
-        .values(rows)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .values(rows as any[])
         .onConflict(
           `("uex_id") DO UPDATE SET
             id_category       = EXCLUDED.id_category,
@@ -380,6 +381,7 @@ export class ItemsSyncService {
             active            = EXCLUDED.active,
             deleted           = EXCLUDED.deleted,
             modified_by       = EXCLUDED.modified_by,
+            date_modified     = NOW(),
             is_commodity      = COALESCE(EXCLUDED.is_commodity,      uex_items.is_commodity),
             is_buyable        = COALESCE(EXCLUDED.is_buyable,        uex_items.is_buyable),
             is_sellable       = COALESCE(EXCLUDED.is_sellable,       uex_items.is_sellable),
