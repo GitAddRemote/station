@@ -39,7 +39,10 @@ export class CommoditiesSyncService {
     private readonly configService: ConfigService,
   ) {
     this.batchSize = this.configService.get<number>('UEX_BATCH_SIZE', 100);
-    this.maxRetries = this.configService.get<number>('UEX_RETRY_ATTEMPTS', 3);
+    this.maxRetries = Math.max(
+      1,
+      this.configService.get<number>('UEX_RETRY_ATTEMPTS', 3),
+    );
     this.backoffBase = this.configService.get<number>(
       'UEX_BACKOFF_BASE_MS',
       1000,
