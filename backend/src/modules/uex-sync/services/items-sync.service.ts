@@ -385,6 +385,7 @@ export class ItemsSyncService {
             'is_commodity',
             'is_buyable',
             'is_sellable',
+            'active',
             'deleted',
             'uex_date_modified',
             'modified_by',

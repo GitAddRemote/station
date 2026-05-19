@@ -572,6 +572,31 @@ describe('ItemsSyncService', () => {
     });
   });
 
+  describe('upsert reactivation', () => {
+    it('should include active in conflict update columns so reappearing items are reactivated', async () => {
+      const mockCategories = [{ uexId: 1, name: 'Weapons' }];
+
+      mockSyncService.shouldUseDeltaSync.mockResolvedValue({
+        useDelta: false,
+        reason: 'FIRST_SYNC',
+      });
+
+      mockCategoryRepository.find.mockResolvedValue(mockCategories);
+      mockUexClient.fetchItemsByCategory.mockResolvedValue([
+        { id: 10, id_category: 1, name: 'Reappeared Item' },
+      ]);
+
+      await service.syncItems();
+
+      // orUpdate must include 'active' so a previously soft-deleted row
+      // (active=false, deleted=true) is fully reactivated on re-sync
+      expect(mockQueryBuilder.orUpdate).toHaveBeenCalledWith(
+        expect.arrayContaining(['active', 'deleted']),
+        expect.anything(),
+      );
+    });
+  });
+
   describe('full sync soft-delete', () => {
     it('should mark items not seen in full sync as deleted', async () => {
       const mockCategories = [{ uexId: 1, name: 'Weapons' }];
