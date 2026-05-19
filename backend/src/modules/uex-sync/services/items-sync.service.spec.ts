@@ -16,7 +16,8 @@ import {
 
 describe('ItemsSyncService', () => {
   let service: ItemsSyncService;
-  let mockItemRepository: Record<string, jest.Mock>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockItemRepository: Record<string, any>;
   let mockCategoryRepository: Record<string, jest.Mock>;
   let mockCompanyRepository: Record<string, jest.Mock>;
   let mockUexClient: Record<string, jest.Mock>;
@@ -27,6 +28,7 @@ describe('ItemsSyncService', () => {
   let mockQueryBuilder: Record<string, jest.Mock>;
 
   beforeEach(async () => {
+    // Query builder used for INSERT ... ON CONFLICT (upsert) and UPDATE (soft-delete)
     mockQueryBuilder = {
       insert: jest.fn().mockReturnThis(),
       into: jest.fn().mockReturnThis(),
@@ -43,9 +45,22 @@ describe('ItemsSyncService', () => {
       }),
     };
 
+    // Query builder used for the pre-load SELECT (called with alias 'item')
+    const mockSelectQueryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]), // default: no existing rows
+    };
+
     mockItemRepository = {
       find: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+      // Return select QB when called with an alias, write QB otherwise
+      createQueryBuilder: jest
+        .fn()
+        .mockImplementation((alias?: string) =>
+          alias ? mockSelectQueryBuilder : mockQueryBuilder,
+        ),
+      _selectQueryBuilder: mockSelectQueryBuilder, // expose for per-test override
     };
 
     mockCategoryRepository = {
@@ -199,12 +214,10 @@ describe('ItemsSyncService', () => {
       mockCategoryRepository.find.mockResolvedValue(mockCategories);
       mockUexClient.fetchItemsByCategory.mockResolvedValue(mockItems);
 
-      // No new identifiers — the row existed (updated, not inserted)
-      mockQueryBuilder.execute.mockResolvedValue({
-        identifiers: [],
-        raw: [{ id: 1 }],
-        affected: 1,
-      });
+      // Pre-load returns the item as already existing → counted as updated
+      mockItemRepository._selectQueryBuilder.getMany.mockResolvedValue([
+        { uexId: 100 },
+      ]);
 
       const result = await service.syncItems();
 
@@ -353,9 +366,13 @@ describe('ItemsSyncService', () => {
 
       await service.syncItems();
 
-      // 250 items at batch size 100 → 3 insert execute() calls
+      // 250 items at batch size 100 → 3 upsert execute() calls
       // + 1 soft-delete update execute() call = 4 total
       expect(mockQueryBuilder.execute).toHaveBeenCalledTimes(4);
+      // Pre-load SELECT called once per batch (3 times)
+      expect(
+        mockItemRepository._selectQueryBuilder.getMany,
+      ).toHaveBeenCalledTimes(3);
     });
 
     it('should process all categories concurrently within chunk size', async () => {
@@ -405,6 +422,9 @@ describe('ItemsSyncService', () => {
       const result = await service.syncItems();
 
       expect(result.created).toBe(2);
+      // Soft-delete must be skipped when any category had errors
+      expect(result.deleted).toBe(0);
+      expect(mockQueryBuilder.update).not.toHaveBeenCalled();
     });
 
     it('should parse weight_scu correctly from both string and number', async () => {

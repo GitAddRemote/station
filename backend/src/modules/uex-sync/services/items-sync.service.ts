@@ -127,10 +127,18 @@ export class ItemsSyncService {
       let deleted = 0;
 
       if (!useDelta) {
-        const seenUexIds = new Set<number>(
-          categoryResults.flatMap((r) => r.seenUexIds),
-        );
-        deleted = await this.markMissingItemsAsDeleted(seenUexIds);
+        const hasErrors = categoryResults.some((r) => r.errors > 0);
+        if (hasErrors) {
+          this.logger.warn(
+            'Skipping soft-delete: one or more categories failed to sync. ' +
+              'Items from failed categories would be incorrectly marked deleted.',
+          );
+        } else {
+          const seenUexIds = new Set<number>(
+            categoryResults.flatMap((r) => r.seenUexIds),
+          );
+          deleted = await this.markMissingItemsAsDeleted(seenUexIds);
+        }
       }
 
       const durationMs = Date.now() - startTime;
@@ -347,7 +355,18 @@ export class ItemsSyncService {
         };
       });
 
-      const result = await this.itemRepository
+      // Pre-load which uexIds already exist so we can accurately split
+      // created vs updated after the upsert (ON CONFLICT RETURNING returns
+      // identifiers for both inserted and updated rows in PostgreSQL).
+      const batchUexIds = batch.map((item) => item.id);
+      const existing = await this.itemRepository
+        .createQueryBuilder('item')
+        .select('item.uexId')
+        .where('item.uexId IN (:...ids)', { ids: batchUexIds })
+        .getMany();
+      const existingUexIds = new Set(existing.map((e) => e.uexId));
+
+      await this.itemRepository
         .createQueryBuilder()
         .insert()
         .into(UexItem)
@@ -374,12 +393,11 @@ export class ItemsSyncService {
         )
         .execute();
 
-      // identifiers contains the rows that were inserted (created); affected
-      // covers both inserts and updates so we derive updated from the difference
-      const insertedCount = result.identifiers.filter((r) => r.id).length;
-      const affectedCount = result.raw?.length ?? batch.length;
-      created += insertedCount;
-      updated += affectedCount - insertedCount;
+      const batchCreated = batchUexIds.filter(
+        (id) => !existingUexIds.has(id),
+      ).length;
+      created += batchCreated;
+      updated += batch.length - batchCreated;
 
       this.logger.debug(
         `Bulk upserted batch ${Math.floor(i / this.batchSize) + 1}/` +
