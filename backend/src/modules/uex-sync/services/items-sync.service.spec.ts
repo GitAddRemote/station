@@ -276,12 +276,11 @@ describe('ItemsSyncService', () => {
       expect(mockSyncService.recordSyncSuccess).toHaveBeenCalled();
     });
 
-    it('should handle permanent rate limit failure gracefully for individual categories', async () => {
+    it('should throw and record failure when a full sync has a permanently failing category', async () => {
       const mockCategories = [
         { uexId: 1, name: 'Weapons' },
         { uexId: 2, name: 'Armor' },
       ];
-      const mockItems = [{ id: 200, id_category: 2, name: 'Armor' }];
 
       mockSyncService.shouldUseDeltaSync.mockResolvedValue({
         useDelta: false,
@@ -290,27 +289,24 @@ describe('ItemsSyncService', () => {
 
       mockCategoryRepository.find.mockResolvedValue(mockCategories);
 
-      // Weapons: rate-limits on all maxRetries (default 3), then Armor succeeds.
-      // Each rate-limit attempt sleeps rateLimitPauseMs — use a tiny backoff
-      // by injecting a fast ConfigService for this test only.
+      // Weapons exhausts all retries; Armor would succeed but we never reach it
       mockUexClient.fetchItemsByCategory
         .mockRejectedValueOnce(new RateLimitException('RL'))
         .mockRejectedValueOnce(new RateLimitException('RL'))
         .mockRejectedValueOnce(new RateLimitException('RL'))
-        .mockResolvedValueOnce(mockItems);
+        .mockResolvedValueOnce([{ id: 200, id_category: 2, name: 'Armor' }]);
 
       mockQueryBuilder.execute.mockResolvedValue({
-        identifiers: [{ id: 2 }],
-        raw: [{ id: 2 }],
-        affected: 1,
+        identifiers: [],
+        raw: [],
+        affected: 0,
       });
 
-      const result = await service.syncItems();
+      await expect(service.syncItems()).rejects.toThrow(/Full sync incomplete/);
 
-      expect(mockSyncService.recordSyncSuccess).toHaveBeenCalled();
+      expect(mockSyncService.recordSyncFailure).toHaveBeenCalled();
+      expect(mockSyncService.recordSyncSuccess).not.toHaveBeenCalled();
       expect(mockSyncService.releaseSyncLock).toHaveBeenCalled();
-      // Armor's item should still have been synced
-      expect(result.created).toBeGreaterThanOrEqual(0);
     }, 15000);
 
     it('should retry on server errors with exponential backoff', async () => {
@@ -394,7 +390,7 @@ describe('ItemsSyncService', () => {
       expect(mockUexClient.fetchItemsByCategory).toHaveBeenCalledTimes(5);
     });
 
-    it('should handle partial category failures gracefully', async () => {
+    it('should throw and record failure when a full sync has category errors', async () => {
       const mockCategories = [
         { uexId: 1, name: 'Category 1' },
         { uexId: 2, name: 'Category 2' },
@@ -419,18 +415,13 @@ describe('ItemsSyncService', () => {
         affected: 1,
       });
 
-      const result = await service.syncItems();
+      await expect(service.syncItems()).rejects.toThrow(/Full sync incomplete/);
 
-      expect(result.created).toBe(2);
-      // Soft-delete must be skipped when any category had errors
-      expect(result.deleted).toBe(0);
+      // Soft-delete must not have been called
       expect(mockQueryBuilder.update).not.toHaveBeenCalled();
-      // Incomplete full sync must NOT advance lastFullSyncAt — record as 'delta'
-      expect(result.syncMode).toBe('delta');
-      expect(mockSyncService.recordSyncSuccess).toHaveBeenCalledWith(
-        'items',
-        expect.objectContaining({ syncMode: 'delta' }),
-      );
+      // Failure recorded — neither lastSuccessfulSyncAt nor lastFullSyncAt advance
+      expect(mockSyncService.recordSyncFailure).toHaveBeenCalled();
+      expect(mockSyncService.recordSyncSuccess).not.toHaveBeenCalled();
     });
 
     it('should parse weight_scu correctly from both string and number', async () => {
