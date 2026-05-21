@@ -15,7 +15,6 @@ export class OrgInventoryItemDto {
   orgId!: number;
   gameId!: number;
   uexItemId!: number;
-  locationId!: number;
   quantity!: number;
   notes?: string;
   active!: boolean;
@@ -26,7 +25,6 @@ export class OrgInventoryItemDto {
 
   // Populated from relations
   itemName?: string;
-  locationName?: string;
   orgName?: string;
   addedByUsername?: string;
   modifiedByUsername?: string;
@@ -50,10 +48,6 @@ export class CreateOrgInventoryItemDto {
   @IsInt()
   uexItemId!: number;
 
-  @ApiProperty({ description: 'Location ID', example: 200 })
-  @IsInt()
-  locationId!: number;
-
   @ApiProperty({ description: 'Quantity', example: 100.5, minimum: 0.01 })
   @IsNumber()
   @Min(0.01)
@@ -72,11 +66,6 @@ export class CreateOrgInventoryItemDto {
 }
 
 export class UpdateOrgInventoryItemDto {
-  @ApiPropertyOptional({ description: 'Location ID', example: 300 })
-  @IsOptional()
-  @IsInt()
-  locationId?: number;
-
   @ApiPropertyOptional({ description: 'Quantity', example: 150, minimum: 0.01 })
   @IsOptional()
   @IsNumber()
@@ -86,7 +75,7 @@ export class UpdateOrgInventoryItemDto {
 
   @ApiPropertyOptional({
     description: 'Optional notes',
-    example: 'Moved to new location',
+    example: 'Updated notes',
     maxLength: 1000,
   })
   @IsOptional()
@@ -142,11 +131,6 @@ export class OrgInventorySearchDto {
   @IsInt()
   categoryId?: number;
 
-  @ApiPropertyOptional({ description: 'Filter by Location ID', example: 200 })
-  @IsOptional()
-  @IsInt()
-  locationId?: number;
-
   @ApiPropertyOptional({
     description: 'Search by item name or notes',
     example: 'Prospector',
@@ -167,11 +151,11 @@ export class OrgInventorySearchDto {
   @ApiPropertyOptional({
     description: 'Sort column',
     example: 'date_modified',
-    enum: ['name', 'quantity', 'location', 'date_added', 'date_modified'],
+    enum: ['name', 'quantity', 'date_added', 'date_modified'],
   })
   @IsOptional()
   @IsString()
-  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
 
   @ApiPropertyOptional({
     description: 'Sort order',
@@ -212,6 +196,5 @@ export class OrgInventorySummaryDto {
   gameId!: number;
   totalItems!: number;
   uniqueItems!: number;
-  locationCount!: number;
   lastUpdated!: Date;
 }

@@ -130,15 +130,6 @@ export class OrgInventoryController {
           min: 1,
         },
       ),
-      locationId: this.readOptionalNumber(
-        query,
-        ['location_id', 'locationId'],
-        'location_id',
-        {
-          integer: true,
-          min: 1,
-        },
-      ),
       search: asString(query.search),
       limit: this.readOptionalNumber(query, ['limit'], 'limit', {
         integer: true,
@@ -151,7 +142,6 @@ export class OrgInventoryController {
       sort: asString(query.sort) as
         | 'name'
         | 'quantity'
-        | 'location'
         | 'date_added'
         | 'date_modified'
         | undefined,

@@ -32,7 +32,6 @@ describe('OrgInventoryController', () => {
         gameId: '1',
         categoryId: '5',
         uexItemId: '9',
-        locationId: '12',
         minQuantity: '0.25',
         maxQuantity: '10.5',
         limit: '25',
@@ -45,7 +44,6 @@ describe('OrgInventoryController', () => {
       gameId: 1,
       categoryId: 5,
       uexItemId: 9,
-      locationId: 12,
       search: undefined,
       limit: 25,
       offset: 50,
@@ -114,21 +112,6 @@ describe('OrgInventoryController', () => {
         },
       ),
     ).rejects.toThrow(new BadRequestException('game_id must be an integer'));
-
-    await expect(
-      controller.list(
-        {
-          user: { userId: 7, username: 'testuser' },
-        } as unknown as AuthenticatedRequest,
-        42,
-        {
-          gameId: '1',
-          locationId: '2.5',
-        },
-      ),
-    ).rejects.toThrow(
-      new BadRequestException('location_id must be an integer'),
-    );
   });
 
   it('throws a bad request for negative quantity filters', async () => {

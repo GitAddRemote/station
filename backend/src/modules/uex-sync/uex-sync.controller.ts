@@ -12,7 +12,6 @@ import { CategoriesSyncService } from './services/categories-sync.service';
 import { CommoditiesSyncService } from './services/commodities-sync.service';
 import { ItemsSyncService } from './services/items-sync.service';
 import { CompaniesSyncService } from './services/companies-sync.service';
-import { LocationsSyncService } from './services/locations-sync.service';
 
 @Controller('admin/uex-sync')
 @UseGuards(JwtAuthGuard)
@@ -23,7 +22,6 @@ export class UexSyncController {
     private readonly commoditiesSyncService: CommoditiesSyncService,
     private readonly itemsSyncService: ItemsSyncService,
     private readonly companiesSyncService: CompaniesSyncService,
-    private readonly locationsSyncService: LocationsSyncService,
   ) {}
 
   @Get('health')
@@ -119,36 +117,21 @@ export class UexSyncController {
   async runSyncNow(
     @Body() body: SyncTriggerRequestDto,
   ): Promise<{ results: SyncTriggerResultDto[] }> {
-    const requested: (
-      | 'categories'
-      | 'items'
-      | 'companies'
-      | 'locations'
-      | 'commodities'
-      | 'all'
-    )[] =
+    type SyncEndpoint = 'categories' | 'items' | 'companies' | 'commodities';
+
+    const requested =
       body.endpoints && body.endpoints.length > 0
         ? body.endpoints
-        : ['categories', 'companies', 'items', 'commodities', 'locations'];
+        : ['categories', 'companies', 'items', 'commodities'];
 
-    const endpoints: Array<
-      'categories' | 'items' | 'companies' | 'locations' | 'commodities'
-    > =
+    const endpoints: SyncEndpoint[] =
       requested.includes('all') || requested.length === 0
-        ? ['categories', 'companies', 'items', 'commodities', 'locations']
+        ? ['categories', 'companies', 'items', 'commodities']
         : requested.filter(
-            (
-              e,
-            ): e is
-              | 'categories'
-              | 'items'
-              | 'companies'
-              | 'locations'
-              | 'commodities' =>
+            (e): e is SyncEndpoint =>
               e === 'categories' ||
               e === 'items' ||
               e === 'companies' ||
-              e === 'locations' ||
               e === 'commodities',
           );
 
@@ -165,10 +148,7 @@ export class UexSyncController {
               ReturnType<typeof this.commoditiesSyncService.syncCommodities>
             >
           | Awaited<ReturnType<typeof this.itemsSyncService.syncItems>>
-          | Awaited<ReturnType<typeof this.companiesSyncService.syncCompanies>>
-          | Awaited<
-              ReturnType<typeof this.locationsSyncService.syncAllLocations>
-            >;
+          | Awaited<ReturnType<typeof this.companiesSyncService.syncCompanies>>;
 
         if (endpoint === 'categories') {
           result = await this.categoriesSyncService.syncCategories(
@@ -180,41 +160,20 @@ export class UexSyncController {
           );
         } else if (endpoint === 'items') {
           result = await this.itemsSyncService.syncItems(body.forceFull);
-        } else if (endpoint === 'companies') {
+        } else {
           result = await this.companiesSyncService.syncCompanies(
             body.forceFull,
           );
-        } else {
-          result = await this.locationsSyncService.syncAllLocations(
-            body.forceFull,
-          );
         }
-
-        const created =
-          'totalCreated' in result
-            ? result.totalCreated
-            : (result.created ?? 0);
-        const updated =
-          'totalUpdated' in result
-            ? result.totalUpdated
-            : (result.updated ?? 0);
-        const deleted =
-          'totalDeleted' in result
-            ? result.totalDeleted
-            : (result.deleted ?? 0);
-        const durationMs =
-          'totalDurationMs' in result
-            ? result.totalDurationMs
-            : (result.durationMs ?? Date.now() - start);
 
         results.push({
           endpoint,
           status: SyncStatus.SUCCESS,
           mode: result.syncMode ?? (body.forceFull ? 'full' : 'delta'),
-          created,
-          updated,
-          deleted,
-          durationMs,
+          created: result.created ?? 0,
+          updated: result.updated ?? 0,
+          deleted: result.deleted ?? 0,
+          durationMs: result.durationMs ?? Date.now() - start,
         });
       } catch (error: unknown) {
         const errorMessage =

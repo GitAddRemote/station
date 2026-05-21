@@ -98,12 +98,6 @@ export class UserInventoryController {
         'uex_item_id',
         { integer: true },
       ),
-      locationId: this.readOptionalNumber(
-        query,
-        ['location_id', 'locationId'],
-        'location_id',
-        { integer: true },
-      ),
       sharedOrgId: this.readOptionalNumber(
         query,
         ['shared_org_id', 'sharedOrgId'],
@@ -122,7 +116,6 @@ export class UserInventoryController {
       sort: asString(query.sort) as
         | 'name'
         | 'quantity'
-        | 'location'
         | 'date_added'
         | 'date_modified'
         | undefined,

@@ -13,7 +13,6 @@ export class UserInventoryItemDto {
   userId!: number;
   gameId!: number;
   uexItemId!: number;
-  locationId!: number;
   quantity!: number;
   notes?: string;
   sharedOrgId?: number | null;
@@ -23,7 +22,6 @@ export class UserInventoryItemDto {
 
   // Populated from relations
   itemName?: string;
-  locationName?: string;
   sharedOrgName?: string;
   categoryName?: string;
 }
@@ -34,9 +32,6 @@ export class CreateUserInventoryItemDto {
 
   @IsInt()
   uexItemId!: number;
-
-  @IsInt()
-  locationId!: number;
 
   @IsNumber()
   @Min(0.01)
@@ -53,10 +48,6 @@ export class CreateUserInventoryItemDto {
 }
 
 export class UpdateUserInventoryItemDto {
-  @IsOptional()
-  @IsInt()
-  locationId?: number;
-
   @IsOptional()
   @IsNumber()
   @Min(0.01)
@@ -100,10 +91,6 @@ export class UserInventorySearchDto {
 
   @IsOptional()
   @IsInt()
-  locationId?: number;
-
-  @IsOptional()
-  @IsInt()
   sharedOrgId?: number;
 
   @IsOptional()
@@ -123,7 +110,7 @@ export class UserInventorySearchDto {
 
   @IsOptional()
   @IsString()
-  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
 
   @IsOptional()
   @IsString()
@@ -139,7 +126,6 @@ export class UserInventorySummaryDto {
   gameId!: number;
   totalItems!: number;
   uniqueItems!: number;
-  locationCount!: number;
   sharedItemsCount!: number;
   lastUpdated!: Date;
 }

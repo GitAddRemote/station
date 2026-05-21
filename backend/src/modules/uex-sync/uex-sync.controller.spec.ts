@@ -5,7 +5,6 @@ import { CategoriesSyncService } from './services/categories-sync.service';
 import { CommoditiesSyncService } from './services/commodities-sync.service';
 import { ItemsSyncService } from './services/items-sync.service';
 import { CompaniesSyncService } from './services/companies-sync.service';
-import { LocationsSyncService } from './services/locations-sync.service';
 import { SyncStatus } from './uex-sync-state.entity';
 
 describe('UexSyncController', () => {
@@ -29,15 +28,6 @@ describe('UexSyncController', () => {
   const mockCompaniesSync = {
     syncCompanies: jest.fn().mockResolvedValue(syncResult),
   };
-  const mockLocationsSync = {
-    syncAllLocations: jest.fn().mockResolvedValue({
-      totalCreated: 5,
-      totalUpdated: 2,
-      totalDeleted: 1,
-      totalDurationMs: 100,
-      syncMode: 'full' as const,
-    }),
-  };
   const mockSyncService = {
     getAllSyncStates: jest.fn().mockResolvedValue([]),
     getSyncConfig: jest.fn().mockResolvedValue(null),
@@ -57,7 +47,6 @@ describe('UexSyncController', () => {
         { provide: CommoditiesSyncService, useValue: mockCommoditiesSync },
         { provide: ItemsSyncService, useValue: mockItemsSync },
         { provide: CompaniesSyncService, useValue: mockCompaniesSync },
-        { provide: LocationsSyncService, useValue: mockLocationsSync },
       ],
     }).compile();
 
@@ -89,14 +78,13 @@ describe('UexSyncController', () => {
       });
     });
 
-    it('should include commodities in run-all (no endpoints specified)', async () => {
+    it('should include all endpoints in run-all (no endpoints specified)', async () => {
       await controller.runSyncNow({ forceFull: true });
 
       expect(mockCategoriesSync.syncCategories).toHaveBeenCalled();
       expect(mockCommoditiesSync.syncCommodities).toHaveBeenCalled();
       expect(mockItemsSync.syncItems).toHaveBeenCalled();
       expect(mockCompaniesSync.syncCompanies).toHaveBeenCalled();
-      expect(mockLocationsSync.syncAllLocations).toHaveBeenCalled();
     });
 
     it('should include commodities when "all" is specified', async () => {

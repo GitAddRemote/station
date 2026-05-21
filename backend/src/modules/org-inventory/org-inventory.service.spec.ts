@@ -16,7 +16,6 @@ import {
 import { Organization } from '../organizations/organization.entity';
 import { Game } from '../games/game.entity';
 import { UexItem } from '../uex/entities/uex-item.entity';
-import { Location, LocationType } from '../locations/entities/location.entity';
 import { User } from '../users/user.entity';
 import { OrgPermission } from '../permissions/permissions.constants';
 
@@ -28,17 +27,6 @@ describe('OrgInventoryService', () => {
   const mockOrg: Organization = { id: 1, name: 'Test Org' } as Organization;
   const mockGame: Game = { id: 1, name: 'Star Citizen' } as Game;
   const mockItem: UexItem = { id: 1, uexId: 100, name: 'Test Item' } as UexItem;
-  const mockLocation: Location = {
-    id: 200,
-    gameId: 1,
-    displayName: 'Test Location',
-    shortName: 'Test Location',
-    locationType: LocationType.CITY,
-    active: true,
-    deleted: false,
-    dateAdded: new Date(),
-    dateModified: new Date(),
-  } as unknown as Location;
   const mockUser: User = { id: 1, username: 'testuser' } as User;
 
   const mockOrgInventoryItem: OrgInventoryItem = {
@@ -46,7 +34,6 @@ describe('OrgInventoryService', () => {
     orgId: 1,
     gameId: 1,
     uexItemId: 100,
-    locationId: 200,
     quantity: 10.5,
     notes: 'Test org item',
     active: true,
@@ -58,10 +45,9 @@ describe('OrgInventoryService', () => {
     org: mockOrg,
     game: mockGame,
     item: mockItem,
-    location: mockLocation,
     addedByUser: mockUser,
     modifiedByUser: mockUser,
-  };
+  } as unknown as OrgInventoryItem;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -78,7 +64,6 @@ describe('OrgInventoryService', () => {
             softDeleteItem: jest.fn(),
             searchInventory: jest.fn(),
             getOrgInventorySummary: jest.fn(),
-            findByLocationId: jest.fn(),
             findByUexItemId: jest.fn(),
           },
         },
@@ -105,7 +90,6 @@ describe('OrgInventoryService', () => {
       orgId: 1,
       gameId: 1,
       uexItemId: 100,
-      locationId: 200,
       quantity: 10.5,
       notes: 'Test notes',
     };
@@ -131,7 +115,6 @@ describe('OrgInventoryService', () => {
         orgId: createDto.orgId,
         gameId: createDto.gameId,
         uexItemId: createDto.uexItemId,
-        locationId: createDto.locationId,
       });
       expect(repository.create).toHaveBeenCalledWith({
         ...createDto,
@@ -367,7 +350,6 @@ describe('OrgInventoryService', () => {
         orgId: 1,
         gameId: 1,
         activeOnly: true,
-        locationId: undefined,
         uexItemId: undefined,
         categoryId: undefined,
         limit: 100,
@@ -395,7 +377,6 @@ describe('OrgInventoryService', () => {
       jest.spyOn(repository, 'getOrgInventorySummary').mockResolvedValue({
         totalItems: 10,
         uniqueItems: 5,
-        locationCount: 3,
         lastUpdated: new Date(),
       });
 
@@ -403,7 +384,6 @@ describe('OrgInventoryService', () => {
 
       expect(result.totalItems).toBe(10);
       expect(result.uniqueItems).toBe(5);
-      expect(result.locationCount).toBe(3);
     });
 
     it('should throw ForbiddenException without view permission', async () => {
@@ -412,33 +392,6 @@ describe('OrgInventoryService', () => {
       await expect(service.getSummary(1, 1, 1)).rejects.toThrow(
         ForbiddenException,
       );
-    });
-  });
-
-  describe('findByLocation', () => {
-    it('should return org inventory items by location', async () => {
-      jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
-      jest
-        .spyOn(repository, 'findByLocationId')
-        .mockResolvedValue([mockOrgInventoryItem]);
-
-      const result = await service.findByLocation(1, 1, 200);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].locationId).toBe(200);
-    });
-
-    it('should filter out items from other orgs', async () => {
-      jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
-      const otherOrgItem = { ...mockOrgInventoryItem, orgId: 2 };
-      jest
-        .spyOn(repository, 'findByLocationId')
-        .mockResolvedValue([mockOrgInventoryItem, otherOrgItem]);
-
-      const result = await service.findByLocation(1, 1, 200);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].orgId).toBe(1);
     });
   });
 

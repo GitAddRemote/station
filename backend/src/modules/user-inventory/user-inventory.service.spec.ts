@@ -31,7 +31,6 @@ describe('UserInventoryService', () => {
     userId: 1,
     gameId: 1,
     uexItemId: 100,
-    locationId: 200,
     quantity: 10.5,
     notes: 'Test item',
     sharedOrgId: undefined,
@@ -44,9 +43,6 @@ describe('UserInventoryService', () => {
     user: undefined as unknown as UserInventoryItem['user'],
     game: undefined as unknown as UserInventoryItem['game'],
     item: { name: 'Test Item' } as unknown as UserInventoryItem['item'],
-    location: {
-      displayName: 'Test Location',
-    } as unknown as UserInventoryItem['location'],
     sharedOrg: undefined,
     addedByUser: undefined as unknown as UserInventoryItem['addedByUser'],
     modifiedByUser: undefined as unknown as UserInventoryItem['modifiedByUser'],
@@ -166,24 +162,6 @@ describe('UserInventoryService', () => {
       );
     });
 
-    it('should filter by locationId', async () => {
-      const searchDto: UserInventorySearchDto = {
-        gameId: 1,
-        locationId: 200,
-      };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([
-        [mockInventoryItem],
-        1,
-      ]);
-
-      await service.findAll(1, searchDto);
-
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'inventory.location_id = :locationId',
-        { locationId: 200 },
-      );
-    });
-
     it('should filter by search text', async () => {
       const searchDto: UserInventorySearchDto = {
         gameId: 1,
@@ -225,10 +203,9 @@ describe('UserInventoryService', () => {
       );
     });
 
-    it('should sort by location when requested', async () => {
+    it('should sort by date_modified by default', async () => {
       const searchDto: UserInventorySearchDto = {
         gameId: 1,
-        sort: 'location',
         order: 'asc',
       };
       mockQueryBuilder.getManyAndCount.mockResolvedValue([
@@ -239,7 +216,7 @@ describe('UserInventoryService', () => {
       await service.findAll(1, searchDto);
 
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'location.displayName',
+        'inventory.dateModified',
         'ASC',
       );
     });
@@ -254,7 +231,7 @@ describe('UserInventoryService', () => {
       expect(result.id).toBe(mockInventoryItem.id);
       expect(repository.findOne).toHaveBeenCalledWith({
         where: { id: mockInventoryItem.id, userId: 1, deleted: false },
-        relations: ['item', 'location', 'sharedOrg'],
+        relations: ['item', 'sharedOrg'],
       });
     });
 
@@ -272,7 +249,6 @@ describe('UserInventoryService', () => {
       const createDto: CreateUserInventoryItemDto = {
         gameId: 1,
         uexItemId: 100,
-        locationId: 200,
         quantity: 10.5,
         notes: 'New item',
       };
@@ -298,7 +274,6 @@ describe('UserInventoryService', () => {
       const createDto: CreateUserInventoryItemDto = {
         gameId: 1,
         uexItemId: 100,
-        locationId: 200,
         quantity: 2,
         notes: 'merge note',
       };
@@ -395,7 +370,6 @@ describe('UserInventoryService', () => {
       mockQueryBuilder.getRawOne.mockResolvedValue({
         totalItems: '10',
         uniqueItems: '5',
-        locationCount: '3',
         sharedItemsCount: '2',
         lastUpdated: new Date(),
       });
@@ -404,7 +378,6 @@ describe('UserInventoryService', () => {
 
       expect(result.totalItems).toBe(10);
       expect(result.uniqueItems).toBe(5);
-      expect(result.locationCount).toBe(3);
       expect(result.sharedItemsCount).toBe(2);
     });
   });
@@ -423,7 +396,7 @@ describe('UserInventoryService', () => {
           deleted: false,
           active: true,
         },
-        relations: ['item', 'location', 'user'],
+        relations: ['item', 'user'],
         order: { dateModified: 'DESC' },
         take: 100,
       });

@@ -96,7 +96,6 @@ export class InventorySharingService {
           userId: item.userId,
           gameId: item.gameId,
           uexItemId: item.uexItemId,
-          locationId: item.locationId,
           quantity,
           sharedOrgId: orgId,
           active: true,

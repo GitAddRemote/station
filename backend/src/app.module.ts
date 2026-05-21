@@ -23,7 +23,6 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { GamesModule } from './modules/games/games.module';
 import { UexModule } from './modules/uex/uex.module';
 import { UexSyncModule } from './modules/uex-sync/uex-sync.module';
-import { LocationsModule } from './modules/locations/locations.module';
 import { UserInventoryModule } from './modules/user-inventory/user-inventory.module';
 import { OrgInventoryModule } from './modules/org-inventory/org-inventory.module';
 import { HealthModule } from './health/health.module';
@@ -167,7 +166,6 @@ if (!isTest) {
     GamesModule,
     UexModule,
     UexSyncModule,
-    LocationsModule,
     UserInventoryModule,
     OrgInventoryModule,
     HealthModule,

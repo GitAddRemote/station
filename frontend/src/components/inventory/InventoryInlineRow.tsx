@@ -1,7 +1,6 @@
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import type { MouseEvent } from 'react';
 import {
-  Autocomplete,
   Box,
   Chip,
   IconButton,
@@ -18,58 +17,33 @@ import type {
   OrgInventoryItem,
 } from '../../services/inventory.service';
 import type { FocusController } from '../../utils/focusController';
-import { useMemoizedLocations } from '../../hooks/useMemoizedLocations';
 
 const EDITOR_MODE_QUANTITY_MAX = 100000;
 const MIN_INVENTORY_QUANTITY = 0.01;
 
-const normalizeDraftLocationId = (locationId: number | ''): number | '' =>
-  typeof locationId === 'string'
-    ? locationId === ''
-      ? ''
-      : Number(locationId)
-    : locationId;
-
 export type InventoryRecord = InventoryItem | OrgInventoryItem;
-
-interface LocationOption {
-  id: number;
-  name: string;
-}
 
 interface InventoryInlineRowProps {
   item: InventoryRecord;
   density: 'standard' | 'compact';
-  allLocations: LocationOption[];
-  locationNameById: Map<number, string>;
-  inlineDraft: { locationId: number | ''; quantity: number | '' };
-  inlineLocationInput: string;
-  locationEditing: boolean;
+  inlineDraft: { quantity: number | '' };
   quantityEditing: boolean;
   inlineSaving: boolean;
   inlineSaved?: boolean;
   inlineError?: string | null;
   isDirty: boolean;
   isRowActive: boolean;
-  focusController: FocusController<string, 'location' | 'quantity' | 'save'>;
+  focusController: FocusController<string, 'quantity' | 'save'>;
   rowKey: string;
   onDraftChange: (
     itemId: string,
-    changes: Partial<{ locationId: number | ''; quantity: number | '' }>,
+    changes: Partial<{ quantity: number | '' }>,
   ) => void;
   onErrorChange: (itemId: string, message: string | null) => void;
-  onLocationInputChange: (rowKey: string, value: string) => void;
-  onLocationFocus: (itemId: string) => void;
-  onLocationBlur: (
-    rowKey: string,
-    itemId: string,
-    draftLocationId: number | '',
-    selectedName?: string,
-  ) => void;
   onQuantityBlur: (rowKey: string) => void;
   onActivateField: (
     rowKey: string,
-    field: 'location' | 'quantity',
+    field: 'quantity',
     initialInput?: string,
   ) => void;
   onSave: (item: InventoryRecord) => void;
@@ -77,7 +51,6 @@ interface InventoryInlineRowProps {
     event: MouseEvent<HTMLElement>,
     item: InventoryRecord,
   ) => void;
-  setLocationRef: (ref: HTMLInputElement | null, key: string) => void;
   setQuantityRef: (ref: HTMLInputElement | null, key: string) => void;
   setSaveRef: (ref: HTMLButtonElement | null, key: string) => void;
 }
@@ -85,11 +58,7 @@ interface InventoryInlineRowProps {
 const InventoryInlineRow = ({
   item,
   density,
-  allLocations,
-  locationNameById,
   inlineDraft,
-  inlineLocationInput,
-  locationEditing,
   quantityEditing,
   inlineSaving,
   inlineSaved,
@@ -100,30 +69,13 @@ const InventoryInlineRow = ({
   rowKey,
   onDraftChange,
   onErrorChange,
-  onLocationInputChange,
-  onLocationFocus,
-  onLocationBlur,
   onQuantityBlur,
   onActivateField,
   onSave,
   onOpenActions,
-  setLocationRef,
   setQuantityRef,
   setSaveRef,
 }: InventoryInlineRowProps) => {
-  const draftLocationId = normalizeDraftLocationId(inlineDraft.locationId);
-
-  const { filtered: filteredOptions } = useMemoizedLocations(
-    allLocations,
-    inlineLocationInput,
-    locationEditing,
-  );
-  const selectedLocation = useMemo(() => {
-    if (typeof draftLocationId !== 'number') return null;
-    const name = locationNameById.get(draftLocationId) ?? item.locationName;
-    return name ? { id: draftLocationId, name } : null;
-  }, [draftLocationId, locationNameById, item.locationName]);
-
   const draftQuantityNumber = Number(inlineDraft.quantity);
   const displayQuantity = Number.isFinite(draftQuantityNumber)
     ? draftQuantityNumber
@@ -193,157 +145,13 @@ const InventoryInlineRow = ({
               Location
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              {item.locationName || 'Unknown'}
+              &mdash;
             </Typography>
           </>
         ) : (
-          <>
-            {locationEditing ? (
-              <Autocomplete
-                size="small"
-                fullWidth
-                options={filteredOptions}
-                autoHighlight
-                openOnFocus
-                filterOptions={(options) => options}
-                value={locationEditing ? null : selectedLocation}
-                inputValue={inlineLocationInput}
-                getOptionLabel={(option) => option?.name ?? ''}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-                onChange={(_, value) => {
-                  onDraftChange(item.id, { locationId: value ? value.id : '' });
-                  onLocationInputChange(rowKey, value?.name ?? '');
-                  onLocationBlur(
-                    rowKey,
-                    item.id,
-                    draftLocationId,
-                    value?.name ?? '',
-                  );
-                  onErrorChange(item.id, null);
-                }}
-                onInputChange={(_, value) => {
-                  onLocationInputChange(rowKey, value);
-                }}
-                onFocus={() => {
-                  onLocationFocus(item.id);
-                }}
-                onBlur={() => {
-                  onLocationBlur(
-                    rowKey,
-                    item.id,
-                    draftLocationId,
-                    selectedLocation?.name ?? '',
-                  );
-                }}
-                renderOption={(props, option) => (
-                  <li {...props} key={option.id}>
-                    {option.name}
-                  </li>
-                )}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Location"
-                    data-testid={`inline-location-${item.id}`}
-                    inputRef={(el) => {
-                      setLocationRef(el, rowKey);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        const bestMatch = filteredOptions[0];
-                        if (bestMatch) {
-                          onDraftChange(item.id, { locationId: bestMatch.id });
-                          onLocationInputChange(rowKey, bestMatch.name);
-                          onLocationBlur(
-                            rowKey,
-                            item.id,
-                            draftLocationId,
-                            bestMatch.name,
-                          );
-                          onErrorChange(item.id, null);
-                          focusController.focus(rowKey, 'quantity');
-                        } else {
-                          onErrorChange(item.id, 'No matches found');
-                        }
-                      } else if (event.key === 'Escape') {
-                        event.preventDefault();
-                        onLocationInputChange(
-                          rowKey,
-                          selectedLocation?.name ?? '',
-                        );
-                        onLocationBlur(
-                          rowKey,
-                          item.id,
-                          draftLocationId,
-                          selectedLocation?.name ?? '',
-                        );
-                      }
-                    }}
-                  />
-                )}
-              />
-            ) : (
-              <Box
-                role="button"
-                tabIndex={0}
-                onClick={() =>
-                  onActivateField(
-                    rowKey,
-                    'location',
-                    selectedLocation?.name ?? item.locationName ?? '',
-                  )
-                }
-                onFocus={() =>
-                  onActivateField(
-                    rowKey,
-                    'location',
-                    selectedLocation?.name ?? item.locationName ?? '',
-                  )
-                }
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onActivateField(
-                      rowKey,
-                      'location',
-                      selectedLocation?.name ?? item.locationName ?? '',
-                    );
-                  }
-                }}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.75,
-                  cursor: 'text',
-                  color: 'text.primary',
-                  textDecoration: 'underline dotted',
-                  textUnderlineOffset: '4px',
-                  textDecorationColor: 'rgba(255,255,255,0.35)',
-                  '&:hover .inline-edit-icon': {
-                    opacity: 0.75,
-                  },
-                  '&:focus-visible': {
-                    outline: '1px solid rgba(74, 158, 255, 0.6)',
-                    borderRadius: 1,
-                    outlineOffset: 2,
-                  },
-                }}
-                aria-label={`Edit location for ${item.itemName ?? `Item ${item.uexItemId}`}`}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {selectedLocation?.name ||
-                    item.locationName ||
-                    'Select location'}
-                </Typography>
-                <EditIcon
-                  className="inline-edit-icon"
-                  fontSize="inherit"
-                  sx={{ opacity: 0, transition: 'opacity 0.2s ease' }}
-                />
-              </Box>
-            )}
-          </>
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+            &mdash;
+          </Typography>
         )}
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
@@ -562,11 +370,7 @@ const areEqual = (
 ) =>
   prev.item === next.item &&
   prev.density === next.density &&
-  prev.allLocations === next.allLocations &&
-  prev.locationNameById === next.locationNameById &&
   prev.inlineDraft === next.inlineDraft &&
-  prev.inlineLocationInput === next.inlineLocationInput &&
-  prev.locationEditing === next.locationEditing &&
   prev.quantityEditing === next.quantityEditing &&
   prev.inlineSaving === next.inlineSaving &&
   prev.inlineSaved === next.inlineSaved &&
@@ -577,14 +381,10 @@ const areEqual = (
   prev.rowKey === next.rowKey &&
   prev.onDraftChange === next.onDraftChange &&
   prev.onErrorChange === next.onErrorChange &&
-  prev.onLocationInputChange === next.onLocationInputChange &&
-  prev.onLocationFocus === next.onLocationFocus &&
-  prev.onLocationBlur === next.onLocationBlur &&
   prev.onQuantityBlur === next.onQuantityBlur &&
   prev.onActivateField === next.onActivateField &&
   prev.onSave === next.onSave &&
   prev.onOpenActions === next.onOpenActions &&
-  prev.setLocationRef === next.setLocationRef &&
   prev.setQuantityRef === next.setQuantityRef &&
   prev.setSaveRef === next.setSaveRef;
 

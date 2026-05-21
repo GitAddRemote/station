@@ -33,7 +33,6 @@ export class UserInventoryService {
       .createQueryBuilder('inventory')
       .leftJoinAndSelect('inventory.item', 'item')
       .leftJoinAndSelect('item.category', 'category')
-      .leftJoinAndSelect('inventory.location', 'location')
       .leftJoinAndSelect('inventory.sharedOrg', 'sharedOrg')
       .where('inventory.user_id = :userId', { userId })
       .andWhere('inventory.game_id = :gameId', { gameId: searchDto.gameId })
@@ -49,12 +48,6 @@ export class UserInventoryService {
     if (searchDto.categoryId) {
       queryBuilder.andWhere('item.idCategory = :categoryId', {
         categoryId: searchDto.categoryId,
-      });
-    }
-
-    if (searchDto.locationId) {
-      queryBuilder.andWhere('inventory.location_id = :locationId', {
-        locationId: searchDto.locationId,
       });
     }
 
@@ -112,7 +105,7 @@ export class UserInventoryService {
   async findById(id: string, userId: number): Promise<UserInventoryItemDto> {
     const item = await this.inventoryRepository.findOne({
       where: { id, userId, deleted: false },
-      relations: ['item', 'location', 'sharedOrg'],
+      relations: ['item', 'sharedOrg'],
     });
 
     if (!item) {
@@ -141,9 +134,6 @@ export class UserInventoryService {
           })
           .andWhere('inventory.uex_item_id = :uexItemId', {
             uexItemId: createDto.uexItemId,
-          })
-          .andWhere('inventory.location_id = :locationId', {
-            locationId: createDto.locationId,
           })
           .andWhere(
             'COALESCE(inventory.shared_org_id, -1) = COALESCE(:sharedOrgId, -1)',
@@ -176,7 +166,7 @@ export class UserInventoryService {
 
     if (merged) {
       this.logger.info(
-        `Merged inventory item ${saved.id} for user ${userId}: added ${createDto.quantity} to item ${createDto.uexItemId} at location ${createDto.locationId}`,
+        `Merged inventory item ${saved.id} for user ${userId}: added ${createDto.quantity} to item ${createDto.uexItemId}`,
       );
     } else {
       this.logger.info(
@@ -224,7 +214,6 @@ export class UserInventoryService {
       .createQueryBuilder('inventory')
       .select('COUNT(*)', 'totalItems')
       .addSelect('COUNT(DISTINCT inventory.uex_item_id)', 'uniqueItems')
-      .addSelect('COUNT(DISTINCT inventory.location_id)', 'locationCount')
       .addSelect(
         'SUM(CASE WHEN inventory.shared_org_id IS NOT NULL THEN 1 ELSE 0 END)',
         'sharedItemsCount',
@@ -241,7 +230,6 @@ export class UserInventoryService {
       gameId,
       totalItems: parseInt(result.totalItems || '0', 10),
       uniqueItems: parseInt(result.uniqueItems || '0', 10),
-      locationCount: parseInt(result.locationCount || '0', 10),
       sharedItemsCount: parseInt(result.sharedItemsCount || '0', 10),
       lastUpdated: result.lastUpdated || new Date(),
     };
@@ -258,7 +246,7 @@ export class UserInventoryService {
         deleted: false,
         active: true,
       },
-      relations: ['item', 'location', 'user'],
+      relations: ['item', 'user'],
       order: { dateModified: 'DESC' },
       take: 100,
     });
@@ -287,7 +275,6 @@ export class UserInventoryService {
       userId: item.userId,
       gameId: item.gameId,
       uexItemId: item.uexItemId,
-      locationId: item.locationId,
       quantity: parseFloat(item.quantity.toString()),
       notes: item.notes,
       sharedOrgId: item.sharedOrgId,
@@ -295,7 +282,6 @@ export class UserInventoryService {
       dateAdded: item.dateAdded,
       dateModified: item.dateModified,
       itemName: item.item?.name,
-      locationName: item.location?.displayName,
       sharedOrgName: item.sharedOrg?.name,
       categoryName: item.item?.category?.name || item.item?.categoryName,
     };
@@ -307,8 +293,6 @@ export class UserInventoryService {
         return 'item.name';
       case 'quantity':
         return 'inventory.quantity';
-      case 'location':
-        return 'location.displayName';
       case 'date_added':
         return 'inventory.dateAdded';
       case 'date_modified':

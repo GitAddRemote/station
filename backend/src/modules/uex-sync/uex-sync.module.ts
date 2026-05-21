@@ -24,7 +24,6 @@ import { UEXCompaniesClient } from './clients/uex-companies.client';
 import { CategoriesSyncService } from './services/categories-sync.service';
 import { CommoditiesSyncService } from './services/commodities-sync.service';
 import { ItemsSyncService } from './services/items-sync.service';
-import { LocationsSyncService } from './services/locations-sync.service';
 import { CompaniesSyncService } from './services/companies-sync.service';
 import { UEXSyncScheduler } from './schedulers/uex-sync.scheduler';
 import { UsersModule } from '../users/users.module';
@@ -60,7 +59,6 @@ import { UsersModule } from '../users/users.module';
     CategoriesSyncService,
     CommoditiesSyncService,
     ItemsSyncService,
-    LocationsSyncService,
     CompaniesSyncService,
     UEXSyncScheduler,
   ],
@@ -69,7 +67,6 @@ import { UsersModule } from '../users/users.module';
     CategoriesSyncService,
     CommoditiesSyncService,
     ItemsSyncService,
-    LocationsSyncService,
   ],
 })
 export class UexSyncModule {}

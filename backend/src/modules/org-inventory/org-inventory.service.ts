@@ -59,7 +59,6 @@ export class OrgInventoryService {
       orgId: entity.orgId,
       gameId: entity.gameId,
       uexItemId: entity.uexItemId,
-      locationId: entity.locationId,
       quantity: entity.quantity,
       notes: entity.notes,
       active: entity.active,
@@ -68,7 +67,6 @@ export class OrgInventoryService {
       addedBy: entity.addedBy,
       modifiedBy: entity.modifiedBy,
       itemName: entity.item?.name,
-      locationName: entity.location?.displayName,
       orgName: entity.org?.name,
       addedByUsername: entity.addedByUser?.username,
       modifiedByUsername: entity.modifiedByUser?.username,
@@ -93,18 +91,17 @@ export class OrgInventoryService {
       orgId: dto.orgId,
       gameId: dto.gameId,
       uexItemId: dto.uexItemId,
-      locationId: dto.locationId,
     });
 
     if (existing) {
       throw new ConflictException(
-        'Inventory item already exists for this organization and location',
+        'Inventory item already exists for this organization',
       );
     }
 
     const item = this.orgInventoryRepository.create({
       ...dto,
-      orgId: dto.orgId, // Ensure orgId is set
+      orgId: dto.orgId,
       addedBy: userId,
       modifiedBy: userId,
       active: true,
@@ -184,10 +181,6 @@ export class OrgInventoryService {
 
     await this.verifyInventoryPermission(userId, item.orgId, 'manage');
 
-    // Update fields
-    if (dto.locationId !== undefined) {
-      item.locationId = dto.locationId;
-    }
     if (dto.quantity !== undefined) {
       item.quantity = dto.quantity;
     }
@@ -260,7 +253,6 @@ export class OrgInventoryService {
       gameId: searchDto.gameId,
       uexItemId: searchDto.uexItemId,
       categoryId: searchDto.categoryId,
-      locationId: searchDto.locationId,
       activeOnly: searchDto.activeOnly,
       limit,
       offset,
@@ -299,28 +291,8 @@ export class OrgInventoryService {
       gameId,
       totalItems: summary.totalItems,
       uniqueItems: summary.uniqueItems,
-      locationCount: summary.locationCount,
       lastUpdated: summary.lastUpdated!,
     };
-  }
-
-  /**
-   * Get inventory by location
-   */
-  async findByLocation(
-    userId: number,
-    orgId: number,
-    locationId: number,
-  ): Promise<OrgInventoryItemDto[]> {
-    await this.verifyInventoryPermission(userId, orgId, 'view');
-
-    const items =
-      await this.orgInventoryRepository.findByLocationId(locationId);
-
-    // Filter to ensure only items from this org are returned
-    const orgItems = items.filter((item) => item.orgId === orgId);
-
-    return orgItems.map((item) => this.toDto(item));
   }
 
   /**

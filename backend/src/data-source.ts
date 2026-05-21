@@ -8,7 +8,6 @@ import { UserOrganizationRole } from './modules/user-organization-roles/user-org
 import { PasswordReset } from './modules/auth/password-reset.entity';
 import { AuditLog } from './modules/audit-logs/audit-log.entity';
 import { Game } from './modules/games/game.entity';
-import { Location } from './modules/locations/entities/location.entity';
 import { UserInventoryItem } from './modules/user-inventory/entities/user-inventory-item.entity';
 import { InventoryAuditLog } from './modules/user-inventory/entities/inventory-audit-log.entity';
 import { OrgInventoryItem } from './modules/org-inventory/entities/org-inventory-item.entity';
@@ -41,7 +40,6 @@ import { CreateUexBaseTables1764802822073 } from './migrations/1764802822073-Cre
 import { CreateUexItemsTable1764802975691 } from './migrations/1764802975691-CreateUexItemsTable';
 import { CreateUexLocationTables1764803020274 } from './migrations/1764803020274-CreateUexLocationTables';
 import { AddUexSyncStateTables1764812815840 } from './migrations/1764812815840-AddUexSyncStateTables';
-import { CreateLocationsTable1764949892544 } from './migrations/1764949892544-CreateLocationsTable';
 import { CreateUserInventoryItemsTable1764950546163 } from './migrations/1764950546163-CreateUserInventoryItemsTable';
 import { CreateInventoryAuditLogTable1764950688227 } from './migrations/1764950688227-CreateInventoryAuditLogTable';
 import { AddAutoUnshareInventoryTrigger1764950720430 } from './migrations/1764950720430-AddAutoUnshareInventoryTrigger';
@@ -69,7 +67,6 @@ export const AppDataSource = new DataSource({
     PasswordReset,
     AuditLog,
     Game,
-    Location,
     UserInventoryItem,
     InventoryAuditLog,
     OrgInventoryItem,
@@ -109,10 +106,7 @@ export const AppDataSource = new DataSource({
     CreateUexLocationTables1764803020274,
     AddUexSyncStateTables1764812815840,
 
-    // Locations (depends on games + UEX tables)
-    CreateLocationsTable1764949892544,
-
-    // Inventory (depends on locations, games, UEX items)
+    // Inventory (depends on games, UEX items)
     CreateUserInventoryItemsTable1764950546163,
     CreateInventoryAuditLogTable1764950688227,
     AddAutoUnshareInventoryTrigger1764950720430,

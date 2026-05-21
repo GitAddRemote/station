@@ -11,7 +11,6 @@ import {
 import { User } from '../../users/user.entity';
 import { Game } from '../../games/game.entity';
 import { UexItem } from '../../uex/entities/uex-item.entity';
-import { Location } from '../../locations/entities/location.entity';
 import { Organization } from '../../organizations/organization.entity';
 
 @Entity('org_inventory_item')
@@ -19,9 +18,6 @@ import { Organization } from '../../organizations/organization.entity';
   where: 'deleted = FALSE',
 })
 @Index('idx_org_inv_item', ['uexItemId'], {
-  where: 'deleted = FALSE',
-})
-@Index('idx_org_inv_location', ['locationId'], {
   where: 'deleted = FALSE',
 })
 @Index('idx_org_inv_recent', ['orgId', 'dateModified'], {
@@ -57,14 +53,6 @@ export class OrgInventoryItem {
   @ManyToOne(() => UexItem)
   @JoinColumn({ name: 'uex_item_id', referencedColumnName: 'uexId' })
   item!: UexItem;
-
-  @Column({ name: 'location_id', type: 'bigint' })
-  @Index()
-  locationId!: number;
-
-  @ManyToOne(() => Location)
-  @JoinColumn({ name: 'location_id' })
-  location!: Location;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   quantity!: number;

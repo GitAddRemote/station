@@ -6,7 +6,6 @@ export interface InventoryItem {
   userId: number;
   gameId: number;
   uexItemId: number;
-  locationId: number;
   quantity: number;
   notes?: string;
   sharedOrgId?: number | null;
@@ -14,7 +13,6 @@ export interface InventoryItem {
   dateAdded: Date;
   dateModified: Date;
   itemName?: string;
-  locationName?: string;
   sharedOrgName?: string;
   categoryName?: string;
 }
@@ -47,7 +45,6 @@ export interface InventorySearchParams {
   gameId: number;
   categoryId?: number;
   uexItemId?: number;
-  locationId?: number;
   sharedOnly?: boolean;
   sharedOrgId?: number;
   search?: string;
@@ -55,7 +52,7 @@ export interface InventorySearchParams {
   maxQuantity?: number;
   limit?: number;
   offset?: number;
-  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
   order?: 'asc' | 'desc';
 }
 
@@ -64,7 +61,6 @@ export interface InventorySummary {
   gameId: number;
   totalItems: number;
   uniqueItems: number;
-  locationCount: number;
   sharedItemsCount: number;
   lastUpdated: Date;
 }
@@ -90,7 +86,6 @@ const buildInventoryQuery = (params: InventorySearchParams) => {
 
   if (params.categoryId !== undefined) query.category_id = params.categoryId;
   if (params.uexItemId !== undefined) query.uex_item_id = params.uexItemId;
-  if (params.locationId !== undefined) query.location_id = params.locationId;
   if (params.sharedOnly !== undefined) query.shared_only = params.sharedOnly;
   if (params.sharedOrgId !== undefined)
     query.shared_org_id = params.sharedOrgId;
@@ -109,12 +104,11 @@ const buildOrgInventoryQuery = (params: {
   gameId: number;
   uexItemId?: number;
   categoryId?: number;
-  locationId?: number;
   activeOnly?: boolean;
   search?: string;
   minQuantity?: number;
   maxQuantity?: number;
-  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
   order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
@@ -125,7 +119,6 @@ const buildOrgInventoryQuery = (params: {
 
   if (params.uexItemId !== undefined) query.uexItemId = params.uexItemId;
   if (params.categoryId !== undefined) query.categoryId = params.categoryId;
-  if (params.locationId !== undefined) query.locationId = params.locationId;
   if (params.activeOnly !== undefined) query.activeOnly = params.activeOnly;
   if (params.search) query.search = params.search;
   if (params.minQuantity !== undefined) query.minQuantity = params.minQuantity;
@@ -262,12 +255,11 @@ export const inventoryService = {
       gameId: number;
       uexItemId?: number;
       categoryId?: number;
-      locationId?: number;
       activeOnly?: boolean;
       search?: string;
       minQuantity?: number;
       maxQuantity?: number;
-      sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+      sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
       order?: 'asc' | 'desc';
       limit?: number;
       offset?: number;

@@ -14,14 +14,7 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   async findByOrgId(orgId: number): Promise<OrgInventoryItem[]> {
     return this.find({
       where: { orgId, deleted: false },
-      relations: [
-        'item',
-        'location',
-        'game',
-        'org',
-        'addedByUser',
-        'modifiedByUser',
-      ],
+      relations: ['item', 'game', 'org', 'addedByUser', 'modifiedByUser'],
       order: { dateModified: 'DESC' },
     });
   }
@@ -35,7 +28,7 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   ): Promise<OrgInventoryItem[]> {
     return this.find({
       where: { orgId, gameId, deleted: false },
-      relations: ['item', 'location', 'game', 'addedByUser', 'modifiedByUser'],
+      relations: ['item', 'game', 'addedByUser', 'modifiedByUser'],
       order: { dateModified: 'DESC' },
     });
   }
@@ -46,32 +39,7 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   async findByIdNotDeleted(id: string): Promise<OrgInventoryItem | null> {
     return this.findOne({
       where: { id, deleted: false },
-      relations: [
-        'item',
-        'location',
-        'game',
-        'org',
-        'addedByUser',
-        'modifiedByUser',
-      ],
-    });
-  }
-
-  /**
-   * Find inventory items by location
-   */
-  async findByLocationId(locationId: number): Promise<OrgInventoryItem[]> {
-    return this.find({
-      where: { locationId, deleted: false },
-      relations: [
-        'item',
-        'location',
-        'game',
-        'org',
-        'addedByUser',
-        'modifiedByUser',
-      ],
-      order: { dateModified: 'DESC' },
+      relations: ['item', 'game', 'org', 'addedByUser', 'modifiedByUser'],
     });
   }
 
@@ -84,7 +52,7 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   ): Promise<OrgInventoryItem[]> {
     return this.find({
       where: { orgId, uexItemId, deleted: false },
-      relations: ['item', 'location', 'game', 'addedByUser', 'modifiedByUser'],
+      relations: ['item', 'game', 'addedByUser', 'modifiedByUser'],
       order: { dateModified: 'DESC' },
     });
   }
@@ -96,14 +64,12 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     orgId: number;
     gameId: number;
     uexItemId: number;
-    locationId: number;
   }): Promise<OrgInventoryItem | null> {
     return this.findOne({
       where: {
         orgId: params.orgId,
         gameId: params.gameId,
         uexItemId: params.uexItemId,
-        locationId: params.locationId,
         deleted: false,
       },
     });
@@ -129,13 +95,11 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   ): Promise<{
     totalItems: number;
     uniqueItems: number;
-    locationCount: number;
     lastUpdated: Date | null;
   }> {
     const result = await this.createQueryBuilder('oii')
       .select('COUNT(*)', 'totalItems')
       .addSelect('COUNT(DISTINCT oii.uex_item_id)', 'uniqueItems')
-      .addSelect('COUNT(DISTINCT oii.location_id)', 'locationCount')
       .addSelect('MAX(oii.date_modified)', 'lastUpdated')
       .where('oii.org_id = :orgId', { orgId })
       .andWhere('oii.game_id = :gameId', { gameId })
@@ -146,7 +110,6 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     return {
       totalItems: parseInt(result.totalItems, 10) || 0,
       uniqueItems: parseInt(result.uniqueItems, 10) || 0,
-      locationCount: parseInt(result.locationCount, 10) || 0,
       lastUpdated: result.lastUpdated || null,
     };
   }
@@ -159,20 +122,18 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     gameId: number;
     uexItemId?: number;
     categoryId?: number;
-    locationId?: number;
     activeOnly?: boolean;
     limit?: number;
     offset?: number;
     search?: string;
     minQuantity?: number;
     maxQuantity?: number;
-    sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+    sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
     order?: 'asc' | 'desc';
   }): Promise<{ items: OrgInventoryItem[]; total: number }> {
     const query = this.createQueryBuilder('oii')
       .leftJoinAndSelect('oii.item', 'item')
       .leftJoinAndSelect('item.category', 'category')
-      .leftJoinAndSelect('oii.location', 'location')
       .leftJoinAndSelect('oii.game', 'game')
       .leftJoinAndSelect('oii.org', 'org')
       .leftJoinAndSelect('oii.addedByUser', 'addedBy')
@@ -190,12 +151,6 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     if (filters.categoryId) {
       query.andWhere('item.idCategory = :categoryId', {
         categoryId: filters.categoryId,
-      });
-    }
-
-    if (filters.locationId) {
-      query.andWhere('oii.location_id = :locationId', {
-        locationId: filters.locationId,
       });
     }
 
@@ -237,15 +192,13 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   }
 
   private resolveSortColumn(
-    sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified',
+    sort?: 'name' | 'quantity' | 'date_added' | 'date_modified',
   ): string {
     switch (sort) {
       case 'name':
         return 'item.name';
       case 'quantity':
         return 'oii.quantity';
-      case 'location':
-        return 'location.displayName';
       case 'date_added':
         return 'oii.dateAdded';
       case 'date_modified':

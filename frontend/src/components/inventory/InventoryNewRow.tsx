@@ -11,11 +11,6 @@ import {
 import type { RefObject } from 'react';
 import type { CatalogItem } from '../../services/uex.service';
 
-interface LocationOption {
-  id: number;
-  name: string;
-}
-
 interface InventoryNewRowProps {
   isEditorMode: boolean;
   itemOptions: CatalogItem[];
@@ -23,18 +18,12 @@ interface InventoryNewRowProps {
   selectedItem: CatalogItem | null;
   itemLoading: boolean;
   itemError: string | null;
-  locationInput: string;
-  locationEditing: boolean;
-  selectedLocation: LocationOption | null;
-  filteredLocations: LocationOption[];
   draft: {
     itemId: number | '';
-    locationId: number | '';
     quantity: number | '';
   };
   errors: {
     item?: string | null;
-    location?: string | null;
     quantity?: string | null;
     org?: string | null;
     api?: string | null;
@@ -45,17 +34,11 @@ interface InventoryNewRowProps {
   showQuantityWarning: boolean;
   onItemInputChange: (value: string, reason: string) => void;
   onItemSelect: (item: CatalogItem | null) => void;
-  onLocationInputChange: (value: string) => void;
-  onLocationSelect: (location: LocationOption | null) => void;
-  onLocationEnter: (bestMatch: LocationOption | undefined) => void;
-  onLocationFocus: () => void;
-  onLocationBlur: (value: string) => void;
   onQuantityChange: (value: string) => void;
   onQuantityEnter: () => void;
   onSave: () => void;
   onRetry: () => void;
   itemRef: RefObject<HTMLInputElement | null>;
-  locationRef: RefObject<HTMLInputElement | null>;
   quantityRef: RefObject<HTMLInputElement | null>;
   saveRef: RefObject<HTMLButtonElement | null>;
 }
@@ -67,10 +50,6 @@ export const InventoryNewRow = ({
   selectedItem,
   itemLoading,
   itemError,
-  locationInput,
-  locationEditing,
-  selectedLocation,
-  filteredLocations,
   draft,
   errors,
   dirty,
@@ -79,17 +58,11 @@ export const InventoryNewRow = ({
   showQuantityWarning,
   onItemInputChange,
   onItemSelect,
-  onLocationInputChange,
-  onLocationSelect,
-  onLocationEnter,
-  onLocationFocus,
-  onLocationBlur,
   onQuantityChange,
   onQuantityEnter,
   onSave,
   onRetry,
   itemRef,
-  locationRef,
   quantityRef,
   saveRef,
 }: InventoryNewRowProps) => {
@@ -101,7 +74,7 @@ export const InventoryNewRow = ({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md: '2fr 1fr 1fr 1fr auto',
+          md: '2fr 1fr 1fr auto',
         },
         gap: 0.75,
         alignItems: 'flex-start',
@@ -154,49 +127,6 @@ export const InventoryNewRow = ({
                 if (event.key === 'Enter') {
                   event.preventDefault();
                   onSave();
-                }
-              }}
-            />
-          )}
-        />
-      </Stack>
-      <Stack spacing={0.5}>
-        <Autocomplete
-          size="small"
-          fullWidth
-          options={filteredLocations}
-          autoHighlight
-          openOnFocus
-          filterOptions={(options) => options}
-          value={locationEditing ? null : selectedLocation}
-          inputValue={
-            locationEditing
-              ? locationInput
-              : (selectedLocation?.name ?? locationInput)
-          }
-          getOptionLabel={(option) => option?.name ?? ''}
-          isOptionEqualToValue={(option, value) => option.id === value.id}
-          onChange={(_, value) => onLocationSelect(value)}
-          onInputChange={(_, value) => onLocationInputChange(value)}
-          onFocus={onLocationFocus}
-          onBlur={() => onLocationBlur(selectedLocation?.name ?? '')}
-          renderOption={(props, option) => (
-            <li {...props} key={option.id}>
-              {option.name}
-            </li>
-          )}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Location"
-              data-testid="new-row-location-input"
-              inputRef={locationRef as RefObject<HTMLInputElement>}
-              error={Boolean(errors.location)}
-              helperText={errors.location || undefined}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  onLocationEnter(filteredLocations[0]);
                 }
               }}
             />
