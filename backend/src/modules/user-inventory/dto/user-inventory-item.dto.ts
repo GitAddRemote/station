@@ -6,6 +6,7 @@ import {
   Min,
   Max,
   IsInt,
+  MaxLength,
 } from 'class-validator';
 
 export class UserInventoryItemDto {
@@ -15,6 +16,7 @@ export class UserInventoryItemDto {
   uexItemId!: number;
   locationId!: number;
   quantity!: number;
+  quality?: number | null;
   notes?: string;
   sharedOrgId?: number | null;
   active!: boolean;
@@ -44,7 +46,14 @@ export class CreateUserInventoryItemDto {
   quantity!: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  quality?: number;
+
+  @IsOptional()
   @IsString()
+  @MaxLength(1000)
   notes?: string;
 
   @IsOptional()
@@ -64,7 +73,14 @@ export class UpdateUserInventoryItemDto {
   quantity?: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  quality?: number;
+
+  @IsOptional()
   @IsString()
+  @MaxLength(1000)
   notes?: string;
 
   @IsOptional()
@@ -89,6 +105,18 @@ export class UserInventorySearchDto {
   @IsNumber()
   @Min(0)
   minQuantity?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  minQuality?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  maxQuality?: number;
 
   @IsOptional()
   @IsInt()
@@ -123,7 +151,13 @@ export class UserInventorySearchDto {
 
   @IsOptional()
   @IsString()
-  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+  sort?:
+    | 'name'
+    | 'quantity'
+    | 'quality'
+    | 'location'
+    | 'date_added'
+    | 'date_modified';
 
   @IsOptional()
   @IsString()

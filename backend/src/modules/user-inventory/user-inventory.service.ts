@@ -80,6 +80,18 @@ export class UserInventoryService {
       });
     }
 
+    if (searchDto.minQuality !== undefined) {
+      queryBuilder.andWhere('inventory.quality >= :minQuality', {
+        minQuality: searchDto.minQuality,
+      });
+    }
+
+    if (searchDto.maxQuality !== undefined) {
+      queryBuilder.andWhere('inventory.quality <= :maxQuality', {
+        maxQuality: searchDto.maxQuality,
+      });
+    }
+
     if (searchDto.search) {
       queryBuilder.andWhere(
         '(item.name ILIKE :search OR inventory.notes ILIKE :search)',
@@ -289,6 +301,7 @@ export class UserInventoryService {
       uexItemId: item.uexItemId,
       locationId: item.locationId,
       quantity: parseFloat(item.quantity.toString()),
+      quality: item.quality,
       notes: item.notes,
       sharedOrgId: item.sharedOrgId,
       active: item.active,
@@ -307,6 +320,8 @@ export class UserInventoryService {
         return 'item.name';
       case 'quantity':
         return 'inventory.quantity';
+      case 'quality':
+        return 'inventory.quality';
       case 'location':
         return 'location.displayName';
       case 'date_added':

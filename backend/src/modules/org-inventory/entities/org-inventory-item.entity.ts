@@ -69,6 +69,9 @@ export class OrgInventoryItem {
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   quantity!: number;
 
+  @Column({ type: 'smallint', nullable: true })
+  quality?: number | null;
+
   @Column({ type: 'text', nullable: true })
   notes?: string;
 

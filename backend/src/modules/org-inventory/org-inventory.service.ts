@@ -61,6 +61,7 @@ export class OrgInventoryService {
       uexItemId: entity.uexItemId,
       locationId: entity.locationId,
       quantity: entity.quantity,
+      quality: entity.quality,
       notes: entity.notes,
       active: entity.active,
       dateAdded: entity.dateAdded,
@@ -191,6 +192,9 @@ export class OrgInventoryService {
     if (dto.quantity !== undefined) {
       item.quantity = dto.quantity;
     }
+    if (dto.quality !== undefined) {
+      item.quality = dto.quality;
+    }
     if (dto.notes !== undefined) {
       item.notes = dto.notes;
     }
@@ -267,6 +271,8 @@ export class OrgInventoryService {
       search: searchDto.search,
       minQuantity: searchDto.minQuantity,
       maxQuantity: searchDto.maxQuantity,
+      minQuality: searchDto.minQuality,
+      maxQuality: searchDto.maxQuality,
       sort: searchDto.sort || 'date_modified',
       order: searchDto.order || 'desc',
     });

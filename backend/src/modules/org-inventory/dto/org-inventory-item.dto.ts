@@ -17,6 +17,7 @@ export class OrgInventoryItemDto {
   uexItemId!: number;
   locationId!: number;
   quantity!: number;
+  quality?: number | null;
   notes?: string;
   active!: boolean;
   dateAdded!: Date;
@@ -61,6 +62,18 @@ export class CreateOrgInventoryItemDto {
   quantity!: number;
 
   @ApiPropertyOptional({
+    description: 'Item quality (0–32767)',
+    example: 500,
+    minimum: 0,
+    maximum: 32767,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  quality?: number;
+
+  @ApiPropertyOptional({
     description: 'Optional notes',
     example: 'Org purchased from auction',
     maxLength: 1000,
@@ -83,6 +96,18 @@ export class UpdateOrgInventoryItemDto {
   @Min(0.01)
   @Max(999999999.99)
   quantity?: number;
+
+  @ApiPropertyOptional({
+    description: 'Item quality (0–32767)',
+    example: 500,
+    minimum: 0,
+    maximum: 32767,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  quality?: number;
 
   @ApiPropertyOptional({
     description: 'Optional notes',
@@ -129,6 +154,30 @@ export class OrgInventorySearchDto {
   @Min(0)
   maxQuantity?: number;
 
+  @ApiPropertyOptional({
+    description: 'Minimum quality filter',
+    example: 100,
+    minimum: 0,
+    maximum: 32767,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  minQuality?: number;
+
+  @ApiPropertyOptional({
+    description: 'Maximum quality filter',
+    example: 1000,
+    minimum: 0,
+    maximum: 32767,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  maxQuality?: number;
+
   @ApiPropertyOptional({ description: 'Filter by UEX Item ID', example: 100 })
   @IsOptional()
   @IsInt()
@@ -167,11 +216,24 @@ export class OrgInventorySearchDto {
   @ApiPropertyOptional({
     description: 'Sort column',
     example: 'date_modified',
-    enum: ['name', 'quantity', 'location', 'date_added', 'date_modified'],
+    enum: [
+      'name',
+      'quantity',
+      'quality',
+      'location',
+      'date_added',
+      'date_modified',
+    ],
   })
   @IsOptional()
   @IsString()
-  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+  sort?:
+    | 'name'
+    | 'quantity'
+    | 'quality'
+    | 'location'
+    | 'date_added'
+    | 'date_modified';
 
   @ApiPropertyOptional({
     description: 'Sort order',
