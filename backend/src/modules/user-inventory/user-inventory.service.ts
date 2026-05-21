@@ -153,6 +153,17 @@ export class UserInventoryService {
           .andWhere('inventory.uex_item_id = :uexItemId', {
             uexItemId: createDto.uexItemId,
           })
+          .andWhere('inventory.unit_of_measure = :unitOfMeasure', {
+            unitOfMeasure: createDto.unitOfMeasure ?? 'unit',
+          })
+          .andWhere(
+            "COALESCE(inventory.location_type, '') = COALESCE(:locationType, '')",
+            { locationType: createDto.locationType ?? null },
+          )
+          .andWhere(
+            'COALESCE(inventory.location_uex_id, -1) = COALESCE(:locationUexId, -1)',
+            { locationUexId: createDto.locationUexId ?? null },
+          )
           .andWhere(
             'COALESCE(inventory.shared_org_id, -1) = COALESCE(:sharedOrgId, -1)',
             { sharedOrgId: createDto.sharedOrgId ?? null },

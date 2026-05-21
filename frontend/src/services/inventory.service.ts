@@ -54,9 +54,12 @@ export interface InventorySearchParams {
   search?: string;
   minQuantity?: number;
   maxQuantity?: number;
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+  minQuality?: number;
+  maxQuality?: number;
   limit?: number;
   offset?: number;
-  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+  sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified';
   order?: 'asc' | 'desc';
 }
 
@@ -96,6 +99,9 @@ const buildInventoryQuery = (params: InventorySearchParams) => {
   if (params.search) query.search = params.search;
   if (params.minQuantity !== undefined) query.min_quantity = params.minQuantity;
   if (params.maxQuantity !== undefined) query.max_quantity = params.maxQuantity;
+  if (params.unitOfMeasure) query.unit_of_measure = params.unitOfMeasure;
+  if (params.minQuality !== undefined) query.min_quality = params.minQuality;
+  if (params.maxQuality !== undefined) query.max_quality = params.maxQuality;
   if (params.limit !== undefined) query.limit = params.limit;
   if (params.offset !== undefined) query.offset = params.offset;
   if (params.sort) query.sort = params.sort;
@@ -112,8 +118,11 @@ const buildOrgInventoryQuery = (params: {
   search?: string;
   minQuantity?: number;
   maxQuantity?: number;
-  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+  sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified';
   order?: 'asc' | 'desc';
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+  minQuality?: number;
+  maxQuality?: number;
   limit?: number;
   offset?: number;
 }) => {
@@ -127,6 +136,9 @@ const buildOrgInventoryQuery = (params: {
   if (params.search) query.search = params.search;
   if (params.minQuantity !== undefined) query.minQuantity = params.minQuantity;
   if (params.maxQuantity !== undefined) query.maxQuantity = params.maxQuantity;
+  if (params.unitOfMeasure) query.unitOfMeasure = params.unitOfMeasure;
+  if (params.minQuality !== undefined) query.minQuality = params.minQuality;
+  if (params.maxQuality !== undefined) query.maxQuality = params.maxQuality;
   if (params.sort) query.sort = params.sort;
   if (params.order) query.order = params.order;
   if (params.limit !== undefined) query.limit = params.limit;
