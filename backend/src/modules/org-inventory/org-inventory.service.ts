@@ -59,7 +59,7 @@ export class OrgInventoryService {
       orgId: entity.orgId,
       gameId: entity.gameId,
       uexItemId: entity.uexItemId,
-      quantity: entity.quantity,
+      quantity: parseFloat(entity.quantity.toString()),
       unitOfMeasure: entity.unitOfMeasure,
       quality: entity.quality,
       locationType: entity.locationType,
@@ -95,6 +95,9 @@ export class OrgInventoryService {
       orgId: dto.orgId,
       gameId: dto.gameId,
       uexItemId: dto.uexItemId,
+      unitOfMeasure: dto.unitOfMeasure ?? 'unit',
+      locationType: dto.locationType ?? null,
+      locationUexId: dto.locationUexId ?? null,
     });
 
     if (existing) {

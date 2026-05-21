@@ -7,6 +7,10 @@ export interface InventoryItem {
   gameId: number;
   uexItemId: number;
   quantity: number;
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+  quality?: number | null;
+  locationType?: string | null;
+  locationUexId?: number | null;
   notes?: string;
   sharedOrgId?: number | null;
   active: boolean;

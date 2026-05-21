@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import { OrgInventoryItem } from './entities/org-inventory-item.entity';
 
 @Injectable()
@@ -64,12 +64,21 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     orgId: number;
     gameId: number;
     uexItemId: number;
+    unitOfMeasure?: string;
+    locationType?: string | null;
+    locationUexId?: number | null;
   }): Promise<OrgInventoryItem | null> {
     return this.findOne({
       where: {
         orgId: params.orgId,
         gameId: params.gameId,
         uexItemId: params.uexItemId,
+        unitOfMeasure: (params.unitOfMeasure ?? 'unit') as
+          | 'unit'
+          | 'scu'
+          | 'uscu',
+        locationType: params.locationType ?? IsNull(),
+        locationUexId: params.locationUexId ?? IsNull(),
         deleted: false,
       },
     });

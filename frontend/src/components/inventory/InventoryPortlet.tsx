@@ -252,7 +252,9 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">
-                          {item.locationName || `Location #${item.locationId}`}
+                          {item.locationType
+                            ? `${item.locationType} #${item.locationUexId}`
+                            : '—'}
                         </Typography>
                       </TableCell>
                       <TableCell>

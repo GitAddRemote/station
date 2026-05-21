@@ -39,14 +39,18 @@ export class BigBangBaselineMigration1748000000000
     // -- user ------------------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "user" (
-        "id"           BIGSERIAL     PRIMARY KEY,
-        "username"     VARCHAR(255)  NOT NULL UNIQUE,
-        "password"     VARCHAR(255)  NOT NULL,
-        "email"        VARCHAR(255)  NOT NULL UNIQUE,
-        "isActive"     BOOLEAN       NOT NULL DEFAULT TRUE,
-        "isSystemUser" BOOLEAN       NOT NULL DEFAULT FALSE,
-        "createdAt"    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-        "updatedAt"    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+        "id"            BIGSERIAL     PRIMARY KEY,
+        "username"      VARCHAR(255)  NOT NULL UNIQUE,
+        "password"      VARCHAR(255)  NOT NULL,
+        "email"         VARCHAR(255)  NOT NULL UNIQUE,
+        "firstName"     VARCHAR(255),
+        "lastName"      VARCHAR(255),
+        "phoneNumber"   VARCHAR(50),
+        "bio"           TEXT,
+        "isActive"      BOOLEAN       NOT NULL DEFAULT TRUE,
+        "isSystemUser"  BOOLEAN       NOT NULL DEFAULT FALSE,
+        "createdAt"     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+        "updatedAt"     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
       )
     `);
     await queryRunner.query(
@@ -66,6 +70,7 @@ export class BigBangBaselineMigration1748000000000
         "name"        VARCHAR(255)  NOT NULL,
         "slug"        VARCHAR(255),
         "description" VARCHAR(500),
+        "game_id"     INTEGER,
         "isActive"    BOOLEAN       NOT NULL DEFAULT TRUE,
         "createdAt"   TIMESTAMP     NOT NULL DEFAULT NOW(),
         "updatedAt"   TIMESTAMP     NOT NULL DEFAULT NOW()
@@ -85,6 +90,9 @@ export class BigBangBaselineMigration1748000000000
       )
     `);
     await queryRunner.query(`CREATE INDEX "IDX_game_code" ON "game" ("code")`);
+    await queryRunner.query(
+      `ALTER TABLE "organization" ADD CONSTRAINT "FK_organization_game" FOREIGN KEY ("game_id") REFERENCES "game"("id") ON DELETE SET NULL`,
+    );
 
     // -- role ------------------------------------------------------------------
     await queryRunner.query(`
@@ -103,7 +111,7 @@ export class BigBangBaselineMigration1748000000000
     await queryRunner.query(`
       CREATE TABLE "user_organization_role" (
         "id"             SERIAL    PRIMARY KEY,
-        "userId"         INTEGER   NOT NULL REFERENCES "user"("id")         ON DELETE CASCADE,
+        "userId"         BIGINT    NOT NULL REFERENCES "user"("id")         ON DELETE CASCADE,
         "organizationId" INTEGER   NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
         "roleId"         INTEGER   NOT NULL REFERENCES "role"("id")         ON DELETE RESTRICT,
         "assignedAt"     TIMESTAMP NOT NULL DEFAULT NOW()

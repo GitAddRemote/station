@@ -115,6 +115,9 @@ describe('OrgInventoryService', () => {
         orgId: createDto.orgId,
         gameId: createDto.gameId,
         uexItemId: createDto.uexItemId,
+        unitOfMeasure: 'unit',
+        locationType: null,
+        locationUexId: null,
       });
       expect(repository.create).toHaveBeenCalledWith({
         ...createDto,
