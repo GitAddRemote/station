@@ -198,6 +198,15 @@ export class OrgInventoryController {
       throw new BadRequestException('game_id is required');
     }
 
+    if (
+      searchDto.unitOfMeasure !== undefined &&
+      !['unit', 'scu', 'uscu'].includes(searchDto.unitOfMeasure)
+    ) {
+      throw new BadRequestException(
+        'unitOfMeasure must be one of: unit, scu, uscu',
+      );
+    }
+
     return this.orgInventoryService.search(userId, searchDto);
   }
 

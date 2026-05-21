@@ -154,6 +154,15 @@ export class UserInventoryController {
         | undefined,
     };
 
+    if (
+      searchDto.unitOfMeasure !== undefined &&
+      !['unit', 'scu', 'uscu'].includes(searchDto.unitOfMeasure)
+    ) {
+      throw new BadRequestException(
+        'unitOfMeasure must be one of: unit, scu, uscu',
+      );
+    }
+
     return this.userInventoryService.findAll(userId, searchDto);
   }
 

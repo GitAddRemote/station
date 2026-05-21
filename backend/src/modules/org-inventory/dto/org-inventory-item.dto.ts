@@ -7,7 +7,6 @@ import {
   Max,
   IsInt,
   MaxLength,
-  IsEnum,
   IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -66,25 +65,29 @@ export class CreateOrgInventoryItemDto {
     example: 'unit',
   })
   @IsOptional()
-  @IsEnum(['unit', 'scu', 'uscu'])
+  @IsIn(['unit', 'scu', 'uscu'])
   unitOfMeasure?: 'unit' | 'scu' | 'uscu';
 
   @ApiPropertyOptional({
-    description: 'Item quality (0-100)',
+    description: 'Item quality (0–32767)',
     example: 90,
     minimum: 0,
+    maximum: 32767,
   })
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(32767)
   quality?: number;
 
   @ApiPropertyOptional({
     description: 'Location type (e.g. city, space_station)',
     example: 'space_station',
+    maxLength: 30,
   })
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   locationType?: string;
 
   @ApiPropertyOptional({
@@ -124,25 +127,29 @@ export class UpdateOrgInventoryItemDto {
     example: 'scu',
   })
   @IsOptional()
-  @IsEnum(['unit', 'scu', 'uscu'])
+  @IsIn(['unit', 'scu', 'uscu'])
   unitOfMeasure?: 'unit' | 'scu' | 'uscu';
 
   @ApiPropertyOptional({
-    description: 'Item quality (0-100)',
+    description: 'Item quality (0–32767)',
     example: 85,
     minimum: 0,
+    maximum: 32767,
   })
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(32767)
   quality?: number | null;
 
   @ApiPropertyOptional({
     description: 'Location type',
     example: 'city',
+    maxLength: 30,
   })
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   locationType?: string | null;
 
   @ApiPropertyOptional({
@@ -206,16 +213,19 @@ export class OrgInventorySearchDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(32767)
   minQuality?: number;
 
   @ApiPropertyOptional({
     description: 'Maximum quality filter',
     example: 100,
     minimum: 0,
+    maximum: 32767,
   })
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(32767)
   maxQuality?: number;
 
   @ApiPropertyOptional({
@@ -224,7 +234,7 @@ export class OrgInventorySearchDto {
     example: 'scu',
   })
   @IsOptional()
-  @IsEnum(['unit', 'scu', 'uscu'])
+  @IsIn(['unit', 'scu', 'uscu'])
   unitOfMeasure?: 'unit' | 'scu' | 'uscu';
 
   @ApiPropertyOptional({ description: 'Filter by UEX Item ID', example: 100 })

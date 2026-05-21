@@ -5,8 +5,8 @@ import {
   IsBoolean,
   Min,
   Max,
+  MaxLength,
   IsInt,
-  IsEnum,
   IsIn,
 } from 'class-validator';
 
@@ -45,16 +45,18 @@ export class CreateUserInventoryItemDto {
   quantity!: number;
 
   @IsOptional()
-  @IsEnum(['unit', 'scu', 'uscu'])
+  @IsIn(['unit', 'scu', 'uscu'])
   unitOfMeasure?: 'unit' | 'scu' | 'uscu';
 
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(32767)
   quality?: number;
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   locationType?: string;
 
   @IsOptional()
@@ -78,16 +80,18 @@ export class UpdateUserInventoryItemDto {
   quantity?: number;
 
   @IsOptional()
-  @IsEnum(['unit', 'scu', 'uscu'])
+  @IsIn(['unit', 'scu', 'uscu'])
   unitOfMeasure?: 'unit' | 'scu' | 'uscu';
 
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(32767)
   quality?: number | null;
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
   locationType?: string | null;
 
   @IsOptional()
@@ -124,15 +128,17 @@ export class UserInventorySearchDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(32767)
   minQuality?: number;
 
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(32767)
   maxQuality?: number;
 
   @IsOptional()
-  @IsEnum(['unit', 'scu', 'uscu'])
+  @IsIn(['unit', 'scu', 'uscu'])
   unitOfMeasure?: 'unit' | 'scu' | 'uscu';
 
   @IsOptional()
