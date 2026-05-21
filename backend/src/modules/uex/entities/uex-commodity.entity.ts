@@ -9,7 +9,7 @@ import {
 import { BaseUexEntity } from './base-uex.entity';
 import { UexCategory } from './uex-category.entity';
 
-@Entity('uex_commodities')
+@Entity('uex_commodity')
 @Index('idx_uex_commodities_active', ['uexId'], {
   where: 'deleted = FALSE AND active = TRUE',
 })

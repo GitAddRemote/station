@@ -7,7 +7,7 @@ import {
   Index,
 } from 'typeorm';
 
-@Entity({ name: 'games' })
+@Entity({ name: 'game' })
 export class Game {
   @PrimaryGeneratedColumn()
   id!: number;

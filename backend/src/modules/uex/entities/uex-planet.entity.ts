@@ -9,7 +9,7 @@ import {
 import { BaseUexEntity } from './base-uex.entity';
 import { UexStarSystem } from './uex-star-system.entity';
 
-@Entity('uex_planets')
+@Entity('uex_planet')
 @Index('idx_uex_planets_active', ['uexId'], {
   where: 'deleted = FALSE AND active = TRUE',
 })

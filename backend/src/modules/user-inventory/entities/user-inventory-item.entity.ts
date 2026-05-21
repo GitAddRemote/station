@@ -14,7 +14,7 @@ import { UexItem } from '../../uex/entities/uex-item.entity';
 import { Location } from '../../locations/entities/location.entity';
 import { Organization } from '../../organizations/organization.entity';
 
-@Entity('user_inventory_items')
+@Entity('user_inventory_item')
 @Index('idx_user_inv_list', ['userId', 'gameId', 'deleted', 'active'], {
   where: 'deleted = FALSE',
 })

@@ -11,7 +11,7 @@ import { UexStarSystem } from './uex-star-system.entity';
 import { UexPlanet } from './uex-planet.entity';
 import { UexMoon } from './uex-moon.entity';
 
-@Entity('uex_space_stations')
+@Entity('uex_space_station')
 @Index('idx_uex_space_stations_active', ['uexId'], {
   where: 'deleted = FALSE AND active = TRUE',
 })

@@ -5,7 +5,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 
-@Entity('oauth_clients')
+@Entity('oauth_client')
 export class OauthClient {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
