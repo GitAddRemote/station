@@ -7,6 +7,8 @@ import {
   Max,
   IsInt,
   MaxLength,
+  IsEnum,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -16,6 +18,10 @@ export class OrgInventoryItemDto {
   gameId!: number;
   uexItemId!: number;
   quantity!: number;
+  unitOfMeasure!: 'unit' | 'scu' | 'uscu';
+  quality?: number | null;
+  locationType?: string | null;
+  locationUexId?: number | null;
   notes?: string;
   active!: boolean;
   dateAdded!: Date;
@@ -48,11 +54,46 @@ export class CreateOrgInventoryItemDto {
   @IsInt()
   uexItemId!: number;
 
-  @ApiProperty({ description: 'Quantity', example: 100.5, minimum: 0.01 })
+  @ApiProperty({ description: 'Quantity', example: 100.5, minimum: 0.000001 })
   @IsNumber()
-  @Min(0.01)
-  @Max(999999999.99)
+  @Min(0.000001)
+  @Max(999999999.999999)
   quantity!: number;
+
+  @ApiPropertyOptional({
+    description: 'Unit of measure',
+    enum: ['unit', 'scu', 'uscu'],
+    example: 'unit',
+  })
+  @IsOptional()
+  @IsEnum(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
+  @ApiPropertyOptional({
+    description: 'Item quality (0-100)',
+    example: 90,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  quality?: number;
+
+  @ApiPropertyOptional({
+    description: 'Location type (e.g. city, space_station)',
+    example: 'space_station',
+  })
+  @IsOptional()
+  @IsString()
+  locationType?: string;
+
+  @ApiPropertyOptional({
+    description: 'UEX ID of the location entity',
+    example: 42,
+  })
+  @IsOptional()
+  @IsInt()
+  locationUexId?: number;
 
   @ApiPropertyOptional({
     description: 'Optional notes',
@@ -66,12 +107,51 @@ export class CreateOrgInventoryItemDto {
 }
 
 export class UpdateOrgInventoryItemDto {
-  @ApiPropertyOptional({ description: 'Quantity', example: 150, minimum: 0.01 })
+  @ApiPropertyOptional({
+    description: 'Quantity',
+    example: 150,
+    minimum: 0.000001,
+  })
   @IsOptional()
   @IsNumber()
-  @Min(0.01)
-  @Max(999999999.99)
+  @Min(0.000001)
+  @Max(999999999.999999)
   quantity?: number;
+
+  @ApiPropertyOptional({
+    description: 'Unit of measure',
+    enum: ['unit', 'scu', 'uscu'],
+    example: 'scu',
+  })
+  @IsOptional()
+  @IsEnum(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
+  @ApiPropertyOptional({
+    description: 'Item quality (0-100)',
+    example: 85,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  quality?: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Location type',
+    example: 'city',
+  })
+  @IsOptional()
+  @IsString()
+  locationType?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'UEX ID of the location entity',
+    example: 10,
+  })
+  @IsOptional()
+  @IsInt()
+  locationUexId?: number | null;
 
   @ApiPropertyOptional({
     description: 'Optional notes',
@@ -118,6 +198,35 @@ export class OrgInventorySearchDto {
   @Min(0)
   maxQuantity?: number;
 
+  @ApiPropertyOptional({
+    description: 'Minimum quality filter',
+    example: 50,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minQuality?: number;
+
+  @ApiPropertyOptional({
+    description: 'Maximum quality filter',
+    example: 100,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxQuality?: number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by unit of measure',
+    enum: ['unit', 'scu', 'uscu'],
+    example: 'scu',
+  })
+  @IsOptional()
+  @IsEnum(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
   @ApiPropertyOptional({ description: 'Filter by UEX Item ID', example: 100 })
   @IsOptional()
   @IsInt()
@@ -151,11 +260,11 @@ export class OrgInventorySearchDto {
   @ApiPropertyOptional({
     description: 'Sort column',
     example: 'date_modified',
-    enum: ['name', 'quantity', 'date_added', 'date_modified'],
+    enum: ['name', 'quantity', 'quality', 'date_added', 'date_modified'],
   })
   @IsOptional()
-  @IsString()
-  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+  @IsIn(['name', 'quantity', 'quality', 'date_added', 'date_modified'])
+  sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified';
 
   @ApiPropertyOptional({
     description: 'Sort order',

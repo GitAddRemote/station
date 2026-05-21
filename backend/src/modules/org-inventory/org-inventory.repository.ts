@@ -128,7 +128,10 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     search?: string;
     minQuantity?: number;
     maxQuantity?: number;
-    sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+    minQuality?: number;
+    maxQuality?: number;
+    unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+    sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified';
     order?: 'asc' | 'desc';
   }): Promise<{ items: OrgInventoryItem[]; total: number }> {
     const query = this.createQueryBuilder('oii')
@@ -166,6 +169,24 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
       });
     }
 
+    if (filters.minQuality !== undefined) {
+      query.andWhere('oii.quality >= :minQuality', {
+        minQuality: filters.minQuality,
+      });
+    }
+
+    if (filters.maxQuality !== undefined) {
+      query.andWhere('oii.quality <= :maxQuality', {
+        maxQuality: filters.maxQuality,
+      });
+    }
+
+    if (filters.unitOfMeasure !== undefined) {
+      query.andWhere('oii.unit_of_measure = :unitOfMeasure', {
+        unitOfMeasure: filters.unitOfMeasure,
+      });
+    }
+
     if (filters.activeOnly) {
       query.andWhere('oii.active = true');
     }
@@ -192,13 +213,15 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   }
 
   private resolveSortColumn(
-    sort?: 'name' | 'quantity' | 'date_added' | 'date_modified',
+    sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified',
   ): string {
     switch (sort) {
       case 'name':
         return 'item.name';
       case 'quantity':
         return 'oii.quantity';
+      case 'quality':
+        return 'oii.quality';
       case 'date_added':
         return 'oii.dateAdded';
       case 'date_modified':

@@ -60,6 +60,10 @@ export class OrgInventoryService {
       gameId: entity.gameId,
       uexItemId: entity.uexItemId,
       quantity: entity.quantity,
+      unitOfMeasure: entity.unitOfMeasure,
+      quality: entity.quality,
+      locationType: entity.locationType,
+      locationUexId: entity.locationUexId,
       notes: entity.notes,
       active: entity.active,
       dateAdded: entity.dateAdded,
@@ -102,6 +106,7 @@ export class OrgInventoryService {
     const item = this.orgInventoryRepository.create({
       ...dto,
       orgId: dto.orgId,
+      unitOfMeasure: dto.unitOfMeasure ?? 'unit',
       addedBy: userId,
       modifiedBy: userId,
       active: true,
@@ -184,6 +189,18 @@ export class OrgInventoryService {
     if (dto.quantity !== undefined) {
       item.quantity = dto.quantity;
     }
+    if (dto.unitOfMeasure !== undefined) {
+      item.unitOfMeasure = dto.unitOfMeasure;
+    }
+    if (dto.quality !== undefined) {
+      item.quality = dto.quality;
+    }
+    if (dto.locationType !== undefined) {
+      item.locationType = dto.locationType;
+    }
+    if (dto.locationUexId !== undefined) {
+      item.locationUexId = dto.locationUexId;
+    }
     if (dto.notes !== undefined) {
       item.notes = dto.notes;
     }
@@ -259,6 +276,9 @@ export class OrgInventoryService {
       search: searchDto.search,
       minQuantity: searchDto.minQuantity,
       maxQuantity: searchDto.maxQuantity,
+      minQuality: searchDto.minQuality,
+      maxQuality: searchDto.maxQuality,
+      unitOfMeasure: searchDto.unitOfMeasure,
       sort: searchDto.sort || 'date_modified',
       order: searchDto.order || 'desc',
     });

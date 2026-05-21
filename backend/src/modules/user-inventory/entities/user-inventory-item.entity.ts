@@ -54,8 +54,30 @@ export class UserInventoryItem {
   @JoinColumn({ name: 'uex_item_id', referencedColumnName: 'uexId' })
   item!: UexItem;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  @Column({ type: 'decimal', precision: 12, scale: 6 })
   quantity!: number;
+
+  @Column({
+    name: 'unit_of_measure',
+    type: 'enum',
+    enum: ['unit', 'scu', 'uscu'],
+    default: 'unit',
+  })
+  unitOfMeasure!: 'unit' | 'scu' | 'uscu';
+
+  @Column({ type: 'smallint', nullable: true })
+  quality?: number | null;
+
+  @Column({
+    name: 'location_type',
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+  })
+  locationType?: string | null;
+
+  @Column({ name: 'location_uex_id', type: 'integer', nullable: true })
+  locationUexId?: number | null;
 
   @Column({ type: 'text', nullable: true })
   notes?: string;

@@ -185,7 +185,7 @@ export class InventorySharingService {
         deleted: false,
         active: true,
       },
-      relations: ['item', 'location', 'sharedOrg'],
+      relations: ['item', 'sharedOrg'],
       order: {
         dateModified: 'DESC',
       },

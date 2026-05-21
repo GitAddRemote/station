@@ -73,6 +73,24 @@ export class UserInventoryService {
       });
     }
 
+    if (searchDto.minQuality !== undefined) {
+      queryBuilder.andWhere('inventory.quality >= :minQuality', {
+        minQuality: searchDto.minQuality,
+      });
+    }
+
+    if (searchDto.maxQuality !== undefined) {
+      queryBuilder.andWhere('inventory.quality <= :maxQuality', {
+        maxQuality: searchDto.maxQuality,
+      });
+    }
+
+    if (searchDto.unitOfMeasure !== undefined) {
+      queryBuilder.andWhere('inventory.unit_of_measure = :unitOfMeasure', {
+        unitOfMeasure: searchDto.unitOfMeasure,
+      });
+    }
+
     if (searchDto.search) {
       queryBuilder.andWhere(
         '(item.name ILIKE :search OR inventory.notes ILIKE :search)',
@@ -276,6 +294,10 @@ export class UserInventoryService {
       gameId: item.gameId,
       uexItemId: item.uexItemId,
       quantity: parseFloat(item.quantity.toString()),
+      unitOfMeasure: item.unitOfMeasure,
+      quality: item.quality,
+      locationType: item.locationType,
+      locationUexId: item.locationUexId,
       notes: item.notes,
       sharedOrgId: item.sharedOrgId,
       active: item.active,
@@ -293,6 +315,8 @@ export class UserInventoryService {
         return 'item.name';
       case 'quantity':
         return 'inventory.quantity';
+      case 'quality':
+        return 'inventory.quality';
       case 'date_added':
         return 'inventory.dateAdded';
       case 'date_modified':

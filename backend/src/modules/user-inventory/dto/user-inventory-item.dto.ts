@@ -6,6 +6,8 @@ import {
   Min,
   Max,
   IsInt,
+  IsEnum,
+  IsIn,
 } from 'class-validator';
 
 export class UserInventoryItemDto {
@@ -14,6 +16,10 @@ export class UserInventoryItemDto {
   gameId!: number;
   uexItemId!: number;
   quantity!: number;
+  unitOfMeasure!: 'unit' | 'scu' | 'uscu';
+  quality?: number | null;
+  locationType?: string | null;
+  locationUexId?: number | null;
   notes?: string;
   sharedOrgId?: number | null;
   active!: boolean;
@@ -34,9 +40,26 @@ export class CreateUserInventoryItemDto {
   uexItemId!: number;
 
   @IsNumber()
-  @Min(0.01)
-  @Max(999999999.99)
+  @Min(0.000001)
+  @Max(999999999.999999)
   quantity!: number;
+
+  @IsOptional()
+  @IsEnum(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  quality?: number;
+
+  @IsOptional()
+  @IsString()
+  locationType?: string;
+
+  @IsOptional()
+  @IsInt()
+  locationUexId?: number;
 
   @IsOptional()
   @IsString()
@@ -50,9 +73,26 @@ export class CreateUserInventoryItemDto {
 export class UpdateUserInventoryItemDto {
   @IsOptional()
   @IsNumber()
-  @Min(0.01)
-  @Max(999999999.99)
+  @Min(0.000001)
+  @Max(999999999.999999)
   quantity?: number;
+
+  @IsOptional()
+  @IsEnum(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  quality?: number | null;
+
+  @IsOptional()
+  @IsString()
+  locationType?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  locationUexId?: number | null;
 
   @IsOptional()
   @IsString()
@@ -83,6 +123,20 @@ export class UserInventorySearchDto {
 
   @IsOptional()
   @IsInt()
+  @Min(0)
+  minQuality?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxQuality?: number;
+
+  @IsOptional()
+  @IsEnum(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
+  @IsOptional()
+  @IsInt()
   categoryId?: number;
 
   @IsOptional()
@@ -109,8 +163,8 @@ export class UserInventorySearchDto {
   offset?: number;
 
   @IsOptional()
-  @IsString()
-  sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+  @IsIn(['name', 'quantity', 'quality', 'date_added', 'date_modified'])
+  sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified';
 
   @IsOptional()
   @IsString()

@@ -116,6 +116,7 @@ export class UserInventoryController {
       sort: asString(query.sort) as
         | 'name'
         | 'quantity'
+        | 'quality'
         | 'date_added'
         | 'date_modified'
         | undefined,
@@ -134,6 +135,23 @@ export class UserInventoryController {
         ['max_quantity', 'maxQuantity'],
         'max_quantity',
       ),
+      minQuality: this.readOptionalNumber(
+        query,
+        ['min_quality', 'minQuality'],
+        'min_quality',
+        { integer: true, min: 0 },
+      ),
+      maxQuality: this.readOptionalNumber(
+        query,
+        ['max_quality', 'maxQuality'],
+        'max_quality',
+        { integer: true, min: 0 },
+      ),
+      unitOfMeasure: asString(query.unit_of_measure ?? query.unitOfMeasure) as
+        | 'unit'
+        | 'scu'
+        | 'uscu'
+        | undefined,
     };
 
     return this.userInventoryService.findAll(userId, searchDto);

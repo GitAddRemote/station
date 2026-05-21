@@ -122,6 +122,7 @@ describe('OrgInventoryService', () => {
         modifiedBy: 1,
         active: true,
         deleted: false,
+        unitOfMeasure: 'unit',
       });
     });
 
