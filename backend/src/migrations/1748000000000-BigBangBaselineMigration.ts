@@ -625,9 +625,6 @@ export class BigBangBaselineMigration1748000000000
         ('categories',    'idle'),
         ('items',         'idle'),
         ('companies',     'idle'),
-        ('star_systems',  'idle'),
-        ('planets',       'idle'),
-        ('space_stations','idle'),
         ('commodities',   'idle')
     `);
 
@@ -636,9 +633,6 @@ export class BigBangBaselineMigration1748000000000
         ('categories',    '0 2 * * *', 50),
         ('items',         '0 3 * * *', 200),
         ('companies',     '0 2 * * *', 50),
-        ('star_systems',  '0 4 * * *', 100),
-        ('planets',       '0 4 * * *', 100),
-        ('space_stations','0 5 * * *', 100),
         ('commodities',   '30 3 * * *', 50)
     `);
 
