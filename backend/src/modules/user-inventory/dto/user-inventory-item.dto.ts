@@ -41,7 +41,7 @@ export class CreateUserInventoryItemDto {
 
   @IsNumber()
   @Min(0.000001)
-  @Max(999999999.999999)
+  @Max(999999.999999)
   quantity!: number;
 
   @IsOptional()
@@ -76,7 +76,7 @@ export class UpdateUserInventoryItemDto {
   @IsOptional()
   @IsNumber()
   @Min(0.000001)
-  @Max(999999999.999999)
+  @Max(999999.999999)
   quantity?: number;
 
   @IsOptional()

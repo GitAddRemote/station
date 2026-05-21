@@ -288,7 +288,7 @@ export const InventoryFiltersPanel = ({
                 search: '',
                 categoryId: '',
                 sharedOnly: false,
-                valueRange: [0, maxQuantity || 100000],
+                valueRange: [0, maxQuantity || 999999.999999],
               })
             }
           >

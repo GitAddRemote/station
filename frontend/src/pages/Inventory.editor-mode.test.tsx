@@ -314,7 +314,7 @@ describe('Inventory editor mode inline controls', () => {
 
     expect(mockCreateItem).not.toHaveBeenCalled();
     expect(
-      screen.getByText('Quantity must be at least 0.01'),
+      screen.getByText('Quantity must be at least 0.000001'),
     ).toBeInTheDocument();
   });
 
@@ -595,13 +595,13 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.click(editorOption);
 
     const quantityInput = await screen.findByTestId('new-row-quantity');
-    fireEvent.change(quantityInput, { target: { value: '100000' } });
+    fireEvent.change(quantityInput, { target: { value: '999999.999999' } });
     expect(
       screen.getByText('Large quantity entered - verify value.'),
     ).toBeInTheDocument();
 
     fireEvent.change(quantityInput, { target: { value: '1000000' } });
-    expect(quantityInput).toHaveValue('100000');
+    expect(quantityInput).toHaveValue('999999.999999');
   });
 
   it('advances focus across inline row fields and into the next row', async () => {

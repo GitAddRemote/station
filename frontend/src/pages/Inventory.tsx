@@ -75,8 +75,8 @@ type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
 type InlineDraft = { quantity: number | '' };
 
 const GAME_ID = 1;
-const EDITOR_MODE_QUANTITY_MAX = 100000;
-const MIN_INVENTORY_QUANTITY = 0.01;
+const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
+const MIN_INVENTORY_QUANTITY = 0.000001;
 const ORG_ACCENT = '#f2a255';
 const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
 const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
@@ -163,7 +163,7 @@ const InventoryPage = () => {
     search: '',
     categoryId: '' as number | '',
     sharedOnly: false,
-    valueRange: [0, 100000] as [number, number],
+    valueRange: [0, 999999.999999] as [number, number],
   });
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'date'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -629,7 +629,7 @@ const InventoryPage = () => {
       return;
     }
     if (newItemQuantity < MIN_INVENTORY_QUANTITY) {
-      setCatalogError('Quantity must be at least 0.01.');
+      setCatalogError('Quantity must be at least 0.000001.');
       return;
     }
 
@@ -970,7 +970,7 @@ const InventoryPage = () => {
       !Number.isFinite(parsedQuantity) ||
       parsedQuantity < MIN_INVENTORY_QUANTITY
     ) {
-      errors.quantity = 'Quantity must be at least 0.01';
+      errors.quantity = 'Quantity must be at least 0.000001';
     }
 
     if (errors.item || errors.quantity) {
@@ -1198,7 +1198,7 @@ const InventoryPage = () => {
       ) {
         setInlineError((prev) => ({
           ...prev,
-          [item.id]: 'Quantity must be at least 0.01',
+          [item.id]: 'Quantity must be at least 0.000001',
         }));
         focusController.focus(item.id.toString(), 'quantity');
         return false;
@@ -1444,7 +1444,7 @@ const InventoryPage = () => {
                 type="number"
                 value={actionQuantity}
                 fullWidth
-                inputProps={{ min: 0, step: 0.01 }}
+                inputProps={{ min: 0, step: 0.000001 }}
                 onChange={(e) => setActionQuantity(Number(e.target.value))}
               />
               <TextField
@@ -1487,7 +1487,7 @@ const InventoryPage = () => {
                 label="Quantity to split"
                 type="number"
                 fullWidth
-                inputProps={{ min: 0.01, max: quantityValue, step: 0.01 }}
+                inputProps={{ min: 0.000001, max: quantityValue, step: 0.000001 }}
                 value={actionQuantity}
                 onChange={(e) => setActionQuantity(Number(e.target.value))}
               />
@@ -1533,7 +1533,7 @@ const InventoryPage = () => {
                 label="Quantity to share"
                 type="number"
                 fullWidth
-                inputProps={{ min: 0.01, max: quantityValue, step: 0.01 }}
+                inputProps={{ min: 0.000001, max: quantityValue, step: 0.000001 }}
                 value={actionQuantity}
                 onChange={(e) => setActionQuantity(Number(e.target.value))}
               />
@@ -2011,7 +2011,7 @@ const InventoryPage = () => {
                           ) {
                             setNewRowErrors((prev) => ({
                               ...prev,
-                              quantity: 'Quantity must be at least 0.01',
+                              quantity: 'Quantity must be at least 0.000001',
                               api: null,
                             }));
                           } else {
@@ -2203,7 +2203,7 @@ const InventoryPage = () => {
                           fullWidth
                           label="Quantity"
                           type="number"
-                          inputProps={{ min: 0.01, step: 0.01 }}
+                          inputProps={{ min: 0.000001, step: 0.000001 }}
                           value={newItemQuantity}
                           onChange={(e) =>
                             setNewItemQuantity(Number(e.target.value))
@@ -2215,7 +2215,7 @@ const InventoryPage = () => {
                             variant="outlined"
                             onClick={() =>
                               setNewItemQuantity((qty) =>
-                                Number(Math.max(0.01, qty - 1).toFixed(2)),
+                                Number(Math.max(0.000001, qty - 1).toFixed(6)),
                               )
                             }
                           >
@@ -2226,7 +2226,7 @@ const InventoryPage = () => {
                             variant="outlined"
                             onClick={() =>
                               setNewItemQuantity((qty) =>
-                                Number(Math.max(0.01, qty + 1).toFixed(2)),
+                                Number(Math.max(0.000001, qty + 1).toFixed(6)),
                               )
                             }
                           >

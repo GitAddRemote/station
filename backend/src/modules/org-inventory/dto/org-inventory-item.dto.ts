@@ -56,7 +56,7 @@ export class CreateOrgInventoryItemDto {
   @ApiProperty({ description: 'Quantity', example: 100.5, minimum: 0.000001 })
   @IsNumber()
   @Min(0.000001)
-  @Max(999999999.999999)
+  @Max(999999.999999)
   quantity!: number;
 
   @ApiPropertyOptional({
@@ -118,7 +118,7 @@ export class UpdateOrgInventoryItemDto {
   @IsOptional()
   @IsNumber()
   @Min(0.000001)
-  @Max(999999999.999999)
+  @Max(999999.999999)
   quantity?: number;
 
   @ApiPropertyOptional({

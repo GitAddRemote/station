@@ -18,8 +18,8 @@ import type {
 } from '../../services/inventory.service';
 import type { FocusController } from '../../utils/focusController';
 
-const EDITOR_MODE_QUANTITY_MAX = 100000;
-const MIN_INVENTORY_QUANTITY = 0.01;
+const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
+const MIN_INVENTORY_QUANTITY = 0.000001;
 
 export type InventoryRecord = InventoryItem | OrgInventoryItem;
 
@@ -194,7 +194,7 @@ const InventoryInlineRow = ({
                     !Number.isFinite(numeric) ||
                     numeric < MIN_INVENTORY_QUANTITY
                   ) {
-                    onErrorChange(item.id, 'Quantity must be at least 0.01');
+                    onErrorChange(item.id, 'Quantity must be at least 0.000001');
                   } else {
                     onErrorChange(item.id, null);
                   }
