@@ -279,271 +279,245 @@ export class BigBangBaselineMigration1748000000000
     // -- uex_item -------------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "uex_item" (
-        "id"               BIGSERIAL    PRIMARY KEY,
-        "uex_id"           INTEGER      NOT NULL UNIQUE,
-        "id_category"      INTEGER      REFERENCES "uex_category"("uex_id"),
-        "id_company"       INTEGER      REFERENCES "uex_company"("uex_id"),
-        "name"             VARCHAR(255) NOT NULL,
-        "section"          VARCHAR(100),
-        "category_name"    VARCHAR(255),
-        "company_name"     VARCHAR(255),
-        "slug"             VARCHAR(255),
-        "uuid"             VARCHAR(64),
-        "size"             VARCHAR(10),
-        "is_exclusive_pledge"      BOOLEAN DEFAULT FALSE,
-        "is_exclusive_subscriber"  BOOLEAN DEFAULT FALSE,
-        "is_exclusive_concierge"   BOOLEAN DEFAULT FALSE,
-        "is_commodity"             BOOLEAN DEFAULT FALSE,
-        "is_harvestable"           BOOLEAN DEFAULT FALSE,
-        "screenshot"               VARCHAR(500),
-        "game_version"             VARCHAR(20),
-        "active"           BOOLEAN      NOT NULL DEFAULT TRUE,
-        "deleted"          BOOLEAN      NOT NULL DEFAULT FALSE,
-        "date_added"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "date_modified"    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "uex_date_added"   TIMESTAMPTZ,
+        "id"                BIGSERIAL    PRIMARY KEY,
+        "uex_id"            INTEGER      NOT NULL UNIQUE,
+        "star_citizen_uuid" VARCHAR(255),
+        "id_category"       INTEGER      REFERENCES "uex_category"("uex_id"),
+        "id_company"        INTEGER      REFERENCES "uex_company"("uex_id"),
+        "name"              VARCHAR(255) NOT NULL,
+        "section"           VARCHAR(100),
+        "category"          VARCHAR(100),
+        "company_name"      VARCHAR(255),
+        "size"              VARCHAR(50),
+        "weight_scu"        DECIMAL(10,2),
+        "is_commodity"      BOOLEAN      NOT NULL DEFAULT FALSE,
+        "is_buyable"        BOOLEAN      NOT NULL DEFAULT FALSE,
+        "is_sellable"       BOOLEAN      NOT NULL DEFAULT FALSE,
+        "active"            BOOLEAN      NOT NULL DEFAULT TRUE,
+        "deleted"           BOOLEAN      NOT NULL DEFAULT FALSE,
+        "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"         BIGINT       REFERENCES "user"("id"),
-        "modified_by"      BIGINT       REFERENCES "user"("id")
+        "added_by"          BIGINT       REFERENCES "user"("id"),
+        "modified_by"       BIGINT       REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_item_uex_id"   ON "uex_item" ("uex_id")`,
+      `CREATE INDEX "idx_uex_items_active"    ON "uex_item" ("uex_id")            WHERE "deleted" = FALSE AND "active" = TRUE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_item_category" ON "uex_item" ("id_category") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_items_category"  ON "uex_item" ("id_category")       WHERE "deleted" = FALSE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_item_company"  ON "uex_item" ("id_company")  WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_items_company"   ON "uex_item" ("id_company")        WHERE "deleted" = FALSE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_item_active"   ON "uex_item" ("uex_id")      WHERE "deleted" = FALSE AND "active" = TRUE`,
+      `CREATE INDEX "idx_uex_items_sc_uuid"   ON "uex_item" ("star_citizen_uuid") WHERE "deleted" = FALSE AND "star_citizen_uuid" IS NOT NULL`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_item_name"     ON "uex_item" ("name")        WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_items_search"    ON "uex_item" ("name")              WHERE "deleted" = FALSE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_item_uuid"     ON "uex_item" ("uuid")        WHERE "uuid" IS NOT NULL`,
+      `CREATE INDEX "idx_uex_items_sync"      ON "uex_item" ("uex_date_modified") WHERE "deleted" = FALSE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_item_sync"     ON "uex_item" ("uex_date_modified") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_items_commodity" ON "uex_item" ("is_commodity")      WHERE "deleted" = FALSE AND "is_commodity" = TRUE`,
     );
 
     // -- uex_star_system ------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "uex_star_system" (
-        "id"                  BIGSERIAL    PRIMARY KEY,
-        "uex_id"              INTEGER      NOT NULL UNIQUE,
-        "name"                VARCHAR(255) NOT NULL,
-        "code"                VARCHAR(20),
-        "is_available"        BOOLEAN      DEFAULT FALSE,
-        "is_available_live"   BOOLEAN      DEFAULT FALSE,
-        "active"              BOOLEAN      NOT NULL DEFAULT TRUE,
-        "deleted"             BOOLEAN      NOT NULL DEFAULT FALSE,
-        "date_added"          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "date_modified"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "uex_date_added"      TIMESTAMPTZ,
-        "uex_date_modified"   TIMESTAMPTZ,
-        "added_by"            BIGINT       REFERENCES "user"("id"),
-        "modified_by"         BIGINT       REFERENCES "user"("id")
+        "id"                BIGSERIAL    PRIMARY KEY,
+        "uex_id"            INTEGER      NOT NULL UNIQUE,
+        "name"              VARCHAR(255) NOT NULL,
+        "code"              VARCHAR(50)  NOT NULL,
+        "is_available"      BOOLEAN      NOT NULL DEFAULT TRUE,
+        "active"            BOOLEAN      NOT NULL DEFAULT TRUE,
+        "deleted"           BOOLEAN      NOT NULL DEFAULT FALSE,
+        "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "uex_date_modified" TIMESTAMPTZ,
+        "added_by"          BIGINT       REFERENCES "user"("id"),
+        "modified_by"       BIGINT       REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_star_system_uex_id"   ON "uex_star_system" ("uex_id")`,
+      `CREATE INDEX "idx_uex_star_systems_active" ON "uex_star_system" ("uex_id") WHERE "deleted" = FALSE AND "active" = TRUE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_star_system_active"   ON "uex_star_system" ("is_available_live") WHERE "is_available_live" = TRUE`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "idx_uex_star_system_sync"     ON "uex_star_system" ("uex_date_modified") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_star_systems_code"   ON "uex_star_system" ("code")   WHERE "deleted" = FALSE`,
     );
 
     // -- uex_planet -----------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "uex_planet" (
-        "id"                  BIGSERIAL    PRIMARY KEY,
-        "uex_id"              INTEGER      NOT NULL UNIQUE,
-        "id_star_system"      INTEGER      REFERENCES "uex_star_system"("uex_id"),
-        "name"                VARCHAR(255) NOT NULL,
-        "is_available"        BOOLEAN      DEFAULT FALSE,
-        "is_available_live"   BOOLEAN      DEFAULT FALSE,
-        "active"              BOOLEAN      NOT NULL DEFAULT TRUE,
-        "deleted"             BOOLEAN      NOT NULL DEFAULT FALSE,
-        "date_added"          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "date_modified"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "uex_date_added"      TIMESTAMPTZ,
-        "uex_date_modified"   TIMESTAMPTZ,
-        "added_by"            BIGINT       REFERENCES "user"("id"),
-        "modified_by"         BIGINT       REFERENCES "user"("id")
+        "id"                BIGSERIAL    PRIMARY KEY,
+        "uex_id"            INTEGER      NOT NULL UNIQUE,
+        "star_system_id"    INTEGER      REFERENCES "uex_star_system"("uex_id"),
+        "name"              VARCHAR(255) NOT NULL,
+        "code"              VARCHAR(50),
+        "is_available"      BOOLEAN      NOT NULL DEFAULT TRUE,
+        "is_landable"       BOOLEAN      NOT NULL DEFAULT FALSE,
+        "active"            BOOLEAN      NOT NULL DEFAULT TRUE,
+        "deleted"           BOOLEAN      NOT NULL DEFAULT FALSE,
+        "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "uex_date_modified" TIMESTAMPTZ,
+        "added_by"          BIGINT       REFERENCES "user"("id"),
+        "modified_by"       BIGINT       REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_planet_uex_id"     ON "uex_planet" ("uex_id")`,
+      `CREATE INDEX "idx_uex_planets_active" ON "uex_planet" ("uex_id")         WHERE "deleted" = FALSE AND "active" = TRUE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_planet_star_system" ON "uex_planet" ("id_star_system") WHERE "deleted" = FALSE`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "idx_uex_planet_sync"        ON "uex_planet" ("uex_date_modified") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_planets_system" ON "uex_planet" ("star_system_id") WHERE "deleted" = FALSE`,
     );
 
     // -- uex_moon -------------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "uex_moon" (
-        "id"                  BIGSERIAL    PRIMARY KEY,
-        "uex_id"              INTEGER      NOT NULL UNIQUE,
-        "id_star_system"      INTEGER      REFERENCES "uex_star_system"("uex_id"),
-        "id_planet"           INTEGER      REFERENCES "uex_planet"("uex_id"),
-        "name"                VARCHAR(255) NOT NULL,
-        "is_available"        BOOLEAN      DEFAULT FALSE,
-        "is_available_live"   BOOLEAN      DEFAULT FALSE,
-        "active"              BOOLEAN      NOT NULL DEFAULT TRUE,
-        "deleted"             BOOLEAN      NOT NULL DEFAULT FALSE,
-        "date_added"          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "date_modified"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "uex_date_added"      TIMESTAMPTZ,
-        "uex_date_modified"   TIMESTAMPTZ,
-        "added_by"            BIGINT       REFERENCES "user"("id"),
-        "modified_by"         BIGINT       REFERENCES "user"("id")
+        "id"                BIGSERIAL    PRIMARY KEY,
+        "uex_id"            INTEGER      NOT NULL UNIQUE,
+        "planet_id"         INTEGER      REFERENCES "uex_planet"("uex_id"),
+        "name"              VARCHAR(255) NOT NULL,
+        "code"              VARCHAR(50),
+        "is_available"      BOOLEAN      NOT NULL DEFAULT TRUE,
+        "is_landable"       BOOLEAN      NOT NULL DEFAULT FALSE,
+        "active"            BOOLEAN      NOT NULL DEFAULT TRUE,
+        "deleted"           BOOLEAN      NOT NULL DEFAULT FALSE,
+        "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "uex_date_modified" TIMESTAMPTZ,
+        "added_by"          BIGINT       REFERENCES "user"("id"),
+        "modified_by"       BIGINT       REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_moon_uex_id"     ON "uex_moon" ("uex_id")`,
+      `CREATE INDEX "idx_uex_moons_active" ON "uex_moon" ("uex_id")   WHERE "deleted" = FALSE AND "active" = TRUE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_moon_star_system" ON "uex_moon" ("id_star_system") WHERE "deleted" = FALSE`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "idx_uex_moon_planet"      ON "uex_moon" ("id_planet")     WHERE "deleted" = FALSE`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "idx_uex_moon_sync"        ON "uex_moon" ("uex_date_modified") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_moons_planet" ON "uex_moon" ("planet_id") WHERE "deleted" = FALSE`,
     );
 
     // -- uex_city -------------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "uex_city" (
-        "id"                  BIGSERIAL    PRIMARY KEY,
-        "uex_id"              INTEGER      NOT NULL UNIQUE,
-        "id_star_system"      INTEGER      REFERENCES "uex_star_system"("uex_id"),
-        "id_planet"           INTEGER      REFERENCES "uex_planet"("uex_id"),
-        "id_moon"             INTEGER      REFERENCES "uex_moon"("uex_id"),
-        "name"                VARCHAR(255) NOT NULL,
-        "is_available"        BOOLEAN      DEFAULT FALSE,
-        "is_available_live"   BOOLEAN      DEFAULT FALSE,
-        "has_trade_terminal"  BOOLEAN      DEFAULT FALSE,
-        "active"              BOOLEAN      NOT NULL DEFAULT TRUE,
-        "deleted"             BOOLEAN      NOT NULL DEFAULT FALSE,
-        "date_added"          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "date_modified"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "uex_date_added"      TIMESTAMPTZ,
-        "uex_date_modified"   TIMESTAMPTZ,
-        "added_by"            BIGINT       REFERENCES "user"("id"),
-        "modified_by"         BIGINT       REFERENCES "user"("id")
+        "id"                BIGSERIAL    PRIMARY KEY,
+        "uex_id"            INTEGER      NOT NULL UNIQUE,
+        "planet_id"         INTEGER      REFERENCES "uex_planet"("uex_id"),
+        "moon_id"           INTEGER      REFERENCES "uex_moon"("uex_id"),
+        "name"              VARCHAR(255) NOT NULL,
+        "code"              VARCHAR(50),
+        "is_available"      BOOLEAN      NOT NULL DEFAULT TRUE,
+        "active"            BOOLEAN      NOT NULL DEFAULT TRUE,
+        "deleted"           BOOLEAN      NOT NULL DEFAULT FALSE,
+        "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "uex_date_modified" TIMESTAMPTZ,
+        "added_by"          BIGINT       REFERENCES "user"("id"),
+        "modified_by"       BIGINT       REFERENCES "user"("id"),
+        CONSTRAINT "CHK_uex_city_location" CHECK (
+          ("planet_id" IS NOT NULL AND "moon_id" IS NULL) OR
+          ("planet_id" IS NULL AND "moon_id" IS NOT NULL)
+        )
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_city_uex_id"     ON "uex_city" ("uex_id")`,
+      `CREATE INDEX "idx_uex_cities_active" ON "uex_city" ("uex_id")   WHERE "deleted" = FALSE AND "active" = TRUE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_city_star_system" ON "uex_city" ("id_star_system") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_cities_planet" ON "uex_city" ("planet_id") WHERE "deleted" = FALSE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_city_sync"        ON "uex_city" ("uex_date_modified") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_cities_moon"   ON "uex_city" ("moon_id")   WHERE "deleted" = FALSE`,
     );
 
     // -- uex_space_station ----------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "uex_space_station" (
-        "id"                  BIGSERIAL    PRIMARY KEY,
-        "uex_id"              INTEGER      NOT NULL UNIQUE,
-        "id_star_system"      INTEGER      REFERENCES "uex_star_system"("uex_id"),
-        "id_planet"           INTEGER      REFERENCES "uex_planet"("uex_id"),
-        "id_moon"             INTEGER      REFERENCES "uex_moon"("uex_id"),
-        "name"                VARCHAR(255) NOT NULL,
-        "is_available"        BOOLEAN      DEFAULT FALSE,
-        "is_available_live"   BOOLEAN      DEFAULT FALSE,
-        "has_trade_terminal"  BOOLEAN      DEFAULT FALSE,
-        "active"              BOOLEAN      NOT NULL DEFAULT TRUE,
-        "deleted"             BOOLEAN      NOT NULL DEFAULT FALSE,
-        "date_added"          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "date_modified"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "uex_date_added"      TIMESTAMPTZ,
-        "uex_date_modified"   TIMESTAMPTZ,
-        "added_by"            BIGINT       REFERENCES "user"("id"),
-        "modified_by"         BIGINT       REFERENCES "user"("id")
+        "id"                BIGSERIAL    PRIMARY KEY,
+        "uex_id"            INTEGER      NOT NULL UNIQUE,
+        "star_system_id"    INTEGER      REFERENCES "uex_star_system"("uex_id"),
+        "planet_id"         INTEGER      REFERENCES "uex_planet"("uex_id"),
+        "moon_id"           INTEGER      REFERENCES "uex_moon"("uex_id"),
+        "name"              VARCHAR(255) NOT NULL,
+        "code"              VARCHAR(50),
+        "is_available"      BOOLEAN      NOT NULL DEFAULT TRUE,
+        "active"            BOOLEAN      NOT NULL DEFAULT TRUE,
+        "deleted"           BOOLEAN      NOT NULL DEFAULT FALSE,
+        "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "uex_date_modified" TIMESTAMPTZ,
+        "added_by"          BIGINT       REFERENCES "user"("id"),
+        "modified_by"       BIGINT       REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_space_station_uex_id"     ON "uex_space_station" ("uex_id")`,
+      `CREATE INDEX "idx_uex_space_stations_active" ON "uex_space_station" ("uex_id")         WHERE "deleted" = FALSE AND "active" = TRUE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_space_station_star_system" ON "uex_space_station" ("id_star_system") WHERE "deleted" = FALSE`,
-    );
-    await queryRunner.query(
-      `CREATE INDEX "idx_uex_space_station_sync"        ON "uex_space_station" ("uex_date_modified") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_space_stations_system" ON "uex_space_station" ("star_system_id") WHERE "deleted" = FALSE`,
     );
 
     // -- uex_outpost ----------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "uex_outpost" (
-        "id"                  BIGSERIAL    PRIMARY KEY,
-        "uex_id"              INTEGER      NOT NULL UNIQUE,
-        "id_star_system"      INTEGER      REFERENCES "uex_star_system"("uex_id"),
-        "id_planet"           INTEGER      REFERENCES "uex_planet"("uex_id"),
-        "id_moon"             INTEGER      REFERENCES "uex_moon"("uex_id"),
-        "name"                VARCHAR(255) NOT NULL,
-        "is_available"        BOOLEAN      DEFAULT FALSE,
-        "is_available_live"   BOOLEAN      DEFAULT FALSE,
-        "active"              BOOLEAN      NOT NULL DEFAULT TRUE,
-        "deleted"             BOOLEAN      NOT NULL DEFAULT FALSE,
-        "date_added"          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "date_modified"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "uex_date_added"      TIMESTAMPTZ,
-        "uex_date_modified"   TIMESTAMPTZ,
-        "added_by"            BIGINT       REFERENCES "user"("id"),
-        "modified_by"         BIGINT       REFERENCES "user"("id")
+        "id"                BIGSERIAL    PRIMARY KEY,
+        "uex_id"            INTEGER      NOT NULL UNIQUE,
+        "planet_id"         INTEGER      REFERENCES "uex_planet"("uex_id"),
+        "moon_id"           INTEGER      REFERENCES "uex_moon"("uex_id"),
+        "name"              VARCHAR(255) NOT NULL,
+        "code"              VARCHAR(50),
+        "is_available"      BOOLEAN      NOT NULL DEFAULT TRUE,
+        "active"            BOOLEAN      NOT NULL DEFAULT TRUE,
+        "deleted"           BOOLEAN      NOT NULL DEFAULT FALSE,
+        "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "uex_date_modified" TIMESTAMPTZ,
+        "added_by"          BIGINT       REFERENCES "user"("id"),
+        "modified_by"       BIGINT       REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_outpost_uex_id"     ON "uex_outpost" ("uex_id")`,
+      `CREATE INDEX "idx_uex_outposts_active" ON "uex_outpost" ("uex_id")   WHERE "deleted" = FALSE AND "active" = TRUE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_outpost_star_system" ON "uex_outpost" ("id_star_system") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_outposts_planet" ON "uex_outpost" ("planet_id") WHERE "deleted" = FALSE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_outpost_sync"        ON "uex_outpost" ("uex_date_modified") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_outposts_moon"   ON "uex_outpost" ("moon_id")   WHERE "deleted" = FALSE`,
     );
 
     // -- uex_poi --------------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "uex_poi" (
-        "id"                  BIGSERIAL    PRIMARY KEY,
-        "uex_id"              INTEGER      NOT NULL UNIQUE,
-        "id_star_system"      INTEGER      REFERENCES "uex_star_system"("uex_id"),
-        "id_planet"           INTEGER      REFERENCES "uex_planet"("uex_id"),
-        "id_moon"             INTEGER      REFERENCES "uex_moon"("uex_id"),
-        "name"                VARCHAR(255) NOT NULL,
-        "is_available"        BOOLEAN      DEFAULT FALSE,
-        "is_available_live"   BOOLEAN      DEFAULT FALSE,
-        "active"              BOOLEAN      NOT NULL DEFAULT TRUE,
-        "deleted"             BOOLEAN      NOT NULL DEFAULT FALSE,
-        "date_added"          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "date_modified"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "uex_date_added"      TIMESTAMPTZ,
-        "uex_date_modified"   TIMESTAMPTZ,
-        "added_by"            BIGINT       REFERENCES "user"("id"),
-        "modified_by"         BIGINT       REFERENCES "user"("id")
+        "id"                BIGSERIAL    PRIMARY KEY,
+        "uex_id"            INTEGER      NOT NULL UNIQUE,
+        "star_system_id"    INTEGER      REFERENCES "uex_star_system"("uex_id"),
+        "planet_id"         INTEGER      REFERENCES "uex_planet"("uex_id"),
+        "moon_id"           INTEGER      REFERENCES "uex_moon"("uex_id"),
+        "name"              VARCHAR(255) NOT NULL,
+        "code"              VARCHAR(50),
+        "type"              VARCHAR(100),
+        "is_available"      BOOLEAN      NOT NULL DEFAULT TRUE,
+        "active"            BOOLEAN      NOT NULL DEFAULT TRUE,
+        "deleted"           BOOLEAN      NOT NULL DEFAULT FALSE,
+        "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        "uex_date_modified" TIMESTAMPTZ,
+        "added_by"          BIGINT       REFERENCES "user"("id"),
+        "modified_by"       BIGINT       REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_poi_uex_id"     ON "uex_poi" ("uex_id")`,
+      `CREATE INDEX "idx_uex_poi_active" ON "uex_poi" ("uex_id") WHERE "deleted" = FALSE AND "active" = TRUE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_poi_star_system" ON "uex_poi" ("id_star_system") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_poi_system" ON "uex_poi" ("star_system_id") WHERE "deleted" = FALSE`,
     );
     await queryRunner.query(
-      `CREATE INDEX "idx_uex_poi_sync"        ON "uex_poi" ("uex_date_modified") WHERE "deleted" = FALSE`,
+      `CREATE INDEX "idx_uex_poi_type" ON "uex_poi" ("type") WHERE "deleted" = FALSE`,
     );
 
     // -- uex_commodity --------------------------------------------------------
