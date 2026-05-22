@@ -7,6 +7,7 @@ import {
   Index,
   CreateDateColumn,
 } from 'typeorm';
+import { Transform } from 'class-transformer';
 import { User } from '../users/user.entity';
 import { Organization } from '../organizations/organization.entity';
 import { Role } from '../roles/role.entity';
@@ -21,6 +22,7 @@ export class UserOrganizationRole {
   id!: number;
 
   @Column({ type: 'bigint' })
+  @Transform(({ value }) => Number(value))
   userId!: number;
 
   @Column()

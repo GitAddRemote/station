@@ -5,11 +5,13 @@ import {
   OneToMany,
   Index,
 } from 'typeorm';
+import { Transform } from 'class-transformer';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
 @Entity()
 export class User {
   @PrimaryGeneratedColumn({ type: 'bigint' })
+  @Transform(({ value }) => Number(value))
   id!: number;
 
   @Column({ unique: true })
