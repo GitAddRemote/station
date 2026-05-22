@@ -25,10 +25,14 @@ export function LocationPairRequired(
       validator: {
         validate(_value: unknown, args: ValidationArguments): boolean {
           const obj = args.object as Record<string, unknown>;
-          const hasType =
-            obj.locationType !== undefined && obj.locationType !== null;
-          const hasId =
-            obj.locationUexId !== undefined && obj.locationUexId !== null;
+          const hasType = Object.prototype.hasOwnProperty.call(
+            obj,
+            'locationType',
+          );
+          const hasId = Object.prototype.hasOwnProperty.call(
+            obj,
+            'locationUexId',
+          );
           return hasType === hasId;
         },
       },
