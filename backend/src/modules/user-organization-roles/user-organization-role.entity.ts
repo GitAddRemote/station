@@ -20,7 +20,7 @@ export class UserOrganizationRole {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column()
+  @Column({ type: 'bigint' })
   userId!: number;
 
   @Column()

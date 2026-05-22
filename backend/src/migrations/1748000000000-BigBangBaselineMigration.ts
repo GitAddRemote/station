@@ -1977,13 +1977,16 @@ export class BigBangBaselineMigration1748000000000
       ON CONFLICT DO NOTHING
     `);
 
-    // Seed default roles
+    // Seed default roles matching DEFAULT_ROLE_PERMISSIONS in permissions.constants.ts
     await queryRunner.query(`
       INSERT INTO "role" ("name", "permissions", "description")
       VALUES
-        ('Admin', '{"*": true}', 'Full system access'),
-        ('Inventory Manager', '{"can_view_org_inventory": true, "can_edit_org_inventory": true, "can_admin_org_inventory": true, "can_view_member_shared_items": true}', 'Can manage organization inventory'),
-        ('Member', '{"can_view_org_inventory": true}', 'Basic member access')
+        ('Owner',            '{"can_view_org_inventory": true, "can_edit_org_inventory": true, "can_admin_org_inventory": true, "can_view_member_shared_items": true}',  'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.'),
+        ('Admin',            '{"can_view_org_inventory": true, "can_edit_org_inventory": true, "can_admin_org_inventory": true, "can_view_member_shared_items": true}',  'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.'),
+        ('Director',         '{"can_view_org_inventory": true, "can_edit_org_inventory": true, "can_admin_org_inventory": true, "can_view_member_shared_items": true}',  'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.'),
+        ('Inventory Manager','{"can_view_org_inventory": true, "can_edit_org_inventory": true, "can_admin_org_inventory": true, "can_view_member_shared_items": true}',  'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.'),
+        ('Member',           '{"can_view_org_inventory": true, "can_edit_org_inventory": false, "can_admin_org_inventory": false, "can_view_member_shared_items": true}', 'Standard member access. Can view organization inventory and member shared items.'),
+        ('Viewer',           '{"can_view_org_inventory": true, "can_edit_org_inventory": false, "can_admin_org_inventory": false, "can_view_member_shared_items": false}','Read-only access. Can only view organization inventory.')
       ON CONFLICT ("name") DO NOTHING
     `);
   }
