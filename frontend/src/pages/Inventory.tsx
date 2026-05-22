@@ -1332,6 +1332,11 @@ const InventoryPage = () => {
           uexItemId: actionItem.uexItemId,
           quantity,
           notes: actionItem.notes,
+          unitOfMeasure: actionItem.unitOfMeasure,
+          quality: actionItem.quality,
+          locationType: actionItem.locationType,
+          locationUexId: actionItem.locationUexId,
+          allowDuplicate: true,
         });
       } else {
         await inventoryService.updateItem(actionItem.id, {
@@ -1342,7 +1347,12 @@ const InventoryPage = () => {
           uexItemId: actionItem.uexItemId,
           quantity,
           notes: actionItem.notes,
+          unitOfMeasure: actionItem.unitOfMeasure,
+          quality: actionItem.quality,
+          locationType: actionItem.locationType,
+          locationUexId: actionItem.locationUexId,
           sharedOrgId: actionItem.sharedOrgId,
+          allowDuplicate: true,
         });
       }
       closeActionMenu();

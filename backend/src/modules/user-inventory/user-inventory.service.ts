@@ -177,7 +177,7 @@ export class UserInventoryService {
           .andWhere('inventory.active = TRUE')
           .getOne();
 
-        if (existing) {
+        if (existing && !createDto.allowDuplicate) {
           // Use SQL NUMERIC addition to avoid JS floating-point drift
           const result = await manager.query(
             `UPDATE "user_inventory_item"

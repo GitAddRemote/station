@@ -117,7 +117,7 @@ export class OrgInventoryService {
         .andWhere('oii.active = TRUE')
         .getOne();
 
-      if (existing) {
+      if (existing && !dto.allowDuplicate) {
         const result = await manager.query(
           `UPDATE "org_inventory_item"
            SET quantity      = quantity + $1::numeric,

@@ -191,7 +191,7 @@ export const inventoryService = {
     item: Omit<
       InventoryItem,
       'id' | 'userId' | 'dateAdded' | 'dateModified' | 'active' | 'unitOfMeasure'
-    > & { unitOfMeasure?: 'unit' | 'scu' | 'uscu' },
+    > & { unitOfMeasure?: 'unit' | 'scu' | 'uscu'; allowDuplicate?: boolean },
   ): Promise<InventoryItem> {
     const response = await axios.post(`${API_URL}/api/inventory`, item, {
       withCredentials: true,
@@ -309,7 +309,7 @@ export const inventoryService = {
       | 'addedBy'
       | 'modifiedBy'
       | 'unitOfMeasure'
-    > & { unitOfMeasure?: 'unit' | 'scu' | 'uscu' },
+    > & { unitOfMeasure?: 'unit' | 'scu' | 'uscu'; allowDuplicate?: boolean },
   ): Promise<OrgInventoryItem> {
     const response = await axios.post(
       `${API_URL}/api/orgs/${orgId}/inventory`,

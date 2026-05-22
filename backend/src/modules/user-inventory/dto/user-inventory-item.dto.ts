@@ -75,6 +75,10 @@ export class CreateUserInventoryItemDto {
   @IsOptional()
   @IsInt()
   sharedOrgId?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  allowDuplicate?: boolean;
 }
 
 @LocationPairRequired()
