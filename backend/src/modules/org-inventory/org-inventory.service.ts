@@ -331,44 +331,49 @@ export class OrgInventoryService {
     id: string,
     dto: UpdateOrgInventoryItemDto,
   ): Promise<OrgInventoryItemDto> {
-    const item = await this.orgInventoryRepository.findByIdNotDeleted(id);
-
-    if (!item) {
-      throw new NotFoundException('Inventory item not found');
-    }
-
-    if (item.orgId !== orgId) {
-      throw new NotFoundException('Inventory item not found in this org');
-    }
-
-    await this.verifyInventoryPermission(userId, item.orgId, 'manage');
-
-    if (dto.quantity !== undefined) {
-      item.quantity = dto.quantity;
-    }
-    if (dto.unitOfMeasure !== undefined) {
-      item.unitOfMeasure = dto.unitOfMeasure;
-    }
-    if (dto.quality !== undefined) {
-      item.quality = dto.quality;
-    }
-    if (dto.locationType !== undefined) {
-      item.locationType = dto.locationType;
-    }
-    if (dto.locationUexId !== undefined) {
-      item.locationUexId = dto.locationUexId;
-    }
-    if (dto.notes !== undefined) {
-      item.notes = dto.notes;
-    }
-    if (dto.active !== undefined) {
-      item.active = dto.active;
-    }
-
-    item.modifiedBy = userId;
+    await this.verifyInventoryPermission(userId, orgId, 'manage');
 
     const savedId = await this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(OrgInventoryItem);
+
+      // Pessimistic write lock pins the row for the duration of the transaction,
+      // preventing a concurrent split() or delete() from modifying it between
+      // our load and save.
+      const item = await repo
+        .createQueryBuilder('oii')
+        .setLock('pessimistic_write')
+        .where('oii.id = :id', { id })
+        .andWhere('oii.org_id = :orgId', { orgId })
+        .andWhere('oii.deleted = FALSE')
+        .getOne();
+
+      if (!item) {
+        throw new NotFoundException(`Inventory item with ID ${id} not found`);
+      }
+
+      if (dto.quantity !== undefined) {
+        item.quantity = dto.quantity;
+      }
+      if (dto.unitOfMeasure !== undefined) {
+        item.unitOfMeasure = dto.unitOfMeasure;
+      }
+      if (dto.quality !== undefined) {
+        item.quality = dto.quality;
+      }
+      if (dto.locationType !== undefined) {
+        item.locationType = dto.locationType;
+      }
+      if (dto.locationUexId !== undefined) {
+        item.locationUexId = dto.locationUexId;
+      }
+      if (dto.notes !== undefined) {
+        item.notes = dto.notes;
+      }
+      if (dto.active !== undefined) {
+        item.active = dto.active;
+      }
+
+      item.modifiedBy = userId;
 
       // Lock the post-update identity so concurrent create() or update()
       // calls targeting the same identity serialize against this transaction.
@@ -378,24 +383,25 @@ export class OrgInventoryService {
 
       if (item.active) {
         const collision = await repo
-          .createQueryBuilder('oii')
-          .where('oii.id != :id', { id })
-          .andWhere('oii.org_id = :orgId', { orgId })
-          .andWhere('oii.game_id = :gameId', { gameId: item.gameId })
-          .andWhere('oii.uex_item_id = :uexItemId', {
+          .createQueryBuilder('oii2')
+          .where('oii2.id != :id', { id })
+          .andWhere('oii2.org_id = :orgId', { orgId })
+          .andWhere('oii2.game_id = :gameId', { gameId: item.gameId })
+          .andWhere('oii2.uex_item_id = :uexItemId', {
             uexItemId: item.uexItemId,
           })
-          .andWhere('oii.unit_of_measure = :unitOfMeasure', {
+          .andWhere('oii2.unit_of_measure = :unitOfMeasure', {
             unitOfMeasure: item.unitOfMeasure,
           })
-          .andWhere('oii.location_type IS NOT DISTINCT FROM :locationType', {
+          .andWhere('oii2.location_type IS NOT DISTINCT FROM :locationType', {
             locationType: item.locationType ?? null,
           })
-          .andWhere('oii.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
-            locationUexId: item.locationUexId ?? null,
-          })
-          .andWhere('oii.deleted = FALSE')
-          .andWhere('oii.active = TRUE')
+          .andWhere(
+            'oii2.location_uex_id IS NOT DISTINCT FROM :locationUexId',
+            { locationUexId: item.locationUexId ?? null },
+          )
+          .andWhere('oii2.deleted = FALSE')
+          .andWhere('oii2.active = TRUE')
           .getOne();
 
         if (collision) {

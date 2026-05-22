@@ -262,29 +262,39 @@ describe('OrgInventoryService', () => {
       notes: 'Updated notes',
     };
 
+    // rowItem  = result of the pessimistic_write row fetch (first getOne)
+    // collision = result of the identity collision check  (second getOne)
     const buildUpdateTxManager = (
+      rowItem: OrgInventoryItem | null = mockOrgInventoryItem,
       collisionItem: OrgInventoryItem | null = null,
-    ) => ({
-      getRepository: jest.fn().mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getOne: jest.fn().mockResolvedValue(collisionItem),
+    ) => {
+      const getOne = jest
+        .fn()
+        .mockResolvedValueOnce(rowItem)
+        .mockResolvedValueOnce(collisionItem);
+      return {
+        getRepository: jest.fn().mockReturnValue({
+          createQueryBuilder: jest.fn().mockReturnValue({
+            setLock: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            getOne,
+          }),
+          save: jest.fn().mockResolvedValue(mockOrgInventoryItem),
         }),
-        save: jest.fn().mockResolvedValue(mockOrgInventoryItem),
-      }),
-      query: jest.fn().mockResolvedValue([]),
-    });
+        query: jest.fn().mockResolvedValue([]),
+      };
+    };
 
     it('should update org inventory item with manage permission', async () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
-      jest
-        .spyOn(repository, 'findByIdNotDeleted')
-        .mockResolvedValue(mockOrgInventoryItem);
       mockDataSource.transaction.mockImplementation(
         async (cb: (m: unknown) => Promise<unknown>) =>
           cb(buildUpdateTxManager()),
       );
+      jest
+        .spyOn(repository, 'findByIdNotDeleted')
+        .mockResolvedValue(mockOrgInventoryItem);
 
       const result = await service.update(
         1,
@@ -302,7 +312,11 @@ describe('OrgInventoryService', () => {
     });
 
     it('should throw NotFoundException if item not found', async () => {
-      jest.spyOn(repository, 'findByIdNotDeleted').mockResolvedValue(null);
+      jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
+      mockDataSource.transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) =>
+          cb(buildUpdateTxManager(null)),
+      );
 
       await expect(
         service.update(1, 1, 'nonexistent-id', updateDto),
@@ -310,10 +324,12 @@ describe('OrgInventoryService', () => {
     });
 
     it('should throw NotFoundException when item belongs to a different org', async () => {
-      jest.spyOn(repository, 'findByIdNotDeleted').mockResolvedValue({
-        ...mockOrgInventoryItem,
-        orgId: 999,
-      });
+      jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
+      // orgId filter in the query builder ensures a row from another org is not returned
+      mockDataSource.transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) =>
+          cb(buildUpdateTxManager(null)),
+      );
 
       await expect(
         service.update(1, 1, mockOrgInventoryItem.id, updateDto),
@@ -321,9 +337,6 @@ describe('OrgInventoryService', () => {
     });
 
     it('should throw ForbiddenException without manage permission', async () => {
-      jest
-        .spyOn(repository, 'findByIdNotDeleted')
-        .mockResolvedValue(mockOrgInventoryItem);
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(false);
 
       await expect(

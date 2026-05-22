@@ -383,9 +383,13 @@ describe('UserInventoryService', () => {
       };
 
       const updatedItem = { ...mockInventoryItem, ...updateDto };
-      // findInventoryItem (pre-txn) and findById (post-txn) both use findOne
-      jest.spyOn(repository, 'findOne').mockResolvedValue(updatedItem);
+      // Row fetch is the first getOne (inside transaction), collision check is the second
+      transactionQueryBuilder.getOne
+        .mockResolvedValueOnce(updatedItem) // row fetch with pessimistic_write
+        .mockResolvedValueOnce(null); // collision check — no collision
       transactionRepository.save.mockResolvedValue(updatedItem);
+      // findById (post-txn) uses repository.findOne
+      jest.spyOn(repository, 'findOne').mockResolvedValue(updatedItem);
 
       const result = await service.update(mockInventoryItem.id, 1, updateDto);
 
@@ -396,7 +400,8 @@ describe('UserInventoryService', () => {
     });
 
     it('should throw NotFoundException if item not found', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
+      // Row fetch returns null → NotFoundException thrown inside transaction
+      transactionQueryBuilder.getOne.mockResolvedValueOnce(null);
 
       await expect(
         service.update('invalid-id', 1, { quantity: 20 }),
@@ -410,9 +415,11 @@ describe('UserInventoryService', () => {
         id: 'other-uuid',
         unitOfMeasure: 'scu' as const,
       };
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockInventoryItem);
-      // Collision check runs inside transaction via transactionQueryBuilder
-      transactionQueryBuilder.getOne.mockResolvedValueOnce(collidingItem);
+      // First getOne: row fetch returns the item to update
+      // Second getOne: collision check returns a colliding row
+      transactionQueryBuilder.getOne
+        .mockResolvedValueOnce(mockInventoryItem)
+        .mockResolvedValueOnce(collidingItem);
 
       await expect(
         service.update(mockInventoryItem.id, 1, updateDto),

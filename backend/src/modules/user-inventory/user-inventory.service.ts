@@ -342,49 +342,64 @@ export class UserInventoryService {
     userId: number,
     updateDto: UpdateUserInventoryItemDto,
   ): Promise<UserInventoryItemDto> {
-    const item = await this.findInventoryItem(id, userId);
-
-    Object.assign(item, updateDto);
-    item.modifiedBy = userId;
-
     const savedId = await this.inventoryRepository.manager.transaction(
       async (manager) => {
         const repo = manager.getRepository(UserInventoryItem);
 
-        // Lock the post-update identity so concurrent create() or update()
-        // calls targeting the same identity serialize against this transaction.
+        // Pessimistic write lock on the target row prevents concurrent
+        // split() or delete() from mutating this row between load and save.
+        const item = await repo
+          .createQueryBuilder('inv')
+          .setLock('pessimistic_write')
+          .where('inv.id = :id', { id })
+          .andWhere('inv.user_id = :userId', { userId })
+          .andWhere('inv.deleted = FALSE')
+          .getOne();
+
+        if (!item) {
+          throw new NotFoundException(`Inventory item with ID ${id} not found`);
+        }
+
+        Object.assign(item, updateDto);
+        item.modifiedBy = userId;
+
+        // Advisory lock on the post-update identity serializes concurrent
+        // create() or update() calls for the same identity.
         await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
           `uii:${userId}:${item.gameId}:${item.uexItemId}:${item.unitOfMeasure ?? 'unit'}:${item.locationType ?? ''}:${item.locationUexId ?? -1}:${item.sharedOrgId ?? -1}`,
         ]);
 
-        const collision = await repo
-          .createQueryBuilder('inv')
-          .where('inv.id != :id', { id })
-          .andWhere('inv.user_id = :userId', { userId })
-          .andWhere('inv.game_id = :gameId', { gameId: item.gameId })
-          .andWhere('inv.uex_item_id = :uexItemId', {
-            uexItemId: item.uexItemId,
-          })
-          .andWhere('inv.unit_of_measure = :unitOfMeasure', {
-            unitOfMeasure: item.unitOfMeasure,
-          })
-          .andWhere('inv.location_type IS NOT DISTINCT FROM :locationType', {
-            locationType: item.locationType ?? null,
-          })
-          .andWhere('inv.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
-            locationUexId: item.locationUexId ?? null,
-          })
-          .andWhere('inv.shared_org_id IS NOT DISTINCT FROM :sharedOrgId', {
-            sharedOrgId: item.sharedOrgId ?? null,
-          })
-          .andWhere('inv.deleted = FALSE')
-          .andWhere('inv.active = TRUE')
-          .getOne();
+        if (item.active) {
+          const collision = await repo
+            .createQueryBuilder('inv2')
+            .where('inv2.id != :id', { id })
+            .andWhere('inv2.user_id = :userId', { userId })
+            .andWhere('inv2.game_id = :gameId', { gameId: item.gameId })
+            .andWhere('inv2.uex_item_id = :uexItemId', {
+              uexItemId: item.uexItemId,
+            })
+            .andWhere('inv2.unit_of_measure = :unitOfMeasure', {
+              unitOfMeasure: item.unitOfMeasure,
+            })
+            .andWhere('inv2.location_type IS NOT DISTINCT FROM :locationType', {
+              locationType: item.locationType ?? null,
+            })
+            .andWhere(
+              'inv2.location_uex_id IS NOT DISTINCT FROM :locationUexId',
+              { locationUexId: item.locationUexId ?? null },
+            )
+            .andWhere('inv2.shared_org_id IS NOT DISTINCT FROM :sharedOrgId', {
+              sharedOrgId: item.sharedOrgId ?? null,
+            })
+            .andWhere('inv2.deleted = FALSE')
+            .andWhere('inv2.active = TRUE')
+            .getOne();
 
-        if (collision) {
-          throw new ConflictException(
-            'An active inventory item with the same identity already exists',
-          );
+          if (collision) {
+            throw new ConflictException(
+              'An active inventory item with the same identity already exists',
+            );
+          }
         }
 
         try {
