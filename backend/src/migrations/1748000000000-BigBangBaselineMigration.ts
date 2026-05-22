@@ -70,7 +70,7 @@ export class BigBangBaselineMigration1748000000000
         "name"        VARCHAR(255)  NOT NULL,
         "slug"        VARCHAR(255),
         "description" VARCHAR(500),
-        "game_id"     INTEGER,
+        "game_id"     INTEGER       NOT NULL,
         "isActive"    BOOLEAN       NOT NULL DEFAULT TRUE,
         "createdAt"   TIMESTAMP     NOT NULL DEFAULT NOW(),
         "updatedAt"   TIMESTAMP     NOT NULL DEFAULT NOW()
@@ -84,14 +84,22 @@ export class BigBangBaselineMigration1748000000000
         "name"        VARCHAR(100)  NOT NULL,
         "code"        VARCHAR(20)   NOT NULL UNIQUE,
         "description" TEXT,
-        "isActive"    BOOLEAN       NOT NULL DEFAULT TRUE,
-        "createdAt"   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-        "updatedAt"   TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+        "active"      BOOLEAN       NOT NULL DEFAULT TRUE,
+        "created_at"  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+        "updated_at"  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
       )
     `);
-    await queryRunner.query(`CREATE INDEX "IDX_game_code" ON "game" ("code")`);
     await queryRunner.query(
-      `ALTER TABLE "organization" ADD CONSTRAINT "FK_organization_game" FOREIGN KEY ("game_id") REFERENCES "game"("id") ON DELETE SET NULL`,
+      `CREATE INDEX "IDX_game_code"   ON "game" ("code")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_game_active" ON "game" ("active")`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "organization" ADD CONSTRAINT "FK_organization_game" FOREIGN KEY ("game_id") REFERENCES "game"("id") ON DELETE RESTRICT`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX "IDX_organization_game_id" ON "organization" ("game_id")`,
     );
 
     // -- role ------------------------------------------------------------------
@@ -136,39 +144,54 @@ export class BigBangBaselineMigration1748000000000
 
     // -- audit_log ------------------------------------------------------------
     await queryRunner.query(`
+      CREATE TYPE "audit_action_enum" AS ENUM (
+        'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT',
+        'ROLE_ASSIGNED', 'ROLE_REMOVED', 'PERMISSION_CHANGED'
+      )
+    `);
+    await queryRunner.query(`
+      CREATE TYPE "audit_entity_type_enum" AS ENUM (
+        'USER', 'ORGANIZATION', 'ROLE', 'USER_ORGANIZATION_ROLE', 'AUTH'
+      )
+    `);
+    await queryRunner.query(`
       CREATE TABLE "audit_log" (
-        "id"         BIGSERIAL    PRIMARY KEY,
-        "userId"     BIGINT       REFERENCES "user"("id") ON DELETE SET NULL,
-        "action"     VARCHAR(100) NOT NULL,
-        "resource"   VARCHAR(100) NOT NULL,
-        "resourceId" VARCHAR(255),
-        "metadata"   JSONB,
-        "timestamp"  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        "id"          BIGSERIAL                 PRIMARY KEY,
+        "userId"      BIGINT                    REFERENCES "user"("id") ON DELETE SET NULL,
+        "username"    VARCHAR(255),
+        "action"      "audit_action_enum"       NOT NULL,
+        "entityType"  "audit_entity_type_enum"  NOT NULL,
+        "entityId"    INTEGER,
+        "metadata"    JSONB,
+        "oldValues"   JSONB,
+        "newValues"   JSONB,
+        "ipAddress"   VARCHAR(255),
+        "userAgent"   VARCHAR(500),
+        "createdAt"   TIMESTAMPTZ               NOT NULL DEFAULT NOW()
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "IDX_audit_log_userId"   ON "audit_log" ("userId")`,
+      `CREATE INDEX "IDX_audit_log_userId"              ON "audit_log" ("userId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_audit_log_action"   ON "audit_log" ("action")`,
+      `CREATE INDEX "IDX_audit_log_entityType_entityId" ON "audit_log" ("entityType", "entityId")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_audit_log_resource" ON "audit_log" ("resource")`,
+      `CREATE INDEX "IDX_audit_log_action"              ON "audit_log" ("action")`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_audit_log_timestamp" ON "audit_log" ("timestamp" DESC)`,
+      `CREATE INDEX "IDX_audit_log_createdAt"           ON "audit_log" ("createdAt" DESC)`,
     );
 
     // -- password_reset -------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "password_reset" (
-        "id"        BIGSERIAL    PRIMARY KEY,
+        "id"        SERIAL       PRIMARY KEY,
         "userId"    BIGINT       NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
         "token"     VARCHAR(255) NOT NULL UNIQUE,
         "expiresAt" TIMESTAMPTZ  NOT NULL,
-        "usedAt"    TIMESTAMPTZ,
-        "createdAt" TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "updatedAt" TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        "used"      BOOLEAN      NOT NULL DEFAULT FALSE,
+        "createdAt" TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       )
     `);
     await queryRunner.query(
@@ -2089,6 +2112,8 @@ export class BigBangBaselineMigration1748000000000
     await queryRunner.query(`DROP TABLE IF EXISTS "oauth_client" CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS "password_reset" CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS "audit_log" CASCADE`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "audit_action_enum"`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "audit_entity_type_enum"`);
     await queryRunner.query(
       `DROP TABLE IF EXISTS "user_organization_role" CASCADE`,
     );
