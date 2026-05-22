@@ -9,7 +9,7 @@ import { UserOrganizationRole } from '../user-organization-roles/user-organizati
 
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({ type: 'bigint' })
   id!: number;
 
   @Column({ unique: true })
