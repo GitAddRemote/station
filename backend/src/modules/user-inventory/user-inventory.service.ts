@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -177,8 +178,14 @@ export class UserInventoryService {
           .getOne();
 
         if (existing) {
-          existing.quantity =
+          const mergedQuantity =
             parseFloat(existing.quantity.toString()) + createDto.quantity;
+          if (mergedQuantity > 999999.999999) {
+            throw new BadRequestException(
+              'Merged quantity would exceed the maximum allowed value of 999999.999999',
+            );
+          }
+          existing.quantity = mergedQuantity;
           existing.notes = createDto.notes ?? existing.notes;
           existing.modifiedBy = userId;
 

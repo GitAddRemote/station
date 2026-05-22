@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { getLoggerToken } from 'nestjs-pino';
 import { UserInventoryService } from './user-inventory.service';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
@@ -347,6 +347,22 @@ describe('UserInventoryService', () => {
         }),
       );
       expect(result.quantity).toBe(5);
+    });
+
+    it('should throw BadRequestException when merged quantity exceeds max', async () => {
+      const createDto: CreateUserInventoryItemDto = {
+        gameId: 1,
+        uexItemId: 100,
+        quantity: 999999.999999,
+      };
+
+      const existingItem = { ...mockInventoryItem, quantity: 1 };
+      transactionQueryBuilder.getOne.mockResolvedValue(existingItem);
+
+      await expect(service.create(1, createDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(transactionRepository.save).not.toHaveBeenCalled();
     });
   });
 
