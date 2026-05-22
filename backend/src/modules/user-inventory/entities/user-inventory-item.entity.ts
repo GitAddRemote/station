@@ -30,7 +30,7 @@ export class UserInventoryItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ name: 'user_id', type: 'bigint' })
+  @Column({ name: 'user_id', type: 'integer' })
   @Index()
   userId!: number;
 
@@ -103,14 +103,14 @@ export class UserInventoryItem {
   @UpdateDateColumn({ name: 'date_modified', type: 'timestamptz' })
   dateModified!: Date;
 
-  @Column({ name: 'added_by', type: 'bigint' })
+  @Column({ name: 'added_by', type: 'integer' })
   addedBy!: number;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'added_by' })
   addedByUser!: User;
 
-  @Column({ name: 'modified_by', type: 'bigint' })
+  @Column({ name: 'modified_by', type: 'integer' })
   modifiedBy!: number;
 
   @ManyToOne(() => User)

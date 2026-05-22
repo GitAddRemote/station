@@ -95,14 +95,14 @@ export class OrgInventoryItem {
   @UpdateDateColumn({ name: 'date_modified', type: 'timestamptz' })
   dateModified!: Date;
 
-  @Column({ name: 'added_by', type: 'bigint' })
+  @Column({ name: 'added_by', type: 'integer' })
   addedBy!: number;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'added_by' })
   addedByUser!: User;
 
-  @Column({ name: 'modified_by', type: 'bigint' })
+  @Column({ name: 'modified_by', type: 'integer' })
   modifiedBy!: number;
 
   @ManyToOne(() => User)

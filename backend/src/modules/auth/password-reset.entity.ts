@@ -13,7 +13,7 @@ export class PasswordReset {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'bigint' })
+  @Column()
   userId!: number;
 
   @ManyToOne(() => User)

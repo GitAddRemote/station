@@ -34,7 +34,7 @@ export class AuditLog {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: 'bigint', nullable: true })
+  @Column({ nullable: true })
   userId?: number;
 
   @Column({ nullable: true })

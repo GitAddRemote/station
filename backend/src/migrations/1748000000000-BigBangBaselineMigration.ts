@@ -39,7 +39,7 @@ export class BigBangBaselineMigration1748000000000
     // -- user ------------------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "user" (
-        "id"            BIGSERIAL     PRIMARY KEY,
+        "id"            SERIAL        PRIMARY KEY,
         "username"      VARCHAR(255)  NOT NULL UNIQUE,
         "password"      VARCHAR(255)  NOT NULL,
         "email"         VARCHAR(255)  NOT NULL UNIQUE,
@@ -119,7 +119,7 @@ export class BigBangBaselineMigration1748000000000
     await queryRunner.query(`
       CREATE TABLE "user_organization_role" (
         "id"             SERIAL    PRIMARY KEY,
-        "userId"         BIGINT    NOT NULL REFERENCES "user"("id")         ON DELETE CASCADE,
+        "userId"         INTEGER   NOT NULL REFERENCES "user"("id")         ON DELETE CASCADE,
         "organizationId" INTEGER   NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
         "roleId"         INTEGER   NOT NULL REFERENCES "role"("id")         ON DELETE RESTRICT,
         "assignedAt"     TIMESTAMP NOT NULL DEFAULT NOW()
@@ -157,7 +157,7 @@ export class BigBangBaselineMigration1748000000000
     await queryRunner.query(`
       CREATE TABLE "audit_log" (
         "id"          BIGSERIAL                 PRIMARY KEY,
-        "userId"      BIGINT                    REFERENCES "user"("id") ON DELETE SET NULL,
+        "userId"      INTEGER                   REFERENCES "user"("id") ON DELETE SET NULL,
         "username"    VARCHAR(255),
         "action"      "audit_action_enum"       NOT NULL,
         "entityType"  "audit_entity_type_enum"  NOT NULL,
@@ -187,7 +187,7 @@ export class BigBangBaselineMigration1748000000000
     await queryRunner.query(`
       CREATE TABLE "password_reset" (
         "id"        SERIAL       PRIMARY KEY,
-        "userId"    BIGINT       NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+        "userId"    INTEGER      NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
         "token"     VARCHAR(255) NOT NULL UNIQUE,
         "expiresAt" TIMESTAMPTZ  NOT NULL,
         "used"      BOOLEAN      NOT NULL DEFAULT FALSE,
@@ -235,8 +235,8 @@ export class BigBangBaselineMigration1748000000000
         "date_modified"    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_added"   TIMESTAMPTZ,
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"         BIGINT       REFERENCES "user"("id"),
-        "modified_by"      BIGINT       REFERENCES "user"("id")
+        "added_by"         INTEGER      REFERENCES "user"("id"),
+        "modified_by"      INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -262,8 +262,8 @@ export class BigBangBaselineMigration1748000000000
         "date_modified"    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_added"   TIMESTAMPTZ,
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"         BIGINT       REFERENCES "user"("id"),
-        "modified_by"      BIGINT       REFERENCES "user"("id")
+        "added_by"         INTEGER      REFERENCES "user"("id"),
+        "modified_by"      INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -298,8 +298,8 @@ export class BigBangBaselineMigration1748000000000
         "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"          BIGINT       REFERENCES "user"("id"),
-        "modified_by"       BIGINT       REFERENCES "user"("id")
+        "added_by"          INTEGER      REFERENCES "user"("id"),
+        "modified_by"       INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -337,8 +337,8 @@ export class BigBangBaselineMigration1748000000000
         "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"          BIGINT       REFERENCES "user"("id"),
-        "modified_by"       BIGINT       REFERENCES "user"("id")
+        "added_by"          INTEGER      REFERENCES "user"("id"),
+        "modified_by"       INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -363,8 +363,8 @@ export class BigBangBaselineMigration1748000000000
         "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"          BIGINT       REFERENCES "user"("id"),
-        "modified_by"       BIGINT       REFERENCES "user"("id")
+        "added_by"          INTEGER      REFERENCES "user"("id"),
+        "modified_by"       INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -389,8 +389,8 @@ export class BigBangBaselineMigration1748000000000
         "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"          BIGINT       REFERENCES "user"("id"),
-        "modified_by"       BIGINT       REFERENCES "user"("id")
+        "added_by"          INTEGER      REFERENCES "user"("id"),
+        "modified_by"       INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -415,8 +415,8 @@ export class BigBangBaselineMigration1748000000000
         "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"          BIGINT       REFERENCES "user"("id"),
-        "modified_by"       BIGINT       REFERENCES "user"("id"),
+        "added_by"          INTEGER      REFERENCES "user"("id"),
+        "modified_by"       INTEGER      REFERENCES "user"("id"),
         CONSTRAINT "CHK_uex_city_location" CHECK (
           ("planet_id" IS NOT NULL AND "moon_id" IS NULL) OR
           ("planet_id" IS NULL AND "moon_id" IS NOT NULL)
@@ -449,8 +449,8 @@ export class BigBangBaselineMigration1748000000000
         "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"          BIGINT       REFERENCES "user"("id"),
-        "modified_by"       BIGINT       REFERENCES "user"("id")
+        "added_by"          INTEGER      REFERENCES "user"("id"),
+        "modified_by"       INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -475,8 +475,8 @@ export class BigBangBaselineMigration1748000000000
         "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"          BIGINT       REFERENCES "user"("id"),
-        "modified_by"       BIGINT       REFERENCES "user"("id")
+        "added_by"          INTEGER      REFERENCES "user"("id"),
+        "modified_by"       INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -506,8 +506,8 @@ export class BigBangBaselineMigration1748000000000
         "date_added"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"          BIGINT       REFERENCES "user"("id"),
-        "modified_by"       BIGINT       REFERENCES "user"("id")
+        "added_by"          INTEGER      REFERENCES "user"("id"),
+        "modified_by"       INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -547,8 +547,8 @@ export class BigBangBaselineMigration1748000000000
         "date_modified"    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "uex_date_added"   TIMESTAMPTZ,
         "uex_date_modified" TIMESTAMPTZ,
-        "added_by"         BIGINT       REFERENCES "user"("id"),
-        "modified_by"      BIGINT       REFERENCES "user"("id")
+        "added_by"         INTEGER      REFERENCES "user"("id"),
+        "modified_by"      INTEGER      REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(
@@ -645,7 +645,7 @@ export class BigBangBaselineMigration1748000000000
     await queryRunner.query(`
       CREATE TABLE "user_inventory_item" (
         "id"              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-        "user_id"         BIGINT       NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+        "user_id"         INTEGER      NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
         "game_id"         INTEGER      NOT NULL REFERENCES "game"("id"),
         "uex_item_id"     INTEGER      NOT NULL REFERENCES "uex_item"("uex_id"),
         "quantity"        DECIMAL(12,6) NOT NULL CHECK ("quantity" > 0),
@@ -659,8 +659,8 @@ export class BigBangBaselineMigration1748000000000
         "deleted"         BOOLEAN      NOT NULL DEFAULT FALSE,
         "date_added"      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         "date_modified"   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-        "added_by"        BIGINT       NOT NULL REFERENCES "user"("id"),
-        "modified_by"     BIGINT       NOT NULL REFERENCES "user"("id")
+        "added_by"        INTEGER      NOT NULL REFERENCES "user"("id"),
+        "modified_by"     INTEGER      NOT NULL REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(`
@@ -698,7 +698,7 @@ export class BigBangBaselineMigration1748000000000
       CREATE TABLE "inventory_audit_log" (
         "id"                 BIGSERIAL    PRIMARY KEY,
         "event_type"         VARCHAR(100) NOT NULL,
-        "user_id"            BIGINT       REFERENCES "user"("id") ON DELETE SET NULL,
+        "user_id"            INTEGER      REFERENCES "user"("id") ON DELETE SET NULL,
         "org_id"             INTEGER      REFERENCES "organization"("id") ON DELETE SET NULL,
         "inventory_item_id"  UUID         REFERENCES "user_inventory_item"("id") ON DELETE SET NULL,
         "records_affected"   INTEGER,
@@ -739,8 +739,8 @@ export class BigBangBaselineMigration1748000000000
         "deleted"         BOOLEAN       NOT NULL DEFAULT FALSE,
         "date_added"      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
         "date_modified"   TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-        "added_by"        BIGINT        NOT NULL REFERENCES "user"("id"),
-        "modified_by"     BIGINT        NOT NULL REFERENCES "user"("id")
+        "added_by"        INTEGER       NOT NULL REFERENCES "user"("id"),
+        "modified_by"     INTEGER       NOT NULL REFERENCES "user"("id")
       )
     `);
     await queryRunner.query(`
