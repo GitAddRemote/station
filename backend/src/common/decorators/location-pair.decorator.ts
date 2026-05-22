@@ -16,7 +16,7 @@ export function LocationPairRequired(
     registerDecorator({
       name: 'locationPairRequired',
       target: target as new (...args: unknown[]) => unknown,
-      propertyName: 'locationType',
+      propertyName: '__locationPair',
       options: {
         message:
           'locationType and locationUexId must both be provided or both omitted',
