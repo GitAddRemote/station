@@ -39,7 +39,7 @@ export class BigBangBaselineMigration1748000000000
     // -- user ------------------------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "user" (
-        "id"            BIGSERIAL     PRIMARY KEY,
+        "id"            SERIAL        PRIMARY KEY,
         "username"      VARCHAR(255)  NOT NULL UNIQUE,
         "password"      VARCHAR(255)  NOT NULL,
         "email"         VARCHAR(255)  NOT NULL UNIQUE,

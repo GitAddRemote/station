@@ -30,7 +30,7 @@ export class OrgInventoryItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ name: 'org_id', type: 'bigint' })
+  @Column({ name: 'org_id', type: 'integer' })
   @Index()
   orgId!: number;
 
