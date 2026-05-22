@@ -157,11 +157,11 @@ export class UserInventoryService {
             unitOfMeasure: createDto.unitOfMeasure ?? 'unit',
           })
           .andWhere(
-            "COALESCE(inventory.location_type, '') = COALESCE(:locationType, '')",
+            'inventory.location_type IS NOT DISTINCT FROM :locationType',
             { locationType: createDto.locationType ?? null },
           )
           .andWhere(
-            'COALESCE(inventory.location_uex_id, -1) = COALESCE(:locationUexId, -1)',
+            'inventory.location_uex_id IS NOT DISTINCT FROM :locationUexId',
             { locationUexId: createDto.locationUexId ?? null },
           )
           .andWhere(

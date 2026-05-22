@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { OrgInventoryService } from './org-inventory.service';
 import { OrgInventoryRepository } from './org-inventory.repository';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -23,6 +24,7 @@ describe('OrgInventoryService', () => {
   let service: OrgInventoryService;
   let repository: OrgInventoryRepository;
   let permissionsService: PermissionsService;
+  let mockDataSource: { transaction: jest.Mock };
 
   const mockOrg: Organization = { id: 1, name: 'Test Org' } as Organization;
   const mockGame: Game = { id: 1, name: 'Star Citizen' } as Game;
@@ -50,6 +52,10 @@ describe('OrgInventoryService', () => {
   } as unknown as OrgInventoryItem;
 
   beforeEach(async () => {
+    mockDataSource = {
+      transaction: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrgInventoryService,
@@ -73,6 +79,10 @@ describe('OrgInventoryService', () => {
             hasPermission: jest.fn(),
           },
         },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
+        },
       ],
     }).compile();
 
@@ -94,11 +104,25 @@ describe('OrgInventoryService', () => {
       notes: 'Test notes',
     };
 
+    const buildMockTxManager = (existingItem: OrgInventoryItem | null) => ({
+      getRepository: jest.fn().mockReturnValue({
+        createQueryBuilder: jest.fn().mockReturnValue({
+          setLock: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockResolvedValue(existingItem),
+        }),
+        create: jest.fn().mockReturnValue(mockOrgInventoryItem),
+        save: jest.fn().mockResolvedValue(mockOrgInventoryItem),
+      }),
+    });
+
     it('should create org inventory item with manage permission', async () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
-      jest.spyOn(repository, 'findExistingItem').mockResolvedValue(null);
-      jest.spyOn(repository, 'create').mockReturnValue(mockOrgInventoryItem);
-      jest.spyOn(repository, 'save').mockResolvedValue(mockOrgInventoryItem);
+      mockDataSource.transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) =>
+          cb(buildMockTxManager(null)),
+      );
       jest
         .spyOn(repository, 'findByIdNotDeleted')
         .mockResolvedValue(mockOrgInventoryItem);
@@ -111,22 +135,7 @@ describe('OrgInventoryService', () => {
         1,
         OrgPermission.CAN_EDIT_ORG_INVENTORY,
       );
-      expect(repository.findExistingItem).toHaveBeenCalledWith({
-        orgId: createDto.orgId,
-        gameId: createDto.gameId,
-        uexItemId: createDto.uexItemId,
-        unitOfMeasure: 'unit',
-        locationType: null,
-        locationUexId: null,
-      });
-      expect(repository.create).toHaveBeenCalledWith({
-        ...createDto,
-        addedBy: 1,
-        modifiedBy: 1,
-        active: true,
-        deleted: false,
-        unitOfMeasure: 'unit',
-      });
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException without manage permission', async () => {
@@ -135,19 +144,19 @@ describe('OrgInventoryService', () => {
       await expect(service.create(1, createDto)).rejects.toThrow(
         ForbiddenException,
       );
-      expect(repository.create).not.toHaveBeenCalled();
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException when item already exists', async () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
-      jest
-        .spyOn(repository, 'findExistingItem')
-        .mockResolvedValue(mockOrgInventoryItem);
+      mockDataSource.transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) =>
+          cb(buildMockTxManager(mockOrgInventoryItem)),
+      );
 
       await expect(service.create(1, createDto)).rejects.toThrow(
         ConflictException,
       );
-      expect(repository.create).not.toHaveBeenCalled();
     });
   });
 

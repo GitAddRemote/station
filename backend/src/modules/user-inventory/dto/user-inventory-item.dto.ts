@@ -3,6 +3,7 @@ import {
   IsNumber,
   IsOptional,
   IsBoolean,
+  IsNotEmpty,
   Min,
   Max,
   MaxLength,
@@ -56,11 +57,13 @@ export class CreateUserInventoryItemDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(30)
   locationType?: string;
 
   @IsOptional()
   @IsInt()
+  @Min(1)
   locationUexId?: number;
 
   @IsOptional()
@@ -91,11 +94,13 @@ export class UpdateUserInventoryItemDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(30)
   locationType?: string | null;
 
   @IsOptional()
   @IsInt()
+  @Min(1)
   locationUexId?: number | null;
 
   @IsOptional()

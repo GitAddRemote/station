@@ -275,7 +275,10 @@ export const inventoryService = {
       search?: string;
       minQuantity?: number;
       maxQuantity?: number;
-      sort?: 'name' | 'quantity' | 'date_added' | 'date_modified';
+      unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+      minQuality?: number;
+      maxQuality?: number;
+      sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified';
       order?: 'asc' | 'desc';
       limit?: number;
       offset?: number;

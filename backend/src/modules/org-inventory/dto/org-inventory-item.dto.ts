@@ -3,6 +3,7 @@ import {
   IsNumber,
   IsOptional,
   IsBoolean,
+  IsNotEmpty,
   Min,
   Max,
   IsInt,
@@ -87,15 +88,18 @@ export class CreateOrgInventoryItemDto {
   })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(30)
   locationType?: string;
 
   @ApiPropertyOptional({
     description: 'UEX ID of the location entity',
     example: 42,
+    minimum: 1,
   })
   @IsOptional()
   @IsInt()
+  @Min(1)
   locationUexId?: number;
 
   @ApiPropertyOptional({
@@ -149,15 +153,18 @@ export class UpdateOrgInventoryItemDto {
   })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(30)
   locationType?: string | null;
 
   @ApiPropertyOptional({
     description: 'UEX ID of the location entity',
     example: 10,
+    minimum: 1,
   })
   @IsOptional()
   @IsInt()
+  @Min(1)
   locationUexId?: number | null;
 
   @ApiPropertyOptional({

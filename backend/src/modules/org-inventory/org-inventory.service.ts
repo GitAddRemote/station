@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { OrgInventoryRepository } from './org-inventory.repository';
 import { PermissionsService } from '../permissions/permissions.service';
 import { OrgInventoryItem } from './entities/org-inventory-item.entity';
@@ -22,6 +23,7 @@ export class OrgInventoryService {
   constructor(
     private readonly orgInventoryRepository: OrgInventoryRepository,
     private readonly permissionsService: PermissionsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -91,35 +93,53 @@ export class OrgInventoryService {
 
     await this.verifyInventoryPermission(userId, dto.orgId, 'manage');
 
-    const existing = await this.orgInventoryRepository.findExistingItem({
-      orgId: dto.orgId,
-      gameId: dto.gameId,
-      uexItemId: dto.uexItemId,
-      unitOfMeasure: dto.unitOfMeasure ?? 'unit',
-      locationType: dto.locationType ?? null,
-      locationUexId: dto.locationUexId ?? null,
+    const unitOfMeasure = dto.unitOfMeasure ?? 'unit';
+    const locationType = dto.locationType ?? null;
+    const locationUexId = dto.locationUexId ?? null;
+
+    const savedId = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(OrgInventoryItem);
+
+      const existing = await repo
+        .createQueryBuilder('oii')
+        .setLock('pessimistic_write')
+        .where('oii.org_id = :orgId', { orgId: dto.orgId })
+        .andWhere('oii.game_id = :gameId', { gameId: dto.gameId })
+        .andWhere('oii.uex_item_id = :uexItemId', { uexItemId: dto.uexItemId })
+        .andWhere('oii.unit_of_measure = :unitOfMeasure', { unitOfMeasure })
+        .andWhere('oii.location_type IS NOT DISTINCT FROM :locationType', {
+          locationType,
+        })
+        .andWhere('oii.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
+          locationUexId,
+        })
+        .andWhere('oii.deleted = FALSE')
+        .getOne();
+
+      if (existing) {
+        throw new ConflictException(
+          'Inventory item already exists for this organization',
+        );
+      }
+
+      const item = repo.create({
+        ...dto,
+        orgId: dto.orgId,
+        unitOfMeasure,
+        locationType,
+        locationUexId,
+        addedBy: userId,
+        modifiedBy: userId,
+        active: true,
+        deleted: false,
+      });
+
+      const saved = await repo.save(item);
+      return saved.id;
     });
 
-    if (existing) {
-      throw new ConflictException(
-        'Inventory item already exists for this organization',
-      );
-    }
-
-    const item = this.orgInventoryRepository.create({
-      ...dto,
-      orgId: dto.orgId,
-      unitOfMeasure: dto.unitOfMeasure ?? 'unit',
-      addedBy: userId,
-      modifiedBy: userId,
-      active: true,
-      deleted: false,
-    });
-
-    const saved = await this.orgInventoryRepository.save(item);
-    const loaded = await this.orgInventoryRepository.findByIdNotDeleted(
-      saved.id,
-    );
+    const loaded =
+      await this.orgInventoryRepository.findByIdNotDeleted(savedId);
 
     if (!loaded) {
       throw new NotFoundException('Failed to load created inventory item');
