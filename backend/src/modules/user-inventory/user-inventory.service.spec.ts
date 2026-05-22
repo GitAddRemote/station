@@ -21,6 +21,7 @@ describe('UserInventoryService', () => {
   let transactionRepository: {
     create: jest.Mock;
     save: jest.Mock;
+    findOneByOrFail: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
   let transactionQueryBuilder: {
@@ -81,6 +82,7 @@ describe('UserInventoryService', () => {
     transactionRepository = {
       create: jest.fn(),
       save: jest.fn(),
+      findOneByOrFail: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(transactionQueryBuilder),
     };
 
@@ -111,12 +113,14 @@ describe('UserInventoryService', () => {
                   (
                     callback: (manager: {
                       getRepository: () => typeof transactionRepository;
+                      query: jest.Mock;
                     }) => Promise<unknown>,
                   ) =>
                     callback({
                       getRepository: jest
                         .fn()
                         .mockReturnValue(transactionRepository),
+                      query: jest.fn().mockResolvedValue([{ id: 'mock-uuid' }]),
                     }),
                 ),
             },
@@ -329,27 +333,14 @@ describe('UserInventoryService', () => {
 
       const existingItem = { ...mockInventoryItem, quantity: 3, notes: 'old' };
 
+      const mergedItem = { ...existingItem, quantity: 5, notes: 'merge note' };
       transactionQueryBuilder.getOne.mockResolvedValue(existingItem);
-      transactionRepository.save.mockResolvedValue({
-        ...existingItem,
-        quantity: 5,
-        notes: 'merge note',
-      });
-      jest.spyOn(repository, 'findOne').mockResolvedValue({
-        ...existingItem,
-        quantity: 5,
-        notes: 'merge note',
-      });
+      transactionRepository.findOneByOrFail.mockResolvedValue(mergedItem);
+      jest.spyOn(repository, 'findOne').mockResolvedValue(mergedItem);
 
       const result = await service.create(1, createDto);
 
-      expect(transactionRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          quantity: 5,
-          notes: 'merge note',
-          modifiedBy: 1,
-        }),
-      );
+      expect(transactionRepository.save).not.toHaveBeenCalled();
       expect(result.quantity).toBe(5);
     });
 
@@ -362,6 +353,19 @@ describe('UserInventoryService', () => {
 
       const existingItem = { ...mockInventoryItem, quantity: 1 };
       transactionQueryBuilder.getOne.mockResolvedValue(existingItem);
+      // Simulate overflow: manager.query returns [] (WHERE quantity check failed)
+      (repository.manager.transaction as jest.Mock).mockImplementationOnce(
+        (
+          callback: (manager: {
+            getRepository: () => typeof transactionRepository;
+            query: jest.Mock;
+          }) => Promise<unknown>,
+        ) =>
+          callback({
+            getRepository: jest.fn().mockReturnValue(transactionRepository),
+            query: jest.fn().mockResolvedValue([]),
+          }),
+      );
 
       await expect(service.create(1, createDto)).rejects.toThrow(
         BadRequestException,

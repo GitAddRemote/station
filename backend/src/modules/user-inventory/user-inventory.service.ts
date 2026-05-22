@@ -178,19 +178,25 @@ export class UserInventoryService {
           .getOne();
 
         if (existing) {
-          const mergedQuantity =
-            parseFloat(existing.quantity.toString()) + createDto.quantity;
-          if (mergedQuantity > 999999.999999) {
+          // Use SQL NUMERIC addition to avoid JS floating-point drift
+          const result = await manager.query(
+            `UPDATE "user_inventory_item"
+             SET quantity      = quantity + $1::numeric,
+                 notes         = COALESCE($2, notes),
+                 modified_by   = $3,
+                 date_modified = NOW()
+             WHERE id = $4
+               AND quantity + $1::numeric <= 999999.999999
+             RETURNING id`,
+            [createDto.quantity, createDto.notes ?? null, userId, existing.id],
+          );
+          if (result.length === 0) {
             throw new BadRequestException(
               'Merged quantity would exceed the maximum allowed value of 999999.999999',
             );
           }
-          existing.quantity = mergedQuantity;
-          existing.notes = createDto.notes ?? existing.notes;
-          existing.modifiedBy = userId;
-
           merged = true;
-          return repo.save(existing);
+          return repo.findOneByOrFail({ id: existing.id });
         }
 
         const item = repo.create({
