@@ -70,6 +70,11 @@ describe('OrgInventoryService', () => {
             searchInventory: jest.fn(),
             getOrgInventorySummary: jest.fn(),
             findByUexItemId: jest.fn(),
+            createQueryBuilder: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              getOne: jest.fn().mockResolvedValue(null),
+            }),
           },
         },
         {

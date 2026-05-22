@@ -101,9 +101,15 @@ export class OrgInventoryService {
     const savedId = await this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(OrgInventoryItem);
 
+      // Advisory lock keyed on the identity serializes concurrent "no
+      // existing row" requests so they don't both pass the check-then-insert
+      // race and produce duplicates. Released automatically at txn end.
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `oii:${dto.orgId}:${dto.gameId}:${dto.uexItemId}:${unitOfMeasure}:${locationType ?? ''}:${locationUexId ?? -1}`,
+      ]);
+
       const existing = await repo
         .createQueryBuilder('oii')
-        .setLock('pessimistic_write')
         .where('oii.org_id = :orgId', { orgId: dto.orgId })
         .andWhere('oii.game_id = :gameId', { gameId: dto.gameId })
         .andWhere('oii.uex_item_id = :uexItemId', { uexItemId: dto.uexItemId })
@@ -360,6 +366,35 @@ export class OrgInventoryService {
     }
 
     item.modifiedBy = userId;
+
+    // Guard against silently creating a duplicate active stack: check whether
+    // any other row already has the post-update identity before saving.
+    if (item.active) {
+      const collision = await this.orgInventoryRepository
+        .createQueryBuilder('oii')
+        .where('oii.id != :id', { id })
+        .andWhere('oii.org_id = :orgId', { orgId })
+        .andWhere('oii.game_id = :gameId', { gameId: item.gameId })
+        .andWhere('oii.uex_item_id = :uexItemId', { uexItemId: item.uexItemId })
+        .andWhere('oii.unit_of_measure = :unitOfMeasure', {
+          unitOfMeasure: item.unitOfMeasure,
+        })
+        .andWhere('oii.location_type IS NOT DISTINCT FROM :locationType', {
+          locationType: item.locationType ?? null,
+        })
+        .andWhere('oii.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
+          locationUexId: item.locationUexId ?? null,
+        })
+        .andWhere('oii.deleted = FALSE')
+        .andWhere('oii.active = TRUE')
+        .getOne();
+
+      if (collision) {
+        throw new ConflictException(
+          'An inventory item with this combination already exists for this organization',
+        );
+      }
+    }
 
     let saved: OrgInventoryItem;
     try {

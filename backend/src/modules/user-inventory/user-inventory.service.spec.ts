@@ -69,6 +69,7 @@ describe('UserInventoryService', () => {
     select: jest.fn().mockReturnThis(),
     addSelect: jest.fn().mockReturnThis(),
     getRawOne: jest.fn(),
+    getOne: jest.fn().mockResolvedValue(null),
   };
 
   beforeEach(async () => {
@@ -403,10 +404,15 @@ describe('UserInventoryService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ConflictException on unique constraint violation (23505)', async () => {
+    it('should throw ConflictException when another active row has the same identity', async () => {
       const updateDto: UpdateUserInventoryItemDto = { unitOfMeasure: 'scu' };
+      const collidingItem = {
+        ...mockInventoryItem,
+        id: 'other-uuid',
+        unitOfMeasure: 'scu' as const,
+      };
       jest.spyOn(repository, 'findOne').mockResolvedValue(mockInventoryItem);
-      jest.spyOn(repository, 'save').mockRejectedValue({ code: '23505' });
+      mockQueryBuilder.getOne.mockResolvedValueOnce(collidingItem);
 
       await expect(
         service.update(mockInventoryItem.id, 1, updateDto),

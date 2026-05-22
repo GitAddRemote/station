@@ -683,6 +683,15 @@ export class BigBangBaselineMigration1748000000000
       ON "user_inventory_item" ("user_id", "date_modified" DESC)
       WHERE "deleted" = FALSE
     `);
+    await queryRunner.query(`
+      CREATE INDEX "idx_user_inv_identity"
+      ON "user_inventory_item" (
+        "user_id", "game_id", "uex_item_id", "unit_of_measure",
+        COALESCE("location_type", ''), COALESCE("location_uex_id", -1),
+        COALESCE("shared_org_id", -1)
+      )
+      WHERE "deleted" = FALSE AND "active" = TRUE
+    `);
 
     // -- inventory_audit_log --------------------------------------------------
     await queryRunner.query(`
@@ -753,6 +762,14 @@ export class BigBangBaselineMigration1748000000000
       CREATE INDEX "idx_org_inv_active"
       ON "org_inventory_item" ("org_id", "active")
       WHERE "deleted" = FALSE
+    `);
+    await queryRunner.query(`
+      CREATE INDEX "idx_org_inv_identity"
+      ON "org_inventory_item" (
+        "org_id", "game_id", "uex_item_id", "unit_of_measure",
+        COALESCE("location_type", ''), COALESCE("location_uex_id", -1)
+      )
+      WHERE "deleted" = FALSE AND "active" = TRUE
     `);
 
     // -- org_shared_inventory_summary (regular VIEW) --------------------------

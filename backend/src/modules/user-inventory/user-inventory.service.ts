@@ -149,13 +149,17 @@ export class UserInventoryService {
       async (manager) => {
         const repo = manager.getRepository(UserInventoryItem);
 
-        const existing = await repo
+        // Advisory lock keyed on the identity serializes concurrent "no
+        // existing row" requests so they don't both pass the check-then-insert
+        // race and produce duplicates. Released automatically at txn end.
+        await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+          `uii:${userId}:${createDto.gameId}:${createDto.uexItemId}:${createDto.unitOfMeasure ?? 'unit'}:${createDto.locationType ?? ''}:${createDto.locationUexId ?? -1}:${createDto.sharedOrgId ?? -1}`,
+        ]);
+
+        const lockedExisting = await repo
           .createQueryBuilder('inventory')
-          .setLock('pessimistic_write')
           .where('inventory.user_id = :userId', { userId })
-          .andWhere('inventory.game_id = :gameId', {
-            gameId: createDto.gameId,
-          })
+          .andWhere('inventory.game_id = :gameId', { gameId: createDto.gameId })
           .andWhere('inventory.uex_item_id = :uexItemId', {
             uexItemId: createDto.uexItemId,
           })
@@ -178,7 +182,7 @@ export class UserInventoryService {
           .andWhere('inventory.active = TRUE')
           .getOne();
 
-        if (existing) {
+        if (lockedExisting) {
           // Use SQL NUMERIC addition to avoid JS floating-point drift
           const result = await manager.query(
             `UPDATE "user_inventory_item"
@@ -189,7 +193,12 @@ export class UserInventoryService {
              WHERE id = $4
                AND quantity + $1::numeric <= 999999.999999
              RETURNING id`,
-            [createDto.quantity, createDto.notes ?? null, userId, existing.id],
+            [
+              createDto.quantity,
+              createDto.notes ?? null,
+              userId,
+              lockedExisting.id,
+            ],
           );
           if (result.length === 0) {
             throw new BadRequestException(
@@ -197,7 +206,7 @@ export class UserInventoryService {
             );
           }
           merged = true;
-          return repo.findOneByOrFail({ id: existing.id });
+          return repo.findOneByOrFail({ id: lockedExisting.id });
         }
 
         const item = repo.create({
@@ -337,6 +346,36 @@ export class UserInventoryService {
 
     Object.assign(item, updateDto);
     item.modifiedBy = userId;
+
+    // Guard against silently creating a duplicate active stack: check whether
+    // any other row already has the post-update identity before saving.
+    const collision = await this.inventoryRepository
+      .createQueryBuilder('inv')
+      .where('inv.id != :id', { id })
+      .andWhere('inv.user_id = :userId', { userId })
+      .andWhere('inv.game_id = :gameId', { gameId: item.gameId })
+      .andWhere('inv.uex_item_id = :uexItemId', { uexItemId: item.uexItemId })
+      .andWhere('inv.unit_of_measure = :unitOfMeasure', {
+        unitOfMeasure: item.unitOfMeasure,
+      })
+      .andWhere('inv.location_type IS NOT DISTINCT FROM :locationType', {
+        locationType: item.locationType ?? null,
+      })
+      .andWhere('inv.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
+        locationUexId: item.locationUexId ?? null,
+      })
+      .andWhere('inv.shared_org_id IS NOT DISTINCT FROM :sharedOrgId', {
+        sharedOrgId: item.sharedOrgId ?? null,
+      })
+      .andWhere('inv.deleted = FALSE')
+      .andWhere('inv.active = TRUE')
+      .getOne();
+
+    if (collision) {
+      throw new ConflictException(
+        'An active inventory item with the same identity already exists',
+      );
+    }
 
     let saved: UserInventoryItem;
     try {
