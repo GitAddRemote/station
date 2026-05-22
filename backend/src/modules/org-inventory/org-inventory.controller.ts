@@ -23,6 +23,7 @@ import {
   OrgInventorySearchDto,
   OrgInventoryItemDto,
   OrgInventorySummaryDto,
+  SplitOrgInventoryItemDto,
 } from './dto/org-inventory-item.dto';
 import {
   ApiTags,
@@ -30,6 +31,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { QueryParams, asString } from '../../common/types/query-params.type';
@@ -276,6 +278,29 @@ export class OrgInventoryController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<OrgInventoryItemDto> {
     return this.orgInventoryService.findById(req.user.userId, orgId, id);
+  }
+
+  /**
+   * Split an inventory item into two independent stacks
+   * POST /api/orgs/:orgId/inventory/:id/split
+   */
+  @Post(':id/split')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Split an org inventory item into two stacks' })
+  @ApiParam({ name: 'orgId', description: 'Organization ID' })
+  @ApiParam({ name: 'id', description: 'Inventory item ID (UUID)' })
+  @ApiBody({ type: SplitOrgInventoryItemDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns both resulting stacks',
+  })
+  async split(
+    @Request() req: AuthenticatedRequest,
+    @Param('orgId', ParseIntPipe) orgId: number,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() splitDto: SplitOrgInventoryItemDto,
+  ): Promise<{ remaining: OrgInventoryItemDto; split: OrgInventoryItemDto }> {
+    return this.orgInventoryService.split(req.user.userId, orgId, id, splitDto);
   }
 
   /**

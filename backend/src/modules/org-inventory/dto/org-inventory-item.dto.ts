@@ -113,10 +113,6 @@ export class CreateOrgInventoryItemDto {
   @IsString()
   @MaxLength(1000)
   notes?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  allowDuplicate?: boolean;
 }
 
 @LocationPairRequired()
@@ -335,4 +331,11 @@ export class OrgInventorySummaryAggregateRow {
 export class OrgInventorySummaryDto {
   orgId!: number;
   aggregates!: OrgInventorySummaryAggregateRow[];
+}
+
+export class SplitOrgInventoryItemDto {
+  @IsNumber()
+  @Min(0.000001)
+  @Max(999999.999999)
+  splitQuantity!: number;
 }

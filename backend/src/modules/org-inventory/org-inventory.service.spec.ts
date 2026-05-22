@@ -175,25 +175,6 @@ describe('OrgInventoryService', () => {
         BadRequestException,
       );
     });
-
-    it('should create a duplicate row when allowDuplicate is true even if matching item exists', async () => {
-      jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
-      mockDataSource.transaction.mockImplementation(
-        async (cb: (m: unknown) => Promise<unknown>) =>
-          cb(buildMockTxManager(mockOrgInventoryItem)),
-      );
-      jest
-        .spyOn(repository, 'findByIdNotDeleted')
-        .mockResolvedValue(mockOrgInventoryItem);
-
-      const result = await service.create(1, {
-        ...createDto,
-        allowDuplicate: true,
-      });
-
-      expect(result).toBeDefined();
-      expect(result.id).toBe(mockOrgInventoryItem.id);
-    });
   });
 
   describe('findByOrgAndGame', () => {

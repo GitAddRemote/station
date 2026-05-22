@@ -187,11 +187,23 @@ export const inventoryService = {
   /**
    * Create new inventory item
    */
+  async splitItem(
+    id: string,
+    splitQuantity: number,
+  ): Promise<{ remaining: InventoryItem; split: InventoryItem }> {
+    const response = await axios.post(
+      `${API_URL}/api/inventory/${id}/split`,
+      { splitQuantity },
+      { withCredentials: true },
+    );
+    return response.data;
+  },
+
   async createItem(
     item: Omit<
       InventoryItem,
       'id' | 'userId' | 'dateAdded' | 'dateModified' | 'active' | 'unitOfMeasure'
-    > & { unitOfMeasure?: 'unit' | 'scu' | 'uscu'; allowDuplicate?: boolean },
+    > & { unitOfMeasure?: 'unit' | 'scu' | 'uscu' },
   ): Promise<InventoryItem> {
     const response = await axios.post(`${API_URL}/api/inventory`, item, {
       withCredentials: true,
@@ -295,6 +307,19 @@ export const inventoryService = {
   /**
    * Create org inventory item
    */
+  async splitOrgItem(
+    orgId: number,
+    id: string,
+    splitQuantity: number,
+  ): Promise<{ remaining: OrgInventoryItem; split: OrgInventoryItem }> {
+    const response = await axios.post(
+      `${API_URL}/api/orgs/${orgId}/inventory/${id}/split`,
+      { splitQuantity },
+      { withCredentials: true },
+    );
+    return response.data;
+  },
+
   async createOrgItem(
     orgId: number,
     item: Omit<
@@ -309,7 +334,7 @@ export const inventoryService = {
       | 'addedBy'
       | 'modifiedBy'
       | 'unitOfMeasure'
-    > & { unitOfMeasure?: 'unit' | 'scu' | 'uscu'; allowDuplicate?: boolean },
+    > & { unitOfMeasure?: 'unit' | 'scu' | 'uscu' },
   ): Promise<OrgInventoryItem> {
     const response = await axios.post(
       `${API_URL}/api/orgs/${orgId}/inventory`,

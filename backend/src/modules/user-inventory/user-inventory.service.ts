@@ -14,6 +14,7 @@ import {
   UpdateUserInventoryItemDto,
   UserInventorySearchDto,
   UserInventorySummaryDto,
+  SplitUserInventoryItemDto,
 } from './dto/user-inventory-item.dto';
 
 @Injectable()
@@ -177,7 +178,7 @@ export class UserInventoryService {
           .andWhere('inventory.active = TRUE')
           .getOne();
 
-        if (existing && !createDto.allowDuplicate) {
+        if (existing) {
           // Use SQL NUMERIC addition to avoid JS floating-point drift
           const result = await manager.query(
             `UPDATE "user_inventory_item"
@@ -235,6 +236,96 @@ export class UserInventoryService {
     }
 
     return this.findById(saved.id, userId);
+  }
+
+  async split(
+    id: string,
+    userId: number,
+    dto: SplitUserInventoryItemDto,
+  ): Promise<{ remaining: UserInventoryItemDto; split: UserInventoryItemDto }> {
+    const [remainingId, splitId] =
+      await this.inventoryRepository.manager.transaction(async (manager) => {
+        const repo = manager.getRepository(UserInventoryItem);
+
+        const source = await repo
+          .createQueryBuilder('inv')
+          .setLock('pessimistic_write')
+          .where('inv.id = :id', { id })
+          .andWhere('inv.user_id = :userId', { userId })
+          .andWhere('inv.deleted = FALSE')
+          .andWhere('inv.active = TRUE')
+          .getOne();
+
+        if (!source) {
+          throw new NotFoundException(`Inventory item with ID ${id} not found`);
+        }
+
+        const sourceQty = parseFloat(source.quantity.toString());
+        if (dto.splitQuantity >= sourceQty) {
+          throw new BadRequestException(
+            'Split quantity must be less than the current quantity',
+          );
+        }
+
+        const remainingQty = sourceQty - dto.splitQuantity;
+
+        // Soft-delete the source so both new rows can be inserted without
+        // colliding against the partial unique index (active=TRUE, deleted=FALSE)
+        await manager.query(
+          `UPDATE "user_inventory_item" SET deleted = TRUE, active = FALSE, modified_by = $1, date_modified = NOW() WHERE id = $2`,
+          [userId, source.id],
+        );
+
+        const rowA = repo.create({
+          userId: source.userId,
+          gameId: source.gameId,
+          uexItemId: source.uexItemId,
+          quantity: remainingQty,
+          unitOfMeasure: source.unitOfMeasure,
+          quality: source.quality,
+          locationType: source.locationType,
+          locationUexId: source.locationUexId,
+          sharedOrgId: source.sharedOrgId,
+          notes: source.notes,
+          active: true,
+          deleted: false,
+          addedBy: source.addedBy,
+          modifiedBy: userId,
+        });
+
+        const rowB = repo.create({
+          userId: source.userId,
+          gameId: source.gameId,
+          uexItemId: source.uexItemId,
+          quantity: dto.splitQuantity,
+          unitOfMeasure: source.unitOfMeasure,
+          quality: source.quality,
+          locationType: source.locationType,
+          locationUexId: source.locationUexId,
+          sharedOrgId: source.sharedOrgId,
+          notes: source.notes,
+          active: true,
+          deleted: false,
+          addedBy: source.addedBy,
+          modifiedBy: userId,
+        });
+
+        const savedA = await repo.save(rowA);
+        const savedB = await repo.save(rowB);
+
+        return [savedA.id, savedB.id] as [string, string];
+      });
+
+    const [remainingItem, splitItem] = await Promise.all([
+      this.findById(remainingId, userId),
+      this.findById(splitId, userId),
+    ]);
+
+    this.logger.info(
+      `Split inventory item ${id} for user ${userId}: ${remainingId} (remaining) + ${splitId} (split)`,
+    );
+
+    return { remaining: remainingItem, split: splitItem };
   }
 
   async update(

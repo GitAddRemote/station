@@ -26,6 +26,7 @@ import {
   CreateUserInventoryItemDto,
   UpdateUserInventoryItemDto,
   UserInventorySearchDto,
+  SplitUserInventoryItemDto,
 } from './dto/user-inventory-item.dto';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { QueryParams, asString } from '../../common/types/query-params.type';
@@ -174,6 +175,16 @@ export class UserInventoryController {
   ) {
     const userId = req.user.userId;
     return this.userInventoryService.create(userId, createDto);
+  }
+
+  @Post(':id/split')
+  @HttpCode(HttpStatus.OK)
+  async split(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() splitDto: SplitUserInventoryItemDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.userInventoryService.split(id, req.user.userId, splitDto);
   }
 
   @Put(':id')

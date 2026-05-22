@@ -1317,43 +1317,15 @@ const InventoryPage = () => {
     try {
       setActionWorking(true);
       setError(null);
-      const remaining = Number(actionItem.quantity) - quantity;
-      if (remaining < 0) {
-        setError('Split quantity exceeds available amount.');
-        throw new Error('Split quantity exceeds available amount');
+      if (quantity >= Number(actionItem.quantity)) {
+        setError('Split quantity must be less than the current quantity.');
+        throw new Error('Split quantity must be less than the current quantity');
       }
 
       if (viewMode === 'org' && selectedOrgId) {
-        await inventoryService.updateOrgItem(selectedOrgId, actionItem.id, {
-          quantity: remaining,
-        });
-        await inventoryService.createOrgItem(selectedOrgId, {
-          gameId: GAME_ID,
-          uexItemId: actionItem.uexItemId,
-          quantity,
-          notes: actionItem.notes,
-          unitOfMeasure: actionItem.unitOfMeasure,
-          quality: actionItem.quality,
-          locationType: actionItem.locationType,
-          locationUexId: actionItem.locationUexId,
-          allowDuplicate: true,
-        });
+        await inventoryService.splitOrgItem(selectedOrgId, actionItem.id, quantity);
       } else {
-        await inventoryService.updateItem(actionItem.id, {
-          quantity: remaining,
-        });
-        await inventoryService.createItem({
-          gameId: GAME_ID,
-          uexItemId: actionItem.uexItemId,
-          quantity,
-          notes: actionItem.notes,
-          unitOfMeasure: actionItem.unitOfMeasure,
-          quality: actionItem.quality,
-          locationType: actionItem.locationType,
-          locationUexId: actionItem.locationUexId,
-          sharedOrgId: actionItem.sharedOrgId,
-          allowDuplicate: true,
-        });
+        await inventoryService.splitItem(actionItem.id, quantity);
       }
       closeActionMenu();
       await fetchInventory();

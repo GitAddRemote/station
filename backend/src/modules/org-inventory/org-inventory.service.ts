@@ -15,6 +15,7 @@ import {
   OrgInventorySearchDto,
   OrgInventorySummaryDto,
   OrgInventoryItemDto,
+  SplitOrgInventoryItemDto,
 } from './dto/org-inventory-item.dto';
 import { OrgPermission } from '../permissions/permissions.constants';
 
@@ -117,7 +118,7 @@ export class OrgInventoryService {
         .andWhere('oii.active = TRUE')
         .getOne();
 
-      if (existing && !dto.allowDuplicate) {
+      if (existing) {
         const result = await manager.query(
           `UPDATE "org_inventory_item"
            SET quantity      = quantity + $1::numeric,
@@ -215,6 +216,104 @@ export class OrgInventoryService {
     await this.verifyInventoryPermission(userId, item.orgId, 'view');
 
     return this.toDto(item);
+  }
+
+  /**
+   * Split an inventory item into two independent rows
+   */
+  async split(
+    userId: number,
+    orgId: number,
+    id: string,
+    dto: SplitOrgInventoryItemDto,
+  ): Promise<{ remaining: OrgInventoryItemDto; split: OrgInventoryItemDto }> {
+    await this.verifyInventoryPermission(userId, orgId, 'manage');
+
+    const [remainingId, splitId] = await this.dataSource.transaction(
+      async (manager) => {
+        const repo = manager.getRepository(OrgInventoryItem);
+
+        const source = await repo
+          .createQueryBuilder('oii')
+          .setLock('pessimistic_write')
+          .where('oii.id = :id', { id })
+          .andWhere('oii.org_id = :orgId', { orgId })
+          .andWhere('oii.deleted = FALSE')
+          .andWhere('oii.active = TRUE')
+          .getOne();
+
+        if (!source) {
+          throw new NotFoundException(`Inventory item with ID ${id} not found`);
+        }
+
+        const sourceQty = parseFloat(source.quantity.toString());
+        if (dto.splitQuantity >= sourceQty) {
+          throw new BadRequestException(
+            'Split quantity must be less than the current quantity',
+          );
+        }
+
+        const remainingQty = sourceQty - dto.splitQuantity;
+
+        // Soft-delete the source so both new rows can be inserted without
+        // colliding against the partial unique index (active=TRUE, deleted=FALSE)
+        await manager.query(
+          `UPDATE "org_inventory_item" SET deleted = TRUE, active = FALSE, modified_by = $1, date_modified = NOW() WHERE id = $2`,
+          [userId, source.id],
+        );
+
+        const rowA = repo.create({
+          orgId: source.orgId,
+          gameId: source.gameId,
+          uexItemId: source.uexItemId,
+          quantity: remainingQty,
+          unitOfMeasure: source.unitOfMeasure,
+          quality: source.quality,
+          locationType: source.locationType,
+          locationUexId: source.locationUexId,
+          notes: source.notes,
+          active: true,
+          deleted: false,
+          addedBy: source.addedBy,
+          modifiedBy: userId,
+        });
+
+        const rowB = repo.create({
+          orgId: source.orgId,
+          gameId: source.gameId,
+          uexItemId: source.uexItemId,
+          quantity: dto.splitQuantity,
+          unitOfMeasure: source.unitOfMeasure,
+          quality: source.quality,
+          locationType: source.locationType,
+          locationUexId: source.locationUexId,
+          notes: source.notes,
+          active: true,
+          deleted: false,
+          addedBy: source.addedBy,
+          modifiedBy: userId,
+        });
+
+        const savedA = await repo.save(rowA);
+        const savedB = await repo.save(rowB);
+
+        return [savedA.id, savedB.id] as [string, string];
+      },
+    );
+
+    const [remainingItem, splitItem] = await Promise.all([
+      this.orgInventoryRepository.findByIdNotDeleted(remainingId),
+      this.orgInventoryRepository.findByIdNotDeleted(splitId),
+    ]);
+
+    if (!remainingItem || !splitItem) {
+      throw new NotFoundException('Failed to load split inventory items');
+    }
+
+    return {
+      remaining: this.toDto(remainingItem),
+      split: this.toDto(splitItem),
+    };
   }
 
   /**

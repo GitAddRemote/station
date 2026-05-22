@@ -75,10 +75,6 @@ export class CreateUserInventoryItemDto {
   @IsOptional()
   @IsInt()
   sharedOrgId?: number;
-
-  @IsOptional()
-  @IsBoolean()
-  allowDuplicate?: boolean;
 }
 
 @LocationPairRequired()
@@ -200,4 +196,11 @@ export class UserInventorySummaryDto {
   uniqueItems!: number;
   sharedItemsCount!: number;
   lastUpdated!: Date;
+}
+
+export class SplitUserInventoryItemDto {
+  @IsNumber()
+  @Min(0.000001)
+  @Max(999999.999999)
+  splitQuantity!: number;
 }

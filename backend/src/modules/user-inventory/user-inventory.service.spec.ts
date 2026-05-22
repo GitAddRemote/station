@@ -372,26 +372,6 @@ describe('UserInventoryService', () => {
       );
       expect(transactionRepository.save).not.toHaveBeenCalled();
     });
-
-    it('should create a duplicate row when allowDuplicate is true even if matching item exists', async () => {
-      const createDto: CreateUserInventoryItemDto = {
-        gameId: 1,
-        uexItemId: 100,
-        quantity: 2,
-        allowDuplicate: true,
-      };
-
-      const existingItem = { ...mockInventoryItem, quantity: 3 };
-      transactionQueryBuilder.getOne.mockResolvedValue(existingItem);
-      transactionRepository.create.mockReturnValue(mockInventoryItem);
-      transactionRepository.save.mockResolvedValue(mockInventoryItem);
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockInventoryItem);
-
-      const result = await service.create(1, createDto);
-
-      expect(transactionRepository.save).toHaveBeenCalled();
-      expect(result.id).toBe(mockInventoryItem.id);
-    });
   });
 
   describe('update', () => {
