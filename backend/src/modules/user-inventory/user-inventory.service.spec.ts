@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { getLoggerToken } from 'nestjs-pino';
 import { UserInventoryService } from './user-inventory.service';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
@@ -393,6 +397,16 @@ describe('UserInventoryService', () => {
       await expect(
         service.update('invalid-id', 1, { quantity: 20 }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException on unique constraint violation (23505)', async () => {
+      const updateDto: UpdateUserInventoryItemDto = { unitOfMeasure: 'scu' };
+      jest.spyOn(repository, 'findOne').mockResolvedValue(mockInventoryItem);
+      jest.spyOn(repository, 'save').mockRejectedValue({ code: '23505' });
+
+      await expect(
+        service.update(mockInventoryItem.id, 1, updateDto),
+      ).rejects.toThrow(ConflictException);
     });
   });
 

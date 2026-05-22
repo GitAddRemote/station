@@ -241,7 +241,21 @@ export class UserInventoryService {
     Object.assign(item, updateDto);
     item.modifiedBy = userId;
 
-    const saved = await this.inventoryRepository.save(item);
+    let saved: UserInventoryItem;
+    try {
+      saved = await this.inventoryRepository.save(item);
+    } catch (err: unknown) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        (err as { code: string }).code === '23505'
+      ) {
+        throw new ConflictException(
+          'An active inventory item with the same identity already exists',
+        );
+      }
+      throw err;
+    }
 
     this.logger.info(`Updated inventory item ${saved.id} for user ${userId}`);
 
