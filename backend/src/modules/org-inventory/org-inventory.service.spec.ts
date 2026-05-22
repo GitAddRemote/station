@@ -369,9 +369,37 @@ describe('OrgInventoryService', () => {
         search: undefined,
         minQuantity: undefined,
         maxQuantity: undefined,
+        minQuality: undefined,
+        maxQuality: undefined,
+        unitOfMeasure: undefined,
         sort: 'date_modified',
         order: 'desc',
       });
+    });
+
+    it('should forward minQuality, maxQuality, and unitOfMeasure to repository', async () => {
+      const filteredDto: OrgInventorySearchDto = {
+        orgId: 1,
+        gameId: 1,
+        activeOnly: true,
+        minQuality: 5,
+        maxQuality: 30,
+        unitOfMeasure: 'scu',
+      };
+      jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
+      jest
+        .spyOn(repository, 'searchInventory')
+        .mockResolvedValue({ items: [], total: 0 });
+
+      await service.search(1, filteredDto);
+
+      expect(repository.searchInventory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minQuality: 5,
+          maxQuality: 30,
+          unitOfMeasure: 'scu',
+        }),
+      );
     });
 
     it('should throw ForbiddenException without view permission', async () => {

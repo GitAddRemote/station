@@ -33,7 +33,13 @@ export function LocationPairRequired(
             obj,
             'locationUexId',
           );
-          return hasType === hasId;
+          if (hasType !== hasId) return false;
+          if (!hasType) return true;
+          const typeIsNull =
+            obj.locationType === null || obj.locationType === undefined;
+          const idIsNull =
+            obj.locationUexId === null || obj.locationUexId === undefined;
+          return typeIsNull === idIsNull;
         },
       },
     });

@@ -19,7 +19,6 @@ import { UexCompany } from '../uex/entities/uex-company.entity';
 import { UEXCategoriesClient } from './clients/uex-categories.client';
 import { UEXCommoditiesClient } from './clients/uex-commodities.client';
 import { UEXItemsClient } from './clients/uex-items.client';
-import { UEXLocationsClient } from './clients/uex-locations.client';
 import { UEXCompaniesClient } from './clients/uex-companies.client';
 import { CategoriesSyncService } from './services/categories-sync.service';
 import { CommoditiesSyncService } from './services/commodities-sync.service';
@@ -54,7 +53,6 @@ import { UsersModule } from '../users/users.module';
     UEXCategoriesClient,
     UEXCommoditiesClient,
     UEXItemsClient,
-    UEXLocationsClient,
     UEXCompaniesClient,
     CategoriesSyncService,
     CommoditiesSyncService,

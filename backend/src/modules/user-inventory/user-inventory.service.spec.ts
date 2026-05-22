@@ -207,6 +207,47 @@ describe('UserInventoryService', () => {
       );
     });
 
+    it('should filter by minQuality and maxQuality', async () => {
+      const searchDto: UserInventorySearchDto = {
+        gameId: 1,
+        minQuality: 10,
+        maxQuality: 50,
+      };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
+
+      await service.findAll(1, searchDto);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'inventory.quality >= :minQuality',
+        { minQuality: 10 },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'inventory.quality <= :maxQuality',
+        { maxQuality: 50 },
+      );
+    });
+
+    it('should filter by unitOfMeasure', async () => {
+      const searchDto: UserInventorySearchDto = {
+        gameId: 1,
+        unitOfMeasure: 'scu',
+      };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
+
+      await service.findAll(1, searchDto);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'inventory.unit_of_measure = :unitOfMeasure',
+        { unitOfMeasure: 'scu' },
+      );
+    });
+
     it('should sort by date_modified by default', async () => {
       const searchDto: UserInventorySearchDto = {
         gameId: 1,
