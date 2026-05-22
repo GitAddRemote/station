@@ -670,7 +670,7 @@ export class BigBangBaselineMigration1748000000000
     // -- user_inventory_item --------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "user_inventory_item" (
-        "id"              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+        "id"              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
         "user_id"         BIGINT       NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
         "game_id"         INTEGER      NOT NULL REFERENCES "game"("id"),
         "uex_item_id"     INTEGER      NOT NULL REFERENCES "uex_item"("uex_id"),
@@ -751,7 +751,7 @@ export class BigBangBaselineMigration1748000000000
     // -- org_inventory_item ---------------------------------------------------
     await queryRunner.query(`
       CREATE TABLE "org_inventory_item" (
-        "id"              UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+        "id"              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
         "org_id"          INTEGER       NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
         "game_id"         INTEGER       NOT NULL REFERENCES "game"("id"),
         "uex_item_id"     INTEGER       NOT NULL REFERENCES "uex_item"("uex_id"),

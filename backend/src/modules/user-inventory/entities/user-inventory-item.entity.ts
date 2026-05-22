@@ -82,7 +82,7 @@ export class UserInventoryItem {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
-  @Column({ name: 'shared_org_id', type: 'bigint', nullable: true })
+  @Column({ name: 'shared_org_id', type: 'int', nullable: true })
   @Index()
   sharedOrgId?: number | null;
 
