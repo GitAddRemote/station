@@ -147,10 +147,11 @@ if (!isTest) {
           password: configService.get<string>('DATABASE_PASSWORD'),
           database: configService.get<string>('DATABASE_NAME'),
           autoLoadEntities: true,
-          synchronize: isTest, // Auto-create tables for tests, false for production
-          dropSchema: isTest, // Clean database before each test run
+          synchronize: isTest,
+          dropSchema: isTest,
           migrations: ['dist/migrations/*.js'],
-          migrationsRun: false, // Run migrations manually for safety
+          migrationsRun: false,
+          extra: { parseInt8: true },
         };
       },
       inject: [ConfigService],

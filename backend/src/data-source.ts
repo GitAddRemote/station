@@ -63,6 +63,7 @@ export const AppDataSource = new DataSource({
   ],
   migrations: [BigBangBaselineMigration1748000000000],
   synchronize: false,
+  extra: { parseInt8: true },
 });
 
 AppDataSource.initialize()
