@@ -247,7 +247,7 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="body2">
-                          {item.quantity.toLocaleString()}
+                          {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
                         </Typography>
                       </TableCell>
                       <TableCell>

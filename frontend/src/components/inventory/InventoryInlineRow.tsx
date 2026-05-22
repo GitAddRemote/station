@@ -164,7 +164,7 @@ const InventoryInlineRow = ({
               variant="body2"
               sx={{ fontWeight: 700, letterSpacing: 0.1 }}
             >
-              {Number(item.quantity).toLocaleString()}
+              {Number(item.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}
             </Typography>
           </>
         ) : (
@@ -268,7 +268,7 @@ const InventoryInlineRow = ({
                   variant="body2"
                   sx={{ fontWeight: 700, letterSpacing: 0.1 }}
                 >
-                  {displayQuantity.toLocaleString()}
+                  {displayQuantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
                 </Typography>
                 <EditIcon
                   className="inline-edit-icon"

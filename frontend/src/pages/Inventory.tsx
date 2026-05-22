@@ -102,7 +102,8 @@ const readStoredDensity = (): 'standard' | 'compact' => {
   return stored === 'compact' ? 'compact' : 'standard';
 };
 
-const valueText = (value: number) => `${value.toLocaleString()} qty`;
+const valueText = (value: number) =>
+  `${value.toLocaleString(undefined, { maximumFractionDigits: 6 })} qty`;
 
 
 const InventoryPage = () => {
@@ -1481,7 +1482,7 @@ const InventoryPage = () => {
           {actionMode === 'split' && (
             <>
               <Typography variant="body2" color="text.secondary">
-                Current quantity: {quantityValue.toLocaleString()}
+                Current quantity: {quantityValue.toLocaleString(undefined, { maximumFractionDigits: 6 })}
               </Typography>
               <TextField
                 label="Quantity to split"
