@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   ForbiddenException,
   NotFoundException,
-  ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { OrgInventoryService } from './org-inventory.service';
@@ -103,7 +103,10 @@ describe('OrgInventoryService', () => {
       notes: 'Test notes',
     };
 
-    const buildMockTxManager = (existingItem: OrgInventoryItem | null) => ({
+    const buildMockTxManager = (
+      existingItem: OrgInventoryItem | null,
+      queryResult: unknown[] = [{ id: mockOrgInventoryItem.id }],
+    ) => ({
       getRepository: jest.fn().mockReturnValue({
         createQueryBuilder: jest.fn().mockReturnValue({
           setLock: jest.fn().mockReturnThis(),
@@ -114,6 +117,7 @@ describe('OrgInventoryService', () => {
         create: jest.fn().mockReturnValue(mockOrgInventoryItem),
         save: jest.fn().mockResolvedValue(mockOrgInventoryItem),
       }),
+      query: jest.fn().mockResolvedValue(queryResult),
     });
 
     it('should create org inventory item with manage permission', async () => {
@@ -146,15 +150,29 @@ describe('OrgInventoryService', () => {
       expect(mockDataSource.transaction).not.toHaveBeenCalled();
     });
 
-    it('should throw ConflictException when item already exists', async () => {
+    it('should merge quantity when item with same identity already exists', async () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
       mockDataSource.transaction.mockImplementation(
         async (cb: (m: unknown) => Promise<unknown>) =>
           cb(buildMockTxManager(mockOrgInventoryItem)),
       );
+      jest
+        .spyOn(repository, 'findByIdNotDeleted')
+        .mockResolvedValue(mockOrgInventoryItem);
+
+      const result = await service.create(1, createDto);
+      expect(result).toBeDefined();
+    });
+
+    it('should throw BadRequestException when merged quantity exceeds max', async () => {
+      jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
+      mockDataSource.transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) =>
+          cb(buildMockTxManager(mockOrgInventoryItem, [])),
+      );
 
       await expect(service.create(1, createDto)).rejects.toThrow(
-        ConflictException,
+        BadRequestException,
       );
     });
   });
@@ -412,24 +430,33 @@ describe('OrgInventoryService', () => {
   });
 
   describe('getSummary', () => {
-    it('should return org inventory summary with view permission', async () => {
+    it('should return org inventory summary aggregates with view permission', async () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
-      jest.spyOn(repository, 'getOrgInventorySummary').mockResolvedValue({
-        totalItems: 10,
-        uniqueItems: 5,
-        lastUpdated: new Date(),
-      });
+      const mockRows = [
+        {
+          uexItemId: 100,
+          unitOfMeasure: 'scu',
+          totalQuantity: 42.5,
+          itemCount: 3,
+          latestUpdate: new Date(),
+        },
+      ];
+      jest
+        .spyOn(repository, 'getOrgInventorySummary')
+        .mockResolvedValue(mockRows);
 
-      const result = await service.getSummary(1, 1, 1);
+      const result = await service.getSummary(1, 1);
 
-      expect(result.totalItems).toBe(10);
-      expect(result.uniqueItems).toBe(5);
+      expect(result.orgId).toBe(1);
+      expect(result.aggregates).toHaveLength(1);
+      expect(result.aggregates[0].uexItemId).toBe(100);
+      expect(result.aggregates[0].totalQuantity).toBe(42.5);
     });
 
     it('should throw ForbiddenException without view permission', async () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(false);
 
-      await expect(service.getSummary(1, 1, 1)).rejects.toThrow(
+      await expect(service.getSummary(1, 1)).rejects.toThrow(
         ForbiddenException,
       );
     });

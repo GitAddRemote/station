@@ -48,7 +48,6 @@ export const envValidationSchema = Joi.object({
   UEX_CATEGORIES_SYNC_ENABLED: Joi.boolean().default(false),
   UEX_COMMODITIES_SYNC_ENABLED: Joi.boolean().default(false),
   UEX_ITEMS_SYNC_ENABLED: Joi.boolean().default(false),
-  UEX_LOCATIONS_SYNC_ENABLED: Joi.boolean().default(false),
   UEX_API_BASE_URL: Joi.string().uri().default('https://uexcorp.space/api/2.0'),
   UEX_TIMEOUT_MS: Joi.number().default(60000),
   UEX_BATCH_SIZE: Joi.number().default(100),

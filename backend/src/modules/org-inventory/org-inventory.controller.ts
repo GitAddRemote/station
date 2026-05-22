@@ -252,9 +252,8 @@ export class OrgInventoryController {
   async getSummary(
     @Request() req: AuthenticatedRequest,
     @Param('orgId', ParseIntPipe) orgId: number,
-    @Query('gameId', ParseIntPipe) gameId: number,
   ): Promise<OrgInventorySummaryDto> {
-    return this.orgInventoryService.getSummary(req.user.userId, orgId, gameId);
+    return this.orgInventoryService.getSummary(req.user.userId, orgId);
   }
 
   /**

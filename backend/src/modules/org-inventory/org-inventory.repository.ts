@@ -69,31 +69,38 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   }
 
   /**
-   * Get inventory summary for an org
+   * Get aggregated inventory summary for an org from the view.
    */
-  async getOrgInventorySummary(
-    orgId: number,
-    gameId: number,
-  ): Promise<{
-    totalItems: number;
-    uniqueItems: number;
-    lastUpdated: Date | null;
-  }> {
-    const result = await this.createQueryBuilder('oii')
-      .select('COUNT(*)', 'totalItems')
-      .addSelect('COUNT(DISTINCT oii.uex_item_id)', 'uniqueItems')
-      .addSelect('MAX(oii.date_modified)', 'lastUpdated')
-      .where('oii.org_id = :orgId', { orgId })
-      .andWhere('oii.game_id = :gameId', { gameId })
-      .andWhere('oii.deleted = false')
-      .andWhere('oii.active = true')
-      .getRawOne();
+  async getOrgInventorySummary(orgId: number): Promise<
+    {
+      uexItemId: number;
+      unitOfMeasure: string;
+      totalQuantity: number;
+      itemCount: number;
+      latestUpdate: Date | null;
+    }[]
+  > {
+    const rows: {
+      uex_item_id: string;
+      unit_of_measure: string;
+      total_quantity: string;
+      item_count: string;
+      latest_update: Date | null;
+    }[] = await this.manager.query(
+      `SELECT uex_item_id, unit_of_measure, total_quantity, item_count, latest_update
+       FROM org_shared_inventory_summary
+       WHERE org_id = $1
+       ORDER BY uex_item_id, unit_of_measure`,
+      [orgId],
+    );
 
-    return {
-      totalItems: parseInt(result.totalItems, 10) || 0,
-      uniqueItems: parseInt(result.uniqueItems, 10) || 0,
-      lastUpdated: result.lastUpdated || null,
-    };
+    return rows.map((r) => ({
+      uexItemId: Number(r.uex_item_id),
+      unitOfMeasure: r.unit_of_measure,
+      totalQuantity: parseFloat(r.total_quantity),
+      itemCount: Number(r.item_count),
+      latestUpdate: r.latest_update,
+    }));
   }
 
   /**

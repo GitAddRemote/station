@@ -118,9 +118,23 @@ export class OrgInventoryService {
         .getOne();
 
       if (existing) {
-        throw new ConflictException(
-          'Inventory item already exists for this organization',
+        const result = await manager.query(
+          `UPDATE "org_inventory_item"
+           SET quantity      = quantity + $1::numeric,
+               notes         = COALESCE($2, notes),
+               modified_by   = $3,
+               date_modified = NOW()
+           WHERE id = $4
+             AND quantity + $1::numeric <= 999999.999999
+           RETURNING id`,
+          [dto.quantity, dto.notes ?? null, userId, existing.id],
         );
+        if (result.length === 0) {
+          throw new BadRequestException(
+            'Merged quantity would exceed the maximum allowed value of 999999.999999',
+          );
+        }
+        return existing.id;
       }
 
       const item = repo.create({
@@ -351,21 +365,15 @@ export class OrgInventoryService {
   async getSummary(
     userId: number,
     orgId: number,
-    gameId: number,
   ): Promise<OrgInventorySummaryDto> {
     await this.verifyInventoryPermission(userId, orgId, 'view');
 
-    const summary = await this.orgInventoryRepository.getOrgInventorySummary(
-      orgId,
-      gameId,
-    );
+    const rows =
+      await this.orgInventoryRepository.getOrgInventorySummary(orgId);
 
     return {
       orgId,
-      gameId,
-      totalItems: summary.totalItems,
-      uniqueItems: summary.uniqueItems,
-      lastUpdated: summary.lastUpdated!,
+      aggregates: rows,
     };
   }
 

@@ -142,8 +142,8 @@ export const InventoryNewRow = ({
           value={draft.quantity}
           onChange={(e) => onQuantityChange(e.target.value)}
           inputProps={{
-            inputMode: 'numeric',
-            pattern: '[0-9]*',
+            inputMode: 'decimal',
+            pattern: '[0-9]*\\.?[0-9]*',
           }}
           inputRef={quantityRef as RefObject<HTMLInputElement>}
           onKeyDown={(event) => {

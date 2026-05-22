@@ -320,10 +320,15 @@ export class OrgInventorySearchDto {
   offset?: number;
 }
 
+export class OrgInventorySummaryAggregateRow {
+  uexItemId!: number;
+  unitOfMeasure!: string;
+  totalQuantity!: number;
+  itemCount!: number;
+  latestUpdate!: Date | null;
+}
+
 export class OrgInventorySummaryDto {
   orgId!: number;
-  gameId!: number;
-  totalItems!: number;
-  uniqueItems!: number;
-  lastUpdated!: Date;
+  aggregates!: OrgInventorySummaryAggregateRow[];
 }
