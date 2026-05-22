@@ -248,7 +248,23 @@ export class OrgInventoryService {
 
     item.modifiedBy = userId;
 
-    const saved = await this.orgInventoryRepository.save(item);
+    let saved: OrgInventoryItem;
+    try {
+      saved = await this.orgInventoryRepository.save(item);
+    } catch (err: unknown) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code: string }).code === '23505'
+      ) {
+        throw new ConflictException(
+          'An inventory item with this combination already exists for this organization',
+        );
+      }
+      throw err;
+    }
+
     const loaded = await this.orgInventoryRepository.findByIdNotDeleted(
       saved.id,
     );

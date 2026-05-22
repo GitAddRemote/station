@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -165,7 +169,7 @@ export class UserInventoryService {
             { locationUexId: createDto.locationUexId ?? null },
           )
           .andWhere(
-            'COALESCE(inventory.shared_org_id, -1) = COALESCE(:sharedOrgId, -1)',
+            'inventory.shared_org_id IS NOT DISTINCT FROM :sharedOrgId',
             { sharedOrgId: createDto.sharedOrgId ?? null },
           )
           .andWhere('inventory.deleted = FALSE')
@@ -189,7 +193,21 @@ export class UserInventoryService {
           modifiedBy: userId,
         });
 
-        return repo.save(item);
+        try {
+          return await repo.save(item);
+        } catch (err: unknown) {
+          if (
+            typeof err === 'object' &&
+            err !== null &&
+            'code' in err &&
+            (err as { code: string }).code === '23505'
+          ) {
+            throw new ConflictException(
+              'An inventory item with this combination already exists',
+            );
+          }
+          throw err;
+        }
       },
     );
 
