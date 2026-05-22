@@ -114,6 +114,7 @@ export class OrgInventoryService {
           locationUexId,
         })
         .andWhere('oii.deleted = FALSE')
+        .andWhere('oii.active = TRUE')
         .getOne();
 
       if (existing) {

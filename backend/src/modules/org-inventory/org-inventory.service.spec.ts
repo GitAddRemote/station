@@ -64,7 +64,6 @@ describe('OrgInventoryService', () => {
           useValue: {
             findByOrgIdAndGameId: jest.fn(),
             findByIdNotDeleted: jest.fn(),
-            findExistingItem: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
             softDeleteItem: jest.fn(),
