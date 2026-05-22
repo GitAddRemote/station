@@ -134,8 +134,22 @@ export class OrgInventoryService {
         deleted: false,
       });
 
-      const saved = await repo.save(item);
-      return saved.id;
+      try {
+        const saved = await repo.save(item);
+        return saved.id;
+      } catch (err: unknown) {
+        if (
+          typeof err === 'object' &&
+          err !== null &&
+          'code' in err &&
+          (err as { code: string }).code === '23505'
+        ) {
+          throw new ConflictException(
+            'Inventory item already exists for this organization',
+          );
+        }
+        throw err;
+      }
     });
 
     const loaded =

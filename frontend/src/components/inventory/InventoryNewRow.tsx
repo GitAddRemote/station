@@ -74,7 +74,7 @@ export const InventoryNewRow = ({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md: '2fr 1fr 1fr auto',
+          md: '2fr 1fr 1fr 1fr auto',
         },
         gap: 0.75,
         alignItems: 'flex-start',
@@ -187,6 +187,7 @@ export const InventoryNewRow = ({
           </Stack>
         )}
       </Stack>
+      <Box sx={{ display: { xs: 'none', md: 'block' } }} />
       <Stack
         direction="row"
         spacing={1}
