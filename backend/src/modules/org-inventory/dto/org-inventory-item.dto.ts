@@ -11,6 +11,7 @@ import {
   IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { LocationPairRequired } from '../../../common/decorators/location-pair.decorator';
 
 export class OrgInventoryItemDto {
   id!: string;
@@ -37,6 +38,7 @@ export class OrgInventoryItemDto {
   categoryName?: string;
 }
 
+@LocationPairRequired()
 export class CreateOrgInventoryItemDto {
   @ApiPropertyOptional({
     description: 'Organization ID (auto-filled from route)',
@@ -113,6 +115,7 @@ export class CreateOrgInventoryItemDto {
   notes?: string;
 }
 
+@LocationPairRequired()
 export class UpdateOrgInventoryItemDto {
   @ApiPropertyOptional({
     description: 'Quantity',

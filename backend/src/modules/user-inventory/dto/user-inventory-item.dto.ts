@@ -10,6 +10,7 @@ import {
   IsInt,
   IsIn,
 } from 'class-validator';
+import { LocationPairRequired } from '../../../common/decorators/location-pair.decorator';
 
 export class UserInventoryItemDto {
   id!: string;
@@ -33,6 +34,7 @@ export class UserInventoryItemDto {
   categoryName?: string;
 }
 
+@LocationPairRequired()
 export class CreateUserInventoryItemDto {
   @IsInt()
   gameId!: number;
@@ -75,6 +77,7 @@ export class CreateUserInventoryItemDto {
   sharedOrgId?: number;
 }
 
+@LocationPairRequired()
 export class UpdateUserInventoryItemDto {
   @IsOptional()
   @IsNumber()
