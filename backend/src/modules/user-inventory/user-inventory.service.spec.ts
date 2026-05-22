@@ -77,7 +77,7 @@ describe('UserInventoryService', () => {
       setLock: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
-      getOne: jest.fn(),
+      getOne: jest.fn().mockResolvedValue(null),
     };
 
     transactionRepository = {
@@ -383,16 +383,15 @@ describe('UserInventoryService', () => {
       };
 
       const updatedItem = { ...mockInventoryItem, ...updateDto };
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockInventoryItem);
-      jest.spyOn(repository, 'save').mockResolvedValue(updatedItem);
+      // findInventoryItem (pre-txn) and findById (post-txn) both use findOne
+      jest.spyOn(repository, 'findOne').mockResolvedValue(updatedItem);
+      transactionRepository.save.mockResolvedValue(updatedItem);
 
       const result = await service.update(mockInventoryItem.id, 1, updateDto);
 
       expect(result.quantity).toBe(20);
-      expect(repository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          modifiedBy: 1,
-        }),
+      expect(transactionRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ modifiedBy: 1 }),
       );
     });
 
@@ -412,7 +411,8 @@ describe('UserInventoryService', () => {
         unitOfMeasure: 'scu' as const,
       };
       jest.spyOn(repository, 'findOne').mockResolvedValue(mockInventoryItem);
-      mockQueryBuilder.getOne.mockResolvedValueOnce(collidingItem);
+      // Collision check runs inside transaction via transactionQueryBuilder
+      transactionQueryBuilder.getOne.mockResolvedValueOnce(collidingItem);
 
       await expect(
         service.update(mockInventoryItem.id, 1, updateDto),

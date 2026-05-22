@@ -367,55 +367,64 @@ export class OrgInventoryService {
 
     item.modifiedBy = userId;
 
-    // Guard against silently creating a duplicate active stack: check whether
-    // any other row already has the post-update identity before saving.
-    if (item.active) {
-      const collision = await this.orgInventoryRepository
-        .createQueryBuilder('oii')
-        .where('oii.id != :id', { id })
-        .andWhere('oii.org_id = :orgId', { orgId })
-        .andWhere('oii.game_id = :gameId', { gameId: item.gameId })
-        .andWhere('oii.uex_item_id = :uexItemId', { uexItemId: item.uexItemId })
-        .andWhere('oii.unit_of_measure = :unitOfMeasure', {
-          unitOfMeasure: item.unitOfMeasure,
-        })
-        .andWhere('oii.location_type IS NOT DISTINCT FROM :locationType', {
-          locationType: item.locationType ?? null,
-        })
-        .andWhere('oii.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
-          locationUexId: item.locationUexId ?? null,
-        })
-        .andWhere('oii.deleted = FALSE')
-        .andWhere('oii.active = TRUE')
-        .getOne();
+    const savedId = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(OrgInventoryItem);
 
-      if (collision) {
-        throw new ConflictException(
-          'An inventory item with this combination already exists for this organization',
-        );
+      // Lock the post-update identity so concurrent create() or update()
+      // calls targeting the same identity serialize against this transaction.
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `oii:${orgId}:${item.gameId}:${item.uexItemId}:${item.unitOfMeasure ?? 'unit'}:${item.locationType ?? ''}:${item.locationUexId ?? -1}`,
+      ]);
+
+      if (item.active) {
+        const collision = await repo
+          .createQueryBuilder('oii')
+          .where('oii.id != :id', { id })
+          .andWhere('oii.org_id = :orgId', { orgId })
+          .andWhere('oii.game_id = :gameId', { gameId: item.gameId })
+          .andWhere('oii.uex_item_id = :uexItemId', {
+            uexItemId: item.uexItemId,
+          })
+          .andWhere('oii.unit_of_measure = :unitOfMeasure', {
+            unitOfMeasure: item.unitOfMeasure,
+          })
+          .andWhere('oii.location_type IS NOT DISTINCT FROM :locationType', {
+            locationType: item.locationType ?? null,
+          })
+          .andWhere('oii.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
+            locationUexId: item.locationUexId ?? null,
+          })
+          .andWhere('oii.deleted = FALSE')
+          .andWhere('oii.active = TRUE')
+          .getOne();
+
+        if (collision) {
+          throw new ConflictException(
+            'An inventory item with this combination already exists for this organization',
+          );
+        }
       }
-    }
 
-    let saved: OrgInventoryItem;
-    try {
-      saved = await this.orgInventoryRepository.save(item);
-    } catch (err: unknown) {
-      if (
-        typeof err === 'object' &&
-        err !== null &&
-        'code' in err &&
-        (err as { code: string }).code === '23505'
-      ) {
-        throw new ConflictException(
-          'An inventory item with this combination already exists for this organization',
-        );
+      try {
+        const saved = await repo.save(item);
+        return saved.id;
+      } catch (err: unknown) {
+        if (
+          typeof err === 'object' &&
+          err !== null &&
+          'code' in err &&
+          (err as { code: string }).code === '23505'
+        ) {
+          throw new ConflictException(
+            'An inventory item with this combination already exists for this organization',
+          );
+        }
+        throw err;
       }
-      throw err;
-    }
+    });
 
-    const loaded = await this.orgInventoryRepository.findByIdNotDeleted(
-      saved.id,
-    );
+    const loaded =
+      await this.orgInventoryRepository.findByIdNotDeleted(savedId);
 
     if (!loaded) {
       throw new NotFoundException('Failed to load updated inventory item');

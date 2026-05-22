@@ -347,55 +347,67 @@ export class UserInventoryService {
     Object.assign(item, updateDto);
     item.modifiedBy = userId;
 
-    // Guard against silently creating a duplicate active stack: check whether
-    // any other row already has the post-update identity before saving.
-    const collision = await this.inventoryRepository
-      .createQueryBuilder('inv')
-      .where('inv.id != :id', { id })
-      .andWhere('inv.user_id = :userId', { userId })
-      .andWhere('inv.game_id = :gameId', { gameId: item.gameId })
-      .andWhere('inv.uex_item_id = :uexItemId', { uexItemId: item.uexItemId })
-      .andWhere('inv.unit_of_measure = :unitOfMeasure', {
-        unitOfMeasure: item.unitOfMeasure,
-      })
-      .andWhere('inv.location_type IS NOT DISTINCT FROM :locationType', {
-        locationType: item.locationType ?? null,
-      })
-      .andWhere('inv.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
-        locationUexId: item.locationUexId ?? null,
-      })
-      .andWhere('inv.shared_org_id IS NOT DISTINCT FROM :sharedOrgId', {
-        sharedOrgId: item.sharedOrgId ?? null,
-      })
-      .andWhere('inv.deleted = FALSE')
-      .andWhere('inv.active = TRUE')
-      .getOne();
+    const savedId = await this.inventoryRepository.manager.transaction(
+      async (manager) => {
+        const repo = manager.getRepository(UserInventoryItem);
 
-    if (collision) {
-      throw new ConflictException(
-        'An active inventory item with the same identity already exists',
-      );
-    }
+        // Lock the post-update identity so concurrent create() or update()
+        // calls targeting the same identity serialize against this transaction.
+        await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+          `uii:${userId}:${item.gameId}:${item.uexItemId}:${item.unitOfMeasure ?? 'unit'}:${item.locationType ?? ''}:${item.locationUexId ?? -1}:${item.sharedOrgId ?? -1}`,
+        ]);
 
-    let saved: UserInventoryItem;
-    try {
-      saved = await this.inventoryRepository.save(item);
-    } catch (err: unknown) {
-      if (
-        typeof err === 'object' &&
-        err !== null &&
-        (err as { code: string }).code === '23505'
-      ) {
-        throw new ConflictException(
-          'An active inventory item with the same identity already exists',
-        );
-      }
-      throw err;
-    }
+        const collision = await repo
+          .createQueryBuilder('inv')
+          .where('inv.id != :id', { id })
+          .andWhere('inv.user_id = :userId', { userId })
+          .andWhere('inv.game_id = :gameId', { gameId: item.gameId })
+          .andWhere('inv.uex_item_id = :uexItemId', {
+            uexItemId: item.uexItemId,
+          })
+          .andWhere('inv.unit_of_measure = :unitOfMeasure', {
+            unitOfMeasure: item.unitOfMeasure,
+          })
+          .andWhere('inv.location_type IS NOT DISTINCT FROM :locationType', {
+            locationType: item.locationType ?? null,
+          })
+          .andWhere('inv.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
+            locationUexId: item.locationUexId ?? null,
+          })
+          .andWhere('inv.shared_org_id IS NOT DISTINCT FROM :sharedOrgId', {
+            sharedOrgId: item.sharedOrgId ?? null,
+          })
+          .andWhere('inv.deleted = FALSE')
+          .andWhere('inv.active = TRUE')
+          .getOne();
 
-    this.logger.info(`Updated inventory item ${saved.id} for user ${userId}`);
+        if (collision) {
+          throw new ConflictException(
+            'An active inventory item with the same identity already exists',
+          );
+        }
 
-    return this.findById(saved.id, userId);
+        try {
+          const saved = await repo.save(item);
+          return saved.id;
+        } catch (err: unknown) {
+          if (
+            typeof err === 'object' &&
+            err !== null &&
+            (err as { code: string }).code === '23505'
+          ) {
+            throw new ConflictException(
+              'An active inventory item with the same identity already exists',
+            );
+          }
+          throw err;
+        }
+      },
+    );
+
+    this.logger.info(`Updated inventory item ${savedId} for user ${userId}`);
+
+    return this.findById(savedId, userId);
   }
 
   async delete(id: string, userId: number): Promise<void> {

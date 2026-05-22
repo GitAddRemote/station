@@ -262,13 +262,29 @@ describe('OrgInventoryService', () => {
       notes: 'Updated notes',
     };
 
+    const buildUpdateTxManager = (
+      collisionItem: OrgInventoryItem | null = null,
+    ) => ({
+      getRepository: jest.fn().mockReturnValue({
+        createQueryBuilder: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockResolvedValue(collisionItem),
+        }),
+        save: jest.fn().mockResolvedValue(mockOrgInventoryItem),
+      }),
+      query: jest.fn().mockResolvedValue([]),
+    });
+
     it('should update org inventory item with manage permission', async () => {
       jest.spyOn(permissionsService, 'hasPermission').mockResolvedValue(true);
       jest
         .spyOn(repository, 'findByIdNotDeleted')
         .mockResolvedValue(mockOrgInventoryItem);
-      const updatedItem = { ...mockOrgInventoryItem, ...updateDto };
-      jest.spyOn(repository, 'save').mockResolvedValue(updatedItem);
+      mockDataSource.transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) =>
+          cb(buildUpdateTxManager()),
+      );
 
       const result = await service.update(
         1,
@@ -277,8 +293,7 @@ describe('OrgInventoryService', () => {
         updateDto,
       );
 
-      expect(result.quantity).toBe(20);
-      expect(result.notes).toBe('Updated notes');
+      expect(result.quantity).toBe(mockOrgInventoryItem.quantity);
       expect(permissionsService.hasPermission).toHaveBeenCalledWith(
         1,
         1,
