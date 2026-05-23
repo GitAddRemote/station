@@ -2,11 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException } from '@nestjs/common';
 import { getLoggerToken } from 'nestjs-pino';
-import { DataSource } from 'typeorm';
 import { CatalogEtlService } from './catalog-etl.service';
 import { EtlRun } from './entities/etl-run.entity';
 import { EtlWarning } from './entities/etl-warning.entity';
 import { EtlStep } from './interfaces/etl-step.interface';
+import { AdvisoryLockService } from '../../common/services/advisory-lock.service';
 
 function buildMockRun(overrides: Partial<EtlRun> = {}): EtlRun {
   const run = new EtlRun();
@@ -25,7 +25,7 @@ describe('CatalogEtlService', () => {
   let service: CatalogEtlService;
   let mockEtlRunRepository: Record<string, jest.Mock>;
   let mockEtlWarningRepository: Record<string, jest.Mock>;
-  let mockDataSource: { query: jest.Mock };
+  let mockAdvisoryLockService: { withLock: jest.Mock };
 
   beforeEach(async () => {
     mockEtlRunRepository = {
@@ -41,8 +41,11 @@ describe('CatalogEtlService', () => {
       find: jest.fn(),
     };
 
-    mockDataSource = {
-      query: jest.fn(),
+    // withLock passes through to the fn by default (simulates lock acquired)
+    mockAdvisoryLockService = {
+      withLock: jest
+        .fn()
+        .mockImplementation((_key: string, fn: () => Promise<unknown>) => fn()),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -66,8 +69,8 @@ describe('CatalogEtlService', () => {
           useValue: mockEtlWarningRepository,
         },
         {
-          provide: DataSource,
-          useValue: mockDataSource,
+          provide: AdvisoryLockService,
+          useValue: mockAdvisoryLockService,
         },
       ],
     }).compile();
@@ -101,11 +104,6 @@ describe('CatalogEtlService', () => {
         step2,
       ];
 
-      // Lock acquired
-      mockDataSource.query
-        .mockResolvedValueOnce([{ acquired: true }]) // pg_try_advisory_lock
-        .mockResolvedValueOnce([{}]); // pg_advisory_unlock
-
       const initialRun = buildMockRun({ stepsTotal: 2 });
       mockEtlRunRepository.create.mockReturnValue(initialRun);
       mockEtlRunRepository.save
@@ -124,6 +122,10 @@ describe('CatalogEtlService', () => {
       expect(result.stepsFailed).toBe(0);
       expect(step1.execute).toHaveBeenCalledWith({ runId: initialRun.runId });
       expect(step2.execute).toHaveBeenCalledWith({ runId: initialRun.runId });
+      expect(mockAdvisoryLockService.withLock).toHaveBeenCalledWith(
+        'catalog_etl',
+        expect.any(Function),
+      );
     });
 
     it('one step fails → status partial, warning saved', async () => {
@@ -140,10 +142,6 @@ describe('CatalogEtlService', () => {
         passingStep,
         failingStep,
       ];
-
-      mockDataSource.query
-        .mockResolvedValueOnce([{ acquired: true }])
-        .mockResolvedValueOnce([{}]);
 
       const initialRun = buildMockRun({ stepsTotal: 2 });
       mockEtlRunRepository.create.mockReturnValue(initialRun);
@@ -186,10 +184,6 @@ describe('CatalogEtlService', () => {
         failingStep2,
       ];
 
-      mockDataSource.query
-        .mockResolvedValueOnce([{ acquired: true }])
-        .mockResolvedValueOnce([{}]);
-
       const initialRun = buildMockRun({ stepsTotal: 2 });
       mockEtlRunRepository.create.mockReturnValue(initialRun);
       mockEtlRunRepository.save
@@ -211,10 +205,6 @@ describe('CatalogEtlService', () => {
 
     it('no steps registered → status no_steps', async () => {
       // ETL_STEPS remains [] (default)
-      mockDataSource.query
-        .mockResolvedValueOnce([{ acquired: true }])
-        .mockResolvedValueOnce([{}]);
-
       const initialRun = buildMockRun({ stepsTotal: 0 });
       mockEtlRunRepository.create.mockReturnValue(initialRun);
       mockEtlRunRepository.save
@@ -232,12 +222,17 @@ describe('CatalogEtlService', () => {
     });
 
     it('concurrent lock rejection → throws 409 ConflictException', async () => {
-      mockDataSource.query.mockResolvedValue([{ acquired: false }]);
+      // Override withLock to simulate lock already held
+      mockAdvisoryLockService.withLock.mockRejectedValue(
+        new ConflictException("Lock 'catalog_etl' already held"),
+      );
 
       const runPromise = service.runEtl();
 
       await expect(runPromise).rejects.toThrow(ConflictException);
-      await expect(runPromise).rejects.toThrow('ETL run already in progress');
+      await expect(runPromise).rejects.toThrow(
+        "Lock 'catalog_etl' already held",
+      );
 
       // Repository should never be touched when lock not acquired
       expect(mockEtlRunRepository.create).not.toHaveBeenCalled();

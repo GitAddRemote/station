@@ -1,10 +1,11 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository } from 'typeorm';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlRun } from './entities/etl-run.entity';
 import { EtlWarning } from './entities/etl-warning.entity';
 import { EtlStep } from './interfaces/etl-step.interface';
+import { AdvisoryLockService } from '../../common/services/advisory-lock.service';
 
 @Injectable()
 export class CatalogEtlService {
@@ -15,34 +16,24 @@ export class CatalogEtlService {
     private readonly etlRunRepository: Repository<EtlRun>,
     @InjectRepository(EtlWarning)
     private readonly etlWarningRepository: Repository<EtlWarning>,
-    private readonly dataSource: DataSource,
+    private readonly advisoryLockService: AdvisoryLockService,
     @InjectPinoLogger(CatalogEtlService.name)
     private readonly logger: PinoLogger,
   ) {}
 
   async runEtl(): Promise<EtlRun> {
-    // Acquire advisory lock to prevent concurrent ETL runs
-    const lockResult = await this.dataSource.query<{ acquired: boolean }[]>(
-      `SELECT pg_try_advisory_lock(hashtext('catalog_etl')) AS acquired`,
-    );
+    return this.advisoryLockService.withLock('catalog_etl', async () => {
+      // Create the run record
+      const runState = this.etlRunRepository.create({
+        status: 'running',
+        stepsTotal: this.ETL_STEPS.length,
+        stepsSucceeded: 0,
+        stepsFailed: 0,
+      });
+      await this.etlRunRepository.save(runState);
 
-    const acquired = lockResult[0]?.acquired;
-    if (!acquired) {
-      throw new ConflictException('ETL run already in progress');
-    }
+      this.logger.info({ runId: runState.runId }, 'ETL run started');
 
-    // Create the run record
-    const runState = this.etlRunRepository.create({
-      status: 'running',
-      stepsTotal: this.ETL_STEPS.length,
-      stepsSucceeded: 0,
-      stepsFailed: 0,
-    });
-    await this.etlRunRepository.save(runState);
-
-    this.logger.info({ runId: runState.runId }, 'ETL run started');
-
-    try {
       for (const step of this.ETL_STEPS) {
         try {
           await step.execute({ runId: runState.runId });
@@ -69,33 +60,28 @@ export class CatalogEtlService {
           await this.etlWarningRepository.save(warning);
         }
       }
-    } finally {
-      // Release advisory lock regardless of outcome
-      await this.dataSource.query(
-        `SELECT pg_advisory_unlock(hashtext('catalog_etl'))`,
+
+      // Determine final status
+      if (this.ETL_STEPS.length === 0) {
+        runState.status = 'no_steps';
+      } else if (runState.stepsFailed === 0) {
+        runState.status = 'completed';
+      } else if (runState.stepsSucceeded === 0) {
+        runState.status = 'failed';
+      } else {
+        runState.status = 'partial';
+      }
+
+      runState.completedAt = new Date();
+      const savedRun = await this.etlRunRepository.save(runState);
+
+      this.logger.info(
+        { runId: savedRun.runId, status: savedRun.status },
+        'ETL run completed',
       );
-    }
 
-    // Determine final status
-    if (this.ETL_STEPS.length === 0) {
-      runState.status = 'no_steps';
-    } else if (runState.stepsFailed === 0) {
-      runState.status = 'completed';
-    } else if (runState.stepsSucceeded === 0) {
-      runState.status = 'failed';
-    } else {
-      runState.status = 'partial';
-    }
-
-    runState.completedAt = new Date();
-    const savedRun = await this.etlRunRepository.save(runState);
-
-    this.logger.info(
-      { runId: savedRun.runId, status: savedRun.status },
-      'ETL run completed',
-    );
-
-    return savedRun;
+      return savedRun;
+    });
   }
 
   async getRuns(page: number, limit: number): Promise<[EtlRun[], number]> {
