@@ -7,6 +7,9 @@ import { EtlRun } from './entities/etl-run.entity';
 import { EtlWarning } from './entities/etl-warning.entity';
 import { EtlStep } from './interfaces/etl-step.interface';
 import { AdvisoryLockService } from '../../common/services';
+import { FactionsSyncStep } from './steps/factions-sync.step';
+import { JurisdictionsSyncStep } from './steps/jurisdictions-sync.step';
+import { CompaniesSyncStep } from './steps/companies-sync.step';
 
 function buildMockRun(overrides: Partial<EtlRun> = {}): EtlRun {
   const run = new EtlRun();
@@ -71,6 +74,18 @@ describe('CatalogEtlService', () => {
           provide: AdvisoryLockService,
           useValue: mockAdvisoryLockService,
         },
+        {
+          provide: FactionsSyncStep,
+          useValue: { name: 'factions', execute: jest.fn() },
+        },
+        {
+          provide: JurisdictionsSyncStep,
+          useValue: { name: 'jurisdictions', execute: jest.fn() },
+        },
+        {
+          provide: CompaniesSyncStep,
+          useValue: { name: 'companies', execute: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -79,8 +94,7 @@ describe('CatalogEtlService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
-    // Reset ETL_STEPS after each test
-    (service as unknown as { ETL_STEPS: EtlStep[] }).ETL_STEPS = [];
+    Object.assign(service, { ETL_STEPS: [] });
   });
 
   it('should be defined', () => {
@@ -98,10 +112,7 @@ describe('CatalogEtlService', () => {
         execute: jest.fn().mockResolvedValue(undefined),
       };
 
-      (service as unknown as { ETL_STEPS: EtlStep[] }).ETL_STEPS = [
-        step1,
-        step2,
-      ];
+      Object.assign(service, { ETL_STEPS: [step1, step2] });
 
       const initialRun = buildMockRun({ stepsTotal: 2 });
       mockEtlRunRepository.create.mockReturnValue(initialRun);
@@ -137,10 +148,7 @@ describe('CatalogEtlService', () => {
         execute: jest.fn().mockRejectedValue(new Error('Step exploded')),
       };
 
-      (service as unknown as { ETL_STEPS: EtlStep[] }).ETL_STEPS = [
-        passingStep,
-        failingStep,
-      ];
+      Object.assign(service, { ETL_STEPS: [passingStep, failingStep] });
 
       const initialRun = buildMockRun({ stepsTotal: 2 });
       mockEtlRunRepository.create.mockReturnValue(initialRun);
@@ -178,10 +186,7 @@ describe('CatalogEtlService', () => {
         execute: jest.fn().mockRejectedValue(new Error('Failure 2')),
       };
 
-      (service as unknown as { ETL_STEPS: EtlStep[] }).ETL_STEPS = [
-        failingStep1,
-        failingStep2,
-      ];
+      Object.assign(service, { ETL_STEPS: [failingStep1, failingStep2] });
 
       const initialRun = buildMockRun({ stepsTotal: 2 });
       mockEtlRunRepository.create.mockReturnValue(initialRun);
@@ -203,7 +208,7 @@ describe('CatalogEtlService', () => {
     });
 
     it('no steps registered → status no_steps', async () => {
-      // ETL_STEPS remains [] (default)
+      Object.assign(service, { ETL_STEPS: [] });
       const initialRun = buildMockRun({ stepsTotal: 0 });
       mockEtlRunRepository.create.mockReturnValue(initialRun);
       mockEtlRunRepository.save
