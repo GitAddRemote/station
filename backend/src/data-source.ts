@@ -28,6 +28,7 @@ import { OauthClient } from './modules/oauth-clients/oauth-client.entity';
 
 import { BigBangBaselineMigration1748000000000 } from './migrations/1748000000000-BigBangBaselineMigration';
 import { CatalogEtlSchemaMigration1748000000001 } from './migrations/1748000000001-CatalogEtlSchemaMigration';
+import { AddNoStepsEtlStatus1748000000002 } from './migrations/1748000000002-AddNoStepsEtlStatus';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -65,6 +66,7 @@ export const AppDataSource = new DataSource({
   migrations: [
     BigBangBaselineMigration1748000000000,
     CatalogEtlSchemaMigration1748000000001,
+    AddNoStepsEtlStatus1748000000002,
   ],
   synchronize: false,
   extra: { parseInt8: true },

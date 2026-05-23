@@ -24,7 +24,7 @@ export class CatalogEtlSchemaMigration1748000000001
         "steps_succeeded" INTEGER     NOT NULL DEFAULT 0,
         "steps_failed"    INTEGER     NOT NULL DEFAULT 0,
         "status"          VARCHAR(20) NOT NULL DEFAULT 'running'
-          CHECK (status IN ('running','completed','partial','failed','no_steps')),
+          CHECK (status IN ('running','completed','partial','failed')),
         "created_at"      TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
