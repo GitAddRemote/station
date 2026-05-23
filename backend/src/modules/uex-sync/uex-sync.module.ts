@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HttpModule } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { getLoggerToken, PinoLogger } from 'nestjs-pino';
 import { UexSyncService } from './uex-sync.service';
 import { UexSyncController } from './uex-sync.controller';
 import { UexSyncState } from './uex-sync-state.entity';
@@ -20,6 +22,7 @@ import { UEXCategoriesClient } from './clients/uex-categories.client';
 import { UEXCommoditiesClient } from './clients/uex-commodities.client';
 import { UEXItemsClient } from './clients/uex-items.client';
 import { UEXCompaniesClient } from './clients/uex-companies.client';
+import { UexApiClient } from './clients/uex-api.client';
 import { CategoriesSyncService } from './services/categories-sync.service';
 import { CommoditiesSyncService } from './services/commodities-sync.service';
 import { ItemsSyncService } from './services/items-sync.service';
@@ -54,6 +57,22 @@ import { UsersModule } from '../users/users.module';
     UEXCommoditiesClient,
     UEXItemsClient,
     UEXCompaniesClient,
+    {
+      provide: UexApiClient,
+      useFactory: (configService: ConfigService, logger: PinoLogger) =>
+        new UexApiClient(logger, {
+          baseUrl: configService.get(
+            'UEX_API_BASE_URL',
+            'https://uexcorp.space/api/2.0',
+          ),
+          requestDelayMs: configService.get<number>(
+            'UEX_REQUEST_DELAY_MS',
+            500,
+          ),
+          timeoutMs: configService.get<number>('UEX_TIMEOUT_MS', 30000),
+        }),
+      inject: [ConfigService, getLoggerToken(UexApiClient.name)],
+    },
     CategoriesSyncService,
     CommoditiesSyncService,
     ItemsSyncService,
@@ -65,6 +84,7 @@ import { UsersModule } from '../users/users.module';
     CategoriesSyncService,
     CommoditiesSyncService,
     ItemsSyncService,
+    UexApiClient,
   ],
 })
 export class UexSyncModule {}
