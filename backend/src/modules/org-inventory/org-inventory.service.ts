@@ -381,7 +381,16 @@ export class OrgInventoryService {
         `oii:${orgId}:${item.gameId}:${item.uexItemId}:${item.unitOfMeasure ?? 'unit'}:${item.locationType ?? ''}:${item.locationUexId ?? -1}`,
       ]);
 
-      if (item.active) {
+      // Only check for identity collisions when the update actually changes
+      // an identity field. Split produces two active rows with identical
+      // identity by design; rejecting updates that don't touch identity
+      // fields would make those rows permanently uneditable.
+      const changesIdentity =
+        Object.prototype.hasOwnProperty.call(dto, 'unitOfMeasure') ||
+        Object.prototype.hasOwnProperty.call(dto, 'locationType') ||
+        Object.prototype.hasOwnProperty.call(dto, 'locationUexId');
+
+      if (item.active && changesIdentity) {
         const collision = await repo
           .createQueryBuilder('oii2')
           .where('oii2.id != :id', { id })
