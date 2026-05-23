@@ -76,6 +76,27 @@ describe('UexApiClient', () => {
       });
     });
 
+    it('throws RateLimitException on HTTP 200 with status=error and requests_limit_reached', async () => {
+      const client = new UexApiClient(makeLogger() as never, makeConfig());
+
+      jest
+        .spyOn(
+          (client as unknown as { axiosInstance: { get: jest.Mock } })
+            .axiosInstance,
+          'get',
+        )
+        .mockResolvedValueOnce({
+          data: { status: 'error', message: 'requests_limit_reached' },
+          headers: {},
+          status: 200,
+        });
+
+      const promise = client.get('/categories');
+      jest.advanceTimersByTime(200);
+
+      await expect(promise).rejects.toBeInstanceOf(RateLimitException);
+    });
+
     it('doubles delayMs when x-ratelimit-remaining ≤ 5', async () => {
       const config = makeConfig({ requestDelayMs: 100 });
       const client = new UexApiClient(makeLogger() as never, config);

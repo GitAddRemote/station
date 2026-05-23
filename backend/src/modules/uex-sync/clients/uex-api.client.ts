@@ -97,9 +97,20 @@ export class UexApiClient {
 
   async get<T>(path: string, params?: Record<string, string>): Promise<T> {
     await sleep(this.delayMs);
-    const response = await this.axiosInstance.get<{ data: T }>(path, {
-      params,
-    });
+    const response = await this.axiosInstance.get<{
+      status: string;
+      data: T;
+      message?: string;
+    }>(path, { params });
+
+    // UEX returns HTTP 200 with status='error' for soft rate-limit hits
+    if (
+      response.data.status === 'error' &&
+      response.data.message?.includes('requests_limit_reached')
+    ) {
+      throw new RateLimitException('UEX API rate limit exceeded');
+    }
+
     return response.data.data;
   }
 }
