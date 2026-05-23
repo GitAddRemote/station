@@ -209,6 +209,28 @@ describe('CatalogEtlService', () => {
       expect(result.stepsFailed).toBe(2);
     });
 
+    it('no steps registered → status no_steps', async () => {
+      // ETL_STEPS remains [] (default)
+      mockDataSource.query
+        .mockResolvedValueOnce([{ acquired: true }])
+        .mockResolvedValueOnce([{}]);
+
+      const initialRun = buildMockRun({ stepsTotal: 0 });
+      mockEtlRunRepository.create.mockReturnValue(initialRun);
+      mockEtlRunRepository.save
+        .mockResolvedValueOnce(initialRun)
+        .mockImplementation((run: EtlRun) =>
+          Promise.resolve({ ...run, completedAt: new Date() }),
+        );
+
+      const result = await service.runEtl();
+
+      expect(result.status).toBe('no_steps');
+      expect(result.stepsSucceeded).toBe(0);
+      expect(result.stepsFailed).toBe(0);
+      expect(mockEtlWarningRepository.save).not.toHaveBeenCalled();
+    });
+
     it('concurrent lock rejection → throws 409 ConflictException', async () => {
       mockDataSource.query.mockResolvedValue([{ acquired: false }]);
 

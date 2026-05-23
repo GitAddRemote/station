@@ -77,7 +77,9 @@ export class CatalogEtlService {
     }
 
     // Determine final status
-    if (runState.stepsFailed === 0) {
+    if (this.ETL_STEPS.length === 0) {
+      runState.status = 'no_steps';
+    } else if (runState.stepsFailed === 0) {
       runState.status = 'completed';
     } else if (runState.stepsSucceeded === 0) {
       runState.status = 'failed';

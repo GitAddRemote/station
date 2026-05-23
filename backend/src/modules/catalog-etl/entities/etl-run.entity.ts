@@ -7,7 +7,12 @@ import {
 } from 'typeorm';
 import { EtlWarning } from './etl-warning.entity';
 
-export type EtlRunStatus = 'running' | 'completed' | 'partial' | 'failed';
+export type EtlRunStatus =
+  | 'running'
+  | 'completed'
+  | 'partial'
+  | 'failed'
+  | 'no_steps';
 
 @Entity('station_etl_run')
 export class EtlRun {
