@@ -120,10 +120,11 @@ export class FactionsSyncStep implements EtlStep {
           runId: ctx.runId,
           stepName: this.name,
           severity: 'warn',
-          message: `Friendly faction ${friendlyId} not found in fetched set`,
+          message: `Friendly faction ${friendlyId} not found in fetched set — link skipped`,
           rawPayload: { faction_id: record.id, missing_id: friendlyId },
         });
         await this.warningsRepo.save(warning);
+        continue;
       }
       await this.dataSource.query(
         `INSERT INTO station_faction_friendly (faction_uex_id, friendly_faction_uex_id)
@@ -152,10 +153,11 @@ export class FactionsSyncStep implements EtlStep {
           runId: ctx.runId,
           stepName: this.name,
           severity: 'warn',
-          message: `Hostile faction ${hostileId} not found in fetched set`,
+          message: `Hostile faction ${hostileId} not found in fetched set — link skipped`,
           rawPayload: { faction_id: record.id, missing_id: hostileId },
         });
         await this.warningsRepo.save(warning);
+        continue;
       }
       await this.dataSource.query(
         `INSERT INTO station_faction_hostile (faction_uex_id, hostile_faction_uex_id)

@@ -170,7 +170,7 @@ describe('FactionsSyncStep', () => {
       expect(insertCalls).toHaveLength(0);
     });
 
-    it('saves a warning when a friendly faction id is not in the fetched set', async () => {
+    it('saves a warning and skips insert when friendly faction id is not in the fetched set', async () => {
       const factions = [makeFaction({ id: 1, ids_factions_friendly: '99' })];
       uexGet.mockResolvedValue(factions);
 
@@ -184,11 +184,11 @@ describe('FactionsSyncStep', () => {
         }),
       );
       expect(repoSave).toHaveBeenCalledTimes(1);
-      // INSERT still happens even if id is missing from fetched set
+      // INSERT must be skipped — referenced faction row may not exist in station_faction
       const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
         (c[0] as string).includes('INSERT INTO station_faction_friendly'),
       );
-      expect(insertCalls).toHaveLength(1);
+      expect(insertCalls).toHaveLength(0);
     });
   });
 
