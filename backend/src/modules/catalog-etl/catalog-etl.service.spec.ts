@@ -1,0 +1,257 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { ConflictException } from '@nestjs/common';
+import { getLoggerToken } from 'nestjs-pino';
+import { DataSource } from 'typeorm';
+import { CatalogEtlService } from './catalog-etl.service';
+import { EtlRun } from './entities/etl-run.entity';
+import { EtlWarning } from './entities/etl-warning.entity';
+import { EtlStep } from './interfaces/etl-step.interface';
+
+function buildMockRun(overrides: Partial<EtlRun> = {}): EtlRun {
+  const run = new EtlRun();
+  run.runId = 'test-run-uuid';
+  run.status = 'running';
+  run.stepsTotal = 0;
+  run.stepsSucceeded = 0;
+  run.stepsFailed = 0;
+  run.startedAt = new Date();
+  run.createdAt = new Date();
+  Object.assign(run, overrides);
+  return run;
+}
+
+describe('CatalogEtlService', () => {
+  let service: CatalogEtlService;
+  let mockEtlRunRepository: Record<string, jest.Mock>;
+  let mockEtlWarningRepository: Record<string, jest.Mock>;
+  let mockDataSource: { query: jest.Mock };
+
+  beforeEach(async () => {
+    mockEtlRunRepository = {
+      create: jest.fn(),
+      save: jest.fn(),
+      find: jest.fn(),
+      findAndCount: jest.fn(),
+    };
+
+    mockEtlWarningRepository = {
+      create: jest.fn(),
+      save: jest.fn(),
+      find: jest.fn(),
+    };
+
+    mockDataSource = {
+      query: jest.fn(),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        CatalogEtlService,
+        {
+          provide: getLoggerToken(CatalogEtlService.name),
+          useValue: {
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(EtlRun),
+          useValue: mockEtlRunRepository,
+        },
+        {
+          provide: getRepositoryToken(EtlWarning),
+          useValue: mockEtlWarningRepository,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
+        },
+      ],
+    }).compile();
+
+    service = module.get<CatalogEtlService>(CatalogEtlService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    // Reset ETL_STEPS after each test
+    (service as unknown as { ETL_STEPS: EtlStep[] }).ETL_STEPS = [];
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('runEtl', () => {
+    it('runs all steps successfully → status completed', async () => {
+      const step1: EtlStep = {
+        name: 'step-one',
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
+      const step2: EtlStep = {
+        name: 'step-two',
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
+
+      (service as unknown as { ETL_STEPS: EtlStep[] }).ETL_STEPS = [
+        step1,
+        step2,
+      ];
+
+      // Lock acquired
+      mockDataSource.query
+        .mockResolvedValueOnce([{ acquired: true }]) // pg_try_advisory_lock
+        .mockResolvedValueOnce([{}]); // pg_advisory_unlock
+
+      const initialRun = buildMockRun({ stepsTotal: 2 });
+      mockEtlRunRepository.create.mockReturnValue(initialRun);
+      mockEtlRunRepository.save
+        .mockResolvedValueOnce(initialRun) // first save (create)
+        .mockImplementation((run: EtlRun) =>
+          Promise.resolve({ ...run, completedAt: new Date() }),
+        ); // final save
+
+      mockEtlWarningRepository.create.mockReturnValue(new EtlWarning());
+      mockEtlWarningRepository.save.mockResolvedValue(new EtlWarning());
+
+      const result = await service.runEtl();
+
+      expect(result.status).toBe('completed');
+      expect(result.stepsSucceeded).toBe(2);
+      expect(result.stepsFailed).toBe(0);
+      expect(step1.execute).toHaveBeenCalledWith({ runId: initialRun.runId });
+      expect(step2.execute).toHaveBeenCalledWith({ runId: initialRun.runId });
+    });
+
+    it('one step fails → status partial, warning saved', async () => {
+      const passingStep: EtlStep = {
+        name: 'passing-step',
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
+      const failingStep: EtlStep = {
+        name: 'failing-step',
+        execute: jest.fn().mockRejectedValue(new Error('Step exploded')),
+      };
+
+      (service as unknown as { ETL_STEPS: EtlStep[] }).ETL_STEPS = [
+        passingStep,
+        failingStep,
+      ];
+
+      mockDataSource.query
+        .mockResolvedValueOnce([{ acquired: true }])
+        .mockResolvedValueOnce([{}]);
+
+      const initialRun = buildMockRun({ stepsTotal: 2 });
+      mockEtlRunRepository.create.mockReturnValue(initialRun);
+      mockEtlRunRepository.save
+        .mockResolvedValueOnce(initialRun)
+        .mockImplementation((run: EtlRun) =>
+          Promise.resolve({ ...run, completedAt: new Date() }),
+        );
+
+      const mockWarning = new EtlWarning();
+      mockEtlWarningRepository.create.mockReturnValue(mockWarning);
+      mockEtlWarningRepository.save.mockResolvedValue(mockWarning);
+
+      const result = await service.runEtl();
+
+      expect(result.status).toBe('partial');
+      expect(result.stepsFailed).toBe(1);
+      expect(mockEtlWarningRepository.save).toHaveBeenCalledTimes(1);
+      expect(mockEtlWarningRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'error',
+          stepName: 'failing-step',
+          message: 'Step exploded',
+        }),
+      );
+    });
+
+    it('all steps fail → status failed', async () => {
+      const failingStep1: EtlStep = {
+        name: 'fail-1',
+        execute: jest.fn().mockRejectedValue(new Error('Failure 1')),
+      };
+      const failingStep2: EtlStep = {
+        name: 'fail-2',
+        execute: jest.fn().mockRejectedValue(new Error('Failure 2')),
+      };
+
+      (service as unknown as { ETL_STEPS: EtlStep[] }).ETL_STEPS = [
+        failingStep1,
+        failingStep2,
+      ];
+
+      mockDataSource.query
+        .mockResolvedValueOnce([{ acquired: true }])
+        .mockResolvedValueOnce([{}]);
+
+      const initialRun = buildMockRun({ stepsTotal: 2 });
+      mockEtlRunRepository.create.mockReturnValue(initialRun);
+      mockEtlRunRepository.save
+        .mockResolvedValueOnce(initialRun)
+        .mockImplementation((run: EtlRun) =>
+          Promise.resolve({ ...run, completedAt: new Date() }),
+        );
+
+      const mockWarning = new EtlWarning();
+      mockEtlWarningRepository.create.mockReturnValue(mockWarning);
+      mockEtlWarningRepository.save.mockResolvedValue(mockWarning);
+
+      const result = await service.runEtl();
+
+      expect(result.status).toBe('failed');
+      expect(result.stepsSucceeded).toBe(0);
+      expect(result.stepsFailed).toBe(2);
+    });
+
+    it('concurrent lock rejection → throws 409 ConflictException', async () => {
+      mockDataSource.query.mockResolvedValue([{ acquired: false }]);
+
+      const runPromise = service.runEtl();
+
+      await expect(runPromise).rejects.toThrow(ConflictException);
+      await expect(runPromise).rejects.toThrow('ETL run already in progress');
+
+      // Repository should never be touched when lock not acquired
+      expect(mockEtlRunRepository.create).not.toHaveBeenCalled();
+      expect(mockEtlRunRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getRuns', () => {
+    it('returns paginated runs ordered by startedAt DESC', async () => {
+      const runs: EtlRun[] = [buildMockRun()];
+      mockEtlRunRepository.findAndCount.mockResolvedValue([runs, 1]);
+
+      const [data, total] = await service.getRuns(1, 20);
+
+      expect(data).toEqual(runs);
+      expect(total).toBe(1);
+      expect(mockEtlRunRepository.findAndCount).toHaveBeenCalledWith({
+        order: { startedAt: 'DESC' },
+        skip: 0,
+        take: 20,
+      });
+    });
+  });
+
+  describe('getRunWarnings', () => {
+    it('returns warnings for a run ordered by createdAt ASC', async () => {
+      const warnings: EtlWarning[] = [];
+      mockEtlWarningRepository.find.mockResolvedValue(warnings);
+
+      const result = await service.getRunWarnings('some-uuid');
+
+      expect(result).toEqual(warnings);
+      expect(mockEtlWarningRepository.find).toHaveBeenCalledWith({
+        where: { runId: 'some-uuid' },
+        order: { createdAt: 'ASC' },
+      });
+    });
+  });
+});
