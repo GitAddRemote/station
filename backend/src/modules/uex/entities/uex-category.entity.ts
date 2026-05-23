@@ -1,7 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 import { BaseUexEntity } from './base-uex.entity';
 
-@Entity('uex_categories')
+@Entity('uex_category')
 @Index('idx_uex_categories_active', ['uexId'], {
   where: 'deleted = FALSE AND active = TRUE',
 })

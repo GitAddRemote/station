@@ -14,14 +14,7 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   async findByOrgId(orgId: number): Promise<OrgInventoryItem[]> {
     return this.find({
       where: { orgId, deleted: false },
-      relations: [
-        'item',
-        'location',
-        'game',
-        'org',
-        'addedByUser',
-        'modifiedByUser',
-      ],
+      relations: ['item', 'game', 'org', 'addedByUser', 'modifiedByUser'],
       order: { dateModified: 'DESC' },
     });
   }
@@ -35,7 +28,7 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   ): Promise<OrgInventoryItem[]> {
     return this.find({
       where: { orgId, gameId, deleted: false },
-      relations: ['item', 'location', 'game', 'addedByUser', 'modifiedByUser'],
+      relations: ['item', 'game', 'addedByUser', 'modifiedByUser'],
       order: { dateModified: 'DESC' },
     });
   }
@@ -46,32 +39,7 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   async findByIdNotDeleted(id: string): Promise<OrgInventoryItem | null> {
     return this.findOne({
       where: { id, deleted: false },
-      relations: [
-        'item',
-        'location',
-        'game',
-        'org',
-        'addedByUser',
-        'modifiedByUser',
-      ],
-    });
-  }
-
-  /**
-   * Find inventory items by location
-   */
-  async findByLocationId(locationId: number): Promise<OrgInventoryItem[]> {
-    return this.find({
-      where: { locationId, deleted: false },
-      relations: [
-        'item',
-        'location',
-        'game',
-        'org',
-        'addedByUser',
-        'modifiedByUser',
-      ],
-      order: { dateModified: 'DESC' },
+      relations: ['item', 'game', 'org', 'addedByUser', 'modifiedByUser'],
     });
   }
 
@@ -84,28 +52,8 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   ): Promise<OrgInventoryItem[]> {
     return this.find({
       where: { orgId, uexItemId, deleted: false },
-      relations: ['item', 'location', 'game', 'addedByUser', 'modifiedByUser'],
+      relations: ['item', 'game', 'addedByUser', 'modifiedByUser'],
       order: { dateModified: 'DESC' },
-    });
-  }
-
-  /**
-   * Find an existing org inventory item with matching composite keys
-   */
-  async findExistingItem(params: {
-    orgId: number;
-    gameId: number;
-    uexItemId: number;
-    locationId: number;
-  }): Promise<OrgInventoryItem | null> {
-    return this.findOne({
-      where: {
-        orgId: params.orgId,
-        gameId: params.gameId,
-        uexItemId: params.uexItemId,
-        locationId: params.locationId,
-        deleted: false,
-      },
     });
   }
 
@@ -121,34 +69,38 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   }
 
   /**
-   * Get inventory summary for an org
+   * Get aggregated inventory summary for an org from the view.
    */
-  async getOrgInventorySummary(
-    orgId: number,
-    gameId: number,
-  ): Promise<{
-    totalItems: number;
-    uniqueItems: number;
-    locationCount: number;
-    lastUpdated: Date | null;
-  }> {
-    const result = await this.createQueryBuilder('oii')
-      .select('COUNT(*)', 'totalItems')
-      .addSelect('COUNT(DISTINCT oii.uex_item_id)', 'uniqueItems')
-      .addSelect('COUNT(DISTINCT oii.location_id)', 'locationCount')
-      .addSelect('MAX(oii.date_modified)', 'lastUpdated')
-      .where('oii.org_id = :orgId', { orgId })
-      .andWhere('oii.game_id = :gameId', { gameId })
-      .andWhere('oii.deleted = false')
-      .andWhere('oii.active = true')
-      .getRawOne();
+  async getOrgInventorySummary(orgId: number): Promise<
+    {
+      uexItemId: number;
+      unitOfMeasure: string;
+      totalQuantity: number;
+      itemCount: number;
+      latestUpdate: Date | null;
+    }[]
+  > {
+    const rows: {
+      uex_item_id: string;
+      unit_of_measure: string;
+      total_quantity: string;
+      item_count: string;
+      latest_update: Date | null;
+    }[] = await this.manager.query(
+      `SELECT uex_item_id, unit_of_measure, total_quantity, item_count, latest_update
+       FROM org_shared_inventory_summary
+       WHERE org_id = $1
+       ORDER BY uex_item_id, unit_of_measure`,
+      [orgId],
+    );
 
-    return {
-      totalItems: parseInt(result.totalItems, 10) || 0,
-      uniqueItems: parseInt(result.uniqueItems, 10) || 0,
-      locationCount: parseInt(result.locationCount, 10) || 0,
-      lastUpdated: result.lastUpdated || null,
-    };
+    return rows.map((r) => ({
+      uexItemId: Number(r.uex_item_id),
+      unitOfMeasure: r.unit_of_measure,
+      totalQuantity: parseFloat(r.total_quantity),
+      itemCount: Number(r.item_count),
+      latestUpdate: r.latest_update,
+    }));
   }
 
   /**
@@ -159,20 +111,21 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     gameId: number;
     uexItemId?: number;
     categoryId?: number;
-    locationId?: number;
     activeOnly?: boolean;
     limit?: number;
     offset?: number;
     search?: string;
     minQuantity?: number;
     maxQuantity?: number;
-    sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+    minQuality?: number;
+    maxQuality?: number;
+    unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+    sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified';
     order?: 'asc' | 'desc';
   }): Promise<{ items: OrgInventoryItem[]; total: number }> {
     const query = this.createQueryBuilder('oii')
       .leftJoinAndSelect('oii.item', 'item')
       .leftJoinAndSelect('item.category', 'category')
-      .leftJoinAndSelect('oii.location', 'location')
       .leftJoinAndSelect('oii.game', 'game')
       .leftJoinAndSelect('oii.org', 'org')
       .leftJoinAndSelect('oii.addedByUser', 'addedBy')
@@ -193,12 +146,6 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
       });
     }
 
-    if (filters.locationId) {
-      query.andWhere('oii.location_id = :locationId', {
-        locationId: filters.locationId,
-      });
-    }
-
     if (filters.minQuantity !== undefined) {
       query.andWhere('oii.quantity >= :minQuantity', {
         minQuantity: filters.minQuantity,
@@ -208,6 +155,24 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
     if (filters.maxQuantity !== undefined) {
       query.andWhere('oii.quantity <= :maxQuantity', {
         maxQuantity: filters.maxQuantity,
+      });
+    }
+
+    if (filters.minQuality !== undefined) {
+      query.andWhere('oii.quality >= :minQuality', {
+        minQuality: filters.minQuality,
+      });
+    }
+
+    if (filters.maxQuality !== undefined) {
+      query.andWhere('oii.quality <= :maxQuality', {
+        maxQuality: filters.maxQuality,
+      });
+    }
+
+    if (filters.unitOfMeasure !== undefined) {
+      query.andWhere('oii.unit_of_measure = :unitOfMeasure', {
+        unitOfMeasure: filters.unitOfMeasure,
       });
     }
 
@@ -237,15 +202,15 @@ export class OrgInventoryRepository extends Repository<OrgInventoryItem> {
   }
 
   private resolveSortColumn(
-    sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified',
+    sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified',
   ): string {
     switch (sort) {
       case 'name':
         return 'item.name';
       case 'quantity':
         return 'oii.quantity';
-      case 'location':
-        return 'location.displayName';
+      case 'quality':
+        return 'oii.quality';
       case 'date_added':
         return 'oii.dateAdded';
       case 'date_modified':

@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { CategoriesSyncService } from '../services/categories-sync.service';
 import { CommoditiesSyncService } from '../services/commodities-sync.service';
 import { ItemsSyncService } from '../services/items-sync.service';
-import { LocationsSyncService } from '../services/locations-sync.service';
 
 @Injectable()
 export class UEXSyncScheduler {
@@ -15,7 +14,6 @@ export class UEXSyncScheduler {
     private readonly categoriesSync: CategoriesSyncService,
     private readonly commoditiesSync: CommoditiesSyncService,
     private readonly itemsSync: ItemsSyncService,
-    private readonly locationsSync: LocationsSyncService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -49,8 +47,6 @@ export class UEXSyncScheduler {
       );
     } catch (error: unknown) {
       this.logger.error({ err: error }, 'Scheduled categories sync failed');
-      // Error already recorded in sync state by service
-      // Add alerting here if needed
     }
   }
 
@@ -84,12 +80,10 @@ export class UEXSyncScheduler {
       );
     } catch (error: unknown) {
       this.logger.error({ err: error }, 'Scheduled items sync failed');
-      // Error already recorded in sync state by service
-      // Add alerting here if needed
     }
   }
 
-  // Runs daily at 3:30 AM UTC (after items sync, before locations sync)
+  // Runs daily at 3:30 AM UTC (after items sync)
   @Cron('30 3 * * *', {
     name: 'sync-uex-commodities',
   })
@@ -119,41 +113,6 @@ export class UEXSyncScheduler {
       );
     } catch (error: unknown) {
       this.logger.error({ err: error }, 'Scheduled commodities sync failed');
-    }
-  }
-
-  // Runs daily at 4:00 AM UTC (after commodities sync)
-  @Cron('0 4 * * *', {
-    name: 'sync-uex-locations',
-  })
-  async scheduledLocationsSync(): Promise<void> {
-    const syncEnabled = this.configService.get<boolean>(
-      'UEX_SYNC_ENABLED',
-      true,
-    );
-    const locationsSyncEnabled = this.configService.get<boolean>(
-      'UEX_LOCATIONS_SYNC_ENABLED',
-      true,
-    );
-
-    if (!syncEnabled || !locationsSyncEnabled) {
-      this.logger.info('Locations sync is disabled via configuration');
-      return;
-    }
-
-    this.logger.info('Starting scheduled locations sync');
-
-    try {
-      const result = await this.locationsSync.syncAllLocations();
-      this.logger.info(
-        `Scheduled locations sync completed successfully: ` +
-          `total created: ${result.totalCreated}, updated: ${result.totalUpdated}, ` +
-          `deleted: ${result.totalDeleted}, duration: ${result.totalDurationMs}ms`,
-      );
-    } catch (error: unknown) {
-      this.logger.error({ err: error }, 'Scheduled locations sync failed');
-      // Error already recorded in sync state by service
-      // Add alerting here if needed
     }
   }
 }

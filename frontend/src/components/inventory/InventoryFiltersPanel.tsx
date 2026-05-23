@@ -26,7 +26,6 @@ interface FiltersPanelProps {
   filters: {
     search: string;
     categoryId: number | '';
-    locationId: number | '';
     sharedOnly: boolean;
     valueRange: [number, number];
   };
@@ -36,15 +35,14 @@ interface FiltersPanelProps {
       | ((prev: FiltersPanelProps['filters']) => FiltersPanelProps['filters']),
   ) => void;
   categories: InventoryCategory[];
-  locationOptions: { id: number; name: string }[];
   valueText: (value: number) => string;
   maxQuantity: number;
-  sortBy: 'name' | 'quantity' | 'location' | 'date';
+  sortBy: 'name' | 'quantity' | 'date';
   sortDir: 'asc' | 'desc';
-  setSortBy: (value: 'name' | 'quantity' | 'location' | 'date') => void;
+  setSortBy: (value: 'name' | 'quantity' | 'date') => void;
   setSortDir: (updater: (prev: 'asc' | 'desc') => 'asc' | 'desc') => void;
-  groupBy: 'none' | 'category' | 'location' | 'share';
-  setGroupBy: (value: 'none' | 'category' | 'location' | 'share') => void;
+  groupBy: 'none' | 'category' | 'share';
+  setGroupBy: (value: 'none' | 'category' | 'share') => void;
   density: 'standard' | 'compact';
   setDensity: (value: 'standard' | 'compact') => void;
   viewMode: 'personal' | 'org';
@@ -66,7 +64,6 @@ export const InventoryFiltersPanel = ({
   filters,
   setFilters,
   categories,
-  locationOptions,
   valueText,
   maxQuantity,
   sortBy,
@@ -129,33 +126,6 @@ export const InventoryFiltersPanel = ({
               {categories.map((category) => (
                 <MenuItem key={category.id} value={category.id}>
                   {category.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-        <Grid item xs={6} md={2}>
-          <FormControl fullWidth>
-            <InputLabel id="location-filter-label">Location</InputLabel>
-            <Select
-              labelId="location-filter-label"
-              label="Location"
-              value={filters.locationId}
-              disabled={disabled}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  locationId:
-                    e.target.value === '' ? '' : Number(e.target.value),
-                }))
-              }
-            >
-              <MenuItem value="">
-                <em>All</em>
-              </MenuItem>
-              {locationOptions.map((loc) => (
-                <MenuItem key={loc.id} value={loc.id}>
-                  {loc.name}
                 </MenuItem>
               ))}
             </Select>
@@ -279,15 +249,12 @@ export const InventoryFiltersPanel = ({
               value={sortBy}
               disabled={disabled}
               onChange={(e) =>
-                setSortBy(
-                  e.target.value as 'name' | 'quantity' | 'location' | 'date',
-                )
+                setSortBy(e.target.value as 'name' | 'quantity' | 'date')
               }
             >
               <MenuItem value="date">Last updated</MenuItem>
               <MenuItem value="name">Name</MenuItem>
               <MenuItem value="quantity">Quantity</MenuItem>
-              <MenuItem value="location">Location</MenuItem>
             </Select>
           </FormControl>
         </Grid>
@@ -300,15 +267,12 @@ export const InventoryFiltersPanel = ({
               value={groupBy}
               disabled={disabled}
               onChange={(e) =>
-                setGroupBy(
-                  e.target.value as 'none' | 'category' | 'location' | 'share',
-                )
+                setGroupBy(e.target.value as 'none' | 'category' | 'share')
               }
               startAdornment={<GroupWorkIcon sx={{ mr: 1 }} />}
             >
               <MenuItem value="none">No grouping</MenuItem>
               <MenuItem value="category">Category</MenuItem>
-              <MenuItem value="location">Location</MenuItem>
               <MenuItem value="share">Share status</MenuItem>
             </Select>
           </FormControl>
@@ -323,9 +287,8 @@ export const InventoryFiltersPanel = ({
               setFilters({
                 search: '',
                 categoryId: '',
-                locationId: '',
                 sharedOnly: false,
-                valueRange: [0, maxQuantity || 100000],
+                valueRange: [0, maxQuantity || 999999.999999],
               })
             }
           >

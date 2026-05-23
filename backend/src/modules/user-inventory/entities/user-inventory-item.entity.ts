@@ -11,10 +11,9 @@ import {
 import { User } from '../../users/user.entity';
 import { Game } from '../../games/game.entity';
 import { UexItem } from '../../uex/entities/uex-item.entity';
-import { Location } from '../../locations/entities/location.entity';
 import { Organization } from '../../organizations/organization.entity';
 
-@Entity('user_inventory_items')
+@Entity('user_inventory_item')
 @Index('idx_user_inv_list', ['userId', 'gameId', 'deleted', 'active'], {
   where: 'deleted = FALSE',
 })
@@ -31,7 +30,7 @@ export class UserInventoryItem {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ name: 'user_id', type: 'bigint' })
+  @Column({ name: 'user_id', type: 'integer' })
   @Index()
   userId!: number;
 
@@ -55,21 +54,35 @@ export class UserInventoryItem {
   @JoinColumn({ name: 'uex_item_id', referencedColumnName: 'uexId' })
   item!: UexItem;
 
-  @Column({ name: 'location_id', type: 'bigint' })
-  @Index()
-  locationId!: number;
-
-  @ManyToOne(() => Location)
-  @JoinColumn({ name: 'location_id' })
-  location!: Location;
-
-  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  @Column({ type: 'decimal', precision: 12, scale: 6 })
   quantity!: number;
+
+  @Column({
+    name: 'unit_of_measure',
+    type: 'enum',
+    enum: ['unit', 'scu', 'uscu'],
+    default: 'unit',
+  })
+  unitOfMeasure!: 'unit' | 'scu' | 'uscu';
+
+  @Column({ type: 'smallint', nullable: true })
+  quality?: number | null;
+
+  @Column({
+    name: 'location_type',
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+  })
+  locationType?: string | null;
+
+  @Column({ name: 'location_uex_id', type: 'integer', nullable: true })
+  locationUexId?: number | null;
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
-  @Column({ name: 'shared_org_id', type: 'bigint', nullable: true })
+  @Column({ name: 'shared_org_id', type: 'int', nullable: true })
   @Index()
   sharedOrgId?: number | null;
 
@@ -90,14 +103,14 @@ export class UserInventoryItem {
   @UpdateDateColumn({ name: 'date_modified', type: 'timestamptz' })
   dateModified!: Date;
 
-  @Column({ name: 'added_by', type: 'bigint' })
+  @Column({ name: 'added_by', type: 'integer' })
   addedBy!: number;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'added_by' })
   addedByUser!: User;
 
-  @Column({ name: 'modified_by', type: 'bigint' })
+  @Column({ name: 'modified_by', type: 'integer' })
   modifiedBy!: number;
 
   @ManyToOne(() => User)

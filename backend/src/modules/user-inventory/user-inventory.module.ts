@@ -9,7 +9,6 @@ import { PermissionsModule } from '../permissions/permissions.module';
 import { User } from '../users/user.entity';
 import { Game } from '../games/game.entity';
 import { UexItem } from '../uex/entities/uex-item.entity';
-import { Location } from '../locations/entities/location.entity';
 import { Organization } from '../organizations/organization.entity';
 
 @Module({
@@ -20,7 +19,6 @@ import { Organization } from '../organizations/organization.entity';
       User,
       Game,
       UexItem,
-      Location,
       Organization,
     ]),
     PermissionsModule,

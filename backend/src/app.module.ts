@@ -23,7 +23,6 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { GamesModule } from './modules/games/games.module';
 import { UexModule } from './modules/uex/uex.module';
 import { UexSyncModule } from './modules/uex-sync/uex-sync.module';
-import { LocationsModule } from './modules/locations/locations.module';
 import { UserInventoryModule } from './modules/user-inventory/user-inventory.module';
 import { OrgInventoryModule } from './modules/org-inventory/org-inventory.module';
 import { HealthModule } from './health/health.module';
@@ -148,10 +147,11 @@ if (!isTest) {
           password: configService.get<string>('DATABASE_PASSWORD'),
           database: configService.get<string>('DATABASE_NAME'),
           autoLoadEntities: true,
-          synchronize: isTest, // Auto-create tables for tests, false for production
-          dropSchema: isTest, // Clean database before each test run
+          synchronize: isTest,
+          dropSchema: isTest,
           migrations: ['dist/migrations/*.js'],
-          migrationsRun: false, // Run migrations manually for safety
+          migrationsRun: false,
+          extra: { parseInt8: true },
         };
       },
       inject: [ConfigService],
@@ -167,7 +167,6 @@ if (!isTest) {
     GamesModule,
     UexModule,
     UexSyncModule,
-    LocationsModule,
     UserInventoryModule,
     OrgInventoryModule,
     HealthModule,

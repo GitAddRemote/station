@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 
-@Entity('password_resets')
+@Entity('password_reset')
 export class PasswordReset {
   @PrimaryGeneratedColumn()
   id!: number;

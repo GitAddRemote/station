@@ -23,6 +23,7 @@ import {
   OrgInventorySearchDto,
   OrgInventoryItemDto,
   OrgInventorySummaryDto,
+  SplitOrgInventoryItemDto,
 } from './dto/org-inventory-item.dto';
 import {
   ApiTags,
@@ -30,6 +31,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { QueryParams, asString } from '../../common/types/query-params.type';
@@ -130,15 +132,6 @@ export class OrgInventoryController {
           min: 1,
         },
       ),
-      locationId: this.readOptionalNumber(
-        query,
-        ['location_id', 'locationId'],
-        'location_id',
-        {
-          integer: true,
-          min: 1,
-        },
-      ),
       search: asString(query.search),
       limit: this.readOptionalNumber(query, ['limit'], 'limit', {
         integer: true,
@@ -151,7 +144,7 @@ export class OrgInventoryController {
       sort: asString(query.sort) as
         | 'name'
         | 'quantity'
-        | 'location'
+        | 'quality'
         | 'date_added'
         | 'date_modified'
         | undefined,
@@ -178,10 +171,42 @@ export class OrgInventoryController {
           min: 0,
         },
       ),
+      minQuality: this.readOptionalNumber(
+        query,
+        ['min_quality', 'minQuality'],
+        'min_quality',
+        {
+          integer: true,
+          min: 0,
+        },
+      ),
+      maxQuality: this.readOptionalNumber(
+        query,
+        ['max_quality', 'maxQuality'],
+        'max_quality',
+        {
+          integer: true,
+          min: 0,
+        },
+      ),
+      unitOfMeasure: asString(query.unit_of_measure ?? query.unitOfMeasure) as
+        | 'unit'
+        | 'scu'
+        | 'uscu'
+        | undefined,
     };
 
     if (!searchDto.gameId) {
       throw new BadRequestException('game_id is required');
+    }
+
+    if (
+      searchDto.unitOfMeasure !== undefined &&
+      !['unit', 'scu', 'uscu'].includes(searchDto.unitOfMeasure)
+    ) {
+      throw new BadRequestException(
+        'unitOfMeasure must be one of: unit, scu, uscu',
+      );
     }
 
     return this.orgInventoryService.search(userId, searchDto);
@@ -229,9 +254,8 @@ export class OrgInventoryController {
   async getSummary(
     @Request() req: AuthenticatedRequest,
     @Param('orgId', ParseIntPipe) orgId: number,
-    @Query('gameId', ParseIntPipe) gameId: number,
   ): Promise<OrgInventorySummaryDto> {
-    return this.orgInventoryService.getSummary(req.user.userId, orgId, gameId);
+    return this.orgInventoryService.getSummary(req.user.userId, orgId);
   }
 
   /**
@@ -254,6 +278,29 @@ export class OrgInventoryController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<OrgInventoryItemDto> {
     return this.orgInventoryService.findById(req.user.userId, orgId, id);
+  }
+
+  /**
+   * Split an inventory item into two independent stacks
+   * POST /api/orgs/:orgId/inventory/:id/split
+   */
+  @Post(':id/split')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Split an org inventory item into two stacks' })
+  @ApiParam({ name: 'orgId', description: 'Organization ID' })
+  @ApiParam({ name: 'id', description: 'Inventory item ID (UUID)' })
+  @ApiBody({ type: SplitOrgInventoryItemDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns both resulting stacks',
+  })
+  async split(
+    @Request() req: AuthenticatedRequest,
+    @Param('orgId', ParseIntPipe) orgId: number,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() splitDto: SplitOrgInventoryItemDto,
+  ): Promise<{ remaining: OrgInventoryItemDto; split: OrgInventoryItemDto }> {
+    return this.orgInventoryService.split(req.user.userId, orgId, id, splitDto);
   }
 
   /**

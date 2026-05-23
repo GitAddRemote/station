@@ -10,7 +10,7 @@ import { BaseUexEntity } from './base-uex.entity';
 import { UexPlanet } from './uex-planet.entity';
 import { UexMoon } from './uex-moon.entity';
 
-@Entity('uex_outposts')
+@Entity('uex_outpost')
 @Index('idx_uex_outposts_active', ['uexId'], {
   where: 'deleted = FALSE AND active = TRUE',
 })

@@ -26,6 +26,7 @@ import {
   CreateUserInventoryItemDto,
   UpdateUserInventoryItemDto,
   UserInventorySearchDto,
+  SplitUserInventoryItemDto,
 } from './dto/user-inventory-item.dto';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { QueryParams, asString } from '../../common/types/query-params.type';
@@ -98,12 +99,6 @@ export class UserInventoryController {
         'uex_item_id',
         { integer: true },
       ),
-      locationId: this.readOptionalNumber(
-        query,
-        ['location_id', 'locationId'],
-        'location_id',
-        { integer: true },
-      ),
       sharedOrgId: this.readOptionalNumber(
         query,
         ['shared_org_id', 'sharedOrgId'],
@@ -122,7 +117,7 @@ export class UserInventoryController {
       sort: asString(query.sort) as
         | 'name'
         | 'quantity'
-        | 'location'
+        | 'quality'
         | 'date_added'
         | 'date_modified'
         | undefined,
@@ -141,7 +136,33 @@ export class UserInventoryController {
         ['max_quantity', 'maxQuantity'],
         'max_quantity',
       ),
+      minQuality: this.readOptionalNumber(
+        query,
+        ['min_quality', 'minQuality'],
+        'min_quality',
+        { integer: true, min: 0 },
+      ),
+      maxQuality: this.readOptionalNumber(
+        query,
+        ['max_quality', 'maxQuality'],
+        'max_quality',
+        { integer: true, min: 0 },
+      ),
+      unitOfMeasure: asString(query.unit_of_measure ?? query.unitOfMeasure) as
+        | 'unit'
+        | 'scu'
+        | 'uscu'
+        | undefined,
     };
+
+    if (
+      searchDto.unitOfMeasure !== undefined &&
+      !['unit', 'scu', 'uscu'].includes(searchDto.unitOfMeasure)
+    ) {
+      throw new BadRequestException(
+        'unitOfMeasure must be one of: unit, scu, uscu',
+      );
+    }
 
     return this.userInventoryService.findAll(userId, searchDto);
   }
@@ -154,6 +175,16 @@ export class UserInventoryController {
   ) {
     const userId = req.user.userId;
     return this.userInventoryService.create(userId, createDto);
+  }
+
+  @Post(':id/split')
+  @HttpCode(HttpStatus.OK)
+  async split(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() splitDto: SplitUserInventoryItemDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.userInventoryService.split(id, req.user.userId, splitDto);
   }
 
   @Put(':id')

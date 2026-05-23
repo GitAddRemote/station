@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { OrgInventoryRepository } from './org-inventory.repository';
 import { PermissionsService } from '../permissions/permissions.service';
 import { OrgInventoryItem } from './entities/org-inventory-item.entity';
@@ -14,6 +15,7 @@ import {
   OrgInventorySearchDto,
   OrgInventorySummaryDto,
   OrgInventoryItemDto,
+  SplitOrgInventoryItemDto,
 } from './dto/org-inventory-item.dto';
 import { OrgPermission } from '../permissions/permissions.constants';
 
@@ -22,6 +24,7 @@ export class OrgInventoryService {
   constructor(
     private readonly orgInventoryRepository: OrgInventoryRepository,
     private readonly permissionsService: PermissionsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -59,8 +62,11 @@ export class OrgInventoryService {
       orgId: entity.orgId,
       gameId: entity.gameId,
       uexItemId: entity.uexItemId,
-      locationId: entity.locationId,
-      quantity: entity.quantity,
+      quantity: parseFloat(entity.quantity.toString()),
+      unitOfMeasure: entity.unitOfMeasure,
+      quality: entity.quality,
+      locationType: entity.locationType,
+      locationUexId: entity.locationUexId,
       notes: entity.notes,
       active: entity.active,
       dateAdded: entity.dateAdded,
@@ -68,7 +74,6 @@ export class OrgInventoryService {
       addedBy: entity.addedBy,
       modifiedBy: entity.modifiedBy,
       itemName: entity.item?.name,
-      locationName: entity.location?.displayName,
       orgName: entity.org?.name,
       addedByUsername: entity.addedByUser?.username,
       modifiedByUsername: entity.modifiedByUser?.username,
@@ -89,32 +94,88 @@ export class OrgInventoryService {
 
     await this.verifyInventoryPermission(userId, dto.orgId, 'manage');
 
-    const existing = await this.orgInventoryRepository.findExistingItem({
-      orgId: dto.orgId,
-      gameId: dto.gameId,
-      uexItemId: dto.uexItemId,
-      locationId: dto.locationId,
+    const unitOfMeasure = dto.unitOfMeasure ?? 'unit';
+    const locationType = dto.locationType ?? null;
+    const locationUexId = dto.locationUexId ?? null;
+
+    const savedId = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(OrgInventoryItem);
+
+      // Advisory lock keyed on the identity serializes concurrent "no
+      // existing row" requests so they don't both pass the check-then-insert
+      // race and produce duplicates. Released automatically at txn end.
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `oii:${dto.orgId}:${dto.gameId}:${dto.uexItemId}:${unitOfMeasure}:${locationType ?? ''}:${locationUexId ?? -1}`,
+      ]);
+
+      const existing = await repo
+        .createQueryBuilder('oii')
+        .where('oii.org_id = :orgId', { orgId: dto.orgId })
+        .andWhere('oii.game_id = :gameId', { gameId: dto.gameId })
+        .andWhere('oii.uex_item_id = :uexItemId', { uexItemId: dto.uexItemId })
+        .andWhere('oii.unit_of_measure = :unitOfMeasure', { unitOfMeasure })
+        .andWhere('oii.location_type IS NOT DISTINCT FROM :locationType', {
+          locationType,
+        })
+        .andWhere('oii.location_uex_id IS NOT DISTINCT FROM :locationUexId', {
+          locationUexId,
+        })
+        .andWhere('oii.deleted = FALSE')
+        .andWhere('oii.active = TRUE')
+        .getOne();
+
+      if (existing) {
+        const result = await manager.query(
+          `UPDATE "org_inventory_item"
+           SET quantity      = quantity + $1::numeric,
+               notes         = COALESCE($2, notes),
+               modified_by   = $3,
+               date_modified = NOW()
+           WHERE id = $4
+             AND quantity + $1::numeric <= 999999.999999
+           RETURNING id`,
+          [dto.quantity, dto.notes ?? null, userId, existing.id],
+        );
+        if (result.length === 0) {
+          throw new BadRequestException(
+            'Merged quantity would exceed the maximum allowed value of 999999.999999',
+          );
+        }
+        return existing.id;
+      }
+
+      const item = repo.create({
+        ...dto,
+        orgId: dto.orgId,
+        unitOfMeasure,
+        locationType,
+        locationUexId,
+        addedBy: userId,
+        modifiedBy: userId,
+        active: true,
+        deleted: false,
+      });
+
+      try {
+        const saved = await repo.save(item);
+        return saved.id;
+      } catch (err: unknown) {
+        if (
+          typeof err === 'object' &&
+          err !== null &&
+          'code' in err &&
+          (err as { code: string }).code === '23505'
+        ) {
+          throw new ConflictException(
+            'Inventory item already exists for this organization',
+          );
+        }
+        throw err;
+      }
     });
 
-    if (existing) {
-      throw new ConflictException(
-        'Inventory item already exists for this organization and location',
-      );
-    }
-
-    const item = this.orgInventoryRepository.create({
-      ...dto,
-      orgId: dto.orgId, // Ensure orgId is set
-      addedBy: userId,
-      modifiedBy: userId,
-      active: true,
-      deleted: false,
-    });
-
-    const saved = await this.orgInventoryRepository.save(item);
-    const loaded = await this.orgInventoryRepository.findByIdNotDeleted(
-      saved.id,
-    );
+    const loaded =
+      await this.orgInventoryRepository.findByIdNotDeleted(savedId);
 
     if (!loaded) {
       throw new NotFoundException('Failed to load created inventory item');
@@ -164,6 +225,104 @@ export class OrgInventoryService {
   }
 
   /**
+   * Split an inventory item into two independent rows
+   */
+  async split(
+    userId: number,
+    orgId: number,
+    id: string,
+    dto: SplitOrgInventoryItemDto,
+  ): Promise<{ remaining: OrgInventoryItemDto; split: OrgInventoryItemDto }> {
+    await this.verifyInventoryPermission(userId, orgId, 'manage');
+
+    const [remainingId, splitId] = await this.dataSource.transaction(
+      async (manager) => {
+        const repo = manager.getRepository(OrgInventoryItem);
+
+        const source = await repo
+          .createQueryBuilder('oii')
+          .setLock('pessimistic_write')
+          .where('oii.id = :id', { id })
+          .andWhere('oii.org_id = :orgId', { orgId })
+          .andWhere('oii.deleted = FALSE')
+          .andWhere('oii.active = TRUE')
+          .getOne();
+
+        if (!source) {
+          throw new NotFoundException(`Inventory item with ID ${id} not found`);
+        }
+
+        const sourceQty = parseFloat(source.quantity.toString());
+        if (dto.splitQuantity >= sourceQty) {
+          throw new BadRequestException(
+            'Split quantity must be less than the current quantity',
+          );
+        }
+
+        const remainingQty = sourceQty - dto.splitQuantity;
+
+        // Soft-delete the source so both new rows can be inserted without
+        // colliding against the partial unique index (active=TRUE, deleted=FALSE)
+        await manager.query(
+          `UPDATE "org_inventory_item" SET deleted = TRUE, active = FALSE, modified_by = $1, date_modified = NOW() WHERE id = $2`,
+          [userId, source.id],
+        );
+
+        const rowA = repo.create({
+          orgId: source.orgId,
+          gameId: source.gameId,
+          uexItemId: source.uexItemId,
+          quantity: remainingQty,
+          unitOfMeasure: source.unitOfMeasure,
+          quality: source.quality,
+          locationType: source.locationType,
+          locationUexId: source.locationUexId,
+          notes: source.notes,
+          active: true,
+          deleted: false,
+          addedBy: source.addedBy,
+          modifiedBy: userId,
+        });
+
+        const rowB = repo.create({
+          orgId: source.orgId,
+          gameId: source.gameId,
+          uexItemId: source.uexItemId,
+          quantity: dto.splitQuantity,
+          unitOfMeasure: source.unitOfMeasure,
+          quality: source.quality,
+          locationType: source.locationType,
+          locationUexId: source.locationUexId,
+          notes: source.notes,
+          active: true,
+          deleted: false,
+          addedBy: source.addedBy,
+          modifiedBy: userId,
+        });
+
+        const savedA = await repo.save(rowA);
+        const savedB = await repo.save(rowB);
+
+        return [savedA.id, savedB.id] as [string, string];
+      },
+    );
+
+    const [remainingItem, splitItem] = await Promise.all([
+      this.orgInventoryRepository.findByIdNotDeleted(remainingId),
+      this.orgInventoryRepository.findByIdNotDeleted(splitId),
+    ]);
+
+    if (!remainingItem || !splitItem) {
+      throw new NotFoundException('Failed to load split inventory items');
+    }
+
+    return {
+      remaining: this.toDto(remainingItem),
+      split: this.toDto(splitItem),
+    };
+  }
+
+  /**
    * Update an inventory item
    */
   async update(
@@ -172,38 +331,106 @@ export class OrgInventoryService {
     id: string,
     dto: UpdateOrgInventoryItemDto,
   ): Promise<OrgInventoryItemDto> {
-    const item = await this.orgInventoryRepository.findByIdNotDeleted(id);
+    await this.verifyInventoryPermission(userId, orgId, 'manage');
 
-    if (!item) {
-      throw new NotFoundException('Inventory item not found');
-    }
+    const savedId = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(OrgInventoryItem);
 
-    if (item.orgId !== orgId) {
-      throw new NotFoundException('Inventory item not found in this org');
-    }
+      // Pessimistic write lock pins the row for the duration of the transaction,
+      // preventing a concurrent split() or delete() from modifying it between
+      // our load and save.
+      const item = await repo
+        .createQueryBuilder('oii')
+        .setLock('pessimistic_write')
+        .where('oii.id = :id', { id })
+        .andWhere('oii.org_id = :orgId', { orgId })
+        .andWhere('oii.deleted = FALSE')
+        .getOne();
 
-    await this.verifyInventoryPermission(userId, item.orgId, 'manage');
+      if (!item) {
+        throw new NotFoundException(`Inventory item with ID ${id} not found`);
+      }
 
-    // Update fields
-    if (dto.locationId !== undefined) {
-      item.locationId = dto.locationId;
-    }
-    if (dto.quantity !== undefined) {
-      item.quantity = dto.quantity;
-    }
-    if (dto.notes !== undefined) {
-      item.notes = dto.notes;
-    }
-    if (dto.active !== undefined) {
-      item.active = dto.active;
-    }
+      if (dto.quantity !== undefined) {
+        item.quantity = dto.quantity;
+      }
+      if (dto.unitOfMeasure !== undefined) {
+        item.unitOfMeasure = dto.unitOfMeasure;
+      }
+      if (dto.quality !== undefined) {
+        item.quality = dto.quality;
+      }
+      if (dto.locationType !== undefined) {
+        item.locationType = dto.locationType;
+      }
+      if (dto.locationUexId !== undefined) {
+        item.locationUexId = dto.locationUexId;
+      }
+      if (dto.notes !== undefined) {
+        item.notes = dto.notes;
+      }
+      if (dto.active !== undefined) {
+        item.active = dto.active;
+      }
 
-    item.modifiedBy = userId;
+      item.modifiedBy = userId;
 
-    const saved = await this.orgInventoryRepository.save(item);
-    const loaded = await this.orgInventoryRepository.findByIdNotDeleted(
-      saved.id,
-    );
+      // Lock the post-update identity so concurrent create() or update()
+      // calls targeting the same identity serialize against this transaction.
+      await manager.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `oii:${orgId}:${item.gameId}:${item.uexItemId}:${item.unitOfMeasure ?? 'unit'}:${item.locationType ?? ''}:${item.locationUexId ?? -1}`,
+      ]);
+
+      if (item.active) {
+        const collision = await repo
+          .createQueryBuilder('oii2')
+          .where('oii2.id != :id', { id })
+          .andWhere('oii2.org_id = :orgId', { orgId })
+          .andWhere('oii2.game_id = :gameId', { gameId: item.gameId })
+          .andWhere('oii2.uex_item_id = :uexItemId', {
+            uexItemId: item.uexItemId,
+          })
+          .andWhere('oii2.unit_of_measure = :unitOfMeasure', {
+            unitOfMeasure: item.unitOfMeasure,
+          })
+          .andWhere('oii2.location_type IS NOT DISTINCT FROM :locationType', {
+            locationType: item.locationType ?? null,
+          })
+          .andWhere(
+            'oii2.location_uex_id IS NOT DISTINCT FROM :locationUexId',
+            { locationUexId: item.locationUexId ?? null },
+          )
+          .andWhere('oii2.deleted = FALSE')
+          .andWhere('oii2.active = TRUE')
+          .getOne();
+
+        if (collision) {
+          throw new ConflictException(
+            'An inventory item with this combination already exists for this organization',
+          );
+        }
+      }
+
+      try {
+        const saved = await repo.save(item);
+        return saved.id;
+      } catch (err: unknown) {
+        if (
+          typeof err === 'object' &&
+          err !== null &&
+          'code' in err &&
+          (err as { code: string }).code === '23505'
+        ) {
+          throw new ConflictException(
+            'An inventory item with this combination already exists for this organization',
+          );
+        }
+        throw err;
+      }
+    });
+
+    const loaded =
+      await this.orgInventoryRepository.findByIdNotDeleted(savedId);
 
     if (!loaded) {
       throw new NotFoundException('Failed to load updated inventory item');
@@ -260,13 +487,15 @@ export class OrgInventoryService {
       gameId: searchDto.gameId,
       uexItemId: searchDto.uexItemId,
       categoryId: searchDto.categoryId,
-      locationId: searchDto.locationId,
       activeOnly: searchDto.activeOnly,
       limit,
       offset,
       search: searchDto.search,
       minQuantity: searchDto.minQuantity,
       maxQuantity: searchDto.maxQuantity,
+      minQuality: searchDto.minQuality,
+      maxQuality: searchDto.maxQuality,
+      unitOfMeasure: searchDto.unitOfMeasure,
       sort: searchDto.sort || 'date_modified',
       order: searchDto.order || 'desc',
     });
@@ -285,42 +514,16 @@ export class OrgInventoryService {
   async getSummary(
     userId: number,
     orgId: number,
-    gameId: number,
   ): Promise<OrgInventorySummaryDto> {
     await this.verifyInventoryPermission(userId, orgId, 'view');
 
-    const summary = await this.orgInventoryRepository.getOrgInventorySummary(
-      orgId,
-      gameId,
-    );
+    const rows =
+      await this.orgInventoryRepository.getOrgInventorySummary(orgId);
 
     return {
       orgId,
-      gameId,
-      totalItems: summary.totalItems,
-      uniqueItems: summary.uniqueItems,
-      locationCount: summary.locationCount,
-      lastUpdated: summary.lastUpdated!,
+      aggregates: rows,
     };
-  }
-
-  /**
-   * Get inventory by location
-   */
-  async findByLocation(
-    userId: number,
-    orgId: number,
-    locationId: number,
-  ): Promise<OrgInventoryItemDto[]> {
-    await this.verifyInventoryPermission(userId, orgId, 'view');
-
-    const items =
-      await this.orgInventoryRepository.findByLocationId(locationId);
-
-    // Filter to ensure only items from this org are returned
-    const orgItems = items.filter((item) => item.orgId === orgId);
-
-    return orgItems.map((item) => this.toDto(item));
   }
 
   /**

@@ -3,20 +3,26 @@ import {
   IsNumber,
   IsOptional,
   IsBoolean,
+  IsNotEmpty,
   Min,
   Max,
   IsInt,
   MaxLength,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { LocationPairRequired } from '../../../common/decorators/location-pair.decorator';
 
 export class OrgInventoryItemDto {
   id!: string;
   orgId!: number;
   gameId!: number;
   uexItemId!: number;
-  locationId!: number;
   quantity!: number;
+  unitOfMeasure!: 'unit' | 'scu' | 'uscu';
+  quality?: number | null;
+  locationType?: string | null;
+  locationUexId?: number | null;
   notes?: string;
   active!: boolean;
   dateAdded!: Date;
@@ -26,13 +32,13 @@ export class OrgInventoryItemDto {
 
   // Populated from relations
   itemName?: string;
-  locationName?: string;
   orgName?: string;
   addedByUsername?: string;
   modifiedByUsername?: string;
   categoryName?: string;
 }
 
+@LocationPairRequired()
 export class CreateOrgInventoryItemDto {
   @ApiPropertyOptional({
     description: 'Organization ID (auto-filled from route)',
@@ -50,15 +56,53 @@ export class CreateOrgInventoryItemDto {
   @IsInt()
   uexItemId!: number;
 
-  @ApiProperty({ description: 'Location ID', example: 200 })
-  @IsInt()
-  locationId!: number;
-
-  @ApiProperty({ description: 'Quantity', example: 100.5, minimum: 0.01 })
+  @ApiProperty({ description: 'Quantity', example: 100.5, minimum: 0.000001 })
   @IsNumber()
-  @Min(0.01)
-  @Max(999999999.99)
+  @Min(0.000001)
+  @Max(999999.999999)
   quantity!: number;
+
+  @ApiPropertyOptional({
+    description: 'Unit of measure',
+    enum: ['unit', 'scu', 'uscu'],
+    example: 'unit',
+  })
+  @IsOptional()
+  @IsIn(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
+  @ApiPropertyOptional({
+    description: 'Item quality (0–32767)',
+    example: 90,
+    minimum: 0,
+    maximum: 32767,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  quality?: number;
+
+  @ApiPropertyOptional({
+    description: 'Location type (e.g. city, space_station)',
+    example: 'space_station',
+    maxLength: 30,
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  locationType?: string;
+
+  @ApiPropertyOptional({
+    description: 'UEX ID of the location entity',
+    example: 42,
+    minimum: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  locationUexId?: number;
 
   @ApiPropertyOptional({
     description: 'Optional notes',
@@ -71,22 +115,64 @@ export class CreateOrgInventoryItemDto {
   notes?: string;
 }
 
+@LocationPairRequired()
 export class UpdateOrgInventoryItemDto {
-  @ApiPropertyOptional({ description: 'Location ID', example: 300 })
-  @IsOptional()
-  @IsInt()
-  locationId?: number;
-
-  @ApiPropertyOptional({ description: 'Quantity', example: 150, minimum: 0.01 })
+  @ApiPropertyOptional({
+    description: 'Quantity',
+    example: 150,
+    minimum: 0.000001,
+  })
   @IsOptional()
   @IsNumber()
-  @Min(0.01)
-  @Max(999999999.99)
+  @Min(0.000001)
+  @Max(999999.999999)
   quantity?: number;
 
   @ApiPropertyOptional({
+    description: 'Unit of measure',
+    enum: ['unit', 'scu', 'uscu'],
+    example: 'scu',
+  })
+  @IsOptional()
+  @IsIn(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
+  @ApiPropertyOptional({
+    description: 'Item quality (0–32767)',
+    example: 85,
+    minimum: 0,
+    maximum: 32767,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  quality?: number | null;
+
+  @ApiPropertyOptional({
+    description: 'Location type',
+    example: 'city',
+    maxLength: 30,
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  locationType?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'UEX ID of the location entity',
+    example: 10,
+    minimum: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  locationUexId?: number | null;
+
+  @ApiPropertyOptional({
     description: 'Optional notes',
-    example: 'Moved to new location',
+    example: 'Updated notes',
     maxLength: 1000,
   })
   @IsOptional()
@@ -129,6 +215,38 @@ export class OrgInventorySearchDto {
   @Min(0)
   maxQuantity?: number;
 
+  @ApiPropertyOptional({
+    description: 'Minimum quality filter',
+    example: 50,
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  minQuality?: number;
+
+  @ApiPropertyOptional({
+    description: 'Maximum quality filter',
+    example: 100,
+    minimum: 0,
+    maximum: 32767,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(32767)
+  maxQuality?: number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by unit of measure',
+    enum: ['unit', 'scu', 'uscu'],
+    example: 'scu',
+  })
+  @IsOptional()
+  @IsIn(['unit', 'scu', 'uscu'])
+  unitOfMeasure?: 'unit' | 'scu' | 'uscu';
+
   @ApiPropertyOptional({ description: 'Filter by UEX Item ID', example: 100 })
   @IsOptional()
   @IsInt()
@@ -141,11 +259,6 @@ export class OrgInventorySearchDto {
   @IsOptional()
   @IsInt()
   categoryId?: number;
-
-  @ApiPropertyOptional({ description: 'Filter by Location ID', example: 200 })
-  @IsOptional()
-  @IsInt()
-  locationId?: number;
 
   @ApiPropertyOptional({
     description: 'Search by item name or notes',
@@ -167,11 +280,11 @@ export class OrgInventorySearchDto {
   @ApiPropertyOptional({
     description: 'Sort column',
     example: 'date_modified',
-    enum: ['name', 'quantity', 'location', 'date_added', 'date_modified'],
+    enum: ['name', 'quantity', 'quality', 'date_added', 'date_modified'],
   })
   @IsOptional()
-  @IsString()
-  sort?: 'name' | 'quantity' | 'location' | 'date_added' | 'date_modified';
+  @IsIn(['name', 'quantity', 'quality', 'date_added', 'date_modified'])
+  sort?: 'name' | 'quantity' | 'quality' | 'date_added' | 'date_modified';
 
   @ApiPropertyOptional({
     description: 'Sort order',
@@ -207,11 +320,22 @@ export class OrgInventorySearchDto {
   offset?: number;
 }
 
+export class OrgInventorySummaryAggregateRow {
+  uexItemId!: number;
+  unitOfMeasure!: string;
+  totalQuantity!: number;
+  itemCount!: number;
+  latestUpdate!: Date | null;
+}
+
 export class OrgInventorySummaryDto {
   orgId!: number;
-  gameId!: number;
-  totalItems!: number;
-  uniqueItems!: number;
-  locationCount!: number;
-  lastUpdated!: Date;
+  aggregates!: OrgInventorySummaryAggregateRow[];
+}
+
+export class SplitOrgInventoryItemDto {
+  @IsNumber()
+  @Min(0.000001)
+  @Max(999999.999999)
+  splitQuantity!: number;
 }

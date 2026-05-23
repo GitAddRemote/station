@@ -8,7 +8,6 @@ import { UserOrganizationRole } from './modules/user-organization-roles/user-org
 import { PasswordReset } from './modules/auth/password-reset.entity';
 import { AuditLog } from './modules/audit-logs/audit-log.entity';
 import { Game } from './modules/games/game.entity';
-import { Location } from './modules/locations/entities/location.entity';
 import { UserInventoryItem } from './modules/user-inventory/entities/user-inventory-item.entity';
 import { InventoryAuditLog } from './modules/user-inventory/entities/inventory-audit-log.entity';
 import { OrgInventoryItem } from './modules/org-inventory/entities/org-inventory-item.entity';
@@ -27,32 +26,7 @@ import { UexSyncState } from './modules/uex-sync/uex-sync-state.entity';
 import { UexSyncConfig } from './modules/uex-sync/uex-sync-config.entity';
 import { OauthClient } from './modules/oauth-clients/oauth-client.entity';
 
-import { CreateUsersTable1716956654528 } from './migrations/1716956654528-CreateUsersTable';
-import { CreateOrganizationsRolesAndJunctionTable1730841000000 } from './migrations/1730841000000-CreateOrganizationsRolesAndJunctionTable';
-import { CreateAuditLogsTable1730900000000 } from './migrations/1730900000000-CreateAuditLogsTable';
-import { CreateRefreshTokenTable1731715200000 } from './migrations/1731715200000-CreateRefreshTokenTable';
-import { AddUserProfileFields1732000000000 } from './migrations/1732000000000-AddUserProfileFields';
-import { CreatePasswordResetsTable1732050000000 } from './migrations/1732050000000-CreatePasswordResetsTable';
-import { CreateGamesTable1733174400000 } from './migrations/1733174400000-CreateGamesTable';
-import { AddGameIdToOrganizations1733174500000 } from './migrations/1733174500000-AddGameIdToOrganizations';
-import { AddIsSystemUserColumn1764791773398 } from './migrations/1764791773398-AddIsSystemUserColumn';
-import { SeedSystemUser1764791795973 } from './migrations/1764791795973-SeedSystemUser';
-import { CreateUexBaseTables1764802822073 } from './migrations/1764802822073-CreateUexBaseTables';
-import { CreateUexItemsTable1764802975691 } from './migrations/1764802975691-CreateUexItemsTable';
-import { CreateUexLocationTables1764803020274 } from './migrations/1764803020274-CreateUexLocationTables';
-import { AddUexSyncStateTables1764812815840 } from './migrations/1764812815840-AddUexSyncStateTables';
-import { CreateLocationsTable1764949892544 } from './migrations/1764949892544-CreateLocationsTable';
-import { CreateUserInventoryItemsTable1764950546163 } from './migrations/1764950546163-CreateUserInventoryItemsTable';
-import { CreateInventoryAuditLogTable1764950688227 } from './migrations/1764950688227-CreateInventoryAuditLogTable';
-import { AddAutoUnshareInventoryTrigger1764950720430 } from './migrations/1764950720430-AddAutoUnshareInventoryTrigger';
-import { AddOrgInventorySummaryView1764950757207 } from './migrations/1764950757207-AddOrgInventorySummaryView';
-import { SeedInventoryManagerRole1764961461064 } from './migrations/1764961461064-SeedInventoryManagerRole';
-import { CreateOrgInventoryItemsTable1764964935270 } from './migrations/1764964935270-CreateOrgInventoryItemsTable';
-import { AddUserInventoryUniqueIndex1765035000000 } from './migrations/1765035000000-AddUserInventoryUniqueIndex';
-import { AddTokenCleanupIndexes1765038000000 } from './migrations/1765038000000-AddTokenCleanupIndexes';
-import { DropRefreshTokensTable1777409770542 } from './migrations/1777409770542-DropRefreshTokensTable';
-import { CreateOauthClientsTable1777647814618 } from './migrations/1777647814618-CreateOauthClientsTable';
-import { CreateUexCommoditiesTable1779219950540 } from './migrations/1779219950540-CreateUexCommoditiesTable';
+import { BigBangBaselineMigration1748000000000 } from './migrations/1748000000000-BigBangBaselineMigration';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -69,7 +43,6 @@ export const AppDataSource = new DataSource({
     PasswordReset,
     AuditLog,
     Game,
-    Location,
     UserInventoryItem,
     InventoryAuditLog,
     OrgInventoryItem,
@@ -88,52 +61,9 @@ export const AppDataSource = new DataSource({
     UexSyncConfig,
     OauthClient,
   ],
-  migrations: [
-    // Core user/org/auth setup
-    CreateUsersTable1716956654528,
-    AddIsSystemUserColumn1764791773398,
-    SeedSystemUser1764791795973,
-    CreateOrganizationsRolesAndJunctionTable1730841000000,
-    CreateAuditLogsTable1730900000000,
-    CreateRefreshTokenTable1731715200000,
-    AddUserProfileFields1732000000000,
-    CreatePasswordResetsTable1732050000000,
-
-    // Games must come before locations
-    CreateGamesTable1733174400000,
-    AddGameIdToOrganizations1733174500000,
-
-    // UEX tables (base entities for items/locations)
-    CreateUexBaseTables1764802822073,
-    CreateUexItemsTable1764802975691,
-    CreateUexLocationTables1764803020274,
-    AddUexSyncStateTables1764812815840,
-
-    // Locations (depends on games + UEX tables)
-    CreateLocationsTable1764949892544,
-
-    // Inventory (depends on locations, games, UEX items)
-    CreateUserInventoryItemsTable1764950546163,
-    CreateInventoryAuditLogTable1764950688227,
-    AddAutoUnshareInventoryTrigger1764950720430,
-    AddOrgInventorySummaryView1764950757207,
-    SeedInventoryManagerRole1764961461064,
-    CreateOrgInventoryItemsTable1764964935270,
-    AddUserInventoryUniqueIndex1765035000000,
-
-    // Token cleanup indexes (supports efficient revoked/expired deletes)
-    AddTokenCleanupIndexes1765038000000,
-
-    // Refresh tokens moved to Redis — drop the DB table
-    DropRefreshTokensTable1777409770542,
-
-    // OAuth 2.0 client credentials
-    CreateOauthClientsTable1777647814618,
-
-    // UEX commodities (depends on uex_categories)
-    CreateUexCommoditiesTable1779219950540,
-  ],
+  migrations: [BigBangBaselineMigration1748000000000],
   synchronize: false,
+  extra: { parseInt8: true },
 });
 
 AppDataSource.initialize()

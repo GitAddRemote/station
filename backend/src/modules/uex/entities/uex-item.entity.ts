@@ -10,7 +10,7 @@ import { BaseUexEntity } from './base-uex.entity';
 import { UexCategory } from './uex-category.entity';
 import { UexCompany } from './uex-company.entity';
 
-@Entity('uex_items')
+@Entity('uex_item')
 @Index('idx_uex_items_active', ['uexId'], {
   where: 'deleted = FALSE AND active = TRUE',
 })

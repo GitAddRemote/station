@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { getLoggerToken } from 'nestjs-pino';
 import { UserInventoryService } from './user-inventory.service';
 import { UserInventoryItem } from './entities/user-inventory-item.entity';
@@ -17,6 +21,7 @@ describe('UserInventoryService', () => {
   let transactionRepository: {
     create: jest.Mock;
     save: jest.Mock;
+    findOneByOrFail: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
   let transactionQueryBuilder: {
@@ -31,8 +36,11 @@ describe('UserInventoryService', () => {
     userId: 1,
     gameId: 1,
     uexItemId: 100,
-    locationId: 200,
     quantity: 10.5,
+    unitOfMeasure: 'unit',
+    quality: undefined,
+    locationType: undefined,
+    locationUexId: undefined,
     notes: 'Test item',
     sharedOrgId: undefined,
     active: true,
@@ -44,9 +52,6 @@ describe('UserInventoryService', () => {
     user: undefined as unknown as UserInventoryItem['user'],
     game: undefined as unknown as UserInventoryItem['game'],
     item: { name: 'Test Item' } as unknown as UserInventoryItem['item'],
-    location: {
-      displayName: 'Test Location',
-    } as unknown as UserInventoryItem['location'],
     sharedOrg: undefined,
     addedByUser: undefined as unknown as UserInventoryItem['addedByUser'],
     modifiedByUser: undefined as unknown as UserInventoryItem['modifiedByUser'],
@@ -64,6 +69,7 @@ describe('UserInventoryService', () => {
     select: jest.fn().mockReturnThis(),
     addSelect: jest.fn().mockReturnThis(),
     getRawOne: jest.fn(),
+    getOne: jest.fn().mockResolvedValue(null),
   };
 
   beforeEach(async () => {
@@ -71,12 +77,13 @@ describe('UserInventoryService', () => {
       setLock: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
-      getOne: jest.fn(),
+      getOne: jest.fn().mockResolvedValue(null),
     };
 
     transactionRepository = {
       create: jest.fn(),
       save: jest.fn(),
+      findOneByOrFail: jest.fn(),
       createQueryBuilder: jest.fn().mockReturnValue(transactionQueryBuilder),
     };
 
@@ -107,12 +114,14 @@ describe('UserInventoryService', () => {
                   (
                     callback: (manager: {
                       getRepository: () => typeof transactionRepository;
+                      query: jest.Mock;
                     }) => Promise<unknown>,
                   ) =>
                     callback({
                       getRepository: jest
                         .fn()
                         .mockReturnValue(transactionRepository),
+                      query: jest.fn().mockResolvedValue([{ id: 'mock-uuid' }]),
                     }),
                 ),
             },
@@ -166,24 +175,6 @@ describe('UserInventoryService', () => {
       );
     });
 
-    it('should filter by locationId', async () => {
-      const searchDto: UserInventorySearchDto = {
-        gameId: 1,
-        locationId: 200,
-      };
-      mockQueryBuilder.getManyAndCount.mockResolvedValue([
-        [mockInventoryItem],
-        1,
-      ]);
-
-      await service.findAll(1, searchDto);
-
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'inventory.location_id = :locationId',
-        { locationId: 200 },
-      );
-    });
-
     it('should filter by search text', async () => {
       const searchDto: UserInventorySearchDto = {
         gameId: 1,
@@ -225,10 +216,50 @@ describe('UserInventoryService', () => {
       );
     });
 
-    it('should sort by location when requested', async () => {
+    it('should filter by minQuality and maxQuality', async () => {
       const searchDto: UserInventorySearchDto = {
         gameId: 1,
-        sort: 'location',
+        minQuality: 10,
+        maxQuality: 50,
+      };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
+
+      await service.findAll(1, searchDto);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'inventory.quality >= :minQuality',
+        { minQuality: 10 },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'inventory.quality <= :maxQuality',
+        { maxQuality: 50 },
+      );
+    });
+
+    it('should filter by unitOfMeasure', async () => {
+      const searchDto: UserInventorySearchDto = {
+        gameId: 1,
+        unitOfMeasure: 'scu',
+      };
+      mockQueryBuilder.getManyAndCount.mockResolvedValue([
+        [mockInventoryItem],
+        1,
+      ]);
+
+      await service.findAll(1, searchDto);
+
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'inventory.unit_of_measure = :unitOfMeasure',
+        { unitOfMeasure: 'scu' },
+      );
+    });
+
+    it('should sort by date_modified by default', async () => {
+      const searchDto: UserInventorySearchDto = {
+        gameId: 1,
         order: 'asc',
       };
       mockQueryBuilder.getManyAndCount.mockResolvedValue([
@@ -239,7 +270,7 @@ describe('UserInventoryService', () => {
       await service.findAll(1, searchDto);
 
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'location.displayName',
+        'inventory.dateModified',
         'ASC',
       );
     });
@@ -254,7 +285,7 @@ describe('UserInventoryService', () => {
       expect(result.id).toBe(mockInventoryItem.id);
       expect(repository.findOne).toHaveBeenCalledWith({
         where: { id: mockInventoryItem.id, userId: 1, deleted: false },
-        relations: ['item', 'location', 'sharedOrg'],
+        relations: ['item', 'sharedOrg'],
       });
     });
 
@@ -272,7 +303,6 @@ describe('UserInventoryService', () => {
       const createDto: CreateUserInventoryItemDto = {
         gameId: 1,
         uexItemId: 100,
-        locationId: 200,
         quantity: 10.5,
         notes: 'New item',
       };
@@ -298,35 +328,50 @@ describe('UserInventoryService', () => {
       const createDto: CreateUserInventoryItemDto = {
         gameId: 1,
         uexItemId: 100,
-        locationId: 200,
         quantity: 2,
         notes: 'merge note',
       };
 
       const existingItem = { ...mockInventoryItem, quantity: 3, notes: 'old' };
 
+      const mergedItem = { ...existingItem, quantity: 5, notes: 'merge note' };
       transactionQueryBuilder.getOne.mockResolvedValue(existingItem);
-      transactionRepository.save.mockResolvedValue({
-        ...existingItem,
-        quantity: 5,
-        notes: 'merge note',
-      });
-      jest.spyOn(repository, 'findOne').mockResolvedValue({
-        ...existingItem,
-        quantity: 5,
-        notes: 'merge note',
-      });
+      transactionRepository.findOneByOrFail.mockResolvedValue(mergedItem);
+      jest.spyOn(repository, 'findOne').mockResolvedValue(mergedItem);
 
       const result = await service.create(1, createDto);
 
-      expect(transactionRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          quantity: 5,
-          notes: 'merge note',
-          modifiedBy: 1,
-        }),
-      );
+      expect(transactionRepository.save).not.toHaveBeenCalled();
       expect(result.quantity).toBe(5);
+    });
+
+    it('should throw BadRequestException when merged quantity exceeds max', async () => {
+      const createDto: CreateUserInventoryItemDto = {
+        gameId: 1,
+        uexItemId: 100,
+        quantity: 999999.999999,
+      };
+
+      const existingItem = { ...mockInventoryItem, quantity: 1 };
+      transactionQueryBuilder.getOne.mockResolvedValue(existingItem);
+      // Simulate overflow: manager.query returns [] (WHERE quantity check failed)
+      (repository.manager.transaction as jest.Mock).mockImplementationOnce(
+        (
+          callback: (manager: {
+            getRepository: () => typeof transactionRepository;
+            query: jest.Mock;
+          }) => Promise<unknown>,
+        ) =>
+          callback({
+            getRepository: jest.fn().mockReturnValue(transactionRepository),
+            query: jest.fn().mockResolvedValue([]),
+          }),
+      );
+
+      await expect(service.create(1, createDto)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(transactionRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -338,25 +383,47 @@ describe('UserInventoryService', () => {
       };
 
       const updatedItem = { ...mockInventoryItem, ...updateDto };
-      jest.spyOn(repository, 'findOne').mockResolvedValue(mockInventoryItem);
-      jest.spyOn(repository, 'save').mockResolvedValue(updatedItem);
+      // Row fetch is the first getOne (inside transaction), collision check is the second
+      transactionQueryBuilder.getOne
+        .mockResolvedValueOnce(updatedItem) // row fetch with pessimistic_write
+        .mockResolvedValueOnce(null); // collision check — no collision
+      transactionRepository.save.mockResolvedValue(updatedItem);
+      // findById (post-txn) uses repository.findOne
+      jest.spyOn(repository, 'findOne').mockResolvedValue(updatedItem);
 
       const result = await service.update(mockInventoryItem.id, 1, updateDto);
 
       expect(result.quantity).toBe(20);
-      expect(repository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          modifiedBy: 1,
-        }),
+      expect(transactionRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ modifiedBy: 1 }),
       );
     });
 
     it('should throw NotFoundException if item not found', async () => {
-      jest.spyOn(repository, 'findOne').mockResolvedValue(null);
+      // Row fetch returns null → NotFoundException thrown inside transaction
+      transactionQueryBuilder.getOne.mockResolvedValueOnce(null);
 
       await expect(
         service.update('invalid-id', 1, { quantity: 20 }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ConflictException when another active row has the same identity', async () => {
+      const updateDto: UpdateUserInventoryItemDto = { unitOfMeasure: 'scu' };
+      const collidingItem = {
+        ...mockInventoryItem,
+        id: 'other-uuid',
+        unitOfMeasure: 'scu' as const,
+      };
+      // First getOne: row fetch returns the item to update
+      // Second getOne: collision check returns a colliding row
+      transactionQueryBuilder.getOne
+        .mockResolvedValueOnce(mockInventoryItem)
+        .mockResolvedValueOnce(collidingItem);
+
+      await expect(
+        service.update(mockInventoryItem.id, 1, updateDto),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -395,7 +462,6 @@ describe('UserInventoryService', () => {
       mockQueryBuilder.getRawOne.mockResolvedValue({
         totalItems: '10',
         uniqueItems: '5',
-        locationCount: '3',
         sharedItemsCount: '2',
         lastUpdated: new Date(),
       });
@@ -404,7 +470,6 @@ describe('UserInventoryService', () => {
 
       expect(result.totalItems).toBe(10);
       expect(result.uniqueItems).toBe(5);
-      expect(result.locationCount).toBe(3);
       expect(result.sharedItemsCount).toBe(2);
     });
   });
@@ -423,7 +488,7 @@ describe('UserInventoryService', () => {
           deleted: false,
           active: true,
         },
-        relations: ['item', 'location', 'user'],
+        relations: ['item', 'user'],
         order: { dateModified: 'DESC' },
         take: 100,
       });
