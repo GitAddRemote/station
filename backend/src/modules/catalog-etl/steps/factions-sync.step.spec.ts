@@ -17,7 +17,7 @@ function makeFaction(overrides: Record<string, unknown> = {}) {
     id: 1,
     name: 'United Empire',
     wiki: 'https://wiki.example.com/ue',
-    ids_star_systems: '1,2',
+    ids_star_systems: '',
     ids_factions_friendly: null,
     ids_factions_hostile: null,
     is_piracy: 0,
@@ -49,7 +49,8 @@ describe('FactionsSyncStep', () => {
 
   beforeEach(() => {
     uexGet = jest.fn();
-    dsQuery = jest.fn().mockResolvedValue([]);
+    // Default: return [] for existence checks, [] for deletes/inserts
+    dsQuery = jest.fn().mockResolvedValue([{ exists: false }]);
     repoCreate = jest
       .fn()
       .mockImplementation((dto) => ({ ...dto }) as EtlWarning);
@@ -70,10 +71,11 @@ describe('FactionsSyncStep', () => {
       await step.execute({ runId: RUN_ID });
 
       expect(uexGet).toHaveBeenCalledWith('/factions');
-      // 2 faction upserts (no junction rows since no friendly/hostile)
-      expect(dsQuery).toHaveBeenCalledTimes(2);
-      expect(dsQuery.mock.calls[0][0]).toContain('INSERT INTO station_faction');
-      expect(dsQuery.mock.calls[0][1][0]).toBe(1);
+      const upsertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction '),
+      );
+      expect(upsertCalls).toHaveLength(2);
+      expect(upsertCalls[0][1][0]).toBe(1);
     });
   });
 
@@ -98,26 +100,31 @@ describe('FactionsSyncStep', () => {
         }),
       );
       expect(repoSave).toHaveBeenCalledTimes(1);
-      // Only one upsert — the nameless faction is skipped
-      expect(dsQuery).toHaveBeenCalledTimes(1);
+      // Only one station_faction upsert — the nameless faction is skipped
+      const upsertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction '),
+      );
+      expect(upsertCalls).toHaveLength(1);
     });
   });
 
   describe('upsert idempotency', () => {
-    it('calls DataSource.query once per record (upsert on conflict)', async () => {
+    it('calls station_faction upsert once per record', async () => {
       const factions = [makeFaction({ id: 1 }), makeFaction({ id: 1 })];
       uexGet.mockResolvedValue(factions);
 
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       await step.execute({ runId: RUN_ID });
 
-      // 2 calls — one per record; the DB handles conflict resolution
-      expect(dsQuery).toHaveBeenCalledTimes(2);
+      const upsertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction '),
+      );
+      expect(upsertCalls).toHaveLength(2);
     });
   });
 
-  describe('friendly/hostile junction population', () => {
-    it('upserts junction rows for each friendly faction id in CSV', async () => {
+  describe('friendly junction reconciliation', () => {
+    it('deletes existing friendly rows then re-inserts current CSV set', async () => {
       const factions = [
         makeFaction({ id: 1, ids_factions_friendly: '2,3' }),
         makeFaction({ id: 2, name: 'Faction 2' }),
@@ -128,13 +135,39 @@ describe('FactionsSyncStep', () => {
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       await step.execute({ runId: RUN_ID });
 
-      // 3 faction upserts + 2 friendly junction inserts
-      const junctionCalls = dsQuery.mock.calls.filter((call: string[]) =>
-        (call[0] as string).includes('station_faction_friendly'),
+      const deleteCalls = dsQuery.mock.calls.filter(
+        (c: unknown[]) =>
+          (c[0] as string).includes('DELETE FROM station_faction_friendly') &&
+          (c[1] as number[])[0] === 1,
       );
-      expect(junctionCalls).toHaveLength(2);
-      expect(junctionCalls[0][1]).toEqual([1, 2]);
-      expect(junctionCalls[1][1]).toEqual([1, 3]);
+      expect(deleteCalls).toHaveLength(1);
+
+      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction_friendly'),
+      );
+      expect(insertCalls).toHaveLength(2);
+      expect(insertCalls[0][1]).toEqual([1, 2]);
+      expect(insertCalls[1][1]).toEqual([1, 3]);
+    });
+
+    it('deletes existing rows even when CSV is empty (removes all stale links)', async () => {
+      const factions = [makeFaction({ id: 1, ids_factions_friendly: null })];
+      uexGet.mockResolvedValue(factions);
+
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      const deleteCalls = dsQuery.mock.calls.filter(
+        (c: unknown[]) =>
+          (c[0] as string).includes('DELETE FROM station_faction_friendly') &&
+          (c[1] as number[])[0] === 1,
+      );
+      expect(deleteCalls).toHaveLength(1);
+
+      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction_friendly'),
+      );
+      expect(insertCalls).toHaveLength(0);
     });
 
     it('saves a warning when a friendly faction id is not in the fetched set', async () => {
@@ -151,14 +184,16 @@ describe('FactionsSyncStep', () => {
         }),
       );
       expect(repoSave).toHaveBeenCalledTimes(1);
-      // Junction insert still happens even if id is missing from fetched set
-      const junctionCalls = dsQuery.mock.calls.filter((call: string[]) =>
-        (call[0] as string).includes('station_faction_friendly'),
+      // INSERT still happens even if id is missing from fetched set
+      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction_friendly'),
       );
-      expect(junctionCalls).toHaveLength(1);
+      expect(insertCalls).toHaveLength(1);
     });
+  });
 
-    it('upserts junction rows for each hostile faction id in CSV', async () => {
+  describe('hostile junction reconciliation', () => {
+    it('deletes existing hostile rows then re-inserts current CSV set', async () => {
       const factions = [
         makeFaction({ id: 1, ids_factions_hostile: '2,3' }),
         makeFaction({ id: 2, name: 'Faction 2' }),
@@ -169,10 +204,100 @@ describe('FactionsSyncStep', () => {
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       await step.execute({ runId: RUN_ID });
 
-      const junctionCalls = dsQuery.mock.calls.filter((call: string[]) =>
-        (call[0] as string).includes('station_faction_hostile'),
+      const deleteCalls = dsQuery.mock.calls.filter(
+        (c: unknown[]) =>
+          (c[0] as string).includes('DELETE FROM station_faction_hostile') &&
+          (c[1] as number[])[0] === 1,
       );
-      expect(junctionCalls).toHaveLength(2);
+      expect(deleteCalls).toHaveLength(1);
+
+      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction_hostile'),
+      );
+      expect(insertCalls).toHaveLength(2);
+    });
+
+    it('deletes existing rows even when CSV is empty', async () => {
+      const factions = [makeFaction({ id: 1, ids_factions_hostile: null })];
+      uexGet.mockResolvedValue(factions);
+
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      const deleteCalls = dsQuery.mock.calls.filter(
+        (c: unknown[]) =>
+          (c[0] as string).includes('DELETE FROM station_faction_hostile') &&
+          (c[1] as number[])[0] === 1,
+      );
+      expect(deleteCalls).toHaveLength(1);
+
+      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction_hostile'),
+      );
+      expect(insertCalls).toHaveLength(0);
+    });
+  });
+
+  describe('star system junction reconciliation', () => {
+    it('deletes existing star system rows then inserts links for known star systems', async () => {
+      const factions = [makeFaction({ id: 1, ids_star_systems: '10,20' })];
+      uexGet.mockResolvedValue(factions);
+
+      // Star system 10 exists, 20 does not
+      dsQuery.mockImplementation((sql: string, params?: unknown[]) => {
+        if ((sql as string).includes('EXISTS') && params?.[0] === 10)
+          return Promise.resolve([{ exists: true }]);
+        if ((sql as string).includes('EXISTS') && params?.[0] === 20)
+          return Promise.resolve([{ exists: false }]);
+        return Promise.resolve([]);
+      });
+
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      const deleteCalls = dsQuery.mock.calls.filter(
+        (c: unknown[]) =>
+          (c[0] as string).includes(
+            'DELETE FROM station_faction_star_system',
+          ) && (c[1] as number[])[0] === 1,
+      );
+      expect(deleteCalls).toHaveLength(1);
+
+      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction_star_system'),
+      );
+      // Only id 10 inserts; id 20 is skipped with a warning
+      expect(insertCalls).toHaveLength(1);
+      expect(insertCalls[0][1]).toEqual([1, 10]);
+
+      expect(repoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('20'),
+          rawPayload: { faction_id: 1, missing_id: 20 },
+        }),
+      );
+    });
+
+    it('deletes existing star system rows even when ids_star_systems is empty', async () => {
+      const factions = [makeFaction({ id: 1, ids_star_systems: '' })];
+      uexGet.mockResolvedValue(factions);
+
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      const deleteCalls = dsQuery.mock.calls.filter(
+        (c: unknown[]) =>
+          (c[0] as string).includes(
+            'DELETE FROM station_faction_star_system',
+          ) && (c[1] as number[])[0] === 1,
+      );
+      expect(deleteCalls).toHaveLength(1);
+
+      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction_star_system'),
+      );
+      expect(insertCalls).toHaveLength(0);
     });
   });
 });

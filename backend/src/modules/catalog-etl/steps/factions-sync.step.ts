@@ -89,51 +89,117 @@ export class FactionsSyncStep implements EtlStep {
       );
     }
 
-    // Populate junction tables after all factions are upserted
+    // Reconcile junction tables per faction — delete existing rows then
+    // re-insert current set so stale relationships are removed on each run.
     for (const record of factions) {
       if (!record.name) continue;
 
-      const friendlyIds = parseCsvInts(record.ids_factions_friendly);
-      for (const friendlyId of friendlyIds) {
-        if (!fetchedIds.has(friendlyId)) {
-          const warning = this.warningsRepo.create({
-            runId: ctx.runId,
-            stepName: this.name,
-            severity: 'warn',
-            message: `Friendly faction ${friendlyId} not found in fetched set`,
-            rawPayload: { faction_id: record.id, missing_id: friendlyId },
-          });
-          await this.warningsRepo.save(warning);
-        }
-        await this.dataSource.query(
-          `INSERT INTO station_faction_friendly (faction_uex_id, friendly_faction_uex_id)
-           VALUES ($1,$2)
-           ON CONFLICT DO NOTHING`,
-          [record.id, friendlyId],
-        );
-      }
-
-      const hostileIds = parseCsvInts(record.ids_factions_hostile);
-      for (const hostileId of hostileIds) {
-        if (!fetchedIds.has(hostileId)) {
-          const warning = this.warningsRepo.create({
-            runId: ctx.runId,
-            stepName: this.name,
-            severity: 'warn',
-            message: `Hostile faction ${hostileId} not found in fetched set`,
-            rawPayload: { faction_id: record.id, missing_id: hostileId },
-          });
-          await this.warningsRepo.save(warning);
-        }
-        await this.dataSource.query(
-          `INSERT INTO station_faction_hostile (faction_uex_id, hostile_faction_uex_id)
-           VALUES ($1,$2)
-           ON CONFLICT DO NOTHING`,
-          [record.id, hostileId],
-        );
-      }
+      await this.reconcileFriendly(ctx, record, fetchedIds);
+      await this.reconcileHostile(ctx, record, fetchedIds);
+      await this.reconcileStarSystems(ctx, record);
     }
 
     this.logger.info({ runId: ctx.runId }, 'factions-sync step complete');
+  }
+
+  private async reconcileFriendly(
+    ctx: EtlStepContext,
+    record: UexFaction,
+    fetchedIds: Set<number>,
+  ): Promise<void> {
+    const friendlyIds = parseCsvInts(record.ids_factions_friendly);
+
+    await this.dataSource.query(
+      `DELETE FROM station_faction_friendly WHERE faction_uex_id = $1`,
+      [record.id],
+    );
+
+    for (const friendlyId of friendlyIds) {
+      if (!fetchedIds.has(friendlyId)) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Friendly faction ${friendlyId} not found in fetched set`,
+          rawPayload: { faction_id: record.id, missing_id: friendlyId },
+        });
+        await this.warningsRepo.save(warning);
+      }
+      await this.dataSource.query(
+        `INSERT INTO station_faction_friendly (faction_uex_id, friendly_faction_uex_id)
+         VALUES ($1,$2)
+         ON CONFLICT DO NOTHING`,
+        [record.id, friendlyId],
+      );
+    }
+  }
+
+  private async reconcileHostile(
+    ctx: EtlStepContext,
+    record: UexFaction,
+    fetchedIds: Set<number>,
+  ): Promise<void> {
+    const hostileIds = parseCsvInts(record.ids_factions_hostile);
+
+    await this.dataSource.query(
+      `DELETE FROM station_faction_hostile WHERE faction_uex_id = $1`,
+      [record.id],
+    );
+
+    for (const hostileId of hostileIds) {
+      if (!fetchedIds.has(hostileId)) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Hostile faction ${hostileId} not found in fetched set`,
+          rawPayload: { faction_id: record.id, missing_id: hostileId },
+        });
+        await this.warningsRepo.save(warning);
+      }
+      await this.dataSource.query(
+        `INSERT INTO station_faction_hostile (faction_uex_id, hostile_faction_uex_id)
+         VALUES ($1,$2)
+         ON CONFLICT DO NOTHING`,
+        [record.id, hostileId],
+      );
+    }
+  }
+
+  private async reconcileStarSystems(
+    ctx: EtlStepContext,
+    record: UexFaction,
+  ): Promise<void> {
+    const starSystemIds = parseCsvInts(record.ids_star_systems);
+
+    await this.dataSource.query(
+      `DELETE FROM station_faction_star_system WHERE faction_uex_id = $1`,
+      [record.id],
+    );
+
+    for (const ssId of starSystemIds) {
+      // Only insert if the star system row exists; it may not be synced yet.
+      const [{ exists }] = await this.dataSource.query(
+        `SELECT EXISTS(SELECT 1 FROM station_star_system WHERE uex_id = $1) AS exists`,
+        [ssId],
+      );
+      if (!exists) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Star system ${ssId} not found — faction_star_system link deferred`,
+          rawPayload: { faction_id: record.id, missing_id: ssId },
+        });
+        await this.warningsRepo.save(warning);
+        continue;
+      }
+      await this.dataSource.query(
+        `INSERT INTO station_faction_star_system (faction_uex_id, star_system_uex_id)
+         VALUES ($1,$2)
+         ON CONFLICT DO NOTHING`,
+        [record.id, ssId],
+      );
+    }
   }
 }
