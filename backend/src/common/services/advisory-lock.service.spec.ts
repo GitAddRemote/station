@@ -5,10 +5,18 @@ import { AdvisoryLockService } from './advisory-lock.service';
 
 describe('AdvisoryLockService', () => {
   let service: AdvisoryLockService;
-  let mockDataSource: { query: jest.Mock };
+  let mockQr: { connect: jest.Mock; query: jest.Mock; release: jest.Mock };
+  let mockDataSource: { createQueryRunner: jest.Mock };
 
   beforeEach(async () => {
-    mockDataSource = { query: jest.fn() };
+    mockQr = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      query: jest.fn(),
+      release: jest.fn().mockResolvedValue(undefined),
+    };
+    mockDataSource = {
+      createQueryRunner: jest.fn().mockReturnValue(mockQr),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -32,36 +40,34 @@ describe('AdvisoryLockService', () => {
   });
 
   describe('withLock()', () => {
-    it('calls fn, releases lock in finally, and returns fn result when lock is acquired', async () => {
-      // Lock acquired
-      mockDataSource.query
-        .mockResolvedValueOnce([{ acquired: true }]) // pg_try_advisory_lock
-        .mockResolvedValueOnce([{}]); // pg_advisory_unlock
+    it('pins to one connection: connect + both queries + release on same QueryRunner', async () => {
+      mockQr.query
+        .mockResolvedValueOnce([{ acquired: true }])
+        .mockResolvedValueOnce([{}]);
 
       const fn = jest.fn().mockResolvedValue('result');
 
       const result = await service.withLock('test-key', fn);
 
       expect(result).toBe('result');
-      expect(fn).toHaveBeenCalledTimes(1);
-
-      // Lock acquired call
-      expect(mockDataSource.query).toHaveBeenNthCalledWith(
+      expect(mockDataSource.createQueryRunner).toHaveBeenCalledTimes(1);
+      expect(mockQr.connect).toHaveBeenCalledTimes(1);
+      expect(mockQr.query).toHaveBeenNthCalledWith(
         1,
         `SELECT pg_try_advisory_lock(hashtext($1)) AS acquired`,
         ['test-key'],
       );
-
-      // Lock release call
-      expect(mockDataSource.query).toHaveBeenNthCalledWith(
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(mockQr.query).toHaveBeenNthCalledWith(
         2,
         `SELECT pg_advisory_unlock(hashtext($1))`,
         ['test-key'],
       );
+      expect(mockQr.release).toHaveBeenCalledTimes(1);
     });
 
-    it('throws ConflictException with correct message when lock is not acquired', async () => {
-      mockDataSource.query.mockResolvedValueOnce([{ acquired: false }]);
+    it('throws ConflictException and does not call fn or unlock when lock not acquired', async () => {
+      mockQr.query.mockResolvedValueOnce([{ acquired: false }]);
 
       const fn = jest.fn();
 
@@ -69,36 +75,31 @@ describe('AdvisoryLockService', () => {
         new ConflictException(`Lock 'busy-key' already held`),
       );
 
-      // fn must NOT be called
       expect(fn).not.toHaveBeenCalled();
-
-      // Unlock must NOT be called
-      expect(mockDataSource.query).toHaveBeenCalledTimes(1);
+      // Only the acquire query ran; unlock must NOT have been called
+      expect(mockQr.query).toHaveBeenCalledTimes(1);
+      // QueryRunner is still released (outer finally)
+      expect(mockQr.release).toHaveBeenCalledTimes(1);
     });
 
-    it('still releases lock in finally even when fn throws', async () => {
-      // Lock acquired
-      mockDataSource.query
-        .mockResolvedValueOnce([{ acquired: true }]) // pg_try_advisory_lock
-        .mockResolvedValueOnce([{}]); // pg_advisory_unlock
+    it('releases lock and QueryRunner in finally even when fn throws', async () => {
+      mockQr.query
+        .mockResolvedValueOnce([{ acquired: true }])
+        .mockResolvedValueOnce([{}]);
 
-      const error = new Error('fn blew up');
-      const fn = jest.fn().mockRejectedValue(error);
+      const fn = jest.fn().mockRejectedValue(new Error('fn blew up'));
 
       await expect(service.withLock('exploding-key', fn)).rejects.toThrow(
         'fn blew up',
       );
 
-      // fn was called
       expect(fn).toHaveBeenCalledTimes(1);
-
-      // Lock was still released
-      expect(mockDataSource.query).toHaveBeenCalledTimes(2);
-      expect(mockDataSource.query).toHaveBeenNthCalledWith(
+      expect(mockQr.query).toHaveBeenNthCalledWith(
         2,
         `SELECT pg_advisory_unlock(hashtext($1))`,
         ['exploding-key'],
       );
+      expect(mockQr.release).toHaveBeenCalledTimes(1);
     });
   });
 });

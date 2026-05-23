@@ -10,18 +10,28 @@ export class AdvisoryLockService {
   ) {}
 
   async withLock<T>(lockKey: string, fn: () => Promise<T>): Promise<T> {
-    const [{ acquired }] = await this.dataSource.query(
-      `SELECT pg_try_advisory_lock(hashtext($1)) AS acquired`,
-      [lockKey],
-    );
-    if (!acquired)
-      throw new ConflictException(`Lock '${lockKey}' already held`);
+    // A QueryRunner pins both queries to the same physical connection.
+    // DataSource.query() draws from a pool and cannot guarantee the lock
+    // and unlock land on the same session — using separate pool calls risks
+    // unlocking a different session's lock or leaving the original stranded.
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+
     try {
-      return await fn();
+      const [{ acquired }] = await qr.query(
+        `SELECT pg_try_advisory_lock(hashtext($1)) AS acquired`,
+        [lockKey],
+      );
+      if (!acquired)
+        throw new ConflictException(`Lock '${lockKey}' already held`);
+
+      try {
+        return await fn();
+      } finally {
+        await qr.query(`SELECT pg_advisory_unlock(hashtext($1))`, [lockKey]);
+      }
     } finally {
-      await this.dataSource.query(`SELECT pg_advisory_unlock(hashtext($1))`, [
-        lockKey,
-      ]);
+      await qr.release();
     }
   }
 }

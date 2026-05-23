@@ -1,3 +1,7 @@
+// UexApiClient is the shared HTTP wrapper for all ETL step implementations
+// (#190–#199). The legacy per-endpoint clients (UEXCategoriesClient etc.)
+// predate this and are not migrated here; new ETL steps inject UexApiClient
+// directly and inherit rate-limiting, backoff, and retry automatically.
 import { Injectable } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import axios, {
