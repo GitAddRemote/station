@@ -63,15 +63,6 @@ export interface InventorySearchParams {
   order?: 'asc' | 'desc';
 }
 
-export interface InventorySummary {
-  userId: number;
-  gameId: number;
-  totalItems: number;
-  uniqueItems: number;
-  sharedItemsCount: number;
-  lastUpdated: Date;
-}
-
 export interface InventoryListResponse {
   items: InventoryItem[];
   total: number;
@@ -168,19 +159,6 @@ export const inventoryService = {
     const response = await axios.get(`${API_URL}/api/uex/categories`, {
       withCredentials: true,
     });
-    return response.data;
-  },
-
-  /**
-   * Get inventory summary statistics
-   */
-  async getSummary(gameId: number): Promise<InventorySummary> {
-    const response = await axios.get(
-      `${API_URL}/api/inventory/summary/${gameId}`,
-      {
-        withCredentials: true,
-      },
-    );
     return response.data;
   },
 
