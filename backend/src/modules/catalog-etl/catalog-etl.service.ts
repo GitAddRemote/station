@@ -6,10 +6,13 @@ import { EtlRun } from './entities/etl-run.entity';
 import { EtlWarning } from './entities/etl-warning.entity';
 import { EtlStep } from './interfaces/etl-step.interface';
 import { AdvisoryLockService } from '../../common/services';
+import { FactionsSyncStep } from './steps/factions-sync.step';
+import { JurisdictionsSyncStep } from './steps/jurisdictions-sync.step';
+import { CompaniesSyncStep } from './steps/companies-sync.step';
 
 @Injectable()
 export class CatalogEtlService {
-  protected readonly ETL_STEPS: EtlStep[] = [];
+  protected readonly ETL_STEPS: EtlStep[];
 
   constructor(
     @InjectRepository(EtlRun)
@@ -19,7 +22,16 @@ export class CatalogEtlService {
     private readonly advisoryLockService: AdvisoryLockService,
     @InjectPinoLogger(CatalogEtlService.name)
     private readonly logger: PinoLogger,
-  ) {}
+    private readonly factionsSyncStep: FactionsSyncStep,
+    private readonly jurisdictionsSyncStep: JurisdictionsSyncStep,
+    private readonly companiesSyncStep: CompaniesSyncStep,
+  ) {
+    this.ETL_STEPS = [
+      factionsSyncStep,
+      jurisdictionsSyncStep,
+      companiesSyncStep,
+    ];
+  }
 
   async runEtl(): Promise<EtlRun> {
     return this.advisoryLockService.withLock('catalog_etl', async () => {
