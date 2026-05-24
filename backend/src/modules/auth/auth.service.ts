@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException,
   Inject,
   Optional,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -43,6 +44,7 @@ export interface RedisClientLike {
   sMembers(key: string): Promise<string[]>;
   sRem(key: string, member: string): Promise<unknown>;
   expire(key: string, seconds: number): Promise<unknown>;
+  quit(): Promise<void>;
 }
 
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 days
@@ -50,7 +52,7 @@ const REFRESH_TTL_MS = REFRESH_TTL_SECONDS * 1000;
 const PRE_AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleDestroy {
   private readonly dummyHash =
     '$2b$10$CwTycUXWue0Thq9StjUM0uJ8WZ0p/7eJYJg6eW9j5Cnz4Gf5Eme1e';
 
@@ -82,6 +84,10 @@ export class AuthService {
           'Redis (single-instance / test only).',
       );
     }
+  }
+
+  async onModuleDestroy() {
+    await this.redisClient?.quit();
   }
 
   async validateUser(
