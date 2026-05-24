@@ -30,6 +30,22 @@ function makeSystem(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// dsQuery mock builder: controls what SELECT uex_id queries return
+function buildDsQuery(
+  knownFactions: number[],
+  knownJurisdictions: number[],
+): jest.Mock {
+  return jest.fn().mockImplementation((sql: string) => {
+    if ((sql as string).includes('FROM station_faction')) {
+      return Promise.resolve(knownFactions.map((id) => ({ uex_id: id })));
+    }
+    if ((sql as string).includes('FROM station_jurisdiction')) {
+      return Promise.resolve(knownJurisdictions.map((id) => ({ uex_id: id })));
+    }
+    return Promise.resolve([]);
+  });
+}
+
 function buildStep(
   uexGet: jest.Mock,
   dsQuery: jest.Mock,
@@ -52,7 +68,7 @@ describe('StarSystemsSyncStep', () => {
 
   beforeEach(() => {
     uexGet = jest.fn();
-    dsQuery = jest.fn().mockResolvedValue([]);
+    dsQuery = buildDsQuery([], []);
     repoCreate = jest
       .fn()
       .mockImplementation((dto) => ({ ...dto }) as EtlWarning);
@@ -80,6 +96,7 @@ describe('StarSystemsSyncStep', () => {
   });
 
   it('maps all scalar fields correctly on upsert', async () => {
+    dsQuery = buildDsQuery([3], [7]);
     uexGet.mockResolvedValue([
       makeSystem({
         id: 5,
@@ -100,7 +117,10 @@ describe('StarSystemsSyncStep', () => {
     const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
-    const params = dsQuery.mock.calls[0][1] as unknown[];
+    const upsertCall = dsQuery.mock.calls.find((c: unknown[]) =>
+      (c[0] as string).includes('INSERT INTO station_star_system'),
+    )!;
+    const params = upsertCall[1] as unknown[];
     expect(params[0]).toBe(5); // uex_id
     expect(params[1]).toBe(3); // faction_uex_id
     expect(params[2]).toBe(7); // jurisdiction_uex_id
@@ -151,8 +171,61 @@ describe('StarSystemsSyncStep', () => {
     const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
-    const params = dsQuery.mock.calls[0][1] as unknown[];
+    const upsertCall = dsQuery.mock.calls.find((c: unknown[]) =>
+      (c[0] as string).includes('INSERT INTO station_star_system'),
+    )!;
+    const params = upsertCall[1] as unknown[];
     expect(params[1]).toBeNull(); // faction_uex_id
     expect(params[2]).toBeNull(); // jurisdiction_uex_id
+  });
+
+  it('nulls out faction_uex_id and warns when faction is unknown', async () => {
+    uexGet.mockResolvedValue([makeSystem({ id: 20, id_faction: 99 })]);
+
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave); // knownFactions=[]
+    await step.execute({ runId: RUN_ID });
+
+    expect(repoCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        message: expect.stringContaining('99'),
+        rawPayload: expect.objectContaining({ missing_faction_id: 99 }),
+      }),
+    );
+    const upsertCall = dsQuery.mock.calls.find((c: unknown[]) =>
+      (c[0] as string).includes('INSERT INTO station_star_system'),
+    )!;
+    expect(upsertCall[1][1]).toBeNull(); // faction_uex_id nulled out
+  });
+
+  it('still upserts the record when faction is unknown (no skip)', async () => {
+    uexGet.mockResolvedValue([makeSystem({ id: 21, id_faction: 99 })]);
+
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    const upserts = dsQuery.mock.calls.filter((c: unknown[]) =>
+      (c[0] as string).includes('INSERT INTO station_star_system'),
+    );
+    expect(upserts).toHaveLength(1);
+  });
+
+  it('nulls out jurisdiction_uex_id and warns when jurisdiction is unknown', async () => {
+    uexGet.mockResolvedValue([makeSystem({ id: 22, id_jurisdiction: 88 })]);
+
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave); // knownJurisdictions=[]
+    await step.execute({ runId: RUN_ID });
+
+    expect(repoCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        message: expect.stringContaining('88'),
+        rawPayload: expect.objectContaining({ missing_jurisdiction_id: 88 }),
+      }),
+    );
+    const upsertCall = dsQuery.mock.calls.find((c: unknown[]) =>
+      (c[0] as string).includes('INSERT INTO station_star_system'),
+    )!;
+    expect(upsertCall[1][2]).toBeNull(); // jurisdiction_uex_id nulled out
   });
 });

@@ -56,10 +56,18 @@ function makeDistance(overrides: Record<string, unknown> = {}) {
 function buildDsQuery(
   knownStarSystems: number[],
   knownOrbits: number[],
+  knownFactions: number[] = [],
+  knownJurisdictions: number[] = [],
 ): jest.Mock {
   return jest.fn().mockImplementation((sql: string) => {
     if ((sql as string).includes('FROM station_star_system')) {
       return Promise.resolve(knownStarSystems.map((id) => ({ uex_id: id })));
+    }
+    if ((sql as string).includes('FROM station_faction')) {
+      return Promise.resolve(knownFactions.map((id) => ({ uex_id: id })));
+    }
+    if ((sql as string).includes('FROM station_jurisdiction')) {
+      return Promise.resolve(knownJurisdictions.map((id) => ({ uex_id: id })));
     }
     if (
       (sql as string).includes('FROM station_orbit') &&
@@ -226,6 +234,71 @@ describe('OrbitsSyncStep', () => {
         }),
       );
     });
+
+    it('nulls out faction_uex_id and warns when orbit faction is unknown', async () => {
+      uexGet
+        .mockResolvedValueOnce([
+          makeOrbit({ id: 7, id_star_system: 10, id_faction: 99 }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const dsQuery = buildDsQuery([10], [7]); // knownFactions=[]
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      expect(repoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('99'),
+          rawPayload: expect.objectContaining({ missing_faction_id: 99 }),
+        }),
+      );
+      const upsertCall = dsQuery.mock.calls.find((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_orbit'),
+      )!;
+      expect(upsertCall[1][2]).toBeNull(); // faction_uex_id nulled out
+    });
+
+    it('still upserts the orbit record when faction is unknown (no skip)', async () => {
+      uexGet
+        .mockResolvedValueOnce([
+          makeOrbit({ id: 8, id_star_system: 10, id_faction: 99 }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const dsQuery = buildDsQuery([10], [8]);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      const upserts = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_orbit'),
+      );
+      expect(upserts).toHaveLength(1);
+    });
+
+    it('nulls out jurisdiction_uex_id and warns when orbit jurisdiction is unknown', async () => {
+      uexGet
+        .mockResolvedValueOnce([
+          makeOrbit({ id: 9, id_star_system: 10, id_jurisdiction: 88 }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      const dsQuery = buildDsQuery([10], [9]); // knownJurisdictions=[]
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      expect(repoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('88'),
+          rawPayload: expect.objectContaining({ missing_jurisdiction_id: 88 }),
+        }),
+      );
+      const upsertCall = dsQuery.mock.calls.find((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_orbit'),
+      )!;
+      expect(upsertCall[1][3]).toBeNull(); // jurisdiction_uex_id nulled out
+    });
   });
 
   describe('syncOrbitDistances', () => {
@@ -308,7 +381,7 @@ describe('OrbitsSyncStep', () => {
         }),
       ]);
 
-      const dsQuery = buildDsQuery([], [1, 2]);
+      const dsQuery = buildDsQuery([10, 20], [1, 2]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       await step.execute({ runId: RUN_ID });
 
@@ -318,6 +391,80 @@ describe('OrbitsSyncStep', () => {
       expect(params[1]).toBe(10); // star_system_origin_uex_id
       expect(params[2]).toBe(20); // star_system_dest_uex_id
       expect(params[6]).toBe('4.0'); // game_version
+    });
+
+    it('nulls out star_system_origin_uex_id and warns when origin star system is unknown', async () => {
+      uexGet.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        makeDistance({
+          id_star_system_origin: 999,
+          id_star_system_destination: 20,
+        }),
+      ]);
+
+      const dsQuery = buildDsQuery([20], [1, 2]); // 999 unknown
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      expect(repoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('999'),
+          rawPayload: expect.objectContaining({
+            missing_star_system_origin_id: 999,
+          }),
+        }),
+      );
+      const params = dsQuery.mock.calls.find((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_orbit_distance'),
+      )![1] as unknown[];
+      expect(params[1]).toBeNull(); // star_system_origin_uex_id nulled out
+      expect(params[2]).toBe(20); // destination unchanged
+    });
+
+    it('nulls out star_system_dest_uex_id and warns when destination star system is unknown', async () => {
+      uexGet.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        makeDistance({
+          id_star_system_origin: 10,
+          id_star_system_destination: 888,
+        }),
+      ]);
+
+      const dsQuery = buildDsQuery([10], [1, 2]); // 888 unknown
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      expect(repoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('888'),
+          rawPayload: expect.objectContaining({
+            missing_star_system_dest_id: 888,
+          }),
+        }),
+      );
+      const params = dsQuery.mock.calls.find((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_orbit_distance'),
+      )![1] as unknown[];
+      expect(params[1]).toBe(10); // origin unchanged
+      expect(params[2]).toBeNull(); // star_system_dest_uex_id nulled out
+    });
+
+    it('still upserts the distance record when a star system FK is unknown (no skip)', async () => {
+      uexGet.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        makeDistance({
+          id_star_system_origin: 999,
+          id_star_system_destination: 888,
+        }),
+      ]);
+
+      const dsQuery = buildDsQuery([], [1, 2]); // both star systems unknown
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      const upserts = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_orbit_distance'),
+      );
+      expect(upserts).toHaveLength(1);
     });
   });
 });

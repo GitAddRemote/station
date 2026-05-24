@@ -31,10 +31,10 @@ export class CatalogEtlService {
     private readonly orbitsSyncStep: OrbitsSyncStep,
   ) {
     this.ETL_STEPS = [
+      starSystemsSyncStep,
       factionsSyncStep,
       jurisdictionsSyncStep,
       companiesSyncStep,
-      starSystemsSyncStep,
       orbitsSyncStep,
     ];
   }

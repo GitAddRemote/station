@@ -47,6 +47,16 @@ export class StarSystemsSyncStep implements EtlStep {
       'Fetched star systems from UEX',
     );
 
+    const factionRows = await this.dataSource.query<{ uex_id: number }[]>(
+      `SELECT uex_id FROM station_faction`,
+    );
+    const knownFactions = new Set(factionRows.map((r) => r.uex_id));
+
+    const jurisdictionRows = await this.dataSource.query<{ uex_id: number }[]>(
+      `SELECT uex_id FROM station_jurisdiction`,
+    );
+    const knownJurisdictions = new Set(jurisdictionRows.map((r) => r.uex_id));
+
     for (const record of systems) {
       if (!record.name) {
         const warning = this.warningsRepo.create({
@@ -58,6 +68,38 @@ export class StarSystemsSyncStep implements EtlStep {
         });
         await this.warningsRepo.save(warning);
         continue;
+      }
+
+      let factionUexId = record.id_faction ?? null;
+      if (factionUexId !== null && !knownFactions.has(factionUexId)) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Star system ${record.id} references unknown faction ${factionUexId} — stored as null`,
+          rawPayload: { id: record.id, missing_faction_id: factionUexId },
+        });
+        await this.warningsRepo.save(warning);
+        factionUexId = null;
+      }
+
+      let jurisdictionUexId = record.id_jurisdiction ?? null;
+      if (
+        jurisdictionUexId !== null &&
+        !knownJurisdictions.has(jurisdictionUexId)
+      ) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Star system ${record.id} references unknown jurisdiction ${jurisdictionUexId} — stored as null`,
+          rawPayload: {
+            id: record.id,
+            missing_jurisdiction_id: jurisdictionUexId,
+          },
+        });
+        await this.warningsRepo.save(warning);
+        jurisdictionUexId = null;
       }
 
       await this.dataSource.query(
@@ -80,8 +122,8 @@ export class StarSystemsSyncStep implements EtlStep {
            synced_at=NOW()`,
         [
           record.id,
-          record.id_faction ?? null,
-          record.id_jurisdiction ?? null,
+          factionUexId,
+          jurisdictionUexId,
           record.name,
           record.code ?? null,
           Boolean(record.is_available),

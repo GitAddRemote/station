@@ -72,10 +72,10 @@ export class OrbitsSyncStep implements EtlStep {
     );
 
     // Build set of known star system uex_ids from DB for FK validation
-    const rows = await this.dataSource.query<{ uex_id: number }[]>(
+    const ssRows = await this.dataSource.query<{ uex_id: number }[]>(
       `SELECT uex_id FROM station_star_system`,
     );
-    const knownStarSystems = new Set(rows.map((r) => r.uex_id));
+    const knownStarSystems = new Set(ssRows.map((r) => r.uex_id));
 
     if (knownStarSystems.size === 0) {
       const warning = this.warningsRepo.create({
@@ -89,6 +89,16 @@ export class OrbitsSyncStep implements EtlStep {
       });
       await this.warningsRepo.save(warning);
     }
+
+    const factionRows = await this.dataSource.query<{ uex_id: number }[]>(
+      `SELECT uex_id FROM station_faction`,
+    );
+    const knownFactions = new Set(factionRows.map((r) => r.uex_id));
+
+    const jurisdictionRows = await this.dataSource.query<{ uex_id: number }[]>(
+      `SELECT uex_id FROM station_jurisdiction`,
+    );
+    const knownJurisdictions = new Set(jurisdictionRows.map((r) => r.uex_id));
 
     for (const record of orbits) {
       if (!record.name) {
@@ -121,6 +131,38 @@ export class OrbitsSyncStep implements EtlStep {
         continue;
       }
 
+      let factionUexId = record.id_faction ?? null;
+      if (factionUexId !== null && !knownFactions.has(factionUexId)) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Orbit ${record.id} references unknown faction ${factionUexId} — stored as null`,
+          rawPayload: { orbit_id: record.id, missing_faction_id: factionUexId },
+        });
+        await this.warningsRepo.save(warning);
+        factionUexId = null;
+      }
+
+      let jurisdictionUexId = record.id_jurisdiction ?? null;
+      if (
+        jurisdictionUexId !== null &&
+        !knownJurisdictions.has(jurisdictionUexId)
+      ) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Orbit ${record.id} references unknown jurisdiction ${jurisdictionUexId} — stored as null`,
+          rawPayload: {
+            orbit_id: record.id,
+            missing_jurisdiction_id: jurisdictionUexId,
+          },
+        });
+        await this.warningsRepo.save(warning);
+        jurisdictionUexId = null;
+      }
+
       await this.dataSource.query(
         `INSERT INTO station_orbit
            (uex_id, star_system_uex_id, faction_uex_id, jurisdiction_uex_id,
@@ -150,8 +192,8 @@ export class OrbitsSyncStep implements EtlStep {
         [
           record.id,
           record.id_star_system,
-          record.id_faction ?? null,
-          record.id_jurisdiction ?? null,
+          factionUexId,
+          jurisdictionUexId,
           record.name,
           record.name_origin ?? null,
           record.code ?? null,
@@ -180,11 +222,15 @@ export class OrbitsSyncStep implements EtlStep {
       'Fetched orbit distances from UEX',
     );
 
-    // Build set of known orbit uex_ids from DB for FK validation
-    const rows = await this.dataSource.query<{ uex_id: number }[]>(
+    const orbitRows = await this.dataSource.query<{ uex_id: number }[]>(
       `SELECT uex_id FROM station_orbit`,
     );
-    const knownOrbits = new Set(rows.map((r) => r.uex_id));
+    const knownOrbits = new Set(orbitRows.map((r) => r.uex_id));
+
+    const ssRows = await this.dataSource.query<{ uex_id: number }[]>(
+      `SELECT uex_id FROM station_star_system`,
+    );
+    const knownStarSystems = new Set(ssRows.map((r) => r.uex_id));
 
     for (const record of distances) {
       if (
@@ -208,6 +254,44 @@ export class OrbitsSyncStep implements EtlStep {
         continue;
       }
 
+      let starSystemOriginUexId = record.id_star_system_origin ?? null;
+      if (
+        starSystemOriginUexId !== null &&
+        !knownStarSystems.has(starSystemOriginUexId)
+      ) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Orbit distance ${record.id} references unknown origin star system ${starSystemOriginUexId} — stored as null`,
+          rawPayload: {
+            id: record.id,
+            missing_star_system_origin_id: starSystemOriginUexId,
+          },
+        });
+        await this.warningsRepo.save(warning);
+        starSystemOriginUexId = null;
+      }
+
+      let starSystemDestUexId = record.id_star_system_destination ?? null;
+      if (
+        starSystemDestUexId !== null &&
+        !knownStarSystems.has(starSystemDestUexId)
+      ) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Orbit distance ${record.id} references unknown destination star system ${starSystemDestUexId} — stored as null`,
+          rawPayload: {
+            id: record.id,
+            missing_star_system_dest_id: starSystemDestUexId,
+          },
+        });
+        await this.warningsRepo.save(warning);
+        starSystemDestUexId = null;
+      }
+
       await this.dataSource.query(
         `INSERT INTO station_orbit_distance
            (uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
@@ -224,8 +308,8 @@ export class OrbitsSyncStep implements EtlStep {
            synced_at=NOW()`,
         [
           record.id,
-          record.id_star_system_origin ?? null,
-          record.id_star_system_destination ?? null,
+          starSystemOriginUexId,
+          starSystemDestUexId,
           record.id_orbit_origin,
           record.id_orbit_destination,
           record.distance_gm,
