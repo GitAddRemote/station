@@ -22,7 +22,7 @@ export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
       ),
       callbackURL: configService.get<string>(
         'DISCORD_CALLBACK_URL',
-        'http://localhost/auth/discord/callback',
+        'http://localhost:3001/auth/discord/callback',
       ),
       scope: ['identify', 'email'],
     });

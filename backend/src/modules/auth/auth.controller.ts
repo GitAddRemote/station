@@ -361,9 +361,11 @@ export class AuthController {
       throw new NotFoundException('Discord auth is disabled');
     }
     const state = await this.authService.generateDiscordState();
+    // __Host- prefix requires Secure unconditionally per browser spec.
+    // Local Discord OAuth must be served over HTTPS (e.g. ngrok or mkcert proxy).
     res.cookie(DISCORD_NONCE_COOKIE, state, {
       httpOnly: true,
-      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      secure: true,
       sameSite: 'lax' as const,
       path: '/',
       maxAge: DISCORD_STATE_TTL_MS,

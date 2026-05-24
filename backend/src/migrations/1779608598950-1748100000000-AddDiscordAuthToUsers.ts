@@ -18,7 +18,7 @@ export class AddDiscordAuthToUsers1779608598950 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_user_email"`);
+    // IDX_user_email was created by the baseline migration; do not drop it here.
     await queryRunner.query(
       `ALTER TABLE "user" DROP CONSTRAINT IF EXISTS "UQ_user_discordId"`,
     );
