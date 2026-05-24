@@ -41,10 +41,10 @@ export class User {
   bio?: string;
 
   @Index()
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   discordId?: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   discordAvatarUrl?: string | null;
 
   @OneToMany(() => UserOrganizationRole, (uor) => uor.user)
