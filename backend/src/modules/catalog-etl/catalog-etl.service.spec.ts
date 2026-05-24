@@ -12,6 +12,8 @@ import { JurisdictionsSyncStep } from './steps/jurisdictions-sync.step';
 import { CompaniesSyncStep } from './steps/companies-sync.step';
 import { StarSystemsSyncStep } from './steps/star-systems-sync.step';
 import { OrbitsSyncStep } from './steps/orbits-sync.step';
+import { PlanetsSyncStep } from './steps/planets-sync.step';
+import { MoonsSyncStep } from './steps/moons-sync.step';
 
 function buildMockRun(overrides: Partial<EtlRun> = {}): EtlRun {
   const run = new EtlRun();
@@ -95,6 +97,14 @@ describe('CatalogEtlService', () => {
         {
           provide: OrbitsSyncStep,
           useValue: { name: 'orbits', execute: jest.fn() },
+        },
+        {
+          provide: PlanetsSyncStep,
+          useValue: { name: 'planets', execute: jest.fn() },
+        },
+        {
+          provide: MoonsSyncStep,
+          useValue: { name: 'moons', execute: jest.fn() },
         },
       ],
     }).compile();
