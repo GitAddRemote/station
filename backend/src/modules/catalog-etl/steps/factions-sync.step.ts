@@ -89,14 +89,15 @@ export class FactionsSyncStep implements EtlStep {
       );
     }
 
-    // Reconcile junction tables per faction — delete existing rows then
-    // re-insert current set so stale relationships are removed on each run.
+    // Reconcile friendly/hostile junction tables per faction — delete existing
+    // rows then re-insert current set so stale relationships are removed on
+    // each run. Star-system junction reconciliation is deferred to
+    // StarSystemsSyncStep so it runs after star systems are populated.
     for (const record of factions) {
       if (!record.name) continue;
 
       await this.reconcileFriendly(ctx, record, fetchedIds);
       await this.reconcileHostile(ctx, record, fetchedIds);
-      await this.reconcileStarSystems(ctx, record);
     }
 
     this.logger.info({ runId: ctx.runId }, 'factions-sync step complete');
@@ -164,43 +165,6 @@ export class FactionsSyncStep implements EtlStep {
          VALUES ($1,$2)
          ON CONFLICT DO NOTHING`,
         [record.id, hostileId],
-      );
-    }
-  }
-
-  private async reconcileStarSystems(
-    ctx: EtlStepContext,
-    record: UexFaction,
-  ): Promise<void> {
-    const starSystemIds = parseCsvInts(record.ids_star_systems);
-
-    await this.dataSource.query(
-      `DELETE FROM station_faction_star_system WHERE faction_uex_id = $1`,
-      [record.id],
-    );
-
-    for (const ssId of starSystemIds) {
-      // Only insert if the star system row exists; it may not be synced yet.
-      const [{ exists }] = await this.dataSource.query(
-        `SELECT EXISTS(SELECT 1 FROM station_star_system WHERE uex_id = $1) AS exists`,
-        [ssId],
-      );
-      if (!exists) {
-        const warning = this.warningsRepo.create({
-          runId: ctx.runId,
-          stepName: this.name,
-          severity: 'warn',
-          message: `Star system ${ssId} not found — faction_star_system link deferred`,
-          rawPayload: { faction_id: record.id, missing_id: ssId },
-        });
-        await this.warningsRepo.save(warning);
-        continue;
-      }
-      await this.dataSource.query(
-        `INSERT INTO station_faction_star_system (faction_uex_id, star_system_uex_id)
-         VALUES ($1,$2)
-         ON CONFLICT DO NOTHING`,
-        [record.id, ssId],
       );
     }
   }

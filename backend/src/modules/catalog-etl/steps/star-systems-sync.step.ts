@@ -21,6 +21,22 @@ interface UexStarSystem {
   date_modified: number;
 }
 
+interface UexFaction {
+  id: number;
+  name: string;
+  ids_star_systems: string;
+}
+
+function parseCsvInts(csv: string | null | undefined): number[] {
+  if (!csv || csv.trim() === '') return [];
+  return csv
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '')
+    .map(Number)
+    .filter((n) => !isNaN(n));
+}
+
 function toDate(unixTs: number | null | undefined): Date | null {
   if (!unixTs) return null;
   return new Date(unixTs * 1000);
@@ -137,6 +153,52 @@ export class StarSystemsSyncStep implements EtlStep {
       );
     }
 
+    await this.reconcileStarSystemJunctions(ctx);
     this.logger.info({ runId: ctx.runId }, 'star-systems-sync step complete');
+  }
+
+  private async reconcileStarSystemJunctions(
+    ctx: EtlStepContext,
+  ): Promise<void> {
+    const factions = await this.uexApiClient.get<UexFaction[]>('/factions');
+
+    const knownSystemIds = new Set(
+      (
+        await this.dataSource.query<{ uex_id: number }[]>(
+          `SELECT uex_id FROM station_star_system`,
+        )
+      ).map((r) => r.uex_id),
+    );
+
+    for (const faction of factions) {
+      if (!faction.name) continue;
+
+      const starSystemIds = parseCsvInts(faction.ids_star_systems);
+
+      await this.dataSource.query(
+        `DELETE FROM station_faction_star_system WHERE faction_uex_id = $1`,
+        [faction.id],
+      );
+
+      for (const ssId of starSystemIds) {
+        if (!knownSystemIds.has(ssId)) {
+          const warning = this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Star system ${ssId} not found — faction_star_system link skipped`,
+            rawPayload: { faction_id: faction.id, missing_id: ssId },
+          });
+          await this.warningsRepo.save(warning);
+          continue;
+        }
+        await this.dataSource.query(
+          `INSERT INTO station_faction_star_system (faction_uex_id, star_system_uex_id)
+           VALUES ($1,$2)
+           ON CONFLICT DO NOTHING`,
+          [faction.id, ssId],
+        );
+      }
+    }
   }
 }

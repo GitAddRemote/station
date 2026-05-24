@@ -31,9 +31,9 @@ export class CatalogEtlService {
     private readonly orbitsSyncStep: OrbitsSyncStep,
   ) {
     this.ETL_STEPS = [
-      starSystemsSyncStep,
       factionsSyncStep,
       jurisdictionsSyncStep,
+      starSystemsSyncStep,
       companiesSyncStep,
       orbitsSyncStep,
     ];
