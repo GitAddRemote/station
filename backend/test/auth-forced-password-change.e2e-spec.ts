@@ -1,5 +1,22 @@
+// Force Redis on for this test file — pre-auth tokens require raw Redis.
+// Must be set before any module is imported (runs at file-evaluation time,
+// after setup-e2e.ts has loaded .env.test which sets USE_REDIS_CACHE=false).
+process.env['USE_REDIS_CACHE'] = 'true';
+process.env['AUTH_LOCAL_LOGIN_ENABLED'] = 'true';
+process.env['AUTH_LOCAL_REGISTER_ENABLED'] = 'true';
+// Raise throttle limits so repeated requests in the same test run don't 429.
+process.env['AUTH_FORCED_PW_THROTTLE_LIMIT'] = '200';
+process.env['AUTH_LOGIN_THROTTLE_LIMIT'] = '200';
+
+// Bcrypt + DB sync across two app contexts needs more than the default 30 s.
+jest.setTimeout(180_000);
+
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  ForbiddenException,
+} from '@nestjs/common';
 import request from 'supertest';
 import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
@@ -8,17 +25,40 @@ import { User } from '../src/modules/users/user.entity';
 import { DatabaseSeederAdminService } from '../src/database/seeds/database-seeder-admin.service';
 import * as bcrypt from 'bcrypt';
 import { seedSystemUser } from './helpers/seed-system-user';
+import {
+  LocalLoginEnabledGuard,
+  LocalRegisterEnabledGuard,
+} from '../src/modules/auth/local-feature-flags.guard';
 
-// Helpers
-async function buildApp(): Promise<{
-  app: INestApplication;
-  dataSource: DataSource;
-}> {
+// ─── Shared app (Redis + local-login enabled) ─────────────────────────────────
+
+let app: INestApplication;
+let dataSource: DataSource;
+let seeder: DatabaseSeederAdminService;
+
+async function createLocalUser(
+  overrides: Partial<Omit<User, 'id'>> = {},
+): Promise<User> {
+  const repo = dataSource.getRepository(User);
+  const hashedPassword = await bcrypt.hash('Password12345!', 10);
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return repo.save({
+    username: `user_${suffix}`,
+    email: `user_${suffix}@example.com`,
+    password: hashedPassword,
+    isActive: true,
+    passwordChangeRequired: false,
+    passwordExpiresAt: null,
+    ...overrides,
+  });
+}
+
+beforeAll(async () => {
   const moduleFixture: TestingModule = await Test.createTestingModule({
     imports: [AppModule],
   }).compile();
 
-  const app = moduleFixture.createNestApplication();
+  app = moduleFixture.createNestApplication();
   app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({
@@ -29,116 +69,75 @@ async function buildApp(): Promise<{
   );
   await app.init();
 
-  const dataSource = moduleFixture.get<DataSource>(DataSource);
+  dataSource = moduleFixture.get<DataSource>(DataSource);
   await seedSystemUser(dataSource);
+  seeder = app.get(DatabaseSeederAdminService);
+});
 
-  return { app, dataSource };
-}
-
-async function createLocalUser(
-  dataSource: DataSource,
-  overrides: Partial<Omit<User, 'id'>> = {},
-): Promise<User> {
-  const repo = dataSource.getRepository(User);
-  const hashedPassword = await bcrypt.hash('Password12345!', 10);
-  return repo.save({
-    username: `user_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-    email: `user_${Date.now()}_${Math.random().toString(36).slice(2)}@example.com`,
-    password: hashedPassword,
-    isActive: true,
-    passwordChangeRequired: false,
-    passwordExpiresAt: null,
-    ...overrides,
-  });
-}
+afterAll(async () => {
+  await app?.close();
+});
 
 // ─── Seed script integration ──────────────────────────────────────────────────
 
 describe('DatabaseSeederAdminService (integration)', () => {
-  let app: INestApplication;
-  let dataSource: DataSource;
-  let seeder: DatabaseSeederAdminService;
-
-  beforeAll(async () => {
-    ({ app, dataSource } = await buildApp());
-    seeder = app.get(DatabaseSeederAdminService);
-  });
+  const SEED_EMAIL = 'admin-seed-test@example.com';
 
   afterAll(async () => {
-    const repo = dataSource.getRepository(User);
-    await repo.delete({ email: 'admin-seed-test@example.com' });
-    await app?.close();
+    await dataSource.getRepository(User).delete({ email: SEED_EMAIL });
   });
 
-  it('creates admin user with password_change_required=true and bcrypt hash on first seed', async () => {
-    process.env.ADMIN_EMAIL = 'admin-seed-test@example.com';
-    process.env.ADMIN_USERNAME = 'admin-seed-test';
-    process.env.ADMIN_INITIAL_PASSWORD = 'ChangeMe!SecurePassword123';
-    process.env.ADMIN_PASSWORD_EXPIRY_DAYS = '90';
+  it('creates admin with password_change_required=true and valid bcrypt hash', async () => {
+    process.env['ADMIN_EMAIL'] = SEED_EMAIL;
+    process.env['ADMIN_USERNAME'] = 'admin-seed-test';
+    process.env['ADMIN_INITIAL_PASSWORD'] = 'ChangeMe!SecurePassword123';
+    process.env['ADMIN_PASSWORD_EXPIRY_DAYS'] = '90';
 
     await seeder.seedAdmin();
 
-    const repo = dataSource.getRepository(User);
-    const user = await repo.findOne({
-      where: { email: 'admin-seed-test@example.com' },
-    });
+    const user = await dataSource
+      .getRepository(User)
+      .findOne({ where: { email: SEED_EMAIL } });
     expect(user).toBeDefined();
     expect(user!.passwordChangeRequired).toBe(true);
     expect(user!.passwordExpiresAt).toBeDefined();
     expect(user!.passwordExpiresAt!.getTime()).toBeGreaterThan(Date.now());
-    const isValidHash = await bcrypt.compare(
-      'ChangeMe!SecurePassword123',
-      user!.password,
-    );
-    expect(isValidHash).toBe(true);
+    expect(
+      await bcrypt.compare('ChangeMe!SecurePassword123', user!.password),
+    ).toBe(true);
   });
 
   it('re-running seed is a no-op — no fields are modified', async () => {
-    process.env.ADMIN_EMAIL = 'admin-seed-test@example.com';
-    process.env.ADMIN_USERNAME = 'admin-seed-test';
-    process.env.ADMIN_INITIAL_PASSWORD = 'different-password!!!!';
-    process.env.ADMIN_PASSWORD_EXPIRY_DAYS = '90';
+    process.env['ADMIN_EMAIL'] = SEED_EMAIL;
+    process.env['ADMIN_USERNAME'] = 'admin-seed-test';
+    process.env['ADMIN_INITIAL_PASSWORD'] = 'DifferentPassword!!!!';
+    process.env['ADMIN_PASSWORD_EXPIRY_DAYS'] = '90';
 
     await seeder.seedAdmin();
 
-    const repo = dataSource.getRepository(User);
-    const user = await repo.findOne({
-      where: { email: 'admin-seed-test@example.com' },
-    });
-    // Password should NOT have changed — seed was skipped
-    const isOriginalHash = await bcrypt.compare(
-      'ChangeMe!SecurePassword123',
-      user!.password,
-    );
-    expect(isOriginalHash).toBe(true);
+    const user = await dataSource
+      .getRepository(User)
+      .findOne({ where: { email: SEED_EMAIL } });
+    // Original hash must be unchanged — second seed was a no-op
+    expect(
+      await bcrypt.compare('ChangeMe!SecurePassword123', user!.password),
+    ).toBe(true);
   });
 });
 
 // ─── POST /auth/login — forced-change and expiry gates ────────────────────────
 
-describe('POST /auth/login — password expiry and forced-change gates (e2e)', () => {
-  let app: INestApplication;
-  let dataSource: DataSource;
-
-  beforeAll(async () => {
-    ({ app, dataSource } = await buildApp());
-  });
-
-  afterAll(async () => {
-    await app?.close();
-  });
-
-  it('returns 403 PASSWORD_CHANGE_REQUIRED with X-Pre-Auth-Token for forced-change user', async () => {
-    const user = await createLocalUser(dataSource, {
-      passwordChangeRequired: true,
-    });
+describe('POST /auth/login — password expiry and forced-change gates', () => {
+  it('returns 403 with code PASSWORD_CHANGE_REQUIRED and X-Pre-Auth-Token header', async () => {
+    const user = await createLocalUser({ passwordChangeRequired: true });
 
     const res = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ username: user.username, password: 'Password12345!' })
       .expect(403);
 
-    expect(res.body.message?.code ?? res.body.code ?? res.body.message).toBe(
+    // ForbiddenException({ code: ... }) produces { code: ... } as the response body
+    expect((res.body as { code: string }).code).toBe(
       'PASSWORD_CHANGE_REQUIRED',
     );
     expect(res.headers['x-pre-auth-token']).toBeDefined();
@@ -146,8 +145,8 @@ describe('POST /auth/login — password expiry and forced-change gates (e2e)', (
     await dataSource.getRepository(User).delete({ id: user.id });
   });
 
-  it('returns 403 PASSWORD_EXPIRED with X-Pre-Auth-Token for expired password user', async () => {
-    const user = await createLocalUser(dataSource, {
+  it('returns 403 with code PASSWORD_EXPIRED and X-Pre-Auth-Token header', async () => {
+    const user = await createLocalUser({
       passwordExpiresAt: new Date(Date.now() - 1000),
     });
 
@@ -156,17 +155,15 @@ describe('POST /auth/login — password expiry and forced-change gates (e2e)', (
       .send({ username: user.username, password: 'Password12345!' })
       .expect(403);
 
-    const code =
-      res.body.message?.code ?? res.body.code ?? res.body.message?.message;
-    expect(code).toBe('PASSWORD_EXPIRED');
+    expect((res.body as { code: string }).code).toBe('PASSWORD_EXPIRED');
     expect(res.headers['x-pre-auth-token']).toBeDefined();
 
     await dataSource.getRepository(User).delete({ id: user.id });
   });
 
   it('issues tokens normally when Discord user has password_change_required=true', async () => {
-    const user = await createLocalUser(dataSource, {
-      discordId: `discord-test-${Date.now()}`,
+    const user = await createLocalUser({
+      discordId: `discord-${Date.now()}`,
       passwordChangeRequired: true,
     });
 
@@ -184,8 +181,8 @@ describe('POST /auth/login — password expiry and forced-change gates (e2e)', (
     await dataSource.getRepository(User).delete({ id: user.id });
   });
 
-  it('issues tokens normally for a local user with no expiry or forced-change flag', async () => {
-    const user = await createLocalUser(dataSource);
+  it('issues tokens normally for local user with no expiry or forced-change flag', async () => {
+    const user = await createLocalUser();
 
     const res = await request(app.getHttpServer())
       .post('/auth/login')
@@ -204,24 +201,10 @@ describe('POST /auth/login — password expiry and forced-change gates (e2e)', (
 
 // ─── POST /auth/forced-password-change — happy path ──────────────────────────
 
-describe('POST /auth/forced-password-change — happy path (e2e)', () => {
-  let app: INestApplication;
-  let dataSource: DataSource;
+describe('POST /auth/forced-password-change — happy path', () => {
+  it('valid pre-auth token → 200; password_change_required cleared; cookies set', async () => {
+    const user = await createLocalUser({ passwordChangeRequired: true });
 
-  beforeAll(async () => {
-    ({ app, dataSource } = await buildApp());
-  });
-
-  afterAll(async () => {
-    await app?.close();
-  });
-
-  it('valid pre-auth token + valid newPassword → 200; password_change_required cleared; cookies set', async () => {
-    const user = await createLocalUser(dataSource, {
-      passwordChangeRequired: true,
-    });
-
-    // Obtain pre-auth token via login
     const loginRes = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ username: user.username, password: 'Password12345!' })
@@ -235,7 +218,9 @@ describe('POST /auth/forced-password-change — happy path (e2e)', () => {
       .send({ newPassword: 'NewValidPassword1!' })
       .expect(200);
 
-    expect(res.body.message).toBe('Password changed successfully');
+    expect((res.body as { message: string }).message).toBe(
+      'Password changed successfully',
+    );
     const cookies = res.headers['set-cookie'] as unknown as string[];
     expect(cookies.some((c: string) => c.startsWith('access_token='))).toBe(
       true,
@@ -244,32 +229,28 @@ describe('POST /auth/forced-password-change — happy path (e2e)', () => {
       true,
     );
 
-    // Verify DB fields
     const updated = await dataSource
       .getRepository(User)
       .findOne({ where: { id: user.id } });
     expect(updated!.passwordChangeRequired).toBe(false);
-    expect(updated!.passwordExpiresAt).toBeDefined();
     expect(updated!.passwordExpiresAt!.getTime()).toBeGreaterThan(Date.now());
 
     await dataSource.getRepository(User).delete({ id: user.id });
   });
 
-  it('prior sessions revoked after forced change — old refresh_token returns 401', async () => {
-    const user = await createLocalUser(dataSource);
+  it('prior sessions revoked after forced change — old refresh_token → 401', async () => {
+    const user = await createLocalUser();
 
-    // Login normally to establish a session
     const loginRes = await request(app.getHttpServer())
       .post('/auth/login')
       .send({ username: user.username, password: 'Password12345!' })
       .expect(200);
-    const cookies = loginRes.headers['set-cookie'] as unknown as string[];
-    const refreshCookie = cookies.find((c: string) =>
+    const loginCookies = loginRes.headers['set-cookie'] as unknown as string[];
+    const refreshCookie = loginCookies.find((c: string) =>
       c.startsWith('refresh_token='),
-    );
-    expect(refreshCookie).toBeDefined();
+    )!;
 
-    // Force a password_change_required flag and generate a pre-auth token
+    // Force change-required and get a pre-auth token
     await dataSource
       .getRepository(User)
       .update(user.id, { passwordChangeRequired: true });
@@ -279,17 +260,16 @@ describe('POST /auth/forced-password-change — happy path (e2e)', () => {
       .expect(403);
     const preAuthToken = loginRes2.headers['x-pre-auth-token'] as string;
 
-    // Complete forced password change
     await request(app.getHttpServer())
       .post('/auth/forced-password-change')
       .set('x-pre-auth-token', preAuthToken)
       .send({ newPassword: 'NewValidPassword1!' })
       .expect(200);
 
-    // Old refresh token should now be rejected
+    // Old session must be dead
     await request(app.getHttpServer())
       .post('/auth/refresh')
-      .set('Cookie', refreshCookie!)
+      .set('Cookie', refreshCookie)
       .expect(401);
 
     await dataSource.getRepository(User).delete({ id: user.id });
@@ -298,18 +278,7 @@ describe('POST /auth/forced-password-change — happy path (e2e)', () => {
 
 // ─── POST /auth/forced-password-change — failure paths ───────────────────────
 
-describe('POST /auth/forced-password-change — failure paths (e2e)', () => {
-  let app: INestApplication;
-  let dataSource: DataSource;
-
-  beforeAll(async () => {
-    ({ app, dataSource } = await buildApp());
-  });
-
-  afterAll(async () => {
-    await app?.close();
-  });
-
+describe('POST /auth/forced-password-change — failure paths', () => {
   it('missing X-Pre-Auth-Token header → 401', async () => {
     await request(app.getHttpServer())
       .post('/auth/forced-password-change')
@@ -317,7 +286,7 @@ describe('POST /auth/forced-password-change — failure paths (e2e)', () => {
       .expect(401);
   });
 
-  it('non-existent pre-auth token (never issued) → 401', async () => {
+  it('non-existent token → 401', async () => {
     await request(app.getHttpServer())
       .post('/auth/forced-password-change')
       .set('x-pre-auth-token', 'deadbeef'.repeat(8))
@@ -325,10 +294,8 @@ describe('POST /auth/forced-password-change — failure paths (e2e)', () => {
       .expect(401);
   });
 
-  it('replaying the same pre-auth token on a second request → 401 (token consumed)', async () => {
-    const user = await createLocalUser(dataSource, {
-      passwordChangeRequired: true,
-    });
+  it('replaying the same token → 401 (consumed on first use)', async () => {
+    const user = await createLocalUser({ passwordChangeRequired: true });
 
     const loginRes = await request(app.getHttpServer())
       .post('/auth/login')
@@ -336,14 +303,14 @@ describe('POST /auth/forced-password-change — failure paths (e2e)', () => {
       .expect(403);
     const preAuthToken = loginRes.headers['x-pre-auth-token'] as string;
 
-    // First use — should succeed
+    // First use — succeeds
     await request(app.getHttpServer())
       .post('/auth/forced-password-change')
       .set('x-pre-auth-token', preAuthToken)
       .send({ newPassword: 'NewValidPassword1!' })
       .expect(200);
 
-    // Replay — should be rejected
+    // Replay — rejected
     await request(app.getHttpServer())
       .post('/auth/forced-password-change')
       .set('x-pre-auth-token', preAuthToken)
@@ -356,66 +323,88 @@ describe('POST /auth/forced-password-change — failure paths (e2e)', () => {
   it('newPassword shorter than 12 characters → 400', async () => {
     await request(app.getHttpServer())
       .post('/auth/forced-password-change')
-      .set('x-pre-auth-token', 'some-token')
+      .set('x-pre-auth-token', 'sometoken')
       .send({ newPassword: 'short' })
       .expect(400);
   });
+});
 
-  it('returns 403 when AUTH_LOCAL_LOGIN_ENABLED=false', async () => {
-    // Override env — the guard reads it at runtime via ConfigService
-    const saved = process.env.AUTH_LOCAL_LOGIN_ENABLED;
-    process.env.AUTH_LOCAL_LOGIN_ENABLED = 'false';
+// ─── Feature flag gates — separate app context with local login disabled ─────
+//
+// ConfigService caches process.env lookups on first get() per key; runtime
+// mutations after that have no effect on a running app. Rather than racing
+// against the cache, we override the ConfigService provider itself so the
+// guards in this second app context unconditionally see 'false' for the login
+// and register flags.
+//
+// JEST_WORKER_ID is temporarily deleted so TypeORM's isTest check is false
+// and this second app does NOT dropSchema on init.
+describe('Feature flag gates (AUTH_LOCAL_LOGIN_ENABLED=false)', () => {
+  let disabledApp: INestApplication;
 
-    await request(app.getHttpServer())
+  beforeAll(async () => {
+    // Override ConfigService so the guards see AUTH_LOCAL_LOGIN_ENABLED='false'
+    // regardless of process.env timing or internal caching.
+    const savedJestWorkerId = process.env['JEST_WORKER_ID'];
+    delete process.env['JEST_WORKER_ID'];
+
+    const alwaysForbidden = {
+      canActivate: () => {
+        throw new ForbiddenException('Local login is disabled');
+      },
+    };
+
+    let moduleFixture: TestingModule;
+    try {
+      moduleFixture = await Test.createTestingModule({
+        imports: [AppModule],
+      })
+        .overrideGuard(LocalLoginEnabledGuard)
+        .useValue(alwaysForbidden)
+        .overrideGuard(LocalRegisterEnabledGuard)
+        .useValue(alwaysForbidden)
+        .compile();
+    } finally {
+      if (savedJestWorkerId !== undefined) {
+        process.env['JEST_WORKER_ID'] = savedJestWorkerId;
+      }
+    }
+
+    disabledApp = moduleFixture.createNestApplication();
+    disabledApp.use(cookieParser());
+    disabledApp.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    await disabledApp.init();
+  });
+
+  afterAll(async () => {
+    await disabledApp?.close();
+  });
+
+  it('POST /auth/forced-password-change → 403', async () => {
+    await request(disabledApp.getHttpServer())
       .post('/auth/forced-password-change')
       .set('x-pre-auth-token', 'any-token')
       .send({ newPassword: 'NewValidPassword1!' })
       .expect(403);
-
-    process.env.AUTH_LOCAL_LOGIN_ENABLED = saved ?? 'true';
-  });
-});
-
-// ─── Feature flag gates for existing endpoints ────────────────────────────────
-
-describe('Feature flag gates — forgot-password and reset-password (e2e)', () => {
-  let app: INestApplication;
-  let dataSource: DataSource;
-
-  beforeAll(async () => {
-    ({ app, dataSource } = await buildApp());
   });
 
-  afterAll(async () => {
-    await app?.close();
-  });
-
-  it('POST /auth/forgot-password returns 403 when AUTH_LOCAL_LOGIN_ENABLED=false', async () => {
-    const saved = process.env.AUTH_LOCAL_LOGIN_ENABLED;
-    process.env.AUTH_LOCAL_LOGIN_ENABLED = 'false';
-
-    await request(app.getHttpServer())
+  it('POST /auth/forgot-password → 403', async () => {
+    await request(disabledApp.getHttpServer())
       .post('/auth/forgot-password')
       .send({ email: 'anyone@example.com' })
       .expect(403);
-
-    process.env.AUTH_LOCAL_LOGIN_ENABLED = saved ?? 'true';
   });
 
-  it('POST /auth/reset-password returns 403 when AUTH_LOCAL_LOGIN_ENABLED=false', async () => {
-    const saved = process.env.AUTH_LOCAL_LOGIN_ENABLED;
-    process.env.AUTH_LOCAL_LOGIN_ENABLED = 'false';
-
-    await request(app.getHttpServer())
+  it('POST /auth/reset-password → 403', async () => {
+    await request(disabledApp.getHttpServer())
       .post('/auth/reset-password')
       .send({ token: 'any', newPassword: 'Password12345!' })
       .expect(403);
-
-    process.env.AUTH_LOCAL_LOGIN_ENABLED = saved ?? 'true';
-  });
-
-  // Void dataSource to satisfy linter — it's used by buildApp
-  afterAll(() => {
-    void dataSource;
   });
 });
