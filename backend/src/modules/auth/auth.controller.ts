@@ -11,7 +11,6 @@ import {
   HttpCode,
   HttpStatus,
   UnauthorizedException,
-  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -42,6 +41,10 @@ import { OauthClientsService } from '../oauth-clients/oauth-clients.service';
 import { DiscordAuthGuard } from './discord-auth.guard';
 import { DiscordProfile } from './discord.strategy';
 import { DISCORD_NONCE_COOKIE, DISCORD_STATE_TTL_MS } from './auth.service';
+import {
+  LocalLoginEnabledGuard,
+  LocalRegisterEnabledGuard,
+} from './local-feature-flags.guard';
 
 // Parse throttle config once at module load time.
 // Number() handles numeric strings and NaN from non-numeric input; the
@@ -198,16 +201,13 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @ApiResponse({ status: 403, description: 'Local login is disabled' })
   @Throttle({ default: { ttl: LOGIN_TTL, limit: LOGIN_LIMIT } })
-  @UseGuards(LocalAuthGuard)
+  @UseGuards(LocalLoginEnabledGuard, LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(
     @Request() req: ExpressRequest & { user: ValidatedUser },
     @Res({ passthrough: true }) res: Response,
   ) {
-    if (!(await this.authService.isLocalLoginEnabled())) {
-      throw new ForbiddenException('Local login is disabled');
-    }
     const tokens = await this.authService.login(req.user);
     res.cookie(
       'access_token',
@@ -227,11 +227,9 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 403, description: 'Local registration is disabled' })
   @Throttle({ default: { ttl: REGISTER_TTL, limit: REGISTER_LIMIT } })
+  @UseGuards(LocalRegisterEnabledGuard)
   @Post('register')
   async register(@Body() userDto: UserDto) {
-    if (!(await this.authService.isLocalRegisterEnabled())) {
-      throw new ForbiddenException('Local registration is disabled');
-    }
     return this.authService.register(userDto);
   }
 
@@ -304,12 +302,10 @@ export class AuthController {
   })
   @ApiResponse({ status: 403, description: 'Local login is disabled' })
   @Throttle({ default: { ttl: FORGOT_TTL, limit: FORGOT_LIMIT } })
+  @UseGuards(LocalLoginEnabledGuard)
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
-    if (!(await this.authService.isLocalLoginEnabled())) {
-      throw new ForbiddenException('Local login is disabled');
-    }
     return this.authService.requestPasswordReset(forgotPasswordDto.email);
   }
 
@@ -318,12 +314,10 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired token' })
   @ApiResponse({ status: 403, description: 'Local login is disabled' })
+  @UseGuards(LocalLoginEnabledGuard)
   @HttpCode(HttpStatus.OK)
   @Post('reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    if (!(await this.authService.isLocalLoginEnabled())) {
-      throw new ForbiddenException('Local login is disabled');
-    }
     const { token, newPassword } = resetPasswordDto;
     return this.authService.resetPassword(token, newPassword);
   }
