@@ -30,6 +30,10 @@ describe('AuthService', () => {
     password: '$2b$10$hashedpassword',
     isSystemUser: false,
     isActive: true,
+    discordId: null,
+    discordAvatarUrl: null,
+    passwordChangeRequired: false,
+    passwordExpiresAt: null,
     userOrganizationRoles: [],
   };
 
@@ -38,6 +42,7 @@ describe('AuthService', () => {
     findByEmail: jest.fn(),
     findById: jest.fn(),
     updatePassword: jest.fn(),
+    updatePasswordWithExpiry: jest.fn(),
     create: jest.fn(),
   };
 
@@ -109,6 +114,7 @@ describe('AuthService', () => {
     it('should create a session, sign a JWT with a jti claim, and store the refresh token hash', async () => {
       mockJwtService.sign.mockReturnValue('signed-access-token');
       mockCacheManager.set.mockResolvedValue(undefined);
+      mockUsersService.findById.mockResolvedValue(mockUser);
 
       const result = await service.login(mockUser);
 
@@ -396,10 +402,10 @@ describe('AuthService', () => {
     it('should revoke the session family and blacklist the access token', async () => {
       const jti = 'logout-jti';
       const rawRefresh = `${jti}.` + 'a'.repeat(64);
-      // revokeRefreshToken reads refresh:{jti}; logout then reads jti:{jti}
+      // logout reads jti:{jti} first, then revokeRefreshToken reads refresh:{jti}
       mockCacheManager.get
-        .mockResolvedValueOnce(`1:${sha256(rawRefresh)}:${sid}`) // refresh:{jti}
-        .mockResolvedValueOnce(sid); // jti:{jti} reverse-index
+        .mockResolvedValueOnce(sid) // jti:{jti} reverse-index (read first)
+        .mockResolvedValueOnce(`1:${sha256(rawRefresh)}:${sid}`); // refresh:{jti}
       mockCacheManager.del.mockResolvedValue(undefined);
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -424,9 +430,10 @@ describe('AuthService', () => {
       // via the jti:{jti} reverse-index.
       const jti = 'logout-jti';
       const rawRefresh = `${jti}.` + 'a'.repeat(64);
+      // logout reads jti:{jti} first, then revokeRefreshToken reads refresh:{jti}
       mockCacheManager.get
-        .mockResolvedValueOnce(null) // refresh:{jti} — already consumed
-        .mockResolvedValueOnce(sid); // jti:{jti} reverse-index still present
+        .mockResolvedValueOnce(sid) // jti:{jti} reverse-index (read first)
+        .mockResolvedValueOnce(null); // refresh:{jti} — already consumed
       mockCacheManager.del.mockResolvedValue(undefined);
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -482,7 +489,7 @@ describe('AuthService', () => {
 
       mockPasswordResetRepository.findOne.mockResolvedValue(validToken);
       mockPasswordResetRepository.update.mockResolvedValue({ affected: 1 });
-      mockUsersService.updatePassword.mockResolvedValue(undefined);
+      mockUsersService.updatePasswordWithExpiry.mockResolvedValue(undefined);
 
       const result = await service.resetPassword(
         'valid-token',
@@ -534,7 +541,8 @@ describe('AuthService', () => {
 
       await service.resetPassword('valid-token', 'newPassword123');
 
-      const hashedPassword = mockUsersService.updatePassword.mock.calls[0][1];
+      const hashedPassword =
+        mockUsersService.updatePasswordWithExpiry.mock.calls[0][1];
       expect(hashedPassword).toMatch(/^\$2[aby]\$\d{1,2}\$.{53}$/);
       expect(await bcrypt.compare('newPassword123', hashedPassword)).toBe(true);
     });
@@ -548,7 +556,7 @@ describe('AuthService', () => {
         ...mockUser,
         password: hashedCurrentPassword,
       });
-      mockUsersService.updatePassword.mockResolvedValue(undefined);
+      mockUsersService.updatePasswordWithExpiry.mockResolvedValue(undefined);
 
       const result = await service.changePassword(
         mockUser.id,

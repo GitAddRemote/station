@@ -3,8 +3,11 @@ import {
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
+  ServiceUnavailableException,
   Inject,
   Optional,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -37,13 +40,19 @@ export interface RedisClientLike {
   del(key: string): Promise<unknown>;
   getDel(key: string): Promise<string | null>;
   pTTL(key: string): Promise<number>;
+  sAdd(key: string, member: string): Promise<unknown>;
+  sMembers(key: string): Promise<string[]>;
+  sRem(key: string, member: string): Promise<unknown>;
+  expire(key: string, seconds: number): Promise<unknown>;
+  quit(): Promise<void>;
 }
 
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 days
 const REFRESH_TTL_MS = REFRESH_TTL_SECONDS * 1000;
+const PRE_AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleDestroy {
   private readonly dummyHash =
     '$2b$10$CwTycUXWue0Thq9StjUM0uJ8WZ0p/7eJYJg6eW9j5Cnz4Gf5Eme1e';
 
@@ -77,6 +86,10 @@ export class AuthService {
     }
   }
 
+  async onModuleDestroy() {
+    await this.redisClient?.quit();
+  }
+
   async validateUser(
     username: string,
     pass: string,
@@ -103,24 +116,96 @@ export class AuthService {
     return null;
   }
 
+  /**
+   * Core login — issues tokens after credential validation.
+   *
+   * For local accounts (discord_id IS NULL), checks password expiry and
+   * forced-change flags before issuing tokens. If either flag is set, returns
+   * a 403 with a pre-auth token in X-Pre-Auth-Token instead of full tokens.
+   *
+   * Returns { accessToken, refreshToken } on success, or throws on expiry/change.
+   * Callers (controller) must catch ForbiddenException and forward the header.
+   */
   async login(
     user: ValidatedUser,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    // Expiry / forced-change checks apply only to local accounts
+    if (!user.discordId) {
+      const fullUser = await this.usersService.findById(user.id);
+      if (!fullUser) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      if (fullUser.passwordChangeRequired) {
+        const token = await this.generatePreAuthToken(user.id);
+        throw Object.assign(
+          new ForbiddenException({ code: 'PASSWORD_CHANGE_REQUIRED' }),
+          { preAuthToken: token },
+        );
+      }
+
+      if (
+        fullUser.passwordExpiresAt &&
+        fullUser.passwordExpiresAt < new Date()
+      ) {
+        const token = await this.generatePreAuthToken(user.id);
+        throw Object.assign(
+          new ForbiddenException({ code: 'PASSWORD_EXPIRED' }),
+          { preAuthToken: token },
+        );
+      }
+    }
+
+    return this.issueTokenPair(user.id, user.username);
+  }
+
+  /** Issues a new access+refresh token pair and maintains the user-sessions index. */
+  private async issueTokenPair(
+    userId: number,
+    username: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const jti = crypto.randomUUID();
     // A session ID (SID) is stable across token rotations for this login.
     // Deleting session:{sid} invalidates the entire token family regardless of
     // which JTI the client currently holds.
     const sid = crypto.randomUUID();
-    await this.authSet(`session:${sid}`, String(user.id), REFRESH_TTL_MS);
+    await this.authSet(`session:${sid}`, String(userId), REFRESH_TTL_MS);
+
+    // Maintain the reverse index so all sessions for a user can be revoked at once.
+    if (this.redisClient) {
+      await this.redisClient.sAdd(`user-sessions:${userId}`, sid);
+      await this.redisClient.expire(
+        `user-sessions:${userId}`,
+        REFRESH_TTL_SECONDS,
+      );
+    }
+
     const payload: JwtPayload = {
-      username: user.username,
-      sub: user.id,
+      username,
+      sub: userId,
       jti,
       sid,
     };
     const accessToken = this.jwtService.sign(payload);
-    const refreshToken = await this.generateRefreshToken(user.id, jti, sid);
+    const refreshToken = await this.generateRefreshToken(userId, jti, sid);
     return { accessToken, refreshToken };
+  }
+
+  /**
+   * Generates a single-use pre-auth token stored in raw Redis only.
+   * Returns 503 if redisClient is null — in-memory storage is forbidden for this flow.
+   */
+  async generatePreAuthToken(userId: number): Promise<string> {
+    if (!this.redisClient) {
+      throw new ServiceUnavailableException(
+        'Pre-auth tokens require Redis. Set USE_REDIS_CACHE=true.',
+      );
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    await this.redisClient.set(`pre_auth:${token}`, String(userId), {
+      PX: PRE_AUTH_TTL_MS,
+    });
+    return token;
   }
 
   async register(userDto: UserDto): Promise<Omit<User, 'password'>> {
@@ -235,10 +320,32 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    // Enforce password-expiry policy on token refresh for local accounts.
+    // A user whose password was flagged after login must not be able to
+    // keep refreshing indefinitely.
+    if (!user.discordId) {
+      if (
+        user.passwordChangeRequired ||
+        (user.passwordExpiresAt && user.passwordExpiresAt < new Date())
+      ) {
+        await this.revokeAllUserSessions(userId);
+        throw new UnauthorizedException('Password change required');
+      }
+    }
+
     // Renew the session TTL so it slides with the refresh token. Without this
     // the original 7-day session window would expire before the client's
     // most-recently issued refresh token, causing spurious 401s.
     await this.authSet(`session:${sid}`, String(userId), REFRESH_TTL_MS);
+
+    // Slide the user-sessions set TTL in lockstep — the SID is stable so no
+    // SADD/SREM is needed here, only the EXPIRE must be refreshed.
+    if (this.redisClient) {
+      await this.redisClient.expire(
+        `user-sessions:${userId}`,
+        REFRESH_TTL_SECONDS,
+      );
+    }
 
     // Old entry already deleted by consumeRefreshEntry — issue new token pair
     // carrying the same SID so the session family remains revocable.
@@ -264,6 +371,9 @@ export class AuthService {
     jti: string,
     rawAccessToken?: string,
   ): Promise<void> {
+    // Read SID early so we can prune the user-sessions set before deletion.
+    const sid = await this.authGet(`jti:${jti}`);
+
     // Best-effort: revoke the refresh entry and delete session:{sid} from the
     // stored value. This succeeds when refresh:{jti} has not been consumed yet.
     await this.revokeRefreshToken(rawRefreshToken, jti);
@@ -272,9 +382,18 @@ export class AuthService {
     // entry: look up the SID via the non-consumed reverse-index jti:{jti} and
     // delete the session family directly. This is idempotent if revokeRefreshToken
     // already deleted it.
-    const sid = await this.authGet(`jti:${jti}`);
     if (sid) {
-      await this.authDel(`session:${sid}`);
+      // When Redis is available, read userId before deleting the session key
+      // so we can prune the user-sessions reverse index.
+      if (this.redisClient) {
+        const userIdStr = await this.redisClient.get(`session:${sid}`);
+        await this.authDel(`session:${sid}`);
+        if (userIdStr) {
+          await this.redisClient.sRem(`user-sessions:${userIdStr}`, sid);
+        }
+      } else {
+        await this.authDel(`session:${sid}`);
+      }
     }
 
     if (rawAccessToken) {
@@ -422,7 +541,11 @@ export class AuthService {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword.trim(), saltRounds);
 
-    await this.usersService.updatePassword(resetToken.userId, hashedPassword);
+    await this.usersService.updatePasswordWithExpiry(
+      resetToken.userId,
+      hashedPassword,
+      this.computePasswordExpiry(),
+    );
 
     await this.passwordResetRepository.update(resetToken.id, { used: true });
 
@@ -468,6 +591,65 @@ export class AuthService {
     };
   }
 
+  /**
+   * Handles POST /auth/forced-password-change.
+   * Atomically consumes a pre-auth token, changes the password, revokes all
+   * existing sessions for the user, and issues a fresh token pair.
+   *
+   * Requires raw Redis (redisClient !== null) — returns 503 otherwise.
+   */
+  async forcedPasswordChange(
+    preAuthToken: string,
+    newPassword: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    if (!this.redisClient) {
+      throw new ServiceUnavailableException(
+        'Forced password change requires Redis. Set USE_REDIS_CACHE=true.',
+      );
+    }
+
+    const userIdStr = await this.redisClient.getDel(`pre_auth:${preAuthToken}`);
+    if (!userIdStr) {
+      throw new UnauthorizedException('Invalid or expired pre-auth token');
+    }
+
+    const userId = parseInt(userIdStr, 10);
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
+    await this.usersService.updatePasswordWithExpiry(
+      userId,
+      hashedPassword,
+      this.computePasswordExpiry(),
+    );
+
+    await this.revokeAllUserSessions(userId);
+
+    return this.issueTokenPair(userId, user.username);
+  }
+
+  /** Returns the password expiry date based on AUTH_PASSWORD_EXPIRY_DAYS (default 90). */
+  private computePasswordExpiry(): Date {
+    const days = this.configService.get<number>(
+      'AUTH_PASSWORD_EXPIRY_DAYS',
+      90,
+    );
+    return new Date(Date.now() + days * 24 * 3600 * 1000);
+  }
+
+  /** Revokes all active sessions for a user via the user-sessions reverse index. */
+  private async revokeAllUserSessions(userId: number): Promise<void> {
+    if (!this.redisClient) return;
+    const sids = await this.redisClient.sMembers(`user-sessions:${userId}`);
+    for (const sid of sids) {
+      await this.redisClient.del(`session:${sid}`);
+    }
+    await this.redisClient.del(`user-sessions:${userId}`);
+  }
+
   async changePassword(
     userId: number,
     currentPassword: string,
@@ -488,7 +670,11 @@ export class AuthService {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword.trim(), saltRounds);
 
-    await this.usersService.updatePassword(userId, hashedPassword);
+    await this.usersService.updatePasswordWithExpiry(
+      userId,
+      hashedPassword,
+      this.computePasswordExpiry(),
+    );
 
     this.logger.info(`Password changed successfully for user ID: ${userId}`);
 
@@ -642,8 +828,6 @@ export class AuthService {
   async loginDiscordUser(
     user: Omit<User, 'password'>,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    return this.login(
-      user as unknown as import('./interfaces/validated-user.interface').ValidatedUser,
-    );
+    return this.issueTokenPair(user.id, user.username);
   }
 }

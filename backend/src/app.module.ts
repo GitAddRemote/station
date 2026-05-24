@@ -19,6 +19,7 @@ import { AppService } from './app.service';
 import { AppController } from './app.controller';
 import { envValidationSchema } from './config/env.validation';
 import { DatabaseSeederModule } from './database/seeds/database-seeder.module';
+import { DatabaseSeederAdminModule } from './database/seeds/database-seeder-admin.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { GamesModule } from './modules/games/games.module';
 import { UexModule } from './modules/uex/uex.module';
@@ -164,6 +165,7 @@ if (!isTest) {
     UserOrganizationRolesModule,
     PermissionsModule,
     DatabaseSeederModule,
+    DatabaseSeederAdminModule,
     AuditLogsModule,
     GamesModule,
     UexModule,

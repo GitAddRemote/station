@@ -105,6 +105,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -133,7 +143,9 @@ jobs:
           DATABASE_PASSWORD: test
           DATABASE_NAME: station_test
           JWT_SECRET: test-secret-key-for-ci-minimum-32-chars
-          USE_REDIS_CACHE: 'false'
+          USE_REDIS_CACHE: 'true'
+          REDIS_HOST: localhost
+          REDIS_PORT: '6379'
         run: pnpm run test:e2e
 
   build:

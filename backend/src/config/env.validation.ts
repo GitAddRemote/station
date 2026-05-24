@@ -58,6 +58,9 @@ export const envValidationSchema = Joi.object({
   UEX_ENDPOINTS_PAUSE_MS: Joi.number().default(2000),
   UEX_API_KEY: Joi.string().allow('').default(''),
 
+  // Password expiry — number of days before a changed password expires.
+  AUTH_PASSWORD_EXPIRY_DAYS: Joi.number().integer().min(1).default(90),
+
   // Token cleanup scheduler (optional — defaults to 3 AM daily)
   REFRESH_TOKEN_CLEANUP_CRON: Joi.string().default(DEFAULT_CLEANUP_CRON),
 

@@ -47,6 +47,12 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   discordAvatarUrl?: string | null;
 
+  @Column({ name: 'password_change_required', default: false })
+  passwordChangeRequired!: boolean;
+
+  @Column({ name: 'password_expires_at', type: 'timestamptz', nullable: true })
+  passwordExpiresAt?: Date | null;
+
   @OneToMany(() => UserOrganizationRole, (uor) => uor.user)
   userOrganizationRoles!: UserOrganizationRole[];
 }

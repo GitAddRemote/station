@@ -25,3 +25,10 @@ export class ChangePasswordDto {
   @MinLength(6)
   newPassword!: string;
 }
+
+export class ForcedPasswordChangeDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(12)
+  newPassword!: string;
+}
