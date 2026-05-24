@@ -5,6 +5,7 @@
   "testRegex": ".e2e-spec.ts$",
   "setupFilesAfterEnv": ["<rootDir>/setup-e2e.ts"],
   "detectOpenHandles": true,
+  "forceExit": true,
   "transform": {
     "^.+\\.ts$": [
       "ts-jest",
