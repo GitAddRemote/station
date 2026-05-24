@@ -1,112 +1,67 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Box,
   Container,
   Typography,
-  TextField,
   Button,
   Card,
   CardContent,
   Alert,
-  Stack,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 } from '@mui/material';
-import LoginIcon from '@mui/icons-material/Login';
-import EmailIcon from '@mui/icons-material/Email';
 import { API_URL } from '../config/api';
 
+const DISCORD_BLUE = '#5865F2';
+
+const ERROR_MESSAGES: Record<string, string> = {
+  discord_denied: 'Login cancelled. Please try again.',
+  state_invalid: 'Login session expired or invalid. Please try again.',
+  discord_error: 'Something went wrong during Discord login. Please try again.',
+  discord_no_email:
+    'Your Discord account does not have an email address. Station requires a verified email to log in.',
+  discord_unverified_email:
+    "Your Discord account's email address is not verified. Please verify your email in Discord and try again.",
+  email_conflict:
+    'This email address is already linked to a different Discord account. Please contact an administrator.',
+  discord_auth_failed: 'Discord authentication failed. Please try again.',
+};
+
+interface AuthConfig {
+  discordEnabled: boolean;
+  localLoginEnabled: boolean;
+}
+
 const Login = () => {
-  const navigate = useNavigate();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [config, setConfig] = useState<AuthConfig | null>(null);
 
-  // Forgot password state
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetSuccess, setResetSuccess] = useState('');
-  const [resetError, setResetError] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (response.ok) {
-        navigate('/dashboard');
-      } else {
-        const errorData = await response.json();
-        console.error('Login error:', errorData);
-        setError(
-          errorData.message ||
-            errorData.error ||
-            'Invalid username or password',
-        );
-      }
-    } catch (err: unknown) {
-      console.error('Login error:', err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Cannot connect to server. Please make sure the backend is running.',
+  useEffect(() => {
+    const code = searchParams.get('error');
+    if (code) {
+      setErrorMessage(
+        ERROR_MESSAGES[code] ??
+          'Something went wrong during login. Please try again.',
       );
-    } finally {
-      setLoading(false);
     }
+  }, [searchParams]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/auth/config`)
+      .then((res) => res.json())
+      .then((cfg: AuthConfig) => setConfig(cfg))
+      .catch(() =>
+        // Fail open so the page is not blank if the backend is unreachable
+        setConfig({ discordEnabled: true, localLoginEnabled: true }),
+      );
+  }, []);
+
+  const handleDiscordLogin = () => {
+    window.location.href = `${API_URL}/auth/discord`;
   };
 
-  const handleForgotPassword = async () => {
-    setResetError('');
-    setResetSuccess('');
-    setResetLoading(true);
-
-    try {
-      const response = await fetch(`${API_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: resetEmail }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setResetSuccess(data.message);
-        setResetEmail('');
-      } else {
-        setResetError(data.message || 'Failed to send reset email');
-      }
-    } catch (err: unknown) {
-      console.error('Forgot password error:', err);
-      setResetError('Cannot connect to server. Please try again later.');
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
-  const handleCloseForgotPassword = () => {
-    setForgotPasswordOpen(false);
-    setResetEmail('');
-    setResetSuccess('');
-    setResetError('');
-  };
+  // Don't render until config is known to avoid flash of disabled buttons
+  if (!config) return null;
 
   return (
     <Box
@@ -141,164 +96,56 @@ const Login = () => {
 
         <Card>
           <CardContent sx={{ p: 4 }}>
-            {error && (
+            {errorMessage && (
               <Alert severity="error" sx={{ mb: 3 }}>
-                {error}
+                {errorMessage}
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit}>
-              <Stack spacing={3}>
-                <TextField
-                  label="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  fullWidth
-                  required
-                  autoFocus
-                  inputProps={{
-                    'aria-label': 'Username',
-                    'aria-required': 'true',
-                  }}
-                />
-
-                <TextField
-                  label="Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  fullWidth
-                  required
-                  inputProps={{
-                    'aria-label': 'Password',
-                    'aria-required': 'true',
-                  }}
-                />
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  size="large"
-                  fullWidth
-                  disabled={loading}
-                  startIcon={<LoginIcon />}
-                >
-                  {loading ? 'Signing In...' : 'Sign In'}
-                </Button>
-
-                <Box sx={{ textAlign: 'right' }}>
-                  <Button
-                    onClick={() => setForgotPasswordOpen(true)}
-                    sx={{
-                      color: '#4A9EFF',
-                      textTransform: 'none',
-                      '&:hover': { backgroundColor: 'rgba(74, 158, 255, 0.1)' },
-                    }}
+            {config.discordEnabled && (
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth
+                onClick={handleDiscordLogin}
+                sx={{
+                  backgroundColor: DISCORD_BLUE,
+                  '&:hover': { backgroundColor: '#4752c4' },
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  py: 1.5,
+                }}
+                startIcon={
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
                   >
-                    Forgot password?
-                  </Button>
-                </Box>
-              </Stack>
-            </form>
-
-            <Box sx={{ mt: 3, textAlign: 'center' }}>
-              <Typography sx={{ color: '#9aa0a6' }}>
-                Don't have an account?{' '}
-                <Link
-                  to="/register"
-                  style={{
-                    color: '#4A9EFF',
-                    textDecoration: 'none',
-                    fontWeight: 500,
-                  }}
-                >
-                  Sign Up
-                </Link>
-              </Typography>
-            </Box>
+                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                  </svg>
+                }
+              >
+                Login with Discord
+              </Button>
+            )}
           </CardContent>
         </Card>
 
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
-          <Link
-            to="/"
-            style={{
-              color: '#9aa0a6',
-              textDecoration: 'none',
-            }}
-          >
-            ← Back to Home
-          </Link>
-        </Box>
-
-        {/* Forgot Password Dialog */}
-        <Dialog
-          open={forgotPasswordOpen}
-          onClose={handleCloseForgotPassword}
-          maxWidth="xs"
-          fullWidth
-        >
-          <DialogTitle>Reset Password</DialogTitle>
-          <DialogContent>
-            {!resetSuccess && (
-              <Typography sx={{ mb: 2, color: '#9aa0a6' }}>
-                Enter your email address and we'll send you a link to reset your
-                password.
-              </Typography>
-            )}
-
-            {resetSuccess && (
-              <Alert severity="success" sx={{ mb: 2 }}>
-                {resetSuccess}
-              </Alert>
-            )}
-
-            {resetError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {resetError}
-              </Alert>
-            )}
-
-            {!resetSuccess && (
-              <TextField
-                label="Email Address"
-                type="email"
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                fullWidth
-                required
-                autoFocus
-                inputProps={{
-                  'aria-label': 'Email Address',
-                }}
-              />
-            )}
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3 }}>
-            {resetSuccess ? (
-              <Button onClick={handleCloseForgotPassword} variant="contained">
-                Close
-              </Button>
-            ) : (
-              <>
-                <Button
-                  onClick={handleCloseForgotPassword}
-                  disabled={resetLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleForgotPassword}
-                  variant="contained"
-                  disabled={!resetEmail || resetLoading}
-                  startIcon={<EmailIcon />}
-                >
-                  {resetLoading ? 'Sending...' : 'Send Reset Link'}
-                </Button>
-              </>
-            )}
-          </DialogActions>
-        </Dialog>
+        {config.localLoginEnabled && (
+          <Box sx={{ mt: 4, textAlign: 'center' }}>
+            <Link
+              to="/login/credentials"
+              style={{
+                color: '#9aa0a6',
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+              }}
+            >
+              Sign in with email
+            </Link>
+          </Box>
+        )}
       </Container>
     </Box>
   );

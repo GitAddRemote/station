@@ -24,6 +24,13 @@ describe('AuthController - Password Reset', () => {
     isAccessTokenBlacklisted: jest.fn(),
     isSessionAlive: jest.fn(),
     parseRefreshTokenJti: jest.fn(),
+    isLocalLoginEnabled: jest.fn().mockResolvedValue(true),
+    isLocalRegisterEnabled: jest.fn().mockResolvedValue(true),
+    isDiscordEnabled: jest.fn().mockReturnValue(true),
+    generateDiscordState: jest.fn().mockResolvedValue('state'),
+    validateAndConsumeDiscordState: jest.fn().mockResolvedValue(true),
+    handleDiscordCallback: jest.fn(),
+    loginDiscordUser: jest.fn(),
   };
 
   beforeEach(async () => {

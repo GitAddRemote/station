@@ -52,7 +52,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errors,
     };
 
-    response.status(status).json(errorResponse);
+    if (!response.headersSent) {
+      response.status(status).json(errorResponse);
+    }
   }
 }
 
@@ -87,6 +89,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message,
     };
 
-    response.status(status).json(errorResponse);
+    if (!response.headersSent) {
+      response.status(status).json(errorResponse);
+    }
   }
 }

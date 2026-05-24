@@ -27,6 +27,9 @@ import { OauthClient } from '../oauth-clients/oauth-client.entity';
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
 
+export const DISCORD_NONCE_COOKIE = '__Host-oauth_state';
+export const DISCORD_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 /** Minimal interface for the operations AuthService needs on the raw client. */
 export interface RedisClientLike {
   get(key: string): Promise<string | null>;
@@ -490,5 +493,157 @@ export class AuthService {
     this.logger.info(`Password changed successfully for user ID: ${userId}`);
 
     return { message: 'Password changed successfully' };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Discord OAuth helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Generate a cryptographically random OAuth state value, store it in Redis
+   * under oauth_state:<state> with a 10-minute TTL, and return it so the
+   * controller can both redirect to Discord and set the nonce cookie.
+   */
+  async generateDiscordState(): Promise<string> {
+    const state = crypto.randomBytes(32).toString('hex');
+    await this.authSet(`oauth_state:${state}`, '1', DISCORD_STATE_TTL_MS);
+    return state;
+  }
+
+  /**
+   * Validate the OAuth state returned by Discord's callback against:
+   * 1. Redis (GETDEL — one-time use, server-side)
+   * 2. The browser-bound nonce cookie value
+   *
+   * Returns true only when both checks pass. Either missing or mismatched
+   * value is treated as an invalid/replayed state.
+   */
+  async validateAndConsumeDiscordState(
+    stateFromQuery: string | undefined,
+    stateFromCookie: string | undefined,
+  ): Promise<boolean> {
+    if (!stateFromQuery || !stateFromCookie) return false;
+    if (stateFromQuery !== stateFromCookie) return false;
+
+    const key = `oauth_state:${stateFromQuery}`;
+    let stored: string | null;
+    if (this.redisClient) {
+      stored = await this.redisClient.getDel(key);
+    } else {
+      stored = (await this.cacheManager.get<string>(key)) ?? null;
+      if (stored) await this.cacheManager.del(key);
+    }
+    return stored !== null;
+  }
+
+  /**
+   * Handle the Discord callback after state validation.
+   *
+   * Lookup order (email is guaranteed present and verified by the controller
+   * before this method is called):
+   *   1. Match by discordId — returning user; update avatar
+   *   2. Match by email, discordId IS NULL — link account
+   *   3. Match by email, discordId already set to a different value — conflict
+   *   4. No match — create new user (up to 5 username-collision retries)
+   *
+   * Returns the user on success, or a string error code on failure.
+   */
+  async handleDiscordCallback(profile: {
+    discordId: string;
+    email: string;
+    username: string;
+    avatarUrl: string | null;
+  }): Promise<{ user: Omit<User, 'password'> } | { error: string }> {
+    // Step 1: returning user by discordId
+    const byDiscordId = await this.usersService.findByDiscordId(
+      profile.discordId,
+    );
+    if (byDiscordId) {
+      await this.usersService.updateDiscordAvatar(
+        byDiscordId.id,
+        profile.avatarUrl,
+      );
+      const { password: _p, ...result } = byDiscordId;
+      return { user: result };
+    }
+
+    // Step 2 & 3: email match
+    const byEmail = await this.usersService.findByEmail(profile.email);
+    if (byEmail) {
+      if (byEmail.discordId != null) {
+        // Already linked to a different Discord account
+        return { error: 'email_conflict' };
+      }
+      await this.usersService.linkDiscord(
+        byEmail.id,
+        profile.discordId,
+        profile.avatarUrl,
+      );
+      const { password: _p, ...result } = byEmail;
+      return { user: result };
+    }
+
+    // Step 4: new user — retry on username collision
+    const baseUsername = profile.username.replace(/[^a-zA-Z0-9]/g, '');
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const suffix = Math.floor(1000 + Math.random() * 9000).toString();
+      const username =
+        attempt === 0 && baseUsername
+          ? baseUsername.slice(0, 20)
+          : `${baseUsername.slice(0, 16)}_${suffix}`;
+      try {
+        const created = await this.usersService.createFromDiscord({
+          username,
+          email: profile.email,
+          discordId: profile.discordId,
+          discordAvatarUrl: profile.avatarUrl,
+        });
+        const { password: _p, ...result } = created;
+        return { user: result };
+      } catch (err: unknown) {
+        const isUnique =
+          err &&
+          typeof err === 'object' &&
+          'code' in err &&
+          (err as { code: string }).code === '23505';
+        // Only retry on username collision; re-throw anything else
+        const detail =
+          err && typeof err === 'object' && 'detail' in err
+            ? String((err as { detail: unknown }).detail)
+            : '';
+        if (isUnique && detail.includes('username')) continue;
+        throw err;
+      }
+    }
+    return { error: 'discord_error' };
+  }
+
+  isLocalLoginEnabled(): boolean {
+    return (
+      this.configService.get<string>('AUTH_LOCAL_LOGIN_ENABLED', 'true') ===
+      'true'
+    );
+  }
+
+  isLocalRegisterEnabled(): boolean {
+    return (
+      this.configService.get<string>('AUTH_LOCAL_REGISTER_ENABLED', 'true') ===
+      'true'
+    );
+  }
+
+  isDiscordEnabled(): boolean {
+    return (
+      this.configService.get<string>('AUTH_DISCORD_ENABLED', 'true') === 'true'
+    );
+  }
+
+  /** Issue tokens for a Discord-authenticated user (no expiry/forced-change checks). */
+  async loginDiscordUser(
+    user: Omit<User, 'password'>,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    return this.login(
+      user as unknown as import('./interfaces/validated-user.interface').ValidatedUser,
+    );
   }
 }
