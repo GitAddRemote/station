@@ -18,6 +18,7 @@ import { CitiesSyncStep } from './steps/cities-sync.step';
 import { SpaceStationsSyncStep } from './steps/space-stations-sync.step';
 import { OutpostsSyncStep } from './steps/outposts-sync.step';
 import { PoisSyncStep } from './steps/pois-sync.step';
+import { JumpPointsSyncStep } from './steps/jump-points-sync.step';
 
 function buildMockRun(overrides: Partial<EtlRun> = {}): EtlRun {
   const run = new EtlRun();
@@ -125,6 +126,10 @@ describe('CatalogEtlService', () => {
         {
           provide: PoisSyncStep,
           useValue: { name: 'pois', execute: jest.fn() },
+        },
+        {
+          provide: JumpPointsSyncStep,
+          useValue: { name: 'jump-points', execute: jest.fn() },
         },
       ],
     }).compile();

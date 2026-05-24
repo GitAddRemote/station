@@ -16,6 +16,7 @@ import { CitiesSyncStep } from './steps/cities-sync.step';
 import { SpaceStationsSyncStep } from './steps/space-stations-sync.step';
 import { OutpostsSyncStep } from './steps/outposts-sync.step';
 import { PoisSyncStep } from './steps/pois-sync.step';
+import { JumpPointsSyncStep } from './steps/jump-points-sync.step';
 import { UexSyncModule } from '../uex-sync/uex-sync.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { UexSyncModule } from '../uex-sync/uex-sync.module';
     SpaceStationsSyncStep,
     OutpostsSyncStep,
     PoisSyncStep,
+    JumpPointsSyncStep,
   ],
   exports: [CatalogEtlService],
 })
