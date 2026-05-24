@@ -126,6 +126,18 @@ export class UsersService {
     await this.usersRepository.update(userId, { password: hashedPassword });
   }
 
+  async updatePasswordWithExpiry(
+    userId: number,
+    hashedPassword: string,
+    passwordExpiresAt: Date,
+  ): Promise<void> {
+    await this.usersRepository.update(userId, {
+      password: hashedPassword,
+      passwordChangeRequired: false,
+      passwordExpiresAt,
+    });
+  }
+
   async findByDiscordId(discordId: string): Promise<User | undefined> {
     const user = await this.usersRepository.findOne({
       where: { discordId, isSystemUser: false },

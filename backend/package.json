@@ -14,6 +14,7 @@
     "db:backup": "./src/database/scripts/backup-database.sh",
     "db:health-check": "./src/database/scripts/health-check.sh",
     "seed": "ts-node -r tsconfig-paths/register src/database/seeds/seed.ts",
+    "seed:admin": "ts-node -r tsconfig-paths/register src/database/seeds/seed-admin.ts",
     "build": "nest build",
     "dev": "nest start --watch",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

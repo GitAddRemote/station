@@ -12,6 +12,8 @@ import {
   HttpStatus,
   UnauthorizedException,
   NotFoundException,
+  ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +32,7 @@ import { UserDto } from '../users/dto/user.dto';
 import { Request as ExpressRequest, Response } from 'express';
 import {
   ChangePasswordDto,
+  ForcedPasswordChangeDto,
   ForgotPasswordDto,
   ResetPasswordDto,
 } from './dto/password-reset.dto';
@@ -88,6 +91,14 @@ const DISCORD_TTL = toThrottleInt(
 const DISCORD_LIMIT = toThrottleInt(
   process.env['AUTH_DISCORD_THROTTLE_LIMIT'],
   20,
+);
+const FORCED_PW_TTL = toThrottleInt(
+  process.env['AUTH_FORCED_PW_THROTTLE_TTL_MS'],
+  60_000,
+);
+const FORCED_PW_LIMIT = toThrottleInt(
+  process.env['AUTH_FORCED_PW_THROTTLE_LIMIT'],
+  5,
 );
 
 @ApiTags('auth')
@@ -210,7 +221,11 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  @ApiResponse({ status: 403, description: 'Local login is disabled' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Local login is disabled, or password change/expiry required (X-Pre-Auth-Token header set)',
+  })
   @Throttle({ default: { ttl: LOGIN_TTL, limit: LOGIN_LIMIT } })
   @UseGuards(LocalLoginEnabledGuard, LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -219,18 +234,34 @@ export class AuthController {
     @Request() req: ExpressRequest & { user: ValidatedUser },
     @Res({ passthrough: true }) res: Response,
   ) {
-    const tokens = await this.authService.login(req.user);
-    res.cookie(
-      'access_token',
-      tokens.accessToken,
-      this.cookieOptions(15 * 60 * 1000),
-    );
-    res.cookie(
-      'refresh_token',
-      tokens.refreshToken,
-      this.cookieOptions(7 * 24 * 60 * 60 * 1000),
-    );
-    return { message: 'Login successful', username: req.user.username };
+    try {
+      const tokens = await this.authService.login(req.user);
+      res.cookie(
+        'access_token',
+        tokens.accessToken,
+        this.cookieOptions(15 * 60 * 1000),
+      );
+      res.cookie(
+        'refresh_token',
+        tokens.refreshToken,
+        this.cookieOptions(7 * 24 * 60 * 60 * 1000),
+      );
+      return { message: 'Login successful', username: req.user.username };
+    } catch (err: unknown) {
+      // When login() throws a ForbiddenException with a preAuthToken attached,
+      // forward the token in a response header before rethrowing.
+      const errWithToken = err as unknown as { preAuthToken?: unknown };
+      if (
+        err instanceof ForbiddenException &&
+        typeof errWithToken.preAuthToken === 'string'
+      ) {
+        res.setHeader('X-Pre-Auth-Token', errWithToken.preAuthToken);
+      }
+      if (err instanceof ServiceUnavailableException) {
+        throw err;
+      }
+      throw err;
+    }
   }
 
   @ApiOperation({ summary: 'Register new user' })
@@ -353,6 +384,53 @@ export class AuthController {
       currentPassword,
       newPassword,
     );
+  }
+
+  @ApiOperation({
+    summary: 'Complete forced password change using a pre-auth token',
+    description:
+      'Consumes the single-use X-Pre-Auth-Token header issued at login when ' +
+      'password_change_required=true or password_expires_at is in the past. ' +
+      'On success issues full token cookies, revokes all prior sessions.',
+  })
+  @ApiBody({ type: ForcedPasswordChangeDto })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing, expired, or replayed pre-auth token',
+  })
+  @ApiResponse({ status: 403, description: 'Local login is disabled' })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
+  @ApiResponse({ status: 503, description: 'Redis unavailable' })
+  @Throttle({ default: { ttl: FORCED_PW_TTL, limit: FORCED_PW_LIMIT } })
+  @UseGuards(LocalLoginEnabledGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('forced-password-change')
+  async forcedPasswordChange(
+    @Headers('x-pre-auth-token') rawPreAuthToken: string | undefined,
+    @Body() dto: ForcedPasswordChangeDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!rawPreAuthToken) {
+      throw new UnauthorizedException('X-Pre-Auth-Token header is required');
+    }
+
+    const tokens = await this.authService.forcedPasswordChange(
+      rawPreAuthToken,
+      dto.newPassword,
+    );
+    res.cookie(
+      'access_token',
+      tokens.accessToken,
+      this.cookieOptions(15 * 60 * 1000),
+    );
+    res.cookie(
+      'refresh_token',
+      tokens.refreshToken,
+      this.cookieOptions(7 * 24 * 60 * 60 * 1000),
+    );
+    return { message: 'Password changed successfully' };
   }
 
   // ---------------------------------------------------------------------------
