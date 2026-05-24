@@ -35,14 +35,10 @@ const LoginCredentials = () => {
 
   // Redirect to /login if local login is disabled
   useEffect(() => {
-    fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ username: '', password: '' }),
-    })
-      .then((res) => {
-        if (res.status === 403) {
+    fetch(`${API_URL}/auth/config`)
+      .then((res) => res.json())
+      .then((cfg: { localLoginEnabled?: boolean }) => {
+        if (cfg.localLoginEnabled === false) {
           navigate('/login', { replace: true });
         } else {
           setChecking(false);

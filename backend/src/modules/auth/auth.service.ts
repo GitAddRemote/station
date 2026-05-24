@@ -618,14 +618,14 @@ export class AuthService {
     return { error: 'discord_error' };
   }
 
-  async isLocalLoginEnabled(): Promise<boolean> {
+  isLocalLoginEnabled(): boolean {
     return (
       this.configService.get<string>('AUTH_LOCAL_LOGIN_ENABLED', 'true') ===
       'true'
     );
   }
 
-  async isLocalRegisterEnabled(): Promise<boolean> {
+  isLocalRegisterEnabled(): boolean {
     return (
       this.configService.get<string>('AUTH_LOCAL_REGISTER_ENABLED', 'true') ===
       'true'

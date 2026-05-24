@@ -187,6 +187,17 @@ export class AuthController {
     return this.authService.issueClientToken(client, grantedScopes);
   }
 
+  @ApiOperation({ summary: 'Auth feature-flag configuration' })
+  @ApiResponse({ status: 200, description: 'Active auth feature flags' })
+  @Get('config')
+  authConfig() {
+    return {
+      localLoginEnabled: this.authService.isLocalLoginEnabled(),
+      localRegisterEnabled: this.authService.isLocalRegisterEnabled(),
+      discordEnabled: this.authService.isDiscordEnabled(),
+    };
+  }
+
   @ApiOperation({ summary: 'Login user' })
   @ApiBody({
     schema: {
