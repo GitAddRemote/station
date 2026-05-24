@@ -42,6 +42,7 @@ describe('AuthService', () => {
     findByEmail: jest.fn(),
     findById: jest.fn(),
     updatePassword: jest.fn(),
+    updatePasswordWithExpiry: jest.fn(),
     create: jest.fn(),
   };
 
@@ -488,7 +489,7 @@ describe('AuthService', () => {
 
       mockPasswordResetRepository.findOne.mockResolvedValue(validToken);
       mockPasswordResetRepository.update.mockResolvedValue({ affected: 1 });
-      mockUsersService.updatePassword.mockResolvedValue(undefined);
+      mockUsersService.updatePasswordWithExpiry.mockResolvedValue(undefined);
 
       const result = await service.resetPassword(
         'valid-token',
@@ -540,7 +541,8 @@ describe('AuthService', () => {
 
       await service.resetPassword('valid-token', 'newPassword123');
 
-      const hashedPassword = mockUsersService.updatePassword.mock.calls[0][1];
+      const hashedPassword =
+        mockUsersService.updatePasswordWithExpiry.mock.calls[0][1];
       expect(hashedPassword).toMatch(/^\$2[aby]\$\d{1,2}\$.{53}$/);
       expect(await bcrypt.compare('newPassword123', hashedPassword)).toBe(true);
     });
@@ -554,7 +556,7 @@ describe('AuthService', () => {
         ...mockUser,
         password: hashedCurrentPassword,
       });
-      mockUsersService.updatePassword.mockResolvedValue(undefined);
+      mockUsersService.updatePasswordWithExpiry.mockResolvedValue(undefined);
 
       const result = await service.changePassword(
         mockUser.id,

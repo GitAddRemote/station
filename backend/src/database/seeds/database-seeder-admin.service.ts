@@ -24,7 +24,7 @@ export class DatabaseSeederAdminService {
       'ChangeMe!SecurePassword123',
     );
     const expiryDays = parseInt(
-      this.configService.get<string>('ADMIN_PASSWORD_EXPIRY_DAYS', '90'),
+      this.configService.get<string>('AUTH_PASSWORD_EXPIRY_DAYS', '90'),
       10,
     );
 

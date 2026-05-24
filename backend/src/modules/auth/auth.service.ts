@@ -320,6 +320,19 @@ export class AuthService implements OnModuleDestroy {
       throw new UnauthorizedException('User not found');
     }
 
+    // Enforce password-expiry policy on token refresh for local accounts.
+    // A user whose password was flagged after login must not be able to
+    // keep refreshing indefinitely.
+    if (!user.discordId) {
+      if (
+        user.passwordChangeRequired ||
+        (user.passwordExpiresAt && user.passwordExpiresAt < new Date())
+      ) {
+        await this.revokeAllUserSessions(userId);
+        throw new UnauthorizedException('Password change required');
+      }
+    }
+
     // Renew the session TTL so it slides with the refresh token. Without this
     // the original 7-day session window would expire before the client's
     // most-recently issued refresh token, causing spurious 401s.
@@ -528,7 +541,11 @@ export class AuthService implements OnModuleDestroy {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword.trim(), saltRounds);
 
-    await this.usersService.updatePassword(resetToken.userId, hashedPassword);
+    await this.usersService.updatePasswordWithExpiry(
+      resetToken.userId,
+      hashedPassword,
+      this.computePasswordExpiry(),
+    );
 
     await this.passwordResetRepository.update(resetToken.id, { used: true });
 
@@ -602,24 +619,25 @@ export class AuthService implements OnModuleDestroy {
       throw new UnauthorizedException('User not found');
     }
 
-    const expiryDays = parseInt(
-      this.configService.get<string>('ADMIN_PASSWORD_EXPIRY_DAYS', '90'),
-      10,
-    );
-    const passwordExpiresAt = new Date(
-      Date.now() + expiryDays * 24 * 3600 * 1000,
-    );
-
     const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
     await this.usersService.updatePasswordWithExpiry(
       userId,
       hashedPassword,
-      passwordExpiresAt,
+      this.computePasswordExpiry(),
     );
 
     await this.revokeAllUserSessions(userId);
 
     return this.issueTokenPair(userId, user.username);
+  }
+
+  /** Returns the password expiry date based on AUTH_PASSWORD_EXPIRY_DAYS (default 90). */
+  private computePasswordExpiry(): Date {
+    const days = parseInt(
+      this.configService.get<string>('AUTH_PASSWORD_EXPIRY_DAYS', '90'),
+      10,
+    );
+    return new Date(Date.now() + days * 24 * 3600 * 1000);
   }
 
   /** Revokes all active sessions for a user via the user-sessions reverse index. */
@@ -652,7 +670,11 @@ export class AuthService implements OnModuleDestroy {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword.trim(), saltRounds);
 
-    await this.usersService.updatePassword(userId, hashedPassword);
+    await this.usersService.updatePasswordWithExpiry(
+      userId,
+      hashedPassword,
+      this.computePasswordExpiry(),
+    );
 
     this.logger.info(`Password changed successfully for user ID: ${userId}`);
 

@@ -91,7 +91,7 @@ describe('DatabaseSeederAdminService (integration)', () => {
     process.env['ADMIN_EMAIL'] = SEED_EMAIL;
     process.env['ADMIN_USERNAME'] = 'admin-seed-test';
     process.env['ADMIN_INITIAL_PASSWORD'] = 'ChangeMe!SecurePassword123';
-    process.env['ADMIN_PASSWORD_EXPIRY_DAYS'] = '90';
+    process.env['AUTH_PASSWORD_EXPIRY_DAYS'] = '90';
 
     await seeder.seedAdmin();
 
@@ -111,7 +111,7 @@ describe('DatabaseSeederAdminService (integration)', () => {
     process.env['ADMIN_EMAIL'] = SEED_EMAIL;
     process.env['ADMIN_USERNAME'] = 'admin-seed-test';
     process.env['ADMIN_INITIAL_PASSWORD'] = 'DifferentPassword!!!!';
-    process.env['ADMIN_PASSWORD_EXPIRY_DAYS'] = '90';
+    process.env['AUTH_PASSWORD_EXPIRY_DAYS'] = '90';
 
     await seeder.seedAdmin();
 
