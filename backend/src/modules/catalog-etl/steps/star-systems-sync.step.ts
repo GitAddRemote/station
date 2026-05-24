@@ -162,6 +162,14 @@ export class StarSystemsSyncStep implements EtlStep {
   ): Promise<void> {
     const factions = await this.uexApiClient.get<UexFaction[]>('/factions');
 
+    const knownFactionIds = new Set(
+      (
+        await this.dataSource.query<{ uex_id: number }[]>(
+          `SELECT uex_id FROM station_faction`,
+        )
+      ).map((r) => r.uex_id),
+    );
+
     const knownSystemIds = new Set(
       (
         await this.dataSource.query<{ uex_id: number }[]>(
@@ -172,6 +180,18 @@ export class StarSystemsSyncStep implements EtlStep {
 
     for (const faction of factions) {
       if (!faction.name) continue;
+
+      if (!knownFactionIds.has(faction.id)) {
+        const warning = this.warningsRepo.create({
+          runId: ctx.runId,
+          stepName: this.name,
+          severity: 'warn',
+          message: `Faction ${faction.id} not found in station_faction — star system junction skipped`,
+          rawPayload: { faction_id: faction.id },
+        });
+        await this.warningsRepo.save(warning);
+        continue;
+      }
 
       const starSystemIds = parseCsvInts(faction.ids_star_systems);
 

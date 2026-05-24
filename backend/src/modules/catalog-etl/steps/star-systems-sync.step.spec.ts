@@ -263,7 +263,7 @@ describe('StarSystemsSyncStep', () => {
 
   describe('reconcileStarSystemJunctions', () => {
     it('deletes existing junction rows then inserts links for known star systems', async () => {
-      dsQuery = buildDsQuery([], [], [10]); // star system 10 exists
+      dsQuery = buildDsQuery([1], [], [10]); // faction 1 and star system 10 exist
       uexGet
         .mockResolvedValueOnce([makeSystem({ id: 10 })]) // /star_systems
         .mockResolvedValueOnce([
@@ -291,7 +291,7 @@ describe('StarSystemsSyncStep', () => {
     });
 
     it('warns and skips junction insert when star system is not in DB', async () => {
-      dsQuery = buildDsQuery([], [], [10]); // only 10 known; 20 is missing
+      dsQuery = buildDsQuery([1], [], [10]); // faction 1 known; only star system 10 known, 20 is missing
       uexGet
         .mockResolvedValueOnce([makeSystem({ id: 10 })])
         .mockResolvedValueOnce([
@@ -315,6 +315,7 @@ describe('StarSystemsSyncStep', () => {
     });
 
     it('deletes existing rows even when ids_star_systems is empty', async () => {
+      dsQuery = buildDsQuery([1], [], []);
       uexGet
         .mockResolvedValueOnce([makeSystem({ id: 1 })])
         .mockResolvedValueOnce([makeFaction({ id: 1, ids_star_systems: '' })]);
@@ -348,6 +349,37 @@ describe('StarSystemsSyncStep', () => {
         (c[0] as string).includes('DELETE FROM station_faction_star_system'),
       );
       expect(deleteCalls).toHaveLength(0);
+    });
+
+    it('warns and skips junction reconciliation for a faction absent from station_faction', async () => {
+      // knownFactionIds is empty — faction 1 was never persisted
+      dsQuery = buildDsQuery([], [], [10]);
+      uexGet
+        .mockResolvedValueOnce([makeSystem({ id: 10 })])
+        .mockResolvedValueOnce([
+          makeFaction({ id: 1, ids_star_systems: '10' }),
+        ]);
+
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      await step.execute({ runId: RUN_ID });
+
+      expect(repoCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining(
+            'Faction 1 not found in station_faction',
+          ),
+          rawPayload: { faction_id: 1 },
+        }),
+      );
+      const deleteCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('DELETE FROM station_faction_star_system'),
+      );
+      expect(deleteCalls).toHaveLength(0);
+      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
+        (c[0] as string).includes('INSERT INTO station_faction_star_system'),
+      );
+      expect(insertCalls).toHaveLength(0);
     });
   });
 });
