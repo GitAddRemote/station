@@ -12,6 +12,10 @@ import { StarSystemsSyncStep } from './steps/star-systems-sync.step';
 import { OrbitsSyncStep } from './steps/orbits-sync.step';
 import { PlanetsSyncStep } from './steps/planets-sync.step';
 import { MoonsSyncStep } from './steps/moons-sync.step';
+import { CitiesSyncStep } from './steps/cities-sync.step';
+import { SpaceStationsSyncStep } from './steps/space-stations-sync.step';
+import { OutpostsSyncStep } from './steps/outposts-sync.step';
+import { PoisSyncStep } from './steps/pois-sync.step';
 import { UexSyncModule } from '../uex-sync/uex-sync.module';
 
 @Module({
@@ -27,6 +31,10 @@ import { UexSyncModule } from '../uex-sync/uex-sync.module';
     OrbitsSyncStep,
     PlanetsSyncStep,
     MoonsSyncStep,
+    CitiesSyncStep,
+    SpaceStationsSyncStep,
+    OutpostsSyncStep,
+    PoisSyncStep,
   ],
   exports: [CatalogEtlService],
 })

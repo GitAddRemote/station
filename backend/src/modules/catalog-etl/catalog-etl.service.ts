@@ -13,6 +13,10 @@ import { StarSystemsSyncStep } from './steps/star-systems-sync.step';
 import { OrbitsSyncStep } from './steps/orbits-sync.step';
 import { PlanetsSyncStep } from './steps/planets-sync.step';
 import { MoonsSyncStep } from './steps/moons-sync.step';
+import { CitiesSyncStep } from './steps/cities-sync.step';
+import { SpaceStationsSyncStep } from './steps/space-stations-sync.step';
+import { OutpostsSyncStep } from './steps/outposts-sync.step';
+import { PoisSyncStep } from './steps/pois-sync.step';
 
 @Injectable()
 export class CatalogEtlService {
@@ -33,6 +37,10 @@ export class CatalogEtlService {
     private readonly orbitsSyncStep: OrbitsSyncStep,
     private readonly planetsSyncStep: PlanetsSyncStep,
     private readonly moonsSyncStep: MoonsSyncStep,
+    private readonly citiesSyncStep: CitiesSyncStep,
+    private readonly spaceStationsSyncStep: SpaceStationsSyncStep,
+    private readonly outpostsSyncStep: OutpostsSyncStep,
+    private readonly poisSyncStep: PoisSyncStep,
   ) {
     this.ETL_STEPS = [
       factionsSyncStep,
@@ -42,6 +50,10 @@ export class CatalogEtlService {
       orbitsSyncStep,
       planetsSyncStep,
       moonsSyncStep,
+      citiesSyncStep,
+      spaceStationsSyncStep,
+      outpostsSyncStep,
+      poisSyncStep,
     ];
   }
 
