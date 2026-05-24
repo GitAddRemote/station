@@ -23,9 +23,9 @@ export class DatabaseSeederAdminService {
       'ADMIN_INITIAL_PASSWORD',
       'ChangeMe!SecurePassword123',
     );
-    const expiryDays = parseInt(
-      this.configService.get<string>('AUTH_PASSWORD_EXPIRY_DAYS', '90'),
-      10,
+    const expiryDays = this.configService.get<number>(
+      'AUTH_PASSWORD_EXPIRY_DAYS',
+      90,
     );
 
     const existing = await this.userRepository.findOne({ where: { email } });

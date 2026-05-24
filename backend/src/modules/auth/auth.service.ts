@@ -633,9 +633,9 @@ export class AuthService implements OnModuleDestroy {
 
   /** Returns the password expiry date based on AUTH_PASSWORD_EXPIRY_DAYS (default 90). */
   private computePasswordExpiry(): Date {
-    const days = parseInt(
-      this.configService.get<string>('AUTH_PASSWORD_EXPIRY_DAYS', '90'),
-      10,
+    const days = this.configService.get<number>(
+      'AUTH_PASSWORD_EXPIRY_DAYS',
+      90,
     );
     return new Date(Date.now() + days * 24 * 3600 * 1000);
   }
