@@ -59,7 +59,7 @@ function makeDiscordProfile(
 function makeStubGuard(profile: ReturnType<typeof makeDiscordProfile>) {
   @Injectable()
   class StubDiscordGuard extends DiscordAuthGuard {
-    override canActivate(context: ExecutionContext) {
+    override async canActivate(context: ExecutionContext): Promise<boolean> {
       const req = context.switchToHttp().getRequest();
       req.user = profile;
       return true;
