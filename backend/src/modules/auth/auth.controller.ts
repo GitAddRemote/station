@@ -7,9 +7,12 @@ import {
   Body,
   Headers,
   Res,
+  Req,
   HttpCode,
   HttpStatus,
   UnauthorizedException,
+  ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -36,6 +39,9 @@ import { AuthenticatedRequest } from './interfaces/authenticated-request.interfa
 import { RefreshTokenRequest } from './interfaces/refresh-token-request.interface';
 import { ValidatedUser } from './interfaces/validated-user.interface';
 import { OauthClientsService } from '../oauth-clients/oauth-clients.service';
+import { DiscordAuthGuard } from './discord-auth.guard';
+import { DiscordProfile } from './discord.strategy';
+import { DISCORD_NONCE_COOKIE, DISCORD_STATE_TTL_MS } from './auth.service';
 
 // Parse throttle config once at module load time.
 // Number() handles numeric strings and NaN from non-numeric input; the
@@ -72,6 +78,14 @@ const TOKEN_TTL = toThrottleInt(
   60_000,
 );
 const TOKEN_LIMIT = toThrottleInt(process.env['AUTH_TOKEN_THROTTLE_LIMIT'], 10);
+const DISCORD_TTL = toThrottleInt(
+  process.env['AUTH_DISCORD_THROTTLE_TTL_MS'],
+  60_000,
+);
+const DISCORD_LIMIT = toThrottleInt(
+  process.env['AUTH_DISCORD_THROTTLE_LIMIT'],
+  20,
+);
 
 @ApiTags('auth')
 @Controller('auth')
@@ -182,6 +196,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 403, description: 'Local login is disabled' })
   @Throttle({ default: { ttl: LOGIN_TTL, limit: LOGIN_LIMIT } })
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -190,6 +205,9 @@ export class AuthController {
     @Request() req: ExpressRequest & { user: ValidatedUser },
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (!(await this.authService.isLocalLoginEnabled())) {
+      throw new ForbiddenException('Local login is disabled');
+    }
     const tokens = await this.authService.login(req.user);
     res.cookie(
       'access_token',
@@ -207,9 +225,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Register new user' })
   @ApiResponse({ status: 201, description: 'User successfully registered' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 403, description: 'Local registration is disabled' })
   @Throttle({ default: { ttl: REGISTER_TTL, limit: REGISTER_LIMIT } })
   @Post('register')
   async register(@Body() userDto: UserDto) {
+    if (!(await this.authService.isLocalRegisterEnabled())) {
+      throw new ForbiddenException('Local registration is disabled');
+    }
     return this.authService.register(userDto);
   }
 
@@ -280,10 +302,14 @@ export class AuthController {
     description:
       'If an account with that email exists, a password reset link has been sent',
   })
+  @ApiResponse({ status: 403, description: 'Local login is disabled' })
   @Throttle({ default: { ttl: FORGOT_TTL, limit: FORGOT_LIMIT } })
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    if (!(await this.authService.isLocalLoginEnabled())) {
+      throw new ForbiddenException('Local login is disabled');
+    }
     return this.authService.requestPasswordReset(forgotPasswordDto.email);
   }
 
@@ -291,9 +317,13 @@ export class AuthController {
   @ApiBody({ type: ResetPasswordDto })
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiResponse({ status: 403, description: 'Local login is disabled' })
   @HttpCode(HttpStatus.OK)
   @Post('reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    if (!(await this.authService.isLocalLoginEnabled())) {
+      throw new ForbiddenException('Local login is disabled');
+    }
     const { token, newPassword } = resetPasswordDto;
     return this.authService.resetPassword(token, newPassword);
   }
@@ -318,5 +348,110 @@ export class AuthController {
       currentPassword,
       newPassword,
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Discord OAuth endpoints
+  // ---------------------------------------------------------------------------
+
+  @ApiOperation({ summary: 'Initiate Discord OAuth login' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to Discord consent screen',
+  })
+  @ApiResponse({ status: 404, description: 'Discord auth is disabled' })
+  @Throttle({ default: { ttl: DISCORD_TTL, limit: DISCORD_LIMIT } })
+  @UseGuards(DiscordAuthGuard)
+  @Get('discord')
+  async discordLogin(@Res({ passthrough: false }) res: Response) {
+    if (!this.authService.isDiscordEnabled()) {
+      throw new NotFoundException('Discord auth is disabled');
+    }
+    const state = await this.authService.generateDiscordState();
+    res.cookie(DISCORD_NONCE_COOKIE, state, {
+      httpOnly: true,
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      sameSite: 'lax' as const,
+      path: '/',
+      maxAge: DISCORD_STATE_TTL_MS,
+    });
+    // Passport-discord handles the actual redirect via the guard
+  }
+
+  @ApiOperation({ summary: 'Discord OAuth callback' })
+  @ApiResponse({
+    status: 302,
+    description: 'Redirect to dashboard or /login?error=',
+  })
+  @ApiResponse({ status: 404, description: 'Discord auth is disabled' })
+  @UseGuards(DiscordAuthGuard)
+  @Get('discord/callback')
+  async discordCallback(
+    @Req()
+    req: ExpressRequest & {
+      user: DiscordProfile;
+      query: Record<string, string>;
+    },
+    @Res({ passthrough: false }) res: Response,
+  ) {
+    if (!this.authService.isDiscordEnabled()) {
+      throw new NotFoundException('Discord auth is disabled');
+    }
+
+    const frontendBase =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+
+    const stateFromQuery = req.query['state'];
+    const stateFromCookie = (
+      req.cookies as Record<string, string> | undefined
+    )?.[DISCORD_NONCE_COOKIE];
+
+    // Validate and consume the state (Redis GETDEL + cookie match)
+    const stateValid = await this.authService.validateAndConsumeDiscordState(
+      stateFromQuery,
+      stateFromCookie,
+    );
+    // Clear the nonce cookie regardless of outcome
+    res.clearCookie(DISCORD_NONCE_COOKIE, { path: '/' });
+
+    if (!stateValid) {
+      return res.redirect(`${frontendBase}/login?error=state_invalid`);
+    }
+
+    const profile = req.user;
+
+    // Email and verified checks — applied before any DB lookup
+    if (!profile.email) {
+      return res.redirect(`${frontendBase}/login?error=discord_no_email`);
+    }
+    if (!profile.verified) {
+      return res.redirect(
+        `${frontendBase}/login?error=discord_unverified_email`,
+      );
+    }
+
+    const result = await this.authService.handleDiscordCallback({
+      discordId: profile.discordId,
+      email: profile.email,
+      username: profile.username,
+      avatarUrl: profile.avatarUrl,
+    });
+
+    if ('error' in result) {
+      return res.redirect(`${frontendBase}/login?error=${result.error}`);
+    }
+
+    const tokens = await this.authService.loginDiscordUser(result.user);
+    res.cookie(
+      'access_token',
+      tokens.accessToken,
+      this.cookieOptions(15 * 60 * 1000),
+    );
+    res.cookie(
+      'refresh_token',
+      tokens.refreshToken,
+      this.cookieOptions(7 * 24 * 60 * 60 * 1000),
+    );
+    return res.redirect(`${frontendBase}/dashboard`);
   }
 }

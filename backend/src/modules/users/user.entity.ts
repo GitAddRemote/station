@@ -40,6 +40,13 @@ export class User {
   @Column({ type: 'text', nullable: true })
   bio?: string;
 
+  @Index()
+  @Column({ nullable: true, unique: true })
+  discordId?: string | null;
+
+  @Column({ nullable: true })
+  discordAvatarUrl?: string | null;
+
   @OneToMany(() => UserOrganizationRole, (uor) => uor.user)
   userOrganizationRoles!: UserOrganizationRole[];
 }

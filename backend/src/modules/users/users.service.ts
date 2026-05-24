@@ -125,4 +125,45 @@ export class UsersService {
   async updatePassword(userId: number, hashedPassword: string): Promise<void> {
     await this.usersRepository.update(userId, { password: hashedPassword });
   }
+
+  async findByDiscordId(discordId: string): Promise<User | undefined> {
+    const user = await this.usersRepository.findOne({
+      where: { discordId, isSystemUser: false },
+    });
+    return user || undefined;
+  }
+
+  async linkDiscord(
+    userId: number,
+    discordId: string,
+    discordAvatarUrl: string | null,
+  ): Promise<void> {
+    await this.usersRepository.update(userId, { discordId, discordAvatarUrl });
+  }
+
+  async updateDiscordAvatar(
+    userId: number,
+    discordAvatarUrl: string | null,
+  ): Promise<void> {
+    await this.usersRepository.update(userId, { discordAvatarUrl });
+  }
+
+  async createFromDiscord(params: {
+    username: string;
+    email: string;
+    discordId: string;
+    discordAvatarUrl: string | null;
+  }): Promise<User> {
+    // Discord-linked accounts have no local password — use an unusable hash
+    const unusablePassword = await bcrypt.hash(
+      'DISCORD_NO_LOCAL_PASSWORD_' + Math.random(),
+      10,
+    );
+    const user = this.usersRepository.create({
+      ...params,
+      password: unusablePassword,
+      isActive: true,
+    });
+    return this.usersRepository.save(user);
+  }
 }

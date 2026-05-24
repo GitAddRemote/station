@@ -7,6 +7,8 @@ import { AuthService, REDIS_CLIENT } from './auth.service';
 import { TokenCleanupService } from './token-cleanup.service';
 import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
+import { DiscordStrategy } from './discord.strategy';
+import { DiscordAuthGuard } from './discord-auth.guard';
 import { UsersModule } from '../users/users.module';
 import { OauthClientsModule } from '../oauth-clients/oauth-clients.module';
 import { PasswordReset } from './password-reset.entity';
@@ -37,6 +39,8 @@ import { createClient } from 'redis';
     TokenCleanupService,
     LocalStrategy,
     JwtStrategy,
+    DiscordStrategy,
+    DiscordAuthGuard,
     RefreshTokenAuthGuard,
     ClientAuthGuard,
     ScopesGuard,
