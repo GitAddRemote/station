@@ -20,13 +20,13 @@ import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
 import { User } from '../src/modules/users/user.entity';
 import * as bcrypt from 'bcrypt';
-import { AuthGuard } from '@nestjs/passport';
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { seedSystemUser } from './helpers/seed-system-user';
 import {
   AuthService,
   DISCORD_NONCE_COOKIE,
 } from '../src/modules/auth/auth.service';
+import { DiscordAuthGuard } from '../src/modules/auth/discord-auth.guard';
 
 // ---------------------------------------------------------------------------
 // Stub helpers
@@ -58,7 +58,7 @@ function makeDiscordProfile(
  */
 function makeStubGuard(profile: ReturnType<typeof makeDiscordProfile>) {
   @Injectable()
-  class StubDiscordGuard extends AuthGuard('discord') {
+  class StubDiscordGuard extends DiscordAuthGuard {
     override canActivate(context: ExecutionContext) {
       const req = context.switchToHttp().getRequest();
       req.user = profile;
@@ -78,7 +78,7 @@ async function buildApp(
   const builder = Test.createTestingModule({ imports: [AppModule] });
 
   if (guardOverride) {
-    builder.overrideGuard(AuthGuard('discord')).useClass(guardOverride);
+    builder.overrideGuard(DiscordAuthGuard).useClass(guardOverride);
   }
 
   const moduleFixture: TestingModule = await builder.compile();
@@ -513,20 +513,18 @@ describe('Auth - Discord OAuth - throttling (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    // Use a real DiscordAuthGuard (redirect) but set a very low throttle limit
-    process.env['AUTH_DISCORD_THROTTLE_LIMIT'] = '2';
-    process.env['AUTH_DISCORD_THROTTLE_TTL_MS'] = '60000';
     ({ app } = await buildApp());
   });
 
   afterAll(async () => {
     await app?.close();
-    delete process.env['AUTH_DISCORD_THROTTLE_LIMIT'];
-    delete process.env['AUTH_DISCORD_THROTTLE_TTL_MS'];
   });
 
   it('GET /auth/discord returns 429 after exceeding throttle limit', async () => {
-    const limit = 2;
+    // Default DISCORD_LIMIT is 20; fire 21 requests from the same IP to trigger 429.
+    // The module-level throttle constants are evaluated at load time so env-var
+    // overrides set after module import have no effect.
+    const limit = 20;
     for (let i = 0; i < limit; i++) {
       await request(app.getHttpServer()).get('/auth/discord');
     }

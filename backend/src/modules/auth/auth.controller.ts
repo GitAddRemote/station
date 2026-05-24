@@ -361,7 +361,6 @@ export class AuthController {
   })
   @ApiResponse({ status: 404, description: 'Discord auth is disabled' })
   @Throttle({ default: { ttl: DISCORD_TTL, limit: DISCORD_LIMIT } })
-  @UseGuards(DiscordAuthGuard)
   @Get('discord')
   async discordLogin(@Res({ passthrough: false }) res: Response) {
     if (!this.authService.isDiscordEnabled()) {
@@ -375,7 +374,18 @@ export class AuthController {
       path: '/',
       maxAge: DISCORD_STATE_TTL_MS,
     });
-    // Passport-discord handles the actual redirect via the guard
+    const clientId = this.configService.get<string>('DISCORD_CLIENT_ID', '');
+    const callbackUrl = this.configService.get<string>(
+      'DISCORD_CALLBACK_URL',
+      'http://localhost:3001/auth/discord/callback',
+    );
+    const authorizeUrl = new URL('https://discord.com/api/oauth2/authorize');
+    authorizeUrl.searchParams.set('client_id', clientId);
+    authorizeUrl.searchParams.set('redirect_uri', callbackUrl);
+    authorizeUrl.searchParams.set('response_type', 'code');
+    authorizeUrl.searchParams.set('scope', 'identify email');
+    authorizeUrl.searchParams.set('state', state);
+    return res.redirect(authorizeUrl.toString());
   }
 
   @ApiOperation({ summary: 'Discord OAuth callback' })
@@ -394,10 +404,6 @@ export class AuthController {
     },
     @Res({ passthrough: false }) res: Response,
   ) {
-    if (!this.authService.isDiscordEnabled()) {
-      throw new NotFoundException('Discord auth is disabled');
-    }
-
     const frontendBase =
       this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
 
