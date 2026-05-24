@@ -11,6 +11,8 @@ import { JurisdictionsSyncStep } from './steps/jurisdictions-sync.step';
 import { CompaniesSyncStep } from './steps/companies-sync.step';
 import { StarSystemsSyncStep } from './steps/star-systems-sync.step';
 import { OrbitsSyncStep } from './steps/orbits-sync.step';
+import { PlanetsSyncStep } from './steps/planets-sync.step';
+import { MoonsSyncStep } from './steps/moons-sync.step';
 
 @Injectable()
 export class CatalogEtlService {
@@ -29,6 +31,8 @@ export class CatalogEtlService {
     private readonly companiesSyncStep: CompaniesSyncStep,
     private readonly starSystemsSyncStep: StarSystemsSyncStep,
     private readonly orbitsSyncStep: OrbitsSyncStep,
+    private readonly planetsSyncStep: PlanetsSyncStep,
+    private readonly moonsSyncStep: MoonsSyncStep,
   ) {
     this.ETL_STEPS = [
       factionsSyncStep,
@@ -36,6 +40,8 @@ export class CatalogEtlService {
       starSystemsSyncStep,
       companiesSyncStep,
       orbitsSyncStep,
+      planetsSyncStep,
+      moonsSyncStep,
     ];
   }
 
