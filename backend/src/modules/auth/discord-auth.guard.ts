@@ -7,24 +7,35 @@ import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 
+class DiscordProviderError extends Error {}
+
 @Injectable()
 export class DiscordAuthGuard extends AuthGuard('discord') {
   constructor(private configService: ConfigService) {
     super();
   }
 
-  override canActivate(context: ExecutionContext) {
+  override async canActivate(context: ExecutionContext): Promise<boolean> {
     const enabled =
       this.configService.get<string>('AUTH_DISCORD_ENABLED', 'true') === 'true';
     if (!enabled) {
       throw new NotFoundException('Discord auth is disabled');
     }
-    return super.canActivate(context);
+    try {
+      return (await super.canActivate(context)) as boolean;
+    } catch (err) {
+      if (err instanceof DiscordProviderError) {
+        // Redirect already committed in handleRequest; stop the request here.
+        return false;
+      }
+      throw err;
+    }
   }
 
   // Passport calls handleRequest after the provider callback completes.
-  // Without this override, provider errors (access_denied, invalid code,
-  // token exchange failure) propagate as 401/500 instead of a redirect.
+  // On provider failure (access_denied, invalid code, token exchange error)
+  // we redirect to the frontend error page and throw DiscordProviderError so
+  // canActivate returns false and the controller never runs.
   override handleRequest<TUser>(
     err: Error | null,
     user: TUser | false,
@@ -37,9 +48,7 @@ export class DiscordAuthGuard extends AuthGuard('discord') {
         this.configService.get<string>('FRONTEND_URL') ??
         'http://localhost:5173';
       res.redirect(`${frontendBase}/login?error=discord_auth_failed`);
-      // Return a sentinel so Passport does not throw; the response is already
-      // committed via the redirect above and NestJS will not write further.
-      return null as unknown as TUser;
+      throw new DiscordProviderError();
     }
     return user;
   }
