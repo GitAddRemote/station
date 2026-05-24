@@ -15,9 +15,15 @@ export interface DiscordProfile {
 export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
   constructor(configService: ConfigService) {
     super({
-      clientID: configService.getOrThrow<string>('DISCORD_CLIENT_ID'),
-      clientSecret: configService.getOrThrow<string>('DISCORD_CLIENT_SECRET'),
-      callbackURL: configService.getOrThrow<string>('DISCORD_CALLBACK_URL'),
+      clientID: configService.get<string>('DISCORD_CLIENT_ID', 'DISABLED'),
+      clientSecret: configService.get<string>(
+        'DISCORD_CLIENT_SECRET',
+        'DISABLED',
+      ),
+      callbackURL: configService.get<string>(
+        'DISCORD_CALLBACK_URL',
+        'http://localhost/auth/discord/callback',
+      ),
       scope: ['identify', 'email'],
     });
   }
