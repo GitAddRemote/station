@@ -9,6 +9,8 @@ import { AdvisoryLockService } from '../../common/services';
 import { FactionsSyncStep } from './steps/factions-sync.step';
 import { JurisdictionsSyncStep } from './steps/jurisdictions-sync.step';
 import { CompaniesSyncStep } from './steps/companies-sync.step';
+import { StarSystemsSyncStep } from './steps/star-systems-sync.step';
+import { OrbitsSyncStep } from './steps/orbits-sync.step';
 
 @Injectable()
 export class CatalogEtlService {
@@ -25,11 +27,15 @@ export class CatalogEtlService {
     private readonly factionsSyncStep: FactionsSyncStep,
     private readonly jurisdictionsSyncStep: JurisdictionsSyncStep,
     private readonly companiesSyncStep: CompaniesSyncStep,
+    private readonly starSystemsSyncStep: StarSystemsSyncStep,
+    private readonly orbitsSyncStep: OrbitsSyncStep,
   ) {
     this.ETL_STEPS = [
       factionsSyncStep,
       jurisdictionsSyncStep,
+      starSystemsSyncStep,
       companiesSyncStep,
+      orbitsSyncStep,
     ];
   }
 

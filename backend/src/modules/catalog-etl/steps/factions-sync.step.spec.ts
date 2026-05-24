@@ -49,8 +49,7 @@ describe('FactionsSyncStep', () => {
 
   beforeEach(() => {
     uexGet = jest.fn();
-    // Default: return [] for existence checks, [] for deletes/inserts
-    dsQuery = jest.fn().mockResolvedValue([{ exists: false }]);
+    dsQuery = jest.fn().mockResolvedValue([]);
     repoCreate = jest
       .fn()
       .mockImplementation((dto) => ({ ...dto }) as EtlWarning);
@@ -233,69 +232,6 @@ describe('FactionsSyncStep', () => {
 
       const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
         (c[0] as string).includes('INSERT INTO station_faction_hostile'),
-      );
-      expect(insertCalls).toHaveLength(0);
-    });
-  });
-
-  describe('star system junction reconciliation', () => {
-    it('deletes existing star system rows then inserts links for known star systems', async () => {
-      const factions = [makeFaction({ id: 1, ids_star_systems: '10,20' })];
-      uexGet.mockResolvedValue(factions);
-
-      // Star system 10 exists, 20 does not
-      dsQuery.mockImplementation((sql: string, params?: unknown[]) => {
-        if ((sql as string).includes('EXISTS') && params?.[0] === 10)
-          return Promise.resolve([{ exists: true }]);
-        if ((sql as string).includes('EXISTS') && params?.[0] === 20)
-          return Promise.resolve([{ exists: false }]);
-        return Promise.resolve([]);
-      });
-
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      await step.execute({ runId: RUN_ID });
-
-      const deleteCalls = dsQuery.mock.calls.filter(
-        (c: unknown[]) =>
-          (c[0] as string).includes(
-            'DELETE FROM station_faction_star_system',
-          ) && (c[1] as number[])[0] === 1,
-      );
-      expect(deleteCalls).toHaveLength(1);
-
-      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
-        (c[0] as string).includes('INSERT INTO station_faction_star_system'),
-      );
-      // Only id 10 inserts; id 20 is skipped with a warning
-      expect(insertCalls).toHaveLength(1);
-      expect(insertCalls[0][1]).toEqual([1, 10]);
-
-      expect(repoCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          severity: 'warn',
-          message: expect.stringContaining('20'),
-          rawPayload: { faction_id: 1, missing_id: 20 },
-        }),
-      );
-    });
-
-    it('deletes existing star system rows even when ids_star_systems is empty', async () => {
-      const factions = [makeFaction({ id: 1, ids_star_systems: '' })];
-      uexGet.mockResolvedValue(factions);
-
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      await step.execute({ runId: RUN_ID });
-
-      const deleteCalls = dsQuery.mock.calls.filter(
-        (c: unknown[]) =>
-          (c[0] as string).includes(
-            'DELETE FROM station_faction_star_system',
-          ) && (c[1] as number[])[0] === 1,
-      );
-      expect(deleteCalls).toHaveLength(1);
-
-      const insertCalls = dsQuery.mock.calls.filter((c: unknown[]) =>
-        (c[0] as string).includes('INSERT INTO station_faction_star_system'),
       );
       expect(insertCalls).toHaveLength(0);
     });

@@ -8,6 +8,8 @@ import { AdvisoryLockService } from '../../common/services';
 import { FactionsSyncStep } from './steps/factions-sync.step';
 import { JurisdictionsSyncStep } from './steps/jurisdictions-sync.step';
 import { CompaniesSyncStep } from './steps/companies-sync.step';
+import { StarSystemsSyncStep } from './steps/star-systems-sync.step';
+import { OrbitsSyncStep } from './steps/orbits-sync.step';
 import { UexSyncModule } from '../uex-sync/uex-sync.module';
 
 @Module({
@@ -19,6 +21,8 @@ import { UexSyncModule } from '../uex-sync/uex-sync.module';
     FactionsSyncStep,
     JurisdictionsSyncStep,
     CompaniesSyncStep,
+    StarSystemsSyncStep,
+    OrbitsSyncStep,
   ],
   exports: [CatalogEtlService],
 })

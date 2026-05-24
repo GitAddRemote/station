@@ -10,6 +10,8 @@ import { AdvisoryLockService } from '../../common/services';
 import { FactionsSyncStep } from './steps/factions-sync.step';
 import { JurisdictionsSyncStep } from './steps/jurisdictions-sync.step';
 import { CompaniesSyncStep } from './steps/companies-sync.step';
+import { StarSystemsSyncStep } from './steps/star-systems-sync.step';
+import { OrbitsSyncStep } from './steps/orbits-sync.step';
 
 function buildMockRun(overrides: Partial<EtlRun> = {}): EtlRun {
   const run = new EtlRun();
@@ -85,6 +87,14 @@ describe('CatalogEtlService', () => {
         {
           provide: CompaniesSyncStep,
           useValue: { name: 'companies', execute: jest.fn() },
+        },
+        {
+          provide: StarSystemsSyncStep,
+          useValue: { name: 'star-systems', execute: jest.fn() },
+        },
+        {
+          provide: OrbitsSyncStep,
+          useValue: { name: 'orbits', execute: jest.fn() },
         },
       ],
     }).compile();
