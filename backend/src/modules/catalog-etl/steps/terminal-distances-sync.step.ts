@@ -29,10 +29,12 @@ export class TerminalDistancesSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    // Skip guard: respect UEX 12-hour cache TTL.
-    // Use MAX(synced_at) from the target table — reliable even on first deploy.
+    // Skip guard: MAX(synced_at) is only advanced by the final UPDATE at the
+    // end of a successful run — batch INSERTs write epoch so a mid-run failure
+    // never causes the next scheduled run to skip.
     const [row] = await this.dataSource.query<{ last_synced: Date | null }[]>(
-      `SELECT MAX(synced_at) AS last_synced FROM station_terminal_distance`,
+      `SELECT MAX(synced_at) AS last_synced FROM station_terminal_distance
+       WHERE synced_at > '1970-01-01'`,
     );
 
     if (row?.last_synced) {
@@ -62,13 +64,29 @@ export class TerminalDistancesSyncStep implements EtlStep {
 
     const terminalByCode = new Map(terminalRows.map((r) => [r.code, r.id]));
 
-    // Collect valid rows, emit warnings for unresolvable codes
-    const validRows: {
-      originId: number;
-      destinationId: number;
-      distance: number;
-    }[] = [];
+    // Stream records in batches to bound peak memory usage
+    let batch: (number | string)[] = [];
+    let valuePlaceholders: string[] = [];
+    let batchRowCount = 0;
+    let upserted = 0;
     let skipped = 0;
+
+    const flushBatch = async () => {
+      if (batchRowCount === 0) return;
+      await this.dataSource.query(
+        `INSERT INTO station_terminal_distance
+           (terminal_origin_id, terminal_destination_id, distance_gm, synced_at)
+         VALUES ${valuePlaceholders.join(', ')}
+         ON CONFLICT (terminal_origin_id, terminal_destination_id) DO UPDATE SET
+           distance_gm=EXCLUDED.distance_gm,
+           synced_at='epoch'`,
+        batch,
+      );
+      upserted += batchRowCount;
+      batch = [];
+      valuePlaceholders = [];
+      batchRowCount = 0;
+    };
 
     for (const record of distances) {
       const originId = terminalByCode.get(record.terminal_code_origin) ?? null;
@@ -108,37 +126,28 @@ export class TerminalDistancesSyncStep implements EtlStep {
         continue;
       }
 
-      validRows.push({ originId, destinationId, distance: record.distance });
-    }
-
-    // Batch upsert to reduce round trips on the ~500k-row dataset
-    for (let i = 0; i < validRows.length; i += UPSERT_BATCH_SIZE) {
-      const batch = validRows.slice(i, i + UPSERT_BATCH_SIZE);
-      const params: (number | string)[] = [];
-      const valuePlaceholders = batch.map((r, idx) => {
-        const base = idx * 3;
-        params.push(r.originId, r.destinationId, r.distance);
-        return `($${base + 1}, $${base + 2}, $${base + 3}, NOW())`;
-      });
-
-      await this.dataSource.query(
-        `INSERT INTO station_terminal_distance
-           (terminal_origin_id, terminal_destination_id, distance_gm, synced_at)
-         VALUES ${valuePlaceholders.join(', ')}
-         ON CONFLICT (terminal_origin_id, terminal_destination_id) DO UPDATE SET
-           distance_gm=EXCLUDED.distance_gm,
-           synced_at=NOW()`,
-        params,
+      const base = batchRowCount * 3;
+      valuePlaceholders.push(
+        `($${base + 1}, $${base + 2}, $${base + 3}, 'epoch')`,
       );
+      batch.push(originId, destinationId, record.distance);
+      batchRowCount++;
+
+      if (batchRowCount >= UPSERT_BATCH_SIZE) {
+        await flushBatch();
+      }
     }
+
+    await flushBatch();
+
+    // Advance synced_at only after the full load completes so the skip guard
+    // never fires on a partially updated table.
+    await this.dataSource.query(
+      `UPDATE station_terminal_distance SET synced_at = NOW()`,
+    );
 
     this.logger.info(
-      {
-        runId: ctx.runId,
-        total: distances.length,
-        upserted: validRows.length,
-        skipped,
-      },
+      { runId: ctx.runId, total: distances.length, upserted, skipped },
       'terminal-distances-sync step complete',
     );
   }

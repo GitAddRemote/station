@@ -497,6 +497,28 @@ describe('TerminalsSyncStep', () => {
       );
       expect(upsertCalls).toHaveLength(2);
     });
+
+    it('advances synced_at via final UPDATE only after all records are written', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([makeTerminal()]);
+
+      await step.execute(CTX);
+
+      // INSERT uses epoch so partial failures don't advance the skip guard
+      const insertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_terminal'),
+      );
+      expect(insertCall[0]).toContain("'epoch'");
+
+      // Final UPDATE fires after the loop completes
+      const finalUpdate = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_terminal') &&
+          sql.includes('synced_at = NOW()'),
+      );
+      expect(finalUpdate).toBeDefined();
+    });
   });
 
   describe('warnings', () => {

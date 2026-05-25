@@ -182,6 +182,34 @@ describe('TerminalDistancesSyncStep', () => {
         100, 200, 100, 200, 300, 200, 100, 300, 300,
       ]);
     });
+
+    it('advances synced_at via final UPDATE only after all batches complete', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([
+        {
+          terminal_code_origin: 'PORTOL',
+          terminal_code_destination: 'LORV',
+          distance: 100,
+        },
+      ]);
+
+      await step.execute(CTX);
+
+      // Batch INSERT uses epoch so partial failures don't advance the skip guard
+      const insertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_terminal_distance'),
+      );
+      expect(insertCall[0]).toContain("'epoch'");
+
+      // Final UPDATE fires after all batches complete
+      const finalUpdate = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_terminal_distance') &&
+          sql.includes('synced_at = NOW()'),
+      );
+      expect(finalUpdate).toBeDefined();
+    });
   });
 
   describe('warnings', () => {

@@ -89,10 +89,12 @@ export class TerminalsSyncStep implements EtlStep {
 
   async execute(ctx: EtlStepContext): Promise<void> {
     // Skip guard: respect UEX 12-hour cache TTL.
-    // Use MAX(synced_at) from the target table — reliable even on first deploy
-    // because an empty table returns NULL and the guard is bypassed.
+    // MAX(synced_at) is only advanced by the final UPDATE at the end of a
+    // successful run — individual INSERTs write epoch so partial failures
+    // never cause the guard to skip the next scheduled run.
     const [row] = await this.dataSource.query<{ last_synced: Date | null }[]>(
-      `SELECT MAX(synced_at) AS last_synced FROM station_terminal`,
+      `SELECT MAX(synced_at) AS last_synced FROM station_terminal
+       WHERE synced_at > '1970-01-01'`,
     );
 
     if (row?.last_synced) {
@@ -304,7 +306,7 @@ export class TerminalsSyncStep implements EtlStep {
             game_version, uex_date_added, uex_date_modified, synced_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
                  $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-                 $39,$40,$41,$42,$43,$44,NOW())
+                 $39,$40,$41,$42,$43,$44,'epoch')
          ON CONFLICT (uex_id) DO UPDATE SET
            name=EXCLUDED.name, fullname=EXCLUDED.fullname, nickname=EXCLUDED.nickname,
            displayname=EXCLUDED.displayname, code=EXCLUDED.code, type=EXCLUDED.type,
@@ -330,7 +332,7 @@ export class TerminalsSyncStep implements EtlStep {
            has_freight_elevator=EXCLUDED.has_freight_elevator,
            game_version=EXCLUDED.game_version,
            uex_date_added=EXCLUDED.uex_date_added, uex_date_modified=EXCLUDED.uex_date_modified,
-           synced_at=NOW()`,
+           synced_at='epoch'`,
         [
           record.id, // $1
           record.name, // $2
@@ -379,6 +381,12 @@ export class TerminalsSyncStep implements EtlStep {
         ],
       );
     }
+
+    // Advance synced_at only after the full load completes so the skip guard
+    // never fires on a partially updated table.
+    await this.dataSource.query(
+      `UPDATE station_terminal SET synced_at = NOW()`,
+    );
 
     this.logger.info(
       { runId: ctx.runId, count: terminals.length },
