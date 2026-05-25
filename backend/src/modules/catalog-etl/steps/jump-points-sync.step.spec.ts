@@ -1,7 +1,12 @@
+import { v5 as uuidv5 } from 'uuid';
 import { JumpPointsSyncStep } from './jump-points-sync.step';
 import { EtlWarning } from '../entities/etl-warning.entity';
 
 const RUN_ID = 'test-run-id';
+const SYNTHETIC_JP_NS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function makeLogger() {
   return {
@@ -83,6 +88,18 @@ describe('JumpPointsSyncStep', () => {
     expect(inserts).toHaveLength(2);
   });
 
+  it('real row id is a valid UUID', async () => {
+    uexGet.mockResolvedValue([makeJumpPoint({ id: 1 })]);
+    const dsQuery = buildDsQuery([10, 20], [100, 200]);
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    const inserts = dsQuery.mock.calls.filter((c) =>
+      (c[0] as string).includes('INSERT INTO station_jump_point'),
+    );
+    expect(inserts[0][1][0]).toMatch(UUID_REGEX); // id is a UUID
+  });
+
   it('real row has correct field mapping', async () => {
     uexGet.mockResolvedValue([
       makeJumpPoint({
@@ -105,17 +122,31 @@ describe('JumpPointsSyncStep', () => {
     const inserts = dsQuery.mock.calls.filter((c) =>
       (c[0] as string).includes('INSERT INTO station_jump_point'),
     );
-    const realParams = inserts[0][1] as unknown[];
-    expect(realParams[0]).toBe(5); // uex_id
-    expect(realParams[1]).toBe(10); // star_system_origin_uex_id
-    expect(realParams[2]).toBe(20); // star_system_dest_uex_id
-    expect(realParams[3]).toBe(100); // orbit_origin_uex_id (entry)
-    expect(realParams[4]).toBe(200); // orbit_dest_uex_id (exit)
-    expect(realParams[5]).toBe('Stanton-Pyro'); // name
-    expect(realParams[6]).toBe('L'); // size mapped from 'large'
-    expect(realParams[7]).toBe(true); // is_available_live
-    expect(realParams[8]).toEqual(new Date(1600000000 * 1000)); // uex_date_added
-    expect(realParams[9]).toEqual(new Date(1600000100 * 1000)); // uex_date_modified
+    const p = inserts[0][1] as unknown[];
+    expect(p[0]).toMatch(UUID_REGEX); // id — UUIDv7
+    expect(p[1]).toBe(5); // uex_id
+    expect(p[2]).toBe(10); // star_system_origin_uex_id
+    expect(p[3]).toBe(20); // star_system_dest_uex_id
+    expect(p[4]).toBe(100); // orbit_origin_uex_id (entry)
+    expect(p[5]).toBe(200); // orbit_dest_uex_id (exit)
+    expect(p[6]).toBe('Stanton-Pyro'); // name
+    expect(p[7]).toBe('L'); // size mapped from 'large'
+    expect(p[8]).toBe(true); // is_available_live
+    expect(p[9]).toEqual(new Date(1600000000 * 1000)); // uex_date_added
+    expect(p[10]).toEqual(new Date(1600000100 * 1000)); // uex_date_modified
+  });
+
+  it('synthetic row id is a deterministic UUIDv5', async () => {
+    uexGet.mockResolvedValue([makeJumpPoint({ id: 7 })]);
+    const dsQuery = buildDsQuery([10, 20], [100, 200]);
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    const inserts = dsQuery.mock.calls.filter((c) =>
+      (c[0] as string).includes('INSERT INTO station_jump_point'),
+    );
+    const expectedId = uuidv5('synthetic-jp-7', SYNTHETIC_JP_NS);
+    expect(inserts[1][1][0]).toBe(expectedId);
   });
 
   it('synthetic row swaps origin/destination and orbit entry/exit', async () => {
@@ -135,12 +166,13 @@ describe('JumpPointsSyncStep', () => {
     const inserts = dsQuery.mock.calls.filter((c) =>
       (c[0] as string).includes('INSERT INTO station_jump_point'),
     );
-    const synthParams = inserts[1][1] as unknown[];
-    expect(synthParams[0]).toBe(20); // origin = original destination
-    expect(synthParams[1]).toBe(10); // dest = original origin
-    expect(synthParams[2]).toBe(200); // orbit_origin = original exit orbit
-    expect(synthParams[3]).toBe(100); // orbit_dest = original entry orbit
-    expect(synthParams[7]).toBe(5); // source_uex_id = real row uex_id
+    const p = inserts[1][1] as unknown[];
+    expect(p[0]).toMatch(UUID_REGEX); // id — deterministic UUID
+    expect(p[1]).toBe(20); // origin = original destination
+    expect(p[2]).toBe(10); // dest = original origin
+    expect(p[3]).toBe(200); // orbit_origin = original exit orbit
+    expect(p[4]).toBe(100); // orbit_dest = original entry orbit
+    expect(p[8]).toBe(5); // source_uex_id = real row uex_id
   });
 
   it('synthetic row ON CONFLICT clause uses source_uex_id', async () => {
@@ -218,7 +250,7 @@ describe('JumpPointsSyncStep', () => {
 
   it('warns and skips both rows when entry orbit is unknown', async () => {
     uexGet.mockResolvedValue([makeJumpPoint({ id: 13, id_orbit_entry: 999 })]);
-    const dsQuery = buildDsQuery([10, 20], [200]); // 999 not in known orbits
+    const dsQuery = buildDsQuery([10, 20], [200]);
     const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
@@ -237,7 +269,7 @@ describe('JumpPointsSyncStep', () => {
 
   it('warns and skips both rows when exit orbit is unknown', async () => {
     uexGet.mockResolvedValue([makeJumpPoint({ id: 14, id_orbit_exit: 999 })]);
-    const dsQuery = buildDsQuery([10, 20], [100]); // 999 not in known orbits
+    const dsQuery = buildDsQuery([10, 20], [100]);
     const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
@@ -276,12 +308,12 @@ describe('JumpPointsSyncStep', () => {
       const realInsert = dsQuery.mock.calls.find((c) =>
         (c[0] as string).includes('INSERT INTO station_jump_point'),
       )!;
-      expect(realInsert[1][6]).toBe(expected);
+      expect(realInsert[1][7]).toBe(expected); // size is now at index 7
       jest.clearAllMocks();
     }
   });
 
-  it('warns and stores null for unknown size — still upserts', async () => {
+  it('warns and stores null for unknown size — still upserts both rows', async () => {
     uexGet.mockResolvedValue([makeJumpPoint({ id: 15, size: 'gigantic' })]);
     const dsQuery = buildDsQuery([10, 20], [100, 200]);
     const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
@@ -296,12 +328,12 @@ describe('JumpPointsSyncStep', () => {
     const realInsert = dsQuery.mock.calls.find((c) =>
       (c[0] as string).includes('INSERT INTO station_jump_point'),
     )!;
-    expect(realInsert[1][6]).toBeNull(); // size stored as null
+    expect(realInsert[1][7]).toBeNull(); // size null at index 7
     expect(
       dsQuery.mock.calls.filter((c) =>
         (c[0] as string).includes('INSERT INTO station_jump_point'),
       ),
-    ).toHaveLength(2); // both real and synthetic still upserted
+    ).toHaveLength(2);
   });
 
   it('null size does not emit a warning', async () => {
@@ -314,10 +346,10 @@ describe('JumpPointsSyncStep', () => {
     const realInsert = dsQuery.mock.calls.find((c) =>
       (c[0] as string).includes('INSERT INTO station_jump_point'),
     )!;
-    expect(realInsert[1][6]).toBeNull();
+    expect(realInsert[1][7]).toBeNull();
   });
 
-  it('is idempotent — two runs produce identical upsert params', async () => {
+  it('synthetic row id is stable across re-runs', async () => {
     uexGet.mockResolvedValue([makeJumpPoint({ id: 1 })]);
     const dsQuery = buildDsQuery([10, 20], [100, 200]);
     const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
@@ -327,8 +359,23 @@ describe('JumpPointsSyncStep', () => {
     const inserts = dsQuery.mock.calls.filter((c) =>
       (c[0] as string).includes('INSERT INTO station_jump_point'),
     );
-    expect(inserts).toHaveLength(4); // 2 per run
-    expect(inserts[0][1]).toEqual(inserts[2][1]); // real row same both runs
-    expect(inserts[1][1]).toEqual(inserts[3][1]); // synthetic row same both runs
+    // Synthetic id is the same both runs; real id is a fresh UUIDv7 each time
+    expect(inserts[1][1][0]).toBe(inserts[3][1][0]);
+    expect(inserts[0][1][0]).not.toBe(inserts[2][1][0]);
+  });
+
+  it('upsert params are otherwise identical across re-runs', async () => {
+    uexGet.mockResolvedValue([makeJumpPoint({ id: 1 })]);
+    const dsQuery = buildDsQuery([10, 20], [100, 200]);
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+    await step.execute({ runId: RUN_ID });
+
+    const inserts = dsQuery.mock.calls.filter((c) =>
+      (c[0] as string).includes('INSERT INTO station_jump_point'),
+    );
+    // All params except id (index 0 of real row) match between runs
+    expect(inserts[0][1].slice(1)).toEqual(inserts[2][1].slice(1));
+    expect(inserts[1][1]).toEqual(inserts[3][1]); // synthetic fully identical
   });
 });

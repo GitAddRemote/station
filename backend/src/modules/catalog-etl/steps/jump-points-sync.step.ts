@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { v7 as uuidv7, v5 as uuidv5 } from 'uuid';
 import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
@@ -17,6 +18,13 @@ interface UexJumpPoint {
   is_available_live: number;
   date_added: number;
   date_modified: number;
+}
+
+// Fixed namespace for synthetic jump point UUIDs — must never change
+const SYNTHETIC_JP_NS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+function syntheticJpId(sourceUexId: number): string {
+  return uuidv5(`synthetic-jp-${sourceUexId}`, SYNTHETIC_JP_NS);
 }
 
 const SIZE_MAP: Record<string, string> = {
@@ -170,15 +178,15 @@ export class JumpPointsSyncStep implements EtlStep {
         );
       }
 
-      // Upsert the real row
+      // Upsert the real row — UUIDv7 id (time-ordered, supplied by application)
       await this.dataSource.query(
         `INSERT INTO station_jump_point
-           (uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
+           (id, uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
             orbit_origin_uex_id, orbit_dest_uex_id,
             name, size, is_available_live,
             is_synthetic, source_uex_id,
             uex_date_added, uex_date_modified, synced_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,FALSE,NULL,$9,$10,NOW())
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,NULL,$10,$11,NOW())
          ON CONFLICT (uex_id) WHERE is_synthetic = FALSE DO UPDATE SET
            star_system_origin_uex_id=EXCLUDED.star_system_origin_uex_id,
            star_system_dest_uex_id=EXCLUDED.star_system_dest_uex_id,
@@ -191,6 +199,7 @@ export class JumpPointsSyncStep implements EtlStep {
            uex_date_modified=EXCLUDED.uex_date_modified,
            synced_at=NOW()`,
         [
+          uuidv7(),
           record.id,
           record.id_star_system_origin,
           record.id_star_system_destination,
@@ -204,15 +213,16 @@ export class JumpPointsSyncStep implements EtlStep {
         ],
       );
 
-      // Upsert the synthetic reverse row
+      // Upsert the synthetic reverse row — deterministic UUIDv5 so re-runs
+      // hit the same row via ON CONFLICT (source_uex_id)
       await this.dataSource.query(
         `INSERT INTO station_jump_point
-           (uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
+           (id, uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
             orbit_origin_uex_id, orbit_dest_uex_id,
             name, size, is_available_live,
             is_synthetic, source_uex_id,
             uex_date_added, uex_date_modified, synced_at)
-         VALUES (NULL,$1,$2,$3,$4,$5,$6,$7,TRUE,$8,$9,$10,NOW())
+         VALUES ($1,NULL,$2,$3,$4,$5,$6,$7,$8,TRUE,$9,$10,$11,NOW())
          ON CONFLICT (source_uex_id) WHERE is_synthetic = TRUE DO UPDATE SET
            star_system_origin_uex_id=EXCLUDED.star_system_origin_uex_id,
            star_system_dest_uex_id=EXCLUDED.star_system_dest_uex_id,
@@ -225,6 +235,7 @@ export class JumpPointsSyncStep implements EtlStep {
            uex_date_modified=EXCLUDED.uex_date_modified,
            synced_at=NOW()`,
         [
+          syntheticJpId(record.id),
           // Swap origin ↔ destination for reverse direction
           record.id_star_system_destination,
           record.id_star_system_origin,

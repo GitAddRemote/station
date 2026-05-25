@@ -6,8 +6,20 @@ export class AlterJumpPointsForSyntheticRows1779664556916
   name = 'AlterJumpPointsForSyntheticRows1779664556916';
 
   async up(queryRunner: QueryRunner): Promise<void> {
+    // Replace BIGSERIAL PK with UUIDv7 (supplied by application; fallback to
+    // gen_random_uuid() for any rows inserted outside the ETL step)
+    await queryRunner.query(
+      `ALTER TABLE "station_jump_point" DROP CONSTRAINT "station_jump_point_pkey"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "station_jump_point" DROP COLUMN "id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "station_jump_point" ADD COLUMN "id" UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY`,
+    );
+
     // Drop the NOT NULL + UNIQUE constraints on uex_id so synthetic rows can
-    // share a nullable uex_id; real rows get a partial unique index instead.
+    // have a null uex_id; real rows get a partial unique index instead.
     await queryRunner.query(
       `ALTER TABLE "station_jump_point" DROP CONSTRAINT IF EXISTS "station_jump_point_uex_id_key"`,
     );
@@ -15,7 +27,7 @@ export class AlterJumpPointsForSyntheticRows1779664556916
       `ALTER TABLE "station_jump_point" ALTER COLUMN "uex_id" DROP NOT NULL`,
     );
 
-    // Unique index only for real (non-synthetic) rows
+    // Unique index for real (non-synthetic) rows only
     await queryRunner.query(
       `CREATE UNIQUE INDEX "idx_jp_uex_id_real" ON "station_jump_point" ("uex_id") WHERE "is_synthetic" = FALSE`,
     );
@@ -25,7 +37,7 @@ export class AlterJumpPointsForSyntheticRows1779664556916
       `CREATE UNIQUE INDEX "idx_jp_synthetic_source" ON "station_jump_point" ("source_uex_id") WHERE "is_synthetic" = TRUE`,
     );
 
-    // Drop the non-partial index on uex_id that was created in the baseline
+    // Drop the old non-partial uex_id index created in the baseline migration
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_jp_uex_id"`);
 
     // Add columns required by the ETL step
@@ -60,6 +72,16 @@ export class AlterJumpPointsForSyntheticRows1779664556916
     );
     await queryRunner.query(
       `ALTER TABLE "station_jump_point" ADD CONSTRAINT "station_jump_point_uex_id_key" UNIQUE ("uex_id")`,
+    );
+    // Restore BIGSERIAL PK (loses existing UUID values — dev/staging only)
+    await queryRunner.query(
+      `ALTER TABLE "station_jump_point" DROP CONSTRAINT "station_jump_point_pkey"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "station_jump_point" DROP COLUMN "id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "station_jump_point" ADD COLUMN "id" BIGSERIAL PRIMARY KEY`,
     );
   }
 }
