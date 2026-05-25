@@ -132,13 +132,39 @@ export class CatalogEtlService {
     });
   }
 
-  async runStep(stepName: string): Promise<void> {
+  async runStep(stepName: string): Promise<EtlRun> {
     const step = this.ETL_STEPS.find((s) => s.name === stepName);
     if (!step) {
       throw new Error(`Unknown ETL step: ${stepName}`);
     }
-    const runId = `scheduler-${stepName}-${Date.now()}`;
-    await step.execute({ runId });
+
+    const runState = this.etlRunRepository.create({
+      status: 'running',
+      stepsTotal: 1,
+      stepsSucceeded: 0,
+      stepsFailed: 0,
+    });
+    await this.etlRunRepository.save(runState);
+
+    try {
+      await step.execute({ runId: runState.runId });
+      runState.stepsSucceeded = 1;
+      runState.status = 'completed';
+    } catch (err: unknown) {
+      runState.stepsFailed = 1;
+      runState.status = 'failed';
+      const message = err instanceof Error ? err.message : String(err);
+      const warning = this.etlWarningRepository.create({
+        runId: runState.runId,
+        stepName: step.name,
+        severity: 'error',
+        message,
+      });
+      await this.etlWarningRepository.save(warning);
+    }
+
+    runState.completedAt = new Date();
+    return this.etlRunRepository.save(runState);
   }
 
   async getRuns(page: number, limit: number): Promise<[EtlRun[], number]> {

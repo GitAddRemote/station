@@ -331,4 +331,70 @@ describe('CatalogEtlService', () => {
       });
     });
   });
+
+  describe('runStep', () => {
+    it('creates an EtlRun row, executes the step, marks run completed', async () => {
+      const step: EtlStep = {
+        name: 'terminals-sync',
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
+      Object.assign(service, { ETL_STEPS: [step] });
+
+      const initialRun = buildMockRun({ stepsTotal: 1 });
+      mockEtlRunRepository.create.mockReturnValue(initialRun);
+      mockEtlRunRepository.save
+        .mockResolvedValueOnce(initialRun)
+        .mockImplementation((run: EtlRun) =>
+          Promise.resolve({ ...run, completedAt: new Date() }),
+        );
+
+      const result = await service.runStep('terminals-sync');
+
+      expect(mockEtlRunRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'running', stepsTotal: 1 }),
+      );
+      expect(step.execute).toHaveBeenCalledWith({ runId: initialRun.runId });
+      expect(result.status).toBe('completed');
+      expect(result.stepsSucceeded).toBe(1);
+      expect(result.stepsFailed).toBe(0);
+      expect(mockEtlWarningRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('marks run failed and saves error warning when step throws', async () => {
+      const step: EtlStep = {
+        name: 'terminals-sync',
+        execute: jest.fn().mockRejectedValue(new Error('step boom')),
+      };
+      Object.assign(service, { ETL_STEPS: [step] });
+
+      const initialRun = buildMockRun({ stepsTotal: 1 });
+      mockEtlRunRepository.create.mockReturnValue(initialRun);
+      mockEtlRunRepository.save
+        .mockResolvedValueOnce(initialRun)
+        .mockImplementation((run: EtlRun) =>
+          Promise.resolve({ ...run, completedAt: new Date() }),
+        );
+      const mockWarning = new EtlWarning();
+      mockEtlWarningRepository.create.mockReturnValue(mockWarning);
+      mockEtlWarningRepository.save.mockResolvedValue(mockWarning);
+
+      const result = await service.runStep('terminals-sync');
+
+      expect(result.status).toBe('failed');
+      expect(result.stepsFailed).toBe(1);
+      expect(mockEtlWarningRepository.save).toHaveBeenCalledTimes(1);
+      expect(mockEtlWarningRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'error', message: 'step boom' }),
+      );
+    });
+
+    it('throws when step name is not registered', async () => {
+      Object.assign(service, { ETL_STEPS: [] });
+
+      await expect(service.runStep('unknown-step')).rejects.toThrow(
+        'Unknown ETL step: unknown-step',
+      );
+      expect(mockEtlRunRepository.create).not.toHaveBeenCalled();
+    });
+  });
 });

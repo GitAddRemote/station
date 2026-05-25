@@ -28,18 +28,26 @@ export class TerminalDistancesSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
+    // Skip guard: respect UEX 12-hour cache TTL.
     const [lastRun] = await this.dataSource.query<
-      { finished_at: Date | null }[]
+      { completed_at: Date | null }[]
     >(
-      `SELECT finished_at FROM station_etl_run_state
-       WHERE step_name = $1 AND status = 'completed'
-       ORDER BY finished_at DESC LIMIT 1`,
+      `SELECT r.completed_at
+       FROM station_etl_run r
+       WHERE r.status = 'completed'
+         AND NOT EXISTS (
+           SELECT 1 FROM station_etl_warning w
+           WHERE w.run_id = r.run_id
+             AND w.step_name = $1
+             AND w.severity = 'error'
+         )
+       ORDER BY r.completed_at DESC LIMIT 1`,
       [this.name],
     );
 
-    if (lastRun?.finished_at) {
+    if (lastRun?.completed_at) {
       const hoursSince =
-        (Date.now() - new Date(lastRun.finished_at).getTime()) /
+        (Date.now() - new Date(lastRun.completed_at).getTime()) /
         (1000 * 60 * 60);
       if (hoursSince < SKIP_HOURS) {
         this.logger.debug(
@@ -114,12 +122,6 @@ export class TerminalDistancesSyncStep implements EtlStep {
         [originId, destinationId, record.distance],
       );
     }
-
-    await this.dataSource.query(
-      `INSERT INTO station_etl_run_state (run_name, step_name, status, started_at, finished_at)
-       VALUES ($1, $2, 'completed', NOW(), NOW())`,
-      ['catalog-etl', this.name],
-    );
 
     this.logger.info(
       { runId: ctx.runId, total: distances.length, skipped },

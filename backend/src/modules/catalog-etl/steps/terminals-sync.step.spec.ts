@@ -88,8 +88,10 @@ function buildDsQuery(maps: FkMaps = {}): jest.Mock {
   } = maps;
 
   return jest.fn().mockImplementation((sql: string) => {
-    if (sql.includes('station_etl_run_state') && sql.includes('SELECT')) {
-      return Promise.resolve(lastRunDate ? [{ finished_at: lastRunDate }] : []);
+    if (sql.includes('FROM station_etl_run')) {
+      return Promise.resolve(
+        lastRunDate ? [{ completed_at: lastRunDate }] : [],
+      );
     }
     if (sql.includes('FROM station_space_station')) {
       return Promise.resolve(
@@ -425,20 +427,17 @@ describe('TerminalsSyncStep', () => {
       expect(upsertCall[1][26]).toBe(false); // is_cargo_center ($27)
     });
 
-    it('records completion in station_etl_run_state', async () => {
+    it('does not write to station_etl_run_state (run tracking is handled by runStep)', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([makeTerminal()]);
 
       await step.execute(CTX);
 
-      const stateInsert = dsQuery.mock.calls.find(
-        ([sql]: [string]) =>
-          sql.includes('INSERT INTO station_etl_run_state') &&
-          sql.includes('completed'),
+      const stateInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('station_etl_run_state'),
       );
-      expect(stateInsert).toBeDefined();
-      expect(stateInsert[1]).toContain('terminals-sync');
+      expect(stateInsert).toBeUndefined();
     });
 
     it('processes multiple terminals', async () => {
