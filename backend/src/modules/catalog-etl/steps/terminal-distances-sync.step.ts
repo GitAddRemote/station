@@ -29,17 +29,30 @@ export class TerminalDistancesSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    // Skip guard: MAX(synced_at) is only advanced by the final UPDATE at the
-    // end of a successful run — batch INSERTs write epoch so a mid-run failure
-    // never causes the next scheduled run to skip.
-    const [row] = await this.dataSource.query<{ last_synced: Date | null }[]>(
-      `SELECT MAX(synced_at) AS last_synced FROM station_terminal_distance
-       WHERE synced_at > 'epoch'`,
+    // Skip guard: use station_etl_run completion status so we don't need
+    // full-table timestamp rewrites on the ~500k-row distances table.
+    // A run is "successfully completed this step" when status='completed',
+    // steps_failed=0, and no error warning exists for this step name.
+    const [row] = await this.dataSource.query<
+      { last_completed: Date | null }[]
+    >(
+      `SELECT MAX(r.completed_at) AS last_completed
+       FROM station_etl_run r
+       WHERE r.status = 'completed'
+         AND r.steps_failed = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM station_etl_warning w
+           WHERE w.run_id = r.run_id
+             AND w.step_name = $1
+             AND w.severity = 'error'
+         )`,
+      [this.name],
     );
 
-    if (row?.last_synced) {
+    if (row?.last_completed) {
       const hoursSince =
-        (Date.now() - new Date(row.last_synced).getTime()) / (1000 * 60 * 60);
+        (Date.now() - new Date(row.last_completed).getTime()) /
+        (1000 * 60 * 60);
       if (hoursSince < SKIP_HOURS) {
         this.logger.debug(
           { runId: ctx.runId, hoursSince: hoursSince.toFixed(1) },
@@ -48,13 +61,6 @@ export class TerminalDistancesSyncStep implements EtlStep {
         return;
       }
     }
-
-    // Reset all existing rows to epoch before the load so that a mid-run
-    // failure leaves the table fully at epoch — MAX(synced_at) returns NULL
-    // and the next scheduled run retries rather than skipping.
-    await this.dataSource.query(
-      `UPDATE station_terminal_distance SET synced_at = 'epoch'`,
-    );
 
     const distances = await this.uexApiClient.get<UexTerminalDistance[]>(
       '/terminals_distances',
@@ -86,7 +92,7 @@ export class TerminalDistancesSyncStep implements EtlStep {
          VALUES ${valuePlaceholders.join(', ')}
          ON CONFLICT (terminal_origin_id, terminal_destination_id) DO UPDATE SET
            distance_gm=EXCLUDED.distance_gm,
-           synced_at='epoch'`,
+           synced_at=NOW()`,
         batch,
       );
       upserted += batchRowCount;
@@ -135,7 +141,7 @@ export class TerminalDistancesSyncStep implements EtlStep {
 
       const base = batchRowCount * 3;
       valuePlaceholders.push(
-        `($${base + 1}, $${base + 2}, $${base + 3}, 'epoch')`,
+        `($${base + 1}, $${base + 2}, $${base + 3}, NOW())`,
       );
       batch.push(originId, destinationId, record.distance);
       batchRowCount++;
@@ -146,12 +152,6 @@ export class TerminalDistancesSyncStep implements EtlStep {
     }
 
     await flushBatch();
-
-    // Advance synced_at only after the full load completes so the skip guard
-    // never fires on a partially updated table.
-    await this.dataSource.query(
-      `UPDATE station_terminal_distance SET synced_at = NOW()`,
-    );
 
     this.logger.info(
       { runId: ctx.runId, total: distances.length, upserted, skipped },

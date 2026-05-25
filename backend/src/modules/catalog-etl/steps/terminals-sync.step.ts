@@ -88,18 +88,30 @@ export class TerminalsSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    // Skip guard: respect UEX 12-hour cache TTL.
-    // MAX(synced_at) is only advanced by the final UPDATE at the end of a
-    // successful run — individual INSERTs write epoch so partial failures
-    // never cause the guard to skip the next scheduled run.
-    const [row] = await this.dataSource.query<{ last_synced: Date | null }[]>(
-      `SELECT MAX(synced_at) AS last_synced FROM station_terminal
-       WHERE synced_at > 'epoch'`,
+    // Skip guard: use station_etl_run completion status so we don't need
+    // full-table timestamp rewrites. A run counts as "successfully completed
+    // this step" when status='completed', steps_failed=0, and no error warning
+    // exists for this step name.
+    const [row] = await this.dataSource.query<
+      { last_completed: Date | null }[]
+    >(
+      `SELECT MAX(r.completed_at) AS last_completed
+       FROM station_etl_run r
+       WHERE r.status = 'completed'
+         AND r.steps_failed = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM station_etl_warning w
+           WHERE w.run_id = r.run_id
+             AND w.step_name = $1
+             AND w.severity = 'error'
+         )`,
+      [this.name],
     );
 
-    if (row?.last_synced) {
+    if (row?.last_completed) {
       const hoursSince =
-        (Date.now() - new Date(row.last_synced).getTime()) / (1000 * 60 * 60);
+        (Date.now() - new Date(row.last_completed).getTime()) /
+        (1000 * 60 * 60);
       if (hoursSince < SKIP_HOURS) {
         this.logger.debug(
           { runId: ctx.runId, hoursSince: hoursSince.toFixed(1) },
@@ -108,13 +120,6 @@ export class TerminalsSyncStep implements EtlStep {
         return;
       }
     }
-
-    // Reset all existing rows to epoch before the load so that a mid-run
-    // failure leaves the table fully at epoch — MAX(synced_at) returns NULL
-    // and the next scheduled run retries rather than skipping.
-    await this.dataSource.query(
-      `UPDATE station_terminal SET synced_at = 'epoch'`,
-    );
 
     const terminals = await this.uexApiClient.get<UexTerminal[]>('/terminals');
     this.logger.info(
@@ -313,7 +318,7 @@ export class TerminalsSyncStep implements EtlStep {
             game_version, uex_date_added, uex_date_modified, synced_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
                  $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-                 $39,$40,$41,$42,$43,$44,'epoch')
+                 $39,$40,$41,$42,$43,$44,NOW())
          ON CONFLICT (uex_id) DO UPDATE SET
            name=EXCLUDED.name, fullname=EXCLUDED.fullname, nickname=EXCLUDED.nickname,
            displayname=EXCLUDED.displayname, code=EXCLUDED.code, type=EXCLUDED.type,
@@ -339,7 +344,7 @@ export class TerminalsSyncStep implements EtlStep {
            has_freight_elevator=EXCLUDED.has_freight_elevator,
            game_version=EXCLUDED.game_version,
            uex_date_added=EXCLUDED.uex_date_added, uex_date_modified=EXCLUDED.uex_date_modified,
-           synced_at='epoch'`,
+           synced_at=NOW()`,
         [
           record.id, // $1
           record.name, // $2
@@ -388,12 +393,6 @@ export class TerminalsSyncStep implements EtlStep {
         ],
       );
     }
-
-    // Advance synced_at only after the full load completes so the skip guard
-    // never fires on a partially updated table.
-    await this.dataSource.query(
-      `UPDATE station_terminal SET synced_at = NOW()`,
-    );
 
     this.logger.info(
       { runId: ctx.runId, count: terminals.length },

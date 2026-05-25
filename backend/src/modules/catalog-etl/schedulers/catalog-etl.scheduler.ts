@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { CatalogEtlService } from '../catalog-etl.service';

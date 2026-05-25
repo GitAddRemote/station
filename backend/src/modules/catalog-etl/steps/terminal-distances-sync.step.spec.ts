@@ -16,13 +16,13 @@ function buildDsQuery(
   lastRunDate: Date | null = null,
 ): jest.Mock {
   return jest.fn().mockImplementation((sql: string) => {
-    if (
-      sql.includes('FROM station_terminal_distance') &&
-      sql.includes('MAX(synced_at)')
-    ) {
-      return Promise.resolve([{ last_synced: lastRunDate ?? null }]);
+    if (sql.includes('FROM station_etl_run')) {
+      return Promise.resolve([{ last_completed: lastRunDate ?? null }]);
     }
-    if (sql.includes('station_terminal')) {
+    if (
+      sql.includes('FROM station_terminal') &&
+      !sql.includes('station_terminal_distance')
+    ) {
       return Promise.resolve(
         Object.entries(terminals).map(([code, id]) => ({ code, id })),
       );
@@ -183,7 +183,7 @@ describe('TerminalDistancesSyncStep', () => {
       ]);
     });
 
-    it('resets all rows to epoch at start, writes epoch in batches, and advances synced_at only after all batches complete', async () => {
+    it('writes NOW() in INSERT and does not issue full-table synced_at UPDATE', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
@@ -196,34 +196,20 @@ describe('TerminalDistancesSyncStep', () => {
 
       await step.execute(CTX);
 
-      // Epoch-reset fires before the API call so untouched rows can't hold a
-      // stale non-epoch timestamp if the run fails mid-way
-      const epochReset = dsQuery.mock.calls.find(
-        ([sql]: [string]) =>
-          sql.includes('UPDATE station_terminal_distance') &&
-          sql.includes("synced_at = 'epoch'") &&
-          !sql.includes('INSERT'),
-      );
-      expect(epochReset).toBeDefined();
-      const epochResetIdx = dsQuery.mock.calls.indexOf(epochReset!);
-      const firstInsertIdx = dsQuery.mock.calls.findIndex(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_terminal_distance'),
-      );
-      expect(epochResetIdx).toBeLessThan(firstInsertIdx);
-
-      // Batch INSERTs also write epoch
+      // Each batch INSERT should write synced_at=NOW() directly
       const insertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_terminal_distance'),
       );
-      expect(insertCall![0]).toContain("'epoch'");
+      expect(insertCall).toBeDefined();
+      expect(insertCall![0]).toContain('NOW()');
 
-      // Final UPDATE fires after all batches complete
-      const finalUpdate = dsQuery.mock.calls.find(
+      // No full-table UPDATE should be issued (skip guard uses station_etl_run)
+      const fullTableUpdate = dsQuery.mock.calls.find(
         ([sql]: [string]) =>
           sql.includes('UPDATE station_terminal_distance') &&
-          sql.includes('synced_at = NOW()'),
+          !sql.includes('INSERT'),
       );
-      expect(finalUpdate).toBeDefined();
+      expect(fullTableUpdate).toBeUndefined();
     });
   });
 
