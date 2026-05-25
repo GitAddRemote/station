@@ -34,7 +34,7 @@ export class TerminalDistancesSyncStep implements EtlStep {
     // never causes the next scheduled run to skip.
     const [row] = await this.dataSource.query<{ last_synced: Date | null }[]>(
       `SELECT MAX(synced_at) AS last_synced FROM station_terminal_distance
-       WHERE synced_at > '1970-01-01'`,
+       WHERE synced_at > 'epoch'`,
     );
 
     if (row?.last_synced) {

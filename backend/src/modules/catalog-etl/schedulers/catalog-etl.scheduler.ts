@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { CatalogEtlService } from '../catalog-etl.service';
@@ -17,6 +18,13 @@ export class CatalogEtlScheduler {
     try {
       await this.catalogEtlService.runStep('terminals-sync');
     } catch (err: unknown) {
+      if (err instanceof ConflictException) {
+        this.logger.debug(
+          { err },
+          'Scheduled terminals sync skipped: ETL lock already held',
+        );
+        return;
+      }
       this.logger.error({ err }, 'Scheduled terminals sync failed');
     }
   }
@@ -28,6 +36,13 @@ export class CatalogEtlScheduler {
     try {
       await this.catalogEtlService.runStep('terminal-distances-sync');
     } catch (err: unknown) {
+      if (err instanceof ConflictException) {
+        this.logger.debug(
+          { err },
+          'Scheduled terminal distances sync skipped: ETL lock already held',
+        );
+        return;
+      }
       this.logger.error({ err }, 'Scheduled terminal distances sync failed');
     }
   }

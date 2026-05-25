@@ -94,7 +94,7 @@ export class TerminalsSyncStep implements EtlStep {
     // never cause the guard to skip the next scheduled run.
     const [row] = await this.dataSource.query<{ last_synced: Date | null }[]>(
       `SELECT MAX(synced_at) AS last_synced FROM station_terminal
-       WHERE synced_at > '1970-01-01'`,
+       WHERE synced_at > 'epoch'`,
     );
 
     if (row?.last_synced) {
