@@ -72,7 +72,6 @@ interface FkMaps {
   moons?: Record<number, number>;
   factions?: Record<number, number>;
   companies?: Record<number, number>;
-  lastRunDate?: Date | null;
 }
 
 function buildDsQuery(maps: FkMaps = {}): jest.Mock {
@@ -87,13 +86,9 @@ function buildDsQuery(maps: FkMaps = {}): jest.Mock {
     moons = {},
     factions = { 5: 1005 },
     companies = { 6: 1006 },
-    lastRunDate = null,
   } = maps;
 
   return jest.fn().mockImplementation((sql: string) => {
-    if (sql.includes('FROM station_etl_run')) {
-      return Promise.resolve([{ last_completed: lastRunDate ?? null }]);
-    }
     if (sql.includes('FROM station_space_station')) {
       return Promise.resolve(
         Object.entries(spaceStations).map(([k, v]) => ({
@@ -189,39 +184,6 @@ describe('TerminalsSyncStep', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
-
-  describe('skip guard', () => {
-    it('skips when last completed run was within 12 hours', async () => {
-      const recentDate = new Date(Date.now() - 6 * 60 * 60 * 1000);
-      const dsQuery = buildDsQuery({ lastRunDate: recentDate });
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-
-      await step.execute(CTX);
-
-      expect(uexGet).not.toHaveBeenCalled();
-    });
-
-    it('runs when no prior completed run exists', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([makeTerminal()]);
-
-      await step.execute(CTX);
-
-      expect(uexGet).toHaveBeenCalledWith('/terminals');
-    });
-
-    it('runs when last completed run was more than 12 hours ago', async () => {
-      const oldDate = new Date(Date.now() - 13 * 60 * 60 * 1000);
-      const dsQuery = buildDsQuery({ lastRunDate: oldDate });
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([makeTerminal()]);
-
-      await step.execute(CTX);
-
-      expect(uexGet).toHaveBeenCalledWith('/terminals');
-    });
-  });
 
   describe('type mapping', () => {
     it.each([

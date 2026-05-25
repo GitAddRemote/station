@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlRun } from './entities/etl-run.entity';
 import { EtlWarning } from './entities/etl-warning.entity';
@@ -31,6 +31,7 @@ export class CatalogEtlService {
     private readonly etlRunRepository: Repository<EtlRun>,
     @InjectRepository(EtlWarning)
     private readonly etlWarningRepository: Repository<EtlWarning>,
+    private readonly dataSource: DataSource,
     private readonly advisoryLockService: AdvisoryLockService,
     @InjectPinoLogger(CatalogEtlService.name)
     private readonly logger: PinoLogger,
@@ -170,6 +171,25 @@ export class CatalogEtlService {
       runState.completedAt = new Date();
       return this.etlRunRepository.save(runState);
     });
+  }
+
+  async getLastSuccessfulStepRun(stepName: string): Promise<Date | null> {
+    const [row] = await this.dataSource.query<
+      { last_completed: Date | null }[]
+    >(
+      `SELECT MAX(r.completed_at) AS last_completed
+       FROM station_etl_run r
+       WHERE r.status = 'completed'
+         AND r.steps_failed = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM station_etl_warning w
+           WHERE w.run_id = r.run_id
+             AND w.step_name = $1
+             AND w.severity = 'error'
+         )`,
+      [stepName],
+    );
+    return row?.last_completed ?? null;
   }
 
   async getRuns(page: number, limit: number): Promise<[EtlRun[], number]> {

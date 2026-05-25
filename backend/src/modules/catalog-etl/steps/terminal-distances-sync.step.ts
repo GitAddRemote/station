@@ -6,7 +6,6 @@ import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
 
-const SKIP_HOURS = 12;
 const UPSERT_BATCH_SIZE = 500;
 
 interface UexTerminalDistance {
@@ -29,39 +28,6 @@ export class TerminalDistancesSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    // Skip guard: use station_etl_run completion status so we don't need
-    // full-table timestamp rewrites on the ~500k-row distances table.
-    // A run is "successfully completed this step" when status='completed',
-    // steps_failed=0, and no error warning exists for this step name.
-    const [row] = await this.dataSource.query<
-      { last_completed: Date | null }[]
-    >(
-      `SELECT MAX(r.completed_at) AS last_completed
-       FROM station_etl_run r
-       WHERE r.status = 'completed'
-         AND r.steps_failed = 0
-         AND NOT EXISTS (
-           SELECT 1 FROM station_etl_warning w
-           WHERE w.run_id = r.run_id
-             AND w.step_name = $1
-             AND w.severity = 'error'
-         )`,
-      [this.name],
-    );
-
-    if (row?.last_completed) {
-      const hoursSince =
-        (Date.now() - new Date(row.last_completed).getTime()) /
-        (1000 * 60 * 60);
-      if (hoursSince < SKIP_HOURS) {
-        this.logger.debug(
-          { runId: ctx.runId, hoursSince: hoursSince.toFixed(1) },
-          'terminal-distances-sync skipped: last run was within 12h',
-        );
-        return;
-      }
-    }
-
     const distances = await this.uexApiClient.get<UexTerminalDistance[]>(
       '/terminals_distances',
     );

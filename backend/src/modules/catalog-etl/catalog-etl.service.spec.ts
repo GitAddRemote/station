@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { getLoggerToken } from 'nestjs-pino';
 import { CatalogEtlService } from './catalog-etl.service';
 import { EtlRun } from './entities/etl-run.entity';
@@ -85,6 +86,12 @@ describe('CatalogEtlService', () => {
         {
           provide: AdvisoryLockService,
           useValue: mockAdvisoryLockService,
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            query: jest.fn().mockResolvedValue([{ last_completed: null }]),
+          },
         },
         {
           provide: FactionsSyncStep,

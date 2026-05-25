@@ -13,12 +13,8 @@ function makeLogger() {
 
 function buildDsQuery(
   terminals: Record<string, number> = { PORTOL: 100, LORV: 200 },
-  lastRunDate: Date | null = null,
 ): jest.Mock {
   return jest.fn().mockImplementation((sql: string) => {
-    if (sql.includes('FROM station_etl_run')) {
-      return Promise.resolve([{ last_completed: lastRunDate ?? null }]);
-    }
     if (
       sql.includes('FROM station_terminal') &&
       !sql.includes('station_terminal_distance')
@@ -57,45 +53,6 @@ describe('TerminalDistancesSyncStep', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
-
-  describe('skip guard', () => {
-    it('skips when last completed run was within 12 hours', async () => {
-      const recentDate = new Date(Date.now() - 6 * 60 * 60 * 1000);
-      const dsQuery = buildDsQuery({ PORTOL: 100, LORV: 200 }, recentDate);
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-
-      await step.execute(CTX);
-
-      expect(uexGet).not.toHaveBeenCalled();
-    });
-
-    it('runs when no prior completed run exists', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([]);
-
-      await step.execute(CTX);
-
-      expect(uexGet).toHaveBeenCalledWith('/terminals_distances');
-    });
-
-    it('runs when last completed run was more than 12 hours ago', async () => {
-      const oldDate = new Date(Date.now() - 13 * 60 * 60 * 1000);
-      const dsQuery = buildDsQuery({ PORTOL: 100, LORV: 200 }, oldDate);
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([
-        {
-          terminal_code_origin: 'PORTOL',
-          terminal_code_destination: 'LORV',
-          distance: 1500.5,
-        },
-      ]);
-
-      await step.execute(CTX);
-
-      expect(uexGet).toHaveBeenCalledWith('/terminals_distances');
-    });
-  });
 
   describe('upsert', () => {
     it('upserts distance with resolved terminal FKs', async () => {
