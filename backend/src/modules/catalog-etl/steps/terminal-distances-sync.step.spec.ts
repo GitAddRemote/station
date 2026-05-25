@@ -12,7 +12,7 @@ function makeLogger() {
 }
 
 function buildDsQuery(
-  terminals: Record<number, number> = { 1: 100, 2: 200 },
+  terminals: Record<string, number> = { PORTOL: 100, LORV: 200 },
   lastRunDate: Date | null = null,
 ): jest.Mock {
   return jest.fn().mockImplementation((sql: string) => {
@@ -24,10 +24,7 @@ function buildDsQuery(
     }
     if (sql.includes('station_terminal')) {
       return Promise.resolve(
-        Object.entries(terminals).map(([uex_id, id]) => ({
-          uex_id: Number(uex_id),
-          id,
-        })),
+        Object.entries(terminals).map(([code, id]) => ({ code, id })),
       );
     }
     return Promise.resolve([]);
@@ -64,7 +61,7 @@ describe('TerminalDistancesSyncStep', () => {
   describe('skip guard', () => {
     it('skips when last completed run was within 12 hours', async () => {
       const recentDate = new Date(Date.now() - 6 * 60 * 60 * 1000);
-      const dsQuery = buildDsQuery({ 1: 100, 2: 200 }, recentDate);
+      const dsQuery = buildDsQuery({ PORTOL: 100, LORV: 200 }, recentDate);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
 
       await step.execute(CTX);
@@ -79,20 +76,24 @@ describe('TerminalDistancesSyncStep', () => {
 
       await step.execute(CTX);
 
-      expect(uexGet).toHaveBeenCalledWith('/terminal_distances');
+      expect(uexGet).toHaveBeenCalledWith('/terminals_distances');
     });
 
     it('runs when last completed run was more than 12 hours ago', async () => {
       const oldDate = new Date(Date.now() - 13 * 60 * 60 * 1000);
-      const dsQuery = buildDsQuery({ 1: 100, 2: 200 }, oldDate);
+      const dsQuery = buildDsQuery({ PORTOL: 100, LORV: 200 }, oldDate);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
-        { id_terminal_origin: 1, id_terminal_destination: 2, distance: 1500.5 },
+        {
+          terminal_code_origin: 'PORTOL',
+          terminal_code_destination: 'LORV',
+          distance: 1500.5,
+        },
       ]);
 
       await step.execute(CTX);
 
-      expect(uexGet).toHaveBeenCalledWith('/terminal_distances');
+      expect(uexGet).toHaveBeenCalledWith('/terminals_distances');
     });
   });
 
@@ -101,7 +102,11 @@ describe('TerminalDistancesSyncStep', () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
-        { id_terminal_origin: 1, id_terminal_destination: 2, distance: 1500.5 },
+        {
+          terminal_code_origin: 'PORTOL',
+          terminal_code_destination: 'LORV',
+          distance: 1500.5,
+        },
       ]);
 
       await step.execute(CTX);
@@ -130,7 +135,11 @@ describe('TerminalDistancesSyncStep', () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
-        { id_terminal_origin: 1, id_terminal_destination: 2, distance: 100 },
+        {
+          terminal_code_origin: 'PORTOL',
+          terminal_code_destination: 'LORV',
+          distance: 100,
+        },
       ]);
 
       await step.execute(CTX);
@@ -141,13 +150,25 @@ describe('TerminalDistancesSyncStep', () => {
       expect(stateInsert).toBeUndefined();
     });
 
-    it('processes multiple distances', async () => {
-      const dsQuery = buildDsQuery({ 1: 100, 2: 200, 3: 300 });
+    it('batches multiple distances into a single INSERT', async () => {
+      const dsQuery = buildDsQuery({ PORTOL: 100, LORV: 200, ARIA: 300 });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
-        { id_terminal_origin: 1, id_terminal_destination: 2, distance: 100 },
-        { id_terminal_origin: 2, id_terminal_destination: 3, distance: 200 },
-        { id_terminal_origin: 1, id_terminal_destination: 3, distance: 300 },
+        {
+          terminal_code_origin: 'PORTOL',
+          terminal_code_destination: 'LORV',
+          distance: 100,
+        },
+        {
+          terminal_code_origin: 'LORV',
+          terminal_code_destination: 'ARIA',
+          distance: 200,
+        },
+        {
+          terminal_code_origin: 'PORTOL',
+          terminal_code_destination: 'ARIA',
+          distance: 300,
+        },
       ]);
 
       await step.execute(CTX);
@@ -155,16 +176,24 @@ describe('TerminalDistancesSyncStep', () => {
       const upsertCalls = dsQuery.mock.calls.filter(([sql]: [string]) =>
         sql.includes('INSERT INTO station_terminal_distance'),
       );
-      expect(upsertCalls).toHaveLength(3);
+      // All 3 valid rows fit in one batch (batch size 500)
+      expect(upsertCalls).toHaveLength(1);
+      expect(upsertCalls[0][1]).toEqual([
+        100, 200, 100, 200, 300, 200, 100, 300, 300,
+      ]);
     });
   });
 
   describe('warnings', () => {
-    it('warns and skips when origin terminal is unknown', async () => {
+    it('warns and skips when origin terminal code is unknown', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
-        { id_terminal_origin: 99, id_terminal_destination: 2, distance: 500 },
+        {
+          terminal_code_origin: 'UNKNOWN',
+          terminal_code_destination: 'LORV',
+          distance: 500,
+        },
       ]);
 
       await step.execute(CTX);
@@ -172,7 +201,9 @@ describe('TerminalDistancesSyncStep', () => {
       expect(repoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'warn',
-          message: expect.stringContaining('unknown origin terminal 99'),
+          message: expect.stringContaining(
+            "unknown origin terminal code 'UNKNOWN'",
+          ),
         }),
       );
       const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
@@ -181,11 +212,15 @@ describe('TerminalDistancesSyncStep', () => {
       expect(upsertCall).toBeUndefined();
     });
 
-    it('warns and skips when destination terminal is unknown', async () => {
+    it('warns and skips when destination terminal code is unknown', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
-        { id_terminal_origin: 1, id_terminal_destination: 99, distance: 500 },
+        {
+          terminal_code_origin: 'PORTOL',
+          terminal_code_destination: 'UNKNOWN',
+          distance: 500,
+        },
       ]);
 
       await step.execute(CTX);
@@ -193,7 +228,9 @@ describe('TerminalDistancesSyncStep', () => {
       expect(repoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'warn',
-          message: expect.stringContaining('unknown destination terminal 99'),
+          message: expect.stringContaining(
+            "unknown destination terminal code 'UNKNOWN'",
+          ),
         }),
       );
       const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
@@ -206,8 +243,16 @@ describe('TerminalDistancesSyncStep', () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
-        { id_terminal_origin: 99, id_terminal_destination: 2, distance: 500 },
-        { id_terminal_origin: 1, id_terminal_destination: 2, distance: 1000 },
+        {
+          terminal_code_origin: 'UNKNOWN',
+          terminal_code_destination: 'LORV',
+          distance: 500,
+        },
+        {
+          terminal_code_origin: 'PORTOL',
+          terminal_code_destination: 'LORV',
+          distance: 1000,
+        },
       ]);
 
       await step.execute(CTX);
