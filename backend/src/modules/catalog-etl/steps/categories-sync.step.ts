@@ -73,13 +73,11 @@ export class CategoriesSyncStep implements EtlStep {
       { type: string | null; section: string }
     >();
     for (const cat of categories) {
-      if (cat.section) {
-        const key = sectionKey(mapType(cat.type), cat.section);
+      const section = cat.section?.trim() || null;
+      if (section) {
+        const key = sectionKey(mapType(cat.type), section);
         if (!sectionRows.has(key)) {
-          sectionRows.set(key, {
-            type: mapType(cat.type),
-            section: cat.section,
-          });
+          sectionRows.set(key, { type: mapType(cat.type), section });
         }
       }
     }
@@ -92,7 +90,7 @@ export class CategoriesSyncStep implements EtlStep {
            (uex_id, parent_id, type, section, name, is_section,
             is_game_related, is_mining, synced_at)
          VALUES (NULL, NULL, $1, $2, $3, TRUE, FALSE, FALSE, NOW())
-         ON CONFLICT (type, name) WHERE is_section = TRUE DO UPDATE SET
+         ON CONFLICT (COALESCE(type, ''), name) WHERE is_section = TRUE DO UPDATE SET
            section=EXCLUDED.section,
            synced_at=NOW()
          RETURNING id`,
@@ -133,8 +131,9 @@ export class CategoriesSyncStep implements EtlStep {
         );
       }
 
-      const parentId = record.section
-        ? (sectionIdByKey.get(sectionKey(type, record.section)) ?? null)
+      const section = record.section?.trim() || null;
+      const parentId = section
+        ? (sectionIdByKey.get(sectionKey(type, section)) ?? null)
         : null;
 
       await this.dataSource.query(
@@ -157,7 +156,7 @@ export class CategoriesSyncStep implements EtlStep {
           record.id,
           parentId,
           type,
-          record.section ?? null,
+          section,
           record.name,
           Boolean(record.is_game_related),
           Boolean(record.is_mining),

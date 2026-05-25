@@ -126,7 +126,7 @@ describe('CategoriesSyncStep', () => {
       expect(sectionInsert[1][2]).toBe('Weapons'); // name = section label
     });
 
-    it('section rows conflict on (type, name) WHERE is_section = TRUE', async () => {
+    it("section rows conflict on COALESCE(type, '') to handle NULL type idempotently", async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([makeCategory()]);
@@ -139,8 +139,46 @@ describe('CategoriesSyncStep', () => {
           sql.includes('RETURNING id'),
       );
       expect(sectionInsert[0]).toContain(
-        'ON CONFLICT (type, name) WHERE is_section = TRUE',
+        "ON CONFLICT (COALESCE(type, ''), name) WHERE is_section = TRUE",
       );
+    });
+
+    it('normalizes empty-string section to null — no section row created, leaf parent_id is null', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([makeCategory({ section: '' })]);
+
+      await step.execute(CTX);
+
+      const sectionInserts = dsQuery.mock.calls.filter(
+        ([sql]: [string]) =>
+          sql.includes('INSERT INTO station_category') &&
+          sql.includes('RETURNING id'),
+      );
+      expect(sectionInserts).toHaveLength(0);
+
+      const leafInsert = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('INSERT INTO station_category') &&
+          !sql.includes('RETURNING id'),
+      );
+      expect(leafInsert[1][1]).toBeNull(); // parent_id = $2
+      expect(leafInsert[1][3]).toBeNull(); // section = $4
+    });
+
+    it('normalizes whitespace-only section to null', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([makeCategory({ section: '   ' })]);
+
+      await step.execute(CTX);
+
+      const sectionInserts = dsQuery.mock.calls.filter(
+        ([sql]: [string]) =>
+          sql.includes('INSERT INTO station_category') &&
+          sql.includes('RETURNING id'),
+      );
+      expect(sectionInserts).toHaveLength(0);
     });
   });
 
