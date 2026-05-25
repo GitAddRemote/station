@@ -20,6 +20,8 @@ import { OutpostsSyncStep } from './steps/outposts-sync.step';
 import { PoisSyncStep } from './steps/pois-sync.step';
 import { JumpPointsSyncStep } from './steps/jump-points-sync.step';
 import { CategoriesSyncStep } from './steps/categories-sync.step';
+import { TerminalsSyncStep } from './steps/terminals-sync.step';
+import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step';
 
 function buildMockRun(overrides: Partial<EtlRun> = {}): EtlRun {
   const run = new EtlRun();
@@ -135,6 +137,14 @@ describe('CatalogEtlService', () => {
         {
           provide: CategoriesSyncStep,
           useValue: { name: 'categories-sync', execute: jest.fn() },
+        },
+        {
+          provide: TerminalsSyncStep,
+          useValue: { name: 'terminals-sync', execute: jest.fn() },
+        },
+        {
+          provide: TerminalDistancesSyncStep,
+          useValue: { name: 'terminal-distances-sync', execute: jest.fn() },
         },
       ],
     }).compile();

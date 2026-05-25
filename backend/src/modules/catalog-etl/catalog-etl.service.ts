@@ -19,6 +19,8 @@ import { OutpostsSyncStep } from './steps/outposts-sync.step';
 import { PoisSyncStep } from './steps/pois-sync.step';
 import { JumpPointsSyncStep } from './steps/jump-points-sync.step';
 import { CategoriesSyncStep } from './steps/categories-sync.step';
+import { TerminalsSyncStep } from './steps/terminals-sync.step';
+import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step';
 
 @Injectable()
 export class CatalogEtlService {
@@ -45,6 +47,8 @@ export class CatalogEtlService {
     private readonly poisSyncStep: PoisSyncStep,
     private readonly jumpPointsSyncStep: JumpPointsSyncStep,
     private readonly categoriesSyncStep: CategoriesSyncStep,
+    private readonly terminalsSyncStep: TerminalsSyncStep,
+    private readonly terminalDistancesSyncStep: TerminalDistancesSyncStep,
   ) {
     this.ETL_STEPS = [
       factionsSyncStep,
@@ -60,6 +64,8 @@ export class CatalogEtlService {
       poisSyncStep,
       jumpPointsSyncStep,
       categoriesSyncStep,
+      terminalsSyncStep,
+      terminalDistancesSyncStep,
     ];
   }
 
@@ -124,6 +130,15 @@ export class CatalogEtlService {
 
       return savedRun;
     });
+  }
+
+  async runStep(stepName: string): Promise<void> {
+    const step = this.ETL_STEPS.find((s) => s.name === stepName);
+    if (!step) {
+      throw new Error(`Unknown ETL step: ${stepName}`);
+    }
+    const runId = `scheduler-${stepName}-${Date.now()}`;
+    await step.execute({ runId });
   }
 
   async getRuns(page: number, limit: number): Promise<[EtlRun[], number]> {
