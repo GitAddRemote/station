@@ -23,15 +23,15 @@ function makeTerminal(overrides: Record<string, unknown> = {}) {
     id_outpost: null,
     id_city: null,
     id_star_system: 1,
-    id_planet: null,
-    id_orbit: null,
+    id_planet: 2,
+    id_orbit: 3,
     id_moon: null,
-    id_faction: null,
-    id_company: null,
+    id_faction: 5,
+    id_company: 6,
     contact_url: null,
     screenshot: null,
     max_container_size: null,
-    type: 'trading',
+    type: 'commodity',
     is_available: 1,
     is_available_live: 1,
     is_visible: 1,
@@ -60,37 +60,94 @@ function makeTerminal(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildDsQuery(
-  spaceStations: Record<number, number> = { 10: 100 },
-  outposts: Record<number, number> = {},
-  cities: Record<number, number> = {},
-  lastRunDate: Date | null = null,
-): jest.Mock {
+interface FkMaps {
+  spaceStations?: Record<number, number>;
+  outposts?: Record<number, number>;
+  cities?: Record<number, number>;
+  starSystems?: Record<number, number>;
+  planets?: Record<number, number>;
+  orbits?: Record<number, number>;
+  moons?: Record<number, number>;
+  factions?: Record<number, number>;
+  companies?: Record<number, number>;
+  lastRunDate?: Date | null;
+}
+
+function buildDsQuery(maps: FkMaps = {}): jest.Mock {
+  const {
+    spaceStations = { 10: 100 },
+    outposts = {},
+    cities = {},
+    starSystems = { 1: 1001 },
+    planets = { 2: 1002 },
+    orbits = { 3: 1003 },
+    moons = {},
+    factions = { 5: 1005 },
+    companies = { 6: 1006 },
+    lastRunDate = null,
+  } = maps;
+
   return jest.fn().mockImplementation((sql: string) => {
     if (sql.includes('station_etl_run_state') && sql.includes('SELECT')) {
       return Promise.resolve(lastRunDate ? [{ finished_at: lastRunDate }] : []);
     }
-    if (sql.includes('station_space_station')) {
+    if (sql.includes('FROM station_space_station')) {
       return Promise.resolve(
-        Object.entries(spaceStations).map(([uex_id, id]) => ({
-          uex_id: Number(uex_id),
-          id,
+        Object.entries(spaceStations).map(([k, v]) => ({
+          uex_id: Number(k),
+          id: v,
         })),
       );
     }
-    if (sql.includes('station_outpost')) {
+    if (sql.includes('FROM station_outpost')) {
       return Promise.resolve(
-        Object.entries(outposts).map(([uex_id, id]) => ({
-          uex_id: Number(uex_id),
-          id,
+        Object.entries(outposts).map(([k, v]) => ({
+          uex_id: Number(k),
+          id: v,
         })),
       );
     }
-    if (sql.includes('station_city')) {
+    if (sql.includes('FROM station_city')) {
       return Promise.resolve(
-        Object.entries(cities).map(([uex_id, id]) => ({
-          uex_id: Number(uex_id),
-          id,
+        Object.entries(cities).map(([k, v]) => ({ uex_id: Number(k), id: v })),
+      );
+    }
+    if (sql.includes('FROM station_star_system')) {
+      return Promise.resolve(
+        Object.entries(starSystems).map(([k, v]) => ({
+          uex_id: Number(k),
+          id: v,
+        })),
+      );
+    }
+    if (sql.includes('FROM station_planet')) {
+      return Promise.resolve(
+        Object.entries(planets).map(([k, v]) => ({ uex_id: Number(k), id: v })),
+      );
+    }
+    if (sql.includes('FROM station_orbit')) {
+      return Promise.resolve(
+        Object.entries(orbits).map(([k, v]) => ({ uex_id: Number(k), id: v })),
+      );
+    }
+    if (sql.includes('FROM station_moon')) {
+      return Promise.resolve(
+        Object.entries(moons).map(([k, v]) => ({ uex_id: Number(k), id: v })),
+      );
+    }
+    if (sql.includes('FROM station_faction')) {
+      return Promise.resolve(
+        Object.entries(factions).map(([k, v]) => ({
+          uex_id: Number(k),
+          id: v,
+        })),
+      );
+    }
+    if (sql.includes('FROM station_company')) {
+      return Promise.resolve(
+        Object.entries(companies).map(([k, v]) => ({
+          uex_id: Number(k),
+          id: v,
         })),
       );
     }
@@ -128,7 +185,7 @@ describe('TerminalsSyncStep', () => {
   describe('skip guard', () => {
     it('skips when last completed run was within 12 hours', async () => {
       const recentDate = new Date(Date.now() - 6 * 60 * 60 * 1000);
-      const dsQuery = buildDsQuery({ 10: 100 }, {}, {}, recentDate);
+      const dsQuery = buildDsQuery({ lastRunDate: recentDate });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
 
       await step.execute(CTX);
@@ -148,7 +205,7 @@ describe('TerminalsSyncStep', () => {
 
     it('runs when last completed run was more than 12 hours ago', async () => {
       const oldDate = new Date(Date.now() - 13 * 60 * 60 * 1000);
-      const dsQuery = buildDsQuery({ 10: 100 }, {}, {}, oldDate);
+      const dsQuery = buildDsQuery({ lastRunDate: oldDate });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([makeTerminal()]);
 
@@ -158,11 +215,21 @@ describe('TerminalsSyncStep', () => {
     });
   });
 
-  describe('upsert', () => {
-    it('upserts terminal with resolved space_station FK', async () => {
-      const dsQuery = buildDsQuery({ 10: 100 });
+  describe('type mapping', () => {
+    it.each([
+      ['commodity', 'commodity'],
+      ['item', 'item'],
+      ['commodity_raw', 'commodity_raw'],
+      ['vehicle_buy', 'vehicle_buy'],
+      ['vehicle_rent', 'vehicle_rent'],
+      ['fuel', 'fuel'],
+      ['refinery_audit', 'refinery_audit'],
+      ['refinery', 'refinery_audit'],
+      ['vehicle', 'vehicle_buy'],
+    ])('maps UEX type "%s" → "%s"', async (rawType, expectedType) => {
+      const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([makeTerminal({ id: 1, id_space_station: 10 })]);
+      uexGet.mockResolvedValue([makeTerminal({ type: rawType })]);
 
       await step.execute(CTX);
 
@@ -170,13 +237,51 @@ describe('TerminalsSyncStep', () => {
         sql.includes('INSERT INTO station_terminal'),
       );
       expect(upsertCall).toBeDefined();
+      expect(upsertCall[1][6]).toBe(expectedType); // type is $7
+    });
+
+    it('skips terminal with unknown type and emits warning', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([makeTerminal({ type: 'unknown_type' })]);
+
+      await step.execute(CTX);
+
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining("unknown type 'unknown_type'"),
+        }),
+      );
+      expect(
+        dsQuery.mock.calls.find(([sql]: [string]) =>
+          sql.includes('INSERT INTO station_terminal'),
+        ),
+      ).toBeUndefined();
+    });
+  });
+
+  describe('FK resolution — primary location', () => {
+    it('upserts terminal with resolved space_station FK', async () => {
+      const dsQuery = buildDsQuery({ spaceStations: { 10: 100 } });
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([makeTerminal({ id_space_station: 10 })]);
+
+      await step.execute(CTX);
+
+      const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_terminal'),
+      );
       expect(upsertCall[1][10]).toBe(100); // space_station_id ($11)
       expect(upsertCall[1][11]).toBeNull(); // outpost_id ($12)
       expect(upsertCall[1][12]).toBeNull(); // city_id ($13)
     });
 
     it('upserts terminal with resolved outpost FK when no space station', async () => {
-      const dsQuery = buildDsQuery({}, { 20: 200 });
+      const dsQuery = buildDsQuery({
+        spaceStations: {},
+        outposts: { 20: 200 },
+      });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
         makeTerminal({ id_space_station: null, id_outpost: 20 }),
@@ -187,13 +292,13 @@ describe('TerminalsSyncStep', () => {
       const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_terminal'),
       );
-      expect(upsertCall[1][10]).toBeNull(); // space_station_id
-      expect(upsertCall[1][11]).toBe(200); // outpost_id
-      expect(upsertCall[1][12]).toBeNull(); // city_id
+      expect(upsertCall[1][10]).toBeNull();
+      expect(upsertCall[1][11]).toBe(200);
+      expect(upsertCall[1][12]).toBeNull();
     });
 
     it('upserts terminal with resolved city FK when no space station or outpost', async () => {
-      const dsQuery = buildDsQuery({}, {}, { 30: 300 });
+      const dsQuery = buildDsQuery({ spaceStations: {}, cities: { 30: 300 } });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
         makeTerminal({ id_space_station: null, id_outpost: null, id_city: 30 }),
@@ -204,11 +309,106 @@ describe('TerminalsSyncStep', () => {
       const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_terminal'),
       );
-      expect(upsertCall[1][10]).toBeNull(); // space_station_id
-      expect(upsertCall[1][11]).toBeNull(); // outpost_id
-      expect(upsertCall[1][12]).toBe(300); // city_id
+      expect(upsertCall[1][10]).toBeNull();
+      expect(upsertCall[1][11]).toBeNull();
+      expect(upsertCall[1][12]).toBe(300);
+    });
+  });
+
+  describe('FK resolution — secondary columns', () => {
+    it('resolves star_system_id, planet_id, orbit_id, faction_id, company_id to local BIGINT ids', async () => {
+      const dsQuery = buildDsQuery({
+        starSystems: { 1: 1001 },
+        planets: { 2: 1002 },
+        orbits: { 3: 1003 },
+        factions: { 5: 1005 },
+        companies: { 6: 1006 },
+      });
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([
+        makeTerminal({
+          id_star_system: 1,
+          id_planet: 2,
+          id_orbit: 3,
+          id_moon: null,
+          id_faction: 5,
+          id_company: 6,
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_terminal'),
+      );
+      expect(upsertCall[1][13]).toBe(1001); // star_system_id ($14)
+      expect(upsertCall[1][14]).toBe(1002); // planet_id ($15)
+      expect(upsertCall[1][15]).toBe(1003); // orbit_id ($16)
+      expect(upsertCall[1][16]).toBeNull(); // moon_id ($17)
+      expect(upsertCall[1][17]).toBe(1005); // faction_id ($18)
+      expect(upsertCall[1][18]).toBe(1006); // company_id ($19)
     });
 
+    it('nulls secondary FKs when uex_id not in local tables', async () => {
+      const dsQuery = buildDsQuery({
+        starSystems: {},
+        planets: {},
+        orbits: {},
+        factions: {},
+        companies: {},
+      });
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([
+        makeTerminal({
+          id_star_system: 99,
+          id_planet: 99,
+          id_orbit: 99,
+          id_faction: 99,
+          id_company: 99,
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_terminal'),
+      );
+      expect(upsertCall[1][13]).toBeNull();
+      expect(upsertCall[1][14]).toBeNull();
+      expect(upsertCall[1][15]).toBeNull();
+      expect(upsertCall[1][17]).toBeNull();
+      expect(upsertCall[1][18]).toBeNull();
+    });
+
+    it('passes null for secondary FKs when UEX fields are null', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([
+        makeTerminal({
+          id_star_system: null,
+          id_planet: null,
+          id_orbit: null,
+          id_moon: null,
+          id_faction: null,
+          id_company: null,
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_terminal'),
+      );
+      expect(upsertCall[1][13]).toBeNull();
+      expect(upsertCall[1][14]).toBeNull();
+      expect(upsertCall[1][15]).toBeNull();
+      expect(upsertCall[1][16]).toBeNull();
+      expect(upsertCall[1][17]).toBeNull();
+      expect(upsertCall[1][18]).toBeNull();
+    });
+  });
+
+  describe('upsert', () => {
     it('maps boolean flags correctly', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
@@ -242,13 +442,14 @@ describe('TerminalsSyncStep', () => {
     });
 
     it('processes multiple terminals', async () => {
-      const dsQuery = buildDsQuery({ 10: 100, 11: 101 });
+      const dsQuery = buildDsQuery({ spaceStations: { 10: 100, 11: 101 } });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
         makeTerminal({ id: 1, id_space_station: 10 }),
         makeTerminal({
           id: 2,
           name: 'Lorville Terminal',
+          code: 'LT',
           id_space_station: 11,
         }),
       ]);
@@ -276,14 +477,15 @@ describe('TerminalsSyncStep', () => {
           message: 'Terminal missing name',
         }),
       );
-      const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_terminal'),
-      );
-      expect(upsertCall).toBeUndefined();
+      expect(
+        dsQuery.mock.calls.find(([sql]: [string]) =>
+          sql.includes('INSERT INTO station_terminal'),
+        ),
+      ).toBeUndefined();
     });
 
     it('warns and nulls space_station FK when space station is not found', async () => {
-      const dsQuery = buildDsQuery({});
+      const dsQuery = buildDsQuery({ spaceStations: {} });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([makeTerminal({ id_space_station: 99 })]);
 
@@ -303,7 +505,7 @@ describe('TerminalsSyncStep', () => {
     });
 
     it('warns and nulls outpost FK when outpost is not found', async () => {
-      const dsQuery = buildDsQuery({}, {});
+      const dsQuery = buildDsQuery({ spaceStations: {}, outposts: {} });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
         makeTerminal({ id_space_station: null, id_outpost: 99 }),
@@ -325,7 +527,7 @@ describe('TerminalsSyncStep', () => {
     });
 
     it('warns and nulls city FK when city is not found', async () => {
-      const dsQuery = buildDsQuery({}, {}, {});
+      const dsQuery = buildDsQuery({ spaceStations: {}, cities: {} });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
         makeTerminal({ id_space_station: null, id_outpost: null, id_city: 99 }),
@@ -347,7 +549,7 @@ describe('TerminalsSyncStep', () => {
     });
 
     it('warns when terminal has no location parent and still upserts', async () => {
-      const dsQuery = buildDsQuery({}, {}, {});
+      const dsQuery = buildDsQuery({ spaceStations: {} });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
         makeTerminal({
@@ -365,10 +567,11 @@ describe('TerminalsSyncStep', () => {
           message: expect.stringContaining('no location parent'),
         }),
       );
-      const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_terminal'),
-      );
-      expect(upsertCall).toBeDefined();
+      expect(
+        dsQuery.mock.calls.find(([sql]: [string]) =>
+          sql.includes('INSERT INTO station_terminal'),
+        ),
+      ).toBeDefined();
     });
   });
 });

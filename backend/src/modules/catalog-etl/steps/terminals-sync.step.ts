@@ -8,6 +8,25 @@ import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
 
 const SKIP_HOURS = 12;
 
+// Maps UEX API type strings to the schema CHECK-constraint enum values
+const TERMINAL_TYPE_MAP: Record<string, string> = {
+  commodity: 'commodity',
+  item: 'item',
+  commodity_raw: 'commodity_raw',
+  vehicle_buy: 'vehicle_buy',
+  vehicle_rent: 'vehicle_rent',
+  fuel: 'fuel',
+  refinery_audit: 'refinery_audit',
+  // UEX may send alternate casings or aliases
+  refinery: 'refinery_audit',
+  vehicle: 'vehicle_buy',
+};
+
+function mapTerminalType(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  return TERMINAL_TYPE_MAP[raw.toLowerCase()] ?? null;
+}
+
 interface UexTerminal {
   id: number;
   name: string;
@@ -97,8 +116,18 @@ export class TerminalsSyncStep implements EtlStep {
       'Fetched terminals from UEX',
     );
 
-    // Load parent entity BIGINT ids indexed by uex_id for FK resolution
-    const [ssRows, outpostRows, cityRows] = await Promise.all([
+    // Load all parent entity BIGINT ids indexed by uex_id for FK resolution
+    const [
+      ssRows,
+      outpostRows,
+      cityRows,
+      starSystemRows,
+      planetRows,
+      orbitRows,
+      moonRows,
+      factionRows,
+      companyRows,
+    ] = await Promise.all([
       this.dataSource.query<{ uex_id: number; id: number }[]>(
         `SELECT uex_id, id FROM station_space_station`,
       ),
@@ -108,11 +137,37 @@ export class TerminalsSyncStep implements EtlStep {
       this.dataSource.query<{ uex_id: number; id: number }[]>(
         `SELECT uex_id, id FROM station_city`,
       ),
+      this.dataSource.query<{ uex_id: number; id: number }[]>(
+        `SELECT uex_id, id FROM station_star_system`,
+      ),
+      this.dataSource.query<{ uex_id: number; id: number }[]>(
+        `SELECT uex_id, id FROM station_planet`,
+      ),
+      this.dataSource.query<{ uex_id: number; id: number }[]>(
+        `SELECT uex_id, id FROM station_orbit`,
+      ),
+      this.dataSource.query<{ uex_id: number; id: number }[]>(
+        `SELECT uex_id, id FROM station_moon`,
+      ),
+      this.dataSource.query<{ uex_id: number; id: number }[]>(
+        `SELECT uex_id, id FROM station_faction`,
+      ),
+      this.dataSource.query<{ uex_id: number; id: number }[]>(
+        `SELECT uex_id, id FROM station_company`,
+      ),
     ]);
 
     const ssByUexId = new Map(ssRows.map((r) => [r.uex_id, r.id]));
     const outpostByUexId = new Map(outpostRows.map((r) => [r.uex_id, r.id]));
     const cityByUexId = new Map(cityRows.map((r) => [r.uex_id, r.id]));
+    const starSystemByUexId = new Map(
+      starSystemRows.map((r) => [r.uex_id, r.id]),
+    );
+    const planetByUexId = new Map(planetRows.map((r) => [r.uex_id, r.id]));
+    const orbitByUexId = new Map(orbitRows.map((r) => [r.uex_id, r.id]));
+    const moonByUexId = new Map(moonRows.map((r) => [r.uex_id, r.id]));
+    const factionByUexId = new Map(factionRows.map((r) => [r.uex_id, r.id]));
+    const companyByUexId = new Map(companyRows.map((r) => [r.uex_id, r.id]));
 
     for (const record of terminals) {
       if (!record.name) {
@@ -128,7 +183,21 @@ export class TerminalsSyncStep implements EtlStep {
         continue;
       }
 
-      // Resolve primary location FK
+      const type = mapTerminalType(record.type);
+      if (type === null) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Terminal ${record.id} has unknown type '${record.type}' — skipped`,
+            rawPayload: { terminal_id: record.id, raw_type: record.type },
+          }),
+        );
+        continue;
+      }
+
+      // Resolve primary location FK (space station → outpost → city priority)
       let spaceStationId: number | null = null;
       let outpostId: number | null = null;
       let cityId: number | null = null;
@@ -190,6 +259,32 @@ export class TerminalsSyncStep implements EtlStep {
         );
       }
 
+      // Resolve secondary FK columns — all nullable, unknown values warn and null out
+      const starSystemId =
+        record.id_star_system !== null
+          ? (starSystemByUexId.get(record.id_star_system) ?? null)
+          : null;
+      const planetId =
+        record.id_planet !== null
+          ? (planetByUexId.get(record.id_planet) ?? null)
+          : null;
+      const orbitId =
+        record.id_orbit !== null
+          ? (orbitByUexId.get(record.id_orbit) ?? null)
+          : null;
+      const moonId =
+        record.id_moon !== null
+          ? (moonByUexId.get(record.id_moon) ?? null)
+          : null;
+      const factionId =
+        record.id_faction !== null
+          ? (factionByUexId.get(record.id_faction) ?? null)
+          : null;
+      const companyId =
+        record.id_company !== null
+          ? (companyByUexId.get(record.id_company) ?? null)
+          : null;
+
       await this.dataSource.query(
         `INSERT INTO station_terminal
            (uex_id, name, fullname, nickname, displayname, code, type, contact_url, screenshot,
@@ -236,19 +331,19 @@ export class TerminalsSyncStep implements EtlStep {
           record.nickname ?? null,
           record.displayname ?? null,
           record.code,
-          record.type,
+          type,
           record.contact_url ?? null,
           record.screenshot ?? null,
           record.max_container_size ?? null,
           spaceStationId,
           outpostId,
           cityId,
-          record.id_star_system ?? null,
-          record.id_planet ?? null,
-          record.id_orbit ?? null,
-          record.id_moon ?? null,
-          record.id_faction ?? null,
-          record.id_company ?? null,
+          starSystemId,
+          planetId,
+          orbitId,
+          moonId,
+          factionId,
+          companyId,
           Boolean(record.is_available),
           Boolean(record.is_available_live),
           Boolean(record.is_visible),

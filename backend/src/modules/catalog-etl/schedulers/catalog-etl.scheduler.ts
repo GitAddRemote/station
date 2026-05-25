@@ -21,7 +21,8 @@ export class CatalogEtlScheduler {
     }
   }
 
-  @Cron('0 * * * *', { name: 'terminal-distances-sync' })
+  // Runs 5 minutes after terminals-sync to ensure station_terminal is populated first
+  @Cron('5 * * * *', { name: 'terminal-distances-sync' })
   async scheduledTerminalDistancesSync(): Promise<void> {
     this.logger.info('Starting scheduled terminal distances sync');
     try {
