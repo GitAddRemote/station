@@ -498,20 +498,37 @@ describe('TerminalsSyncStep', () => {
       expect(upsertCalls).toHaveLength(2);
     });
 
-    it('advances synced_at via final UPDATE only after all records are written', async () => {
+    it('resets all rows to epoch at start, writes epoch in INSERTs, and advances synced_at only after all records written', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([makeTerminal()]);
 
       await step.execute(CTX);
 
-      // INSERT uses epoch so partial failures don't advance the skip guard
+      // Epoch-reset fires before the API call so untouched rows can't hold a
+      // stale non-epoch timestamp if the run fails mid-way
+      const epochReset = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_terminal') &&
+          sql.includes("synced_at = 'epoch'") &&
+          !sql.includes('INSERT'),
+      );
+      expect(epochReset).toBeDefined();
+      const epochResetIdx = dsQuery.mock.calls.indexOf(epochReset!);
+      expect(uexGet).toHaveBeenCalled();
+      // epoch-reset must precede the first INSERT
+      const firstInsertIdx = dsQuery.mock.calls.findIndex(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_terminal'),
+      );
+      expect(epochResetIdx).toBeLessThan(firstInsertIdx);
+
+      // Individual INSERTs also write epoch
       const insertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_terminal'),
       );
-      expect(insertCall[0]).toContain("'epoch'");
+      expect(insertCall![0]).toContain("'epoch'");
 
-      // Final UPDATE fires after the loop completes
+      // Final UPDATE advances synced_at to NOW() after the loop completes
       const finalUpdate = dsQuery.mock.calls.find(
         ([sql]: [string]) =>
           sql.includes('UPDATE station_terminal') &&

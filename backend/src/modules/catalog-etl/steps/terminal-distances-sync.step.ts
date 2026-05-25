@@ -49,6 +49,13 @@ export class TerminalDistancesSyncStep implements EtlStep {
       }
     }
 
+    // Reset all existing rows to epoch before the load so that a mid-run
+    // failure leaves the table fully at epoch — MAX(synced_at) returns NULL
+    // and the next scheduled run retries rather than skipping.
+    await this.dataSource.query(
+      `UPDATE station_terminal_distance SET synced_at = 'epoch'`,
+    );
+
     const distances = await this.uexApiClient.get<UexTerminalDistance[]>(
       '/terminals_distances',
     );
