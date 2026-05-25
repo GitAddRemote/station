@@ -88,28 +88,15 @@ export class TerminalsSyncStep implements EtlStep {
 
   async execute(ctx: EtlStepContext): Promise<void> {
     // Skip guard: respect UEX 12-hour cache TTL.
-    // A "successful" run for this step is any completed EtlRun that has no
-    // error warning for this step name — i.e. it ran and did not fail.
-    const [lastRun] = await this.dataSource.query<
-      { completed_at: Date | null }[]
-    >(
-      `SELECT r.completed_at
-       FROM station_etl_run r
-       WHERE r.status = 'completed'
-         AND NOT EXISTS (
-           SELECT 1 FROM station_etl_warning w
-           WHERE w.run_id = r.run_id
-             AND w.step_name = $1
-             AND w.severity = 'error'
-         )
-       ORDER BY r.completed_at DESC LIMIT 1`,
-      [this.name],
+    // Use MAX(synced_at) from the target table — reliable even on first deploy
+    // because an empty table returns NULL and the guard is bypassed.
+    const [row] = await this.dataSource.query<{ last_synced: Date | null }[]>(
+      `SELECT MAX(synced_at) AS last_synced FROM station_terminal`,
     );
 
-    if (lastRun?.completed_at) {
+    if (row?.last_synced) {
       const hoursSince =
-        (Date.now() - new Date(lastRun.completed_at).getTime()) /
-        (1000 * 60 * 60);
+        (Date.now() - new Date(row.last_synced).getTime()) / (1000 * 60 * 60);
       if (hoursSince < SKIP_HOURS) {
         this.logger.debug(
           { runId: ctx.runId, hoursSince: hoursSince.toFixed(1) },

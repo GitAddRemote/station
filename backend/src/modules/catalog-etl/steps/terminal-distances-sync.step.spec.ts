@@ -16,10 +16,11 @@ function buildDsQuery(
   lastRunDate: Date | null = null,
 ): jest.Mock {
   return jest.fn().mockImplementation((sql: string) => {
-    if (sql.includes('FROM station_etl_run')) {
-      return Promise.resolve(
-        lastRunDate ? [{ completed_at: lastRunDate }] : [],
-      );
+    if (
+      sql.includes('FROM station_terminal_distance') &&
+      sql.includes('MAX(synced_at)')
+    ) {
+      return Promise.resolve([{ last_synced: lastRunDate ?? null }]);
     }
     if (sql.includes('station_terminal')) {
       return Promise.resolve(

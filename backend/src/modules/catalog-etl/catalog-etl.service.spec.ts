@@ -333,7 +333,7 @@ describe('CatalogEtlService', () => {
   });
 
   describe('runStep', () => {
-    it('creates an EtlRun row, executes the step, marks run completed', async () => {
+    it('acquires advisory lock, creates EtlRun, executes step, marks completed', async () => {
       const step: EtlStep = {
         name: 'terminals-sync',
         execute: jest.fn().mockResolvedValue(undefined),
@@ -350,6 +350,10 @@ describe('CatalogEtlService', () => {
 
       const result = await service.runStep('terminals-sync');
 
+      expect(mockAdvisoryLockService.withLock).toHaveBeenCalledWith(
+        'catalog_etl',
+        expect.any(Function),
+      );
       expect(mockEtlRunRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'running', stepsTotal: 1 }),
       );
@@ -360,7 +364,7 @@ describe('CatalogEtlService', () => {
       expect(mockEtlWarningRepository.save).not.toHaveBeenCalled();
     });
 
-    it('marks run failed and saves error warning when step throws', async () => {
+    it('persists error warning and rethrows when step throws', async () => {
       const step: EtlStep = {
         name: 'terminals-sync',
         execute: jest.fn().mockRejectedValue(new Error('step boom')),
@@ -378,21 +382,37 @@ describe('CatalogEtlService', () => {
       mockEtlWarningRepository.create.mockReturnValue(mockWarning);
       mockEtlWarningRepository.save.mockResolvedValue(mockWarning);
 
-      const result = await service.runStep('terminals-sync');
+      await expect(service.runStep('terminals-sync')).rejects.toThrow(
+        'step boom',
+      );
 
-      expect(result.status).toBe('failed');
-      expect(result.stepsFailed).toBe(1);
       expect(mockEtlWarningRepository.save).toHaveBeenCalledTimes(1);
       expect(mockEtlWarningRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ severity: 'error', message: 'step boom' }),
       );
     });
 
-    it('throws when step name is not registered', async () => {
+    it('throws when step name is not registered without touching repositories', async () => {
       Object.assign(service, { ETL_STEPS: [] });
 
       await expect(service.runStep('unknown-step')).rejects.toThrow(
         'Unknown ETL step: unknown-step',
+      );
+      expect(mockEtlRunRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects with ConflictException when advisory lock is already held', async () => {
+      const step: EtlStep = {
+        name: 'terminals-sync',
+        execute: jest.fn(),
+      };
+      Object.assign(service, { ETL_STEPS: [step] });
+      mockAdvisoryLockService.withLock.mockRejectedValueOnce(
+        new ConflictException("Lock 'catalog_etl' already held"),
+      );
+
+      await expect(service.runStep('terminals-sync')).rejects.toThrow(
+        ConflictException,
       );
       expect(mockEtlRunRepository.create).not.toHaveBeenCalled();
     });

@@ -88,10 +88,11 @@ function buildDsQuery(maps: FkMaps = {}): jest.Mock {
   } = maps;
 
   return jest.fn().mockImplementation((sql: string) => {
-    if (sql.includes('FROM station_etl_run')) {
-      return Promise.resolve(
-        lastRunDate ? [{ completed_at: lastRunDate }] : [],
-      );
+    if (
+      sql.includes('FROM station_terminal') &&
+      sql.includes('MAX(synced_at)')
+    ) {
+      return Promise.resolve([{ last_synced: lastRunDate ?? null }]);
     }
     if (sql.includes('FROM station_space_station')) {
       return Promise.resolve(

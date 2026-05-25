@@ -138,33 +138,38 @@ export class CatalogEtlService {
       throw new Error(`Unknown ETL step: ${stepName}`);
     }
 
-    const runState = this.etlRunRepository.create({
-      status: 'running',
-      stepsTotal: 1,
-      stepsSucceeded: 0,
-      stepsFailed: 0,
-    });
-    await this.etlRunRepository.save(runState);
-
-    try {
-      await step.execute({ runId: runState.runId });
-      runState.stepsSucceeded = 1;
-      runState.status = 'completed';
-    } catch (err: unknown) {
-      runState.stepsFailed = 1;
-      runState.status = 'failed';
-      const message = err instanceof Error ? err.message : String(err);
-      const warning = this.etlWarningRepository.create({
-        runId: runState.runId,
-        stepName: step.name,
-        severity: 'error',
-        message,
+    return this.advisoryLockService.withLock('catalog_etl', async () => {
+      const runState = this.etlRunRepository.create({
+        status: 'running',
+        stepsTotal: 1,
+        stepsSucceeded: 0,
+        stepsFailed: 0,
       });
-      await this.etlWarningRepository.save(warning);
-    }
+      await this.etlRunRepository.save(runState);
 
-    runState.completedAt = new Date();
-    return this.etlRunRepository.save(runState);
+      try {
+        await step.execute({ runId: runState.runId });
+        runState.stepsSucceeded = 1;
+        runState.status = 'completed';
+      } catch (err: unknown) {
+        runState.stepsFailed = 1;
+        runState.status = 'failed';
+        const message = err instanceof Error ? err.message : String(err);
+        const warning = this.etlWarningRepository.create({
+          runId: runState.runId,
+          stepName: step.name,
+          severity: 'error',
+          message,
+        });
+        await this.etlWarningRepository.save(warning);
+        runState.completedAt = new Date();
+        await this.etlRunRepository.save(runState);
+        throw err;
+      }
+
+      runState.completedAt = new Date();
+      return this.etlRunRepository.save(runState);
+    });
   }
 
   async getRuns(page: number, limit: number): Promise<[EtlRun[], number]> {
