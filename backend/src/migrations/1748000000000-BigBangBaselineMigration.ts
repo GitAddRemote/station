@@ -1421,7 +1421,7 @@ export class BigBangBaselineMigration1748000000000
       `CREATE UNIQUE INDEX "uq_categories_uex_id"       ON "station_category" ("uex_id") WHERE "uex_id" IS NOT NULL`,
     );
     await queryRunner.query(
-      `CREATE UNIQUE INDEX "uq_categories_section_type" ON "station_category" ("type", "name") WHERE "is_section" = TRUE`,
+      `CREATE UNIQUE INDEX "uq_categories_section_type" ON "station_category" (COALESCE("type", ''), "name") WHERE "is_section" = TRUE`,
     );
     await queryRunner.query(
       `CREATE INDEX "idx_categories_parent"             ON "station_category" ("parent_id")`,
