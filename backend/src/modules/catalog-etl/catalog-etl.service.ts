@@ -22,6 +22,7 @@ import { CategoriesSyncStep } from './steps/categories-sync.step';
 import { TerminalsSyncStep } from './steps/terminals-sync.step';
 import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step';
 import { VehiclesSyncStep } from './steps/vehicles-sync.step';
+import { ItemsSyncStep } from './steps/items-sync.step';
 import { CommoditiesSyncStep } from './steps/commodities-sync.step';
 
 @Injectable()
@@ -53,6 +54,7 @@ export class CatalogEtlService {
     private readonly terminalsSyncStep: TerminalsSyncStep,
     private readonly terminalDistancesSyncStep: TerminalDistancesSyncStep,
     private readonly vehiclesSyncStep: VehiclesSyncStep,
+    private readonly itemsSyncStep: ItemsSyncStep,
     private readonly commoditiesSyncStep: CommoditiesSyncStep,
   ) {
     this.ETL_STEPS = [
@@ -72,6 +74,7 @@ export class CatalogEtlService {
       terminalsSyncStep,
       terminalDistancesSyncStep,
       vehiclesSyncStep,
+      itemsSyncStep,
       commoditiesSyncStep,
     ];
   }

@@ -1,0 +1,406 @@
+import { ItemsSyncStep } from './items-sync.step';
+
+const CTX = { runId: 'test-run-id' };
+
+function makeLogger() {
+  return {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  };
+}
+
+function makeAttr(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 101,
+    id_category: 5,
+    id_category_attribute: 42,
+    value: '150',
+    unit: 'damage',
+    date_added: null,
+    date_modified: null,
+    ...overrides,
+  };
+}
+
+function makeItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    uuid: 'sc-uuid-item-1',
+    id_parent: null,
+    id_category: 5,
+    id_company: 10,
+    id_vehicle: null,
+    name: 'Laser Repeater S1',
+    slug: 'laser-repeater-s1',
+    size: 'S1',
+    color: null,
+    color2: null,
+    quality: null,
+    url_store: null,
+    is_exclusive_pledge: 0,
+    is_exclusive_subscriber: 0,
+    is_exclusive_concierge: 0,
+    is_commodity: 0,
+    is_harvestable: 0,
+    screenshot: null,
+    notification: null,
+    game_version: '3.22',
+    date_added: 1700000000,
+    date_modified: 1710000000,
+    attributes: [makeAttr()],
+    ...overrides,
+  };
+}
+
+function buildDsQuery(): jest.Mock {
+  return jest.fn().mockResolvedValue([]);
+}
+
+function buildStep(
+  uexGet: jest.Mock,
+  dsQuery: jest.Mock,
+  repoCreate: jest.Mock,
+  repoSave: jest.Mock,
+) {
+  return new ItemsSyncStep(
+    { get: uexGet } as never,
+    { query: dsQuery } as never,
+    { create: repoCreate, save: repoSave } as never,
+    makeLogger() as never,
+  );
+}
+
+describe('ItemsSyncStep', () => {
+  let uexGet: jest.Mock;
+  let repoCreate: jest.Mock;
+  let repoSave: jest.Mock;
+
+  beforeEach(() => {
+    uexGet = jest.fn();
+    repoCreate = jest.fn().mockImplementation((dto) => dto);
+    repoSave = jest.fn().mockResolvedValue({});
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  describe('item upsert', () => {
+    it('inserts with parent_uex_id=NULL literal in pass 1a', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem()]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[0]).toMatch(/VALUES\s*\(\s*\$1,NULL/);
+    });
+
+    it('has ON CONFLICT (uex_id) DO UPDATE SET with parent_uex_id=EXCLUDED.parent_uex_id', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem()]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[0]).toContain('ON CONFLICT (uex_id) DO UPDATE SET');
+      expect(itemInsert[0]).toContain('parent_uex_id=EXCLUDED.parent_uex_id');
+    });
+
+    it('params array has exactly 23 entries matching $1..$23', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem()]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[1]).toHaveLength(23);
+      // Last two are date timestamps ($22, $23)
+      expect(itemInsert[1][21]).toBeInstanceOf(Date); // uex_date_added
+      expect(itemInsert[1][22]).toBeInstanceOf(Date); // uex_date_modified
+      expect(itemInsert[0]).toMatch(/\$23,NOW\(\)/);
+    });
+
+    it('stores category_uex_id, company_uex_id, vehicle_uex_id correctly', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({ id_category: 7, id_company: 3, id_vehicle: 99 }),
+      ]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[1][1]).toBe(7); // $2 category_uex_id
+      expect(itemInsert[1][2]).toBe(3); // $3 company_uex_id
+      expect(itemInsert[1][3]).toBe(99); // $4 vehicle_uex_id
+    });
+
+    it('stores uuid at $7 (index [6])', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ uuid: 'my-sc-uuid' })]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[1][6]).toBe('my-sc-uuid');
+    });
+
+    it('null uuid stored as null', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ uuid: null })]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[1][6]).toBeNull();
+    });
+
+    it('skips item with no name and emits warn', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ name: '' })]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert).toBeUndefined();
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'warn' }),
+      );
+    });
+
+    it('empty item list produces no inserts', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([]);
+
+      await step.execute(CTX);
+
+      const anyInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT'),
+      );
+      expect(anyInsert).toBeUndefined();
+    });
+  });
+
+  describe('parent_uex_id two-pass', () => {
+    it('pass 1b issues UPDATE to set parent_uex_id when id_parent is set', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id: 2, id_parent: 1 })]);
+
+      await step.execute(CTX);
+
+      const updateCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_item') && sql.includes('parent_uex_id'),
+      );
+      expect(updateCall).toBeDefined();
+      expect(updateCall[1]).toEqual([1, 2]); // [id_parent, uex_id]
+    });
+
+    it('no UPDATE issued when id_parent is null', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id_parent: null })]);
+
+      await step.execute(CTX);
+
+      const updateCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('UPDATE station_item'),
+      );
+      expect(updateCall).toBeUndefined();
+    });
+  });
+
+  describe('attributes_summary JSONB', () => {
+    it('builds summary keyed by category_attribute_uex_id with attribute value', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({
+          attributes: [
+            makeAttr({ id_category_attribute: 42, value: '150' }),
+            makeAttr({ id: 102, id_category_attribute: 43, value: '900' }),
+          ],
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      const summary = JSON.parse(itemInsert[1][19] as string); // $20 attributes_summary
+      expect(summary).toEqual({ '42': '150', '43': '900' });
+    });
+
+    it('produces empty object when item has no attributes', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ attributes: [] })]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(JSON.parse(itemInsert[1][19] as string)).toEqual({});
+    });
+
+    it('stores null attribute value as null in summary', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({
+          attributes: [makeAttr({ id_category_attribute: 42, value: null })],
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      const summary = JSON.parse(itemInsert[1][19] as string);
+      expect(summary['42']).toBeNull();
+    });
+  });
+
+  describe('item attributes upsert', () => {
+    it('upserts each attribute with correct params', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({
+          attributes: [
+            makeAttr({
+              id: 101,
+              id_category_attribute: 42,
+              value: '150',
+              unit: 'dps',
+            }),
+          ],
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item_attribute'),
+      );
+      expect(attrInsert).toBeDefined();
+      expect(attrInsert[1][0]).toBe(101); // $1 uex_id
+      expect(attrInsert[1][1]).toBe(1); // $2 item_uex_id
+      expect(attrInsert[1][3]).toBe(42); // $4 category_attribute_uex_id
+      expect(attrInsert[1][4]).toBe('150'); // $5 value
+      expect(attrInsert[1][5]).toBe('dps'); // $6 unit
+    });
+
+    it('skips attribute with no category_attribute_uex_id and emits warn', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({
+          attributes: [makeAttr({ id_category_attribute: 0 })],
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item_attribute'),
+      );
+      expect(attrInsert).toBeUndefined();
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'warn' }),
+      );
+    });
+
+    it('upserts multiple attributes for a single item', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({
+          attributes: [
+            makeAttr({ id: 101, id_category_attribute: 42 }),
+            makeAttr({ id: 102, id_category_attribute: 43 }),
+          ],
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const attrInserts = dsQuery.mock.calls.filter(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item_attribute'),
+      );
+      expect(attrInserts).toHaveLength(2);
+    });
+
+    it('items with no attributes produce no attribute inserts', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ attributes: [] })]);
+
+      await step.execute(CTX);
+
+      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item_attribute'),
+      );
+      expect(attrInsert).toBeUndefined();
+    });
+
+    it('has ON CONFLICT (uex_id) DO UPDATE on attribute insert', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem()]);
+
+      await step.execute(CTX);
+
+      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item_attribute'),
+      );
+      expect(attrInsert[0]).toContain('ON CONFLICT (uex_id) DO UPDATE SET');
+    });
+  });
+
+  describe('ordering', () => {
+    it('item inserts happen before attribute inserts', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem()]);
+
+      await step.execute(CTX);
+
+      const sqls = dsQuery.mock.calls.map(([sql]: [string]) => sql.trim());
+      const itemInsertIdx = sqls.findIndex((s) =>
+        s.startsWith('INSERT INTO station_item '),
+      );
+      const attrInsertIdx = sqls.findIndex((s) =>
+        s.startsWith('INSERT INTO station_item_attribute'),
+      );
+      expect(itemInsertIdx).toBeGreaterThanOrEqual(0);
+      expect(attrInsertIdx).toBeGreaterThan(itemInsertIdx);
+    });
+  });
+});
