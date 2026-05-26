@@ -182,7 +182,12 @@ export class CatalogEtlService {
        FROM station_etl_run r
        WHERE r.step_name = $1
          AND r.status = 'completed'
-         AND r.steps_failed = 0`,
+         AND r.steps_failed = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM station_etl_warning w
+           WHERE w.run_id = r.run_id
+             AND w.severity = 'error'
+         )`,
       [stepName],
     );
     return row?.last_completed ?? null;
