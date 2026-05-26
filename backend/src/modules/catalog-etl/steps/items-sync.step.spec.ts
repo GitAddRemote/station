@@ -268,6 +268,28 @@ describe('ItemsSyncStep', () => {
       expect(JSON.parse(itemInsert[1][19] as string)).toEqual({});
     });
 
+    it('excludes attributes with falsy id_category_attribute from summary', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({
+          attributes: [
+            makeAttr({ id_category_attribute: 0, value: 'should-be-excluded' }),
+            makeAttr({ id: 102, id_category_attribute: 42, value: 'included' }),
+          ],
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      const summary = JSON.parse(itemInsert[1][19] as string);
+      expect(summary).toEqual({ '42': 'included' });
+      expect(summary['0']).toBeUndefined();
+    });
+
     it('stores null attribute value as null in summary', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);

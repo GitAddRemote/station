@@ -54,6 +54,7 @@ function buildAttributesSummary(
   if (!attributes?.length) return {};
   const summary: Record<string, string | null> = {};
   for (const attr of attributes) {
+    if (!attr.id_category_attribute) continue;
     summary[String(attr.id_category_attribute)] = attr.value ?? null;
   }
   return summary;
@@ -103,9 +104,9 @@ export class ItemsSyncStep implements EtlStep {
       const attributesSummary = buildAttributesSummary(record.attributes);
 
       // Column layout (parent_uex_id is a NULL literal — no placeholder):
-      // $1  uex_id           $2  uuid              $3  category_uex_id
-      // $4  company_uex_id   $5  vehicle_uex_id    $6  name
-      // $7  slug             $8  size              $9  color
+      // $1  uex_id           $2  category_uex_id   $3  company_uex_id
+      // $4  vehicle_uex_id   $5  name              $6  slug
+      // $7  uuid             $8  size              $9  color
       // $10 color2           $11 quality           $12 url_store
       // $13 is_exclusive_pledge  $14 is_exclusive_subscriber  $15 is_exclusive_concierge
       // $16 is_commodity    $17 is_harvestable     $18 screenshot
