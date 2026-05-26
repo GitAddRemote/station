@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { getLoggerToken } from 'nestjs-pino';
 import { CatalogEtlService } from './catalog-etl.service';
 import { EtlRun } from './entities/etl-run.entity';
@@ -20,6 +21,8 @@ import { OutpostsSyncStep } from './steps/outposts-sync.step';
 import { PoisSyncStep } from './steps/pois-sync.step';
 import { JumpPointsSyncStep } from './steps/jump-points-sync.step';
 import { CategoriesSyncStep } from './steps/categories-sync.step';
+import { TerminalsSyncStep } from './steps/terminals-sync.step';
+import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step';
 
 function buildMockRun(overrides: Partial<EtlRun> = {}): EtlRun {
   const run = new EtlRun();
@@ -85,6 +88,12 @@ describe('CatalogEtlService', () => {
           useValue: mockAdvisoryLockService,
         },
         {
+          provide: DataSource,
+          useValue: {
+            query: jest.fn().mockResolvedValue([{ last_completed: null }]),
+          },
+        },
+        {
           provide: FactionsSyncStep,
           useValue: { name: 'factions', execute: jest.fn() },
         },
@@ -135,6 +144,14 @@ describe('CatalogEtlService', () => {
         {
           provide: CategoriesSyncStep,
           useValue: { name: 'categories-sync', execute: jest.fn() },
+        },
+        {
+          provide: TerminalsSyncStep,
+          useValue: { name: 'terminals-sync', execute: jest.fn() },
+        },
+        {
+          provide: TerminalDistancesSyncStep,
+          useValue: { name: 'terminal-distances-sync', execute: jest.fn() },
         },
       ],
     }).compile();
@@ -319,6 +336,96 @@ describe('CatalogEtlService', () => {
         where: { runId: 'some-uuid' },
         order: { createdAt: 'ASC' },
       });
+    });
+  });
+
+  describe('runStep', () => {
+    it('acquires advisory lock, creates EtlRun, executes step, marks completed', async () => {
+      const step: EtlStep = {
+        name: 'terminals-sync',
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
+      Object.assign(service, { ETL_STEPS: [step] });
+
+      const initialRun = buildMockRun({ stepsTotal: 1 });
+      mockEtlRunRepository.create.mockReturnValue(initialRun);
+      mockEtlRunRepository.save
+        .mockResolvedValueOnce(initialRun)
+        .mockImplementation((run: EtlRun) =>
+          Promise.resolve({ ...run, completedAt: new Date() }),
+        );
+
+      const result = await service.runStep('terminals-sync');
+
+      expect(mockAdvisoryLockService.withLock).toHaveBeenCalledWith(
+        'catalog_etl',
+        expect.any(Function),
+      );
+      expect(mockEtlRunRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'running',
+          stepName: 'terminals-sync',
+          stepsTotal: 1,
+        }),
+      );
+      expect(step.execute).toHaveBeenCalledWith({ runId: initialRun.runId });
+      expect(result.status).toBe('completed');
+      expect(result.stepsSucceeded).toBe(1);
+      expect(result.stepsFailed).toBe(0);
+      expect(mockEtlWarningRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('persists error warning and rethrows when step throws', async () => {
+      const step: EtlStep = {
+        name: 'terminals-sync',
+        execute: jest.fn().mockRejectedValue(new Error('step boom')),
+      };
+      Object.assign(service, { ETL_STEPS: [step] });
+
+      const initialRun = buildMockRun({ stepsTotal: 1 });
+      mockEtlRunRepository.create.mockReturnValue(initialRun);
+      mockEtlRunRepository.save
+        .mockResolvedValueOnce(initialRun)
+        .mockImplementation((run: EtlRun) =>
+          Promise.resolve({ ...run, completedAt: new Date() }),
+        );
+      const mockWarning = new EtlWarning();
+      mockEtlWarningRepository.create.mockReturnValue(mockWarning);
+      mockEtlWarningRepository.save.mockResolvedValue(mockWarning);
+
+      await expect(service.runStep('terminals-sync')).rejects.toThrow(
+        'step boom',
+      );
+
+      expect(mockEtlWarningRepository.save).toHaveBeenCalledTimes(1);
+      expect(mockEtlWarningRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'error', message: 'step boom' }),
+      );
+    });
+
+    it('throws when step name is not registered without touching repositories', async () => {
+      Object.assign(service, { ETL_STEPS: [] });
+
+      await expect(service.runStep('unknown-step')).rejects.toThrow(
+        'Unknown ETL step: unknown-step',
+      );
+      expect(mockEtlRunRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects with ConflictException when advisory lock is already held', async () => {
+      const step: EtlStep = {
+        name: 'terminals-sync',
+        execute: jest.fn(),
+      };
+      Object.assign(service, { ETL_STEPS: [step] });
+      mockAdvisoryLockService.withLock.mockRejectedValueOnce(
+        new ConflictException("Lock 'catalog_etl' already held"),
+      );
+
+      await expect(service.runStep('terminals-sync')).rejects.toThrow(
+        ConflictException,
+      );
+      expect(mockEtlRunRepository.create).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlRun } from './entities/etl-run.entity';
 import { EtlWarning } from './entities/etl-warning.entity';
@@ -19,6 +19,8 @@ import { OutpostsSyncStep } from './steps/outposts-sync.step';
 import { PoisSyncStep } from './steps/pois-sync.step';
 import { JumpPointsSyncStep } from './steps/jump-points-sync.step';
 import { CategoriesSyncStep } from './steps/categories-sync.step';
+import { TerminalsSyncStep } from './steps/terminals-sync.step';
+import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step';
 
 @Injectable()
 export class CatalogEtlService {
@@ -29,6 +31,7 @@ export class CatalogEtlService {
     private readonly etlRunRepository: Repository<EtlRun>,
     @InjectRepository(EtlWarning)
     private readonly etlWarningRepository: Repository<EtlWarning>,
+    private readonly dataSource: DataSource,
     private readonly advisoryLockService: AdvisoryLockService,
     @InjectPinoLogger(CatalogEtlService.name)
     private readonly logger: PinoLogger,
@@ -45,6 +48,8 @@ export class CatalogEtlService {
     private readonly poisSyncStep: PoisSyncStep,
     private readonly jumpPointsSyncStep: JumpPointsSyncStep,
     private readonly categoriesSyncStep: CategoriesSyncStep,
+    private readonly terminalsSyncStep: TerminalsSyncStep,
+    private readonly terminalDistancesSyncStep: TerminalDistancesSyncStep,
   ) {
     this.ETL_STEPS = [
       factionsSyncStep,
@@ -60,6 +65,8 @@ export class CatalogEtlService {
       poisSyncStep,
       jumpPointsSyncStep,
       categoriesSyncStep,
+      terminalsSyncStep,
+      terminalDistancesSyncStep,
     ];
   }
 
@@ -124,6 +131,66 @@ export class CatalogEtlService {
 
       return savedRun;
     });
+  }
+
+  async runStep(stepName: string): Promise<EtlRun> {
+    const step = this.ETL_STEPS.find((s) => s.name === stepName);
+    if (!step) {
+      throw new Error(`Unknown ETL step: ${stepName}`);
+    }
+
+    return this.advisoryLockService.withLock('catalog_etl', async () => {
+      const runState = this.etlRunRepository.create({
+        status: 'running',
+        stepName,
+        stepsTotal: 1,
+        stepsSucceeded: 0,
+        stepsFailed: 0,
+      });
+      await this.etlRunRepository.save(runState);
+
+      try {
+        await step.execute({ runId: runState.runId });
+        runState.stepsSucceeded = 1;
+        runState.status = 'completed';
+      } catch (err: unknown) {
+        runState.stepsFailed = 1;
+        runState.status = 'failed';
+        const message = err instanceof Error ? err.message : String(err);
+        const warning = this.etlWarningRepository.create({
+          runId: runState.runId,
+          stepName: step.name,
+          severity: 'error',
+          message,
+        });
+        await this.etlWarningRepository.save(warning);
+        runState.completedAt = new Date();
+        await this.etlRunRepository.save(runState);
+        throw err;
+      }
+
+      runState.completedAt = new Date();
+      return this.etlRunRepository.save(runState);
+    });
+  }
+
+  async getLastSuccessfulStepRun(stepName: string): Promise<Date | null> {
+    const [row] = await this.dataSource.query<
+      { last_completed: Date | null }[]
+    >(
+      `SELECT MAX(r.completed_at) AS last_completed
+       FROM station_etl_run r
+       WHERE r.step_name = $1
+         AND r.status = 'completed'
+         AND r.steps_failed = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM station_etl_warning w
+           WHERE w.run_id = r.run_id
+             AND w.severity = 'error'
+         )`,
+      [stepName],
+    );
+    return row?.last_completed ?? null;
   }
 
   async getRuns(page: number, limit: number): Promise<[EtlRun[], number]> {

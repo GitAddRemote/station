@@ -18,6 +18,9 @@ import { OutpostsSyncStep } from './steps/outposts-sync.step';
 import { PoisSyncStep } from './steps/pois-sync.step';
 import { JumpPointsSyncStep } from './steps/jump-points-sync.step';
 import { CategoriesSyncStep } from './steps/categories-sync.step';
+import { TerminalsSyncStep } from './steps/terminals-sync.step';
+import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step';
+import { CatalogEtlScheduler } from './schedulers/catalog-etl.scheduler';
 import { UexSyncModule } from '../uex-sync/uex-sync.module';
 
 @Module({
@@ -25,6 +28,7 @@ import { UexSyncModule } from '../uex-sync/uex-sync.module';
   controllers: [CatalogEtlController],
   providers: [
     CatalogEtlService,
+    CatalogEtlScheduler,
     AdvisoryLockService,
     FactionsSyncStep,
     JurisdictionsSyncStep,
@@ -39,6 +43,8 @@ import { UexSyncModule } from '../uex-sync/uex-sync.module';
     PoisSyncStep,
     JumpPointsSyncStep,
     CategoriesSyncStep,
+    TerminalsSyncStep,
+    TerminalDistancesSyncStep,
   ],
   exports: [CatalogEtlService],
 })
