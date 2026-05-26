@@ -139,7 +139,7 @@ describe('CategoriesSyncStep', () => {
           sql.includes('RETURNING id'),
       );
       expect(sectionInsert[0]).toContain(
-        "ON CONFLICT (COALESCE(type, ''), name) WHERE is_section = TRUE",
+        "ON CONFLICT ((COALESCE(type, '')), name) WHERE is_section = TRUE",
       );
     });
 

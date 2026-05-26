@@ -90,7 +90,7 @@ export class CategoriesSyncStep implements EtlStep {
            (uex_id, parent_id, type, section, name, is_section,
             is_game_related, is_mining, synced_at)
          VALUES (NULL, NULL, $1, $2, $3, TRUE, FALSE, FALSE, NOW())
-         ON CONFLICT (COALESCE(type, ''), name) WHERE is_section = TRUE DO UPDATE SET
+         ON CONFLICT ((COALESCE(type, '')), name) WHERE is_section = TRUE DO UPDATE SET
            section=EXCLUDED.section,
            synced_at=NOW()
          RETURNING id`,
