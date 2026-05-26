@@ -21,9 +21,6 @@ function makeVehicle(overrides: Record<string, unknown> = {}) {
     name_full: 'Aegis Avenger Titan',
     slug: 'avenger-titan',
     crew: '1',
-    career: 'Combat',
-    role: 'Fighter',
-    size: 'S',
     mass: 45000,
     width: 18,
     height: 5,
@@ -262,8 +259,8 @@ describe('VehiclesSyncStep', () => {
   });
 
   describe('pad_type validation', () => {
-    // pad_type is $21 (index [20]) — one position earlier than before
-    // because parent_uex_id is now a NULL literal not a placeholder.
+    // pad_type is $18 (index [17]): career/role/size are not schema columns
+    // and have been removed, shifting pad_type from $21 to $18.
 
     it('stores valid pad_type uppercased', async () => {
       const dsQuery = buildDsQuery();
@@ -277,7 +274,7 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][20]).toBe('XL'); // pad_type ($21)
+      expect(vehicleInsert[1][17]).toBe('XL'); // pad_type ($18)
     });
 
     it('invalid pad_type stored as null', async () => {
@@ -292,7 +289,7 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][20]).toBeNull();
+      expect(vehicleInsert[1][17]).toBeNull();
     });
   });
 
@@ -441,7 +438,7 @@ describe('VehiclesSyncStep', () => {
       expect(anyInsert).toBeUndefined();
     });
 
-    it('is idempotent — ON CONFLICT (uex_id) DO UPDATE SET present', async () => {
+    it('is idempotent — ON CONFLICT (uex_id) DO UPDATE SET present, parent_uex_id cleared', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([makeVehicle()]).mockResolvedValueOnce([]);
@@ -452,6 +449,32 @@ describe('VehiclesSyncStep', () => {
         sql.includes('INSERT INTO station_vehicle'),
       );
       expect(vehicleInsert[0]).toContain('ON CONFLICT (uex_id) DO UPDATE SET');
+      expect(vehicleInsert[0]).toContain(
+        'parent_uex_id=EXCLUDED.parent_uex_id',
+      );
+    });
+
+    it('params array has exactly 62 entries matching $1..$62 placeholders', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet
+        .mockResolvedValueOnce([
+          makeVehicle({ date_added: 1700000000, date_modified: 1710000000 }),
+        ])
+        .mockResolvedValueOnce([]);
+
+      await step.execute(CTX);
+
+      const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle'),
+      );
+      // 62 params: $1..$62; synced_at and parent_uex_id are SQL literals
+      expect(vehicleInsert[1]).toHaveLength(62);
+      // Last two params are the date timestamps ($61, $62)
+      expect(vehicleInsert[1][60]).toBeInstanceOf(Date); // uex_date_added
+      expect(vehicleInsert[1][61]).toBeInstanceOf(Date); // uex_date_modified
+      // VALUES clause ends at $62,NOW() — not $63 or higher
+      expect(vehicleInsert[0]).toMatch(/\$62,NOW\(\)/);
     });
   });
 });
