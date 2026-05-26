@@ -333,7 +333,7 @@ export class VehiclesSyncStep implements EtlStep {
       'vehicles upserted',
     );
 
-    // Pass 2 — upsert vehicle loaners.
+    // Pass 2 — reconcile vehicle loaners.
     // Preload all known uex_ids into a Set to avoid N+1 queries.
     const knownUexIds = new Set(
       (
@@ -345,6 +345,11 @@ export class VehiclesSyncStep implements EtlStep {
 
     let loanerUpserted = 0;
     let loanerSkipped = 0;
+
+    // Collect valid loaners (both sides known) and the set of origin vehicles
+    // that appear in the UEX payload so we can delete stale rows for them.
+    const validLoaners: { originId: number; loanerId: number }[] = [];
+    const originVehicleIds = new Set<number>();
 
     for (const record of loaners) {
       const { id_vehicle: originId, id_loaner: loanerId } = record;
@@ -363,6 +368,21 @@ export class VehiclesSyncStep implements EtlStep {
         continue;
       }
 
+      validLoaners.push({ originId, loanerId });
+      originVehicleIds.add(originId);
+    }
+
+    // Delete stale loaner rows for every origin vehicle present in the UEX
+    // payload. This removes relationships UEX has dropped since the last sync.
+    if (originVehicleIds.size > 0) {
+      await this.dataSource.query(
+        `DELETE FROM station_vehicle_loaner
+         WHERE vehicle_uex_id = ANY($1)`,
+        [Array.from(originVehicleIds)],
+      );
+    }
+
+    for (const { originId, loanerId } of validLoaners) {
       await this.dataSource.query(
         `INSERT INTO station_vehicle_loaner (vehicle_uex_id, loaner_uex_id)
          VALUES ($1, $2)

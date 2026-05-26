@@ -354,6 +354,52 @@ describe('VehiclesSyncStep', () => {
       expect(loanerInsert[1]).toEqual([1, 2]);
     });
 
+    it('deletes stale loaner rows for origin vehicles before re-inserting', async () => {
+      const dsQuery = buildDsQuery([1, 2]);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet
+        .mockResolvedValueOnce([
+          makeVehicle({ id: 1 }),
+          makeVehicle({ id: 2, name: 'Titan 2' }),
+        ])
+        .mockResolvedValueOnce([makeLoaner({ id_vehicle: 1, id_loaner: 2 })]);
+
+      await step.execute(CTX);
+
+      const deleteCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('DELETE FROM station_vehicle_loaner'),
+      );
+      expect(deleteCall).toBeDefined();
+      // The DELETE should scope to origin vehicle uex_ids present in payload
+      expect(deleteCall[1][0]).toContain(1);
+
+      // DELETE must happen before INSERT
+      const sqls = dsQuery.mock.calls.map(([sql]: [string]) => sql.trim());
+      const deleteIdx = sqls.findIndex((s) =>
+        s.includes('DELETE FROM station_vehicle_loaner'),
+      );
+      const insertIdx = sqls.findIndex((s) =>
+        s.includes('INSERT INTO station_vehicle_loaner'),
+      );
+      expect(deleteIdx).toBeGreaterThanOrEqual(0);
+      expect(insertIdx).toBeGreaterThan(deleteIdx);
+    });
+
+    it('no DELETE issued when loaner payload is empty', async () => {
+      const dsQuery = buildDsQuery([1]);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet
+        .mockResolvedValueOnce([makeVehicle({ id: 1 })])
+        .mockResolvedValueOnce([]);
+
+      await step.execute(CTX);
+
+      const deleteCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('DELETE FROM station_vehicle_loaner'),
+      );
+      expect(deleteCall).toBeUndefined();
+    });
+
     it('skips loaner when one side is absent from the known Set and emits warn', async () => {
       const dsQuery = buildDsQuery([1]); // uex_id 999 not known
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
@@ -372,12 +418,15 @@ describe('VehiclesSyncStep', () => {
       );
     });
 
-    it('vehicle upserts happen before loaner preload and inserts', async () => {
-      const dsQuery = buildDsQuery([1]);
+    it('vehicle upserts → preload → DELETE stale → INSERT loaners, in order', async () => {
+      const dsQuery = buildDsQuery([1, 2]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
-        .mockResolvedValueOnce([makeVehicle({ id: 1 })])
-        .mockResolvedValueOnce([makeLoaner()]);
+        .mockResolvedValueOnce([
+          makeVehicle({ id: 1 }),
+          makeVehicle({ id: 2, name: 'Titan 2' }),
+        ])
+        .mockResolvedValueOnce([makeLoaner({ id_vehicle: 1, id_loaner: 2 })]);
 
       await step.execute(CTX);
 
@@ -388,8 +437,16 @@ describe('VehiclesSyncStep', () => {
       const preloadIdx = sqls.findIndex((s) =>
         s.includes('SELECT uex_id FROM station_vehicle'),
       );
+      const deleteIdx = sqls.findIndex((s) =>
+        s.includes('DELETE FROM station_vehicle_loaner'),
+      );
+      const loanerInsertIdx = sqls.findIndex((s) =>
+        s.includes('INSERT INTO station_vehicle_loaner'),
+      );
       expect(vehicleInsertIdx).toBeGreaterThanOrEqual(0);
       expect(preloadIdx).toBeGreaterThan(vehicleInsertIdx);
+      expect(deleteIdx).toBeGreaterThan(preloadIdx);
+      expect(loanerInsertIdx).toBeGreaterThan(deleteIdx);
     });
 
     it('no loaners → no loaner inserts', async () => {
