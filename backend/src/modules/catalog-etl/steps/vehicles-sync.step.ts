@@ -119,7 +119,8 @@ export class VehiclesSyncStep implements EtlStep {
       'Fetched vehicles and loaners from UEX',
     );
 
-    // Pass 1 — upsert all vehicles
+    // Pass 1a — upsert all vehicles with parent_uex_id=NULL to satisfy the
+    // self-referential FK regardless of arrival order in the UEX payload.
     let upserted = 0;
     let skipped = 0;
 
@@ -165,16 +166,15 @@ export class VehiclesSyncStep implements EtlStep {
            game_version, uex_date_added, uex_date_modified, synced_at
          )
          VALUES (
-           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-           $18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
-           $33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,
-           $48,$49,$50,$51,$52,$53,$54,$55,$56,$57,$58,$59,$60,$61,$62,
-           $63,$64,NOW()
+           $1,$2,$3,NULL,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,
+           $32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,
+           $47,$48,$49,$50,$51,$52,$53,$54,$55,$56,$57,$58,$59,$60,$61,
+           $62,$63,NOW()
          )
          ON CONFLICT (uex_id) DO UPDATE SET
            uuid=EXCLUDED.uuid,
            company_uex_id=EXCLUDED.company_uex_id,
-           parent_uex_id=EXCLUDED.parent_uex_id,
            name=EXCLUDED.name,
            name_full=EXCLUDED.name_full,
            slug=EXCLUDED.slug,
@@ -242,72 +242,85 @@ export class VehiclesSyncStep implements EtlStep {
           record.id, // $1  uex_id
           record.uuid ?? null, // $2  uuid
           record.id_company ?? null, // $3  company_uex_id
-          record.id_parent ?? null, // $4  parent_uex_id
-          record.name, // $5  name
-          record.name_full ?? null, // $6  name_full
-          record.slug ?? null, // $7  slug
-          record.crew ?? null, // $8  crew_raw
-          crewMin, // $9  crew_min
-          crewMax, // $10 crew_max
-          record.career ?? null, // $11 career
-          record.role ?? null, // $12 role
-          record.size ?? null, // $13 size
-          record.mass ?? null, // $14 mass
-          record.width ?? null, // $15 width
-          record.height ?? null, // $16 height
-          record.length ?? null, // $17 length
-          record.scu ?? null, // $18 scu
-          record.fuel_quantum ?? null, // $19 fuel_quantum
-          record.fuel_hydrogen ?? null, // $20 fuel_hydrogen
-          record.container_sizes ?? null, // $21 container_sizes
-          padType, // $22 pad_type
-          Boolean(record.is_addon), // $23
-          Boolean(record.is_boarding), // $24
-          Boolean(record.is_bomber), // $25
-          Boolean(record.is_cargo), // $26
-          Boolean(record.is_carrier), // $27
-          Boolean(record.is_civilian), // $28
-          Boolean(record.is_concept), // $29
-          Boolean(record.is_construction), // $30
-          Boolean(record.is_datarunner), // $31
-          Boolean(record.is_docking), // $32
-          Boolean(record.is_emp), // $33
-          Boolean(record.is_exploration), // $34
-          Boolean(record.is_ground_vehicle), // $35
-          Boolean(record.is_hangar), // $36
-          Boolean(record.is_industrial), // $37
-          Boolean(record.is_interdiction), // $38
-          Boolean(record.is_loading_dock), // $39
-          Boolean(record.is_medical), // $40
-          Boolean(record.is_military), // $41
-          Boolean(record.is_mining), // $42
-          Boolean(record.is_passenger), // $43
-          Boolean(record.is_qed), // $44
-          Boolean(record.is_racing), // $45
-          Boolean(record.is_refinery), // $46
-          Boolean(record.is_refuel), // $47
-          Boolean(record.is_repair), // $48
-          Boolean(record.is_research), // $49
-          Boolean(record.is_salvage), // $50
-          Boolean(record.is_scanning), // $51
-          Boolean(record.is_science), // $52
-          Boolean(record.is_showdown_winner), // $53
-          Boolean(record.is_spaceship), // $54
-          Boolean(record.is_starter), // $55
-          Boolean(record.is_stealth), // $56
-          Boolean(record.is_tractor_beam), // $57
-          Boolean(record.is_quantum_capable), // $58
-          record.url_photo ?? null, // $59
-          record.url_store ?? null, // $60
-          record.url_brochure ?? null, // $61
-          record.url_hotsite ?? null, // $62
-          record.url_video ?? null, // $63
-          record.game_version ?? null, // $64
-          toDate(record.date_added),
-          toDate(record.date_modified),
+          // parent_uex_id=NULL literal (no placeholder — set in pass 1b)
+          record.name, // $4  name
+          record.name_full ?? null, // $5  name_full
+          record.slug ?? null, // $6  slug
+          record.crew ?? null, // $7  crew_raw
+          crewMin, // $8  crew_min
+          crewMax, // $9  crew_max
+          record.career ?? null, // $10 career
+          record.role ?? null, // $11 role
+          record.size ?? null, // $12 size
+          record.mass ?? null, // $13 mass
+          record.width ?? null, // $14 width
+          record.height ?? null, // $15 height
+          record.length ?? null, // $16 length
+          record.scu ?? null, // $17 scu
+          record.fuel_quantum ?? null, // $18 fuel_quantum
+          record.fuel_hydrogen ?? null, // $19 fuel_hydrogen
+          record.container_sizes ?? null, // $20 container_sizes
+          padType, // $21 pad_type
+          Boolean(record.is_addon), // $22
+          Boolean(record.is_boarding), // $23
+          Boolean(record.is_bomber), // $24
+          Boolean(record.is_cargo), // $25
+          Boolean(record.is_carrier), // $26
+          Boolean(record.is_civilian), // $27
+          Boolean(record.is_concept), // $28
+          Boolean(record.is_construction), // $29
+          Boolean(record.is_datarunner), // $30
+          Boolean(record.is_docking), // $31
+          Boolean(record.is_emp), // $32
+          Boolean(record.is_exploration), // $33
+          Boolean(record.is_ground_vehicle), // $34
+          Boolean(record.is_hangar), // $35
+          Boolean(record.is_industrial), // $36
+          Boolean(record.is_interdiction), // $37
+          Boolean(record.is_loading_dock), // $38
+          Boolean(record.is_medical), // $39
+          Boolean(record.is_military), // $40
+          Boolean(record.is_mining), // $41
+          Boolean(record.is_passenger), // $42
+          Boolean(record.is_qed), // $43
+          Boolean(record.is_racing), // $44
+          Boolean(record.is_refinery), // $45
+          Boolean(record.is_refuel), // $46
+          Boolean(record.is_repair), // $47
+          Boolean(record.is_research), // $48
+          Boolean(record.is_salvage), // $49
+          Boolean(record.is_scanning), // $50
+          Boolean(record.is_science), // $51
+          Boolean(record.is_showdown_winner), // $52
+          Boolean(record.is_spaceship), // $53
+          Boolean(record.is_starter), // $54
+          Boolean(record.is_stealth), // $55
+          Boolean(record.is_tractor_beam), // $56
+          Boolean(record.is_quantum_capable), // $57
+          record.url_photo ?? null, // $58
+          record.url_store ?? null, // $59
+          record.url_brochure ?? null, // $60
+          record.url_hotsite ?? null, // $61
+          record.url_video ?? null, // $62
+          record.game_version ?? null, // $63 game_version
+          toDate(record.date_added), // $64 uex_date_added  (was missing placeholder)
+          toDate(record.date_modified), // $65 uex_date_modified (was missing placeholder)
+          // synced_at=NOW() literal
         ],
       );
       upserted++;
+    }
+
+    // Pass 1b — back-fill parent_uex_id now that all rows exist.
+    for (const record of vehicles) {
+      if (!record.name || !record.id_parent) continue;
+      await this.dataSource.query(
+        `UPDATE station_vehicle
+         SET parent_uex_id = $1
+         WHERE uex_id = $2
+           AND parent_uex_id IS DISTINCT FROM $1`,
+        [record.id_parent, record.id],
+      );
     }
 
     this.logger.info(
@@ -315,21 +328,23 @@ export class VehiclesSyncStep implements EtlStep {
       'vehicles upserted',
     );
 
-    // Pass 2 — upsert vehicle loaners (vehicles must exist first)
+    // Pass 2 — upsert vehicle loaners.
+    // Preload all known uex_ids into a Set to avoid N+1 queries.
+    const knownUexIds = new Set(
+      (
+        await this.dataSource.query<{ uex_id: number }[]>(
+          `SELECT uex_id FROM station_vehicle`,
+        )
+      ).map((r) => r.uex_id),
+    );
+
     let loanerUpserted = 0;
     let loanerSkipped = 0;
 
     for (const record of loaners) {
-      const originId = record.id_vehicle;
-      const loanerId = record.id_loaner;
+      const { id_vehicle: originId, id_loaner: loanerId } = record;
 
-      // Verify both sides exist (FK references uex_id which may not be in our set)
-      const [exists] = await this.dataSource.query<{ c: string }[]>(
-        `SELECT COUNT(*) AS c FROM station_vehicle
-         WHERE uex_id IN ($1, $2)`,
-        [originId, loanerId],
-      );
-      if (parseInt(exists.c) < 2) {
+      if (!knownUexIds.has(originId) || !knownUexIds.has(loanerId)) {
         await this.warningsRepo.save(
           this.warningsRepo.create({
             runId: ctx.runId,

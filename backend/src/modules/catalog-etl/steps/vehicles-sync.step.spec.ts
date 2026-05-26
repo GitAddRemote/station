@@ -85,9 +85,13 @@ function makeLoaner(overrides: Record<string, unknown> = {}) {
   return { id_vehicle: 1, id_loaner: 2, ...overrides };
 }
 
-function buildDsQuery(): jest.Mock {
+// Default mock: returns known uex_ids [1, 2] for the loaner-preload SELECT query;
+// returns [] for all other queries (INSERT, UPDATE).
+function buildDsQuery(knownUexIds: number[] = [1, 2]): jest.Mock {
   return jest.fn().mockImplementation((sql: string) => {
-    if (sql.includes('COUNT(*)')) return Promise.resolve([{ c: '2' }]);
+    if (sql.includes('SELECT uex_id FROM station_vehicle')) {
+      return Promise.resolve(knownUexIds.map((id) => ({ uex_id: id })));
+    }
     return Promise.resolve([]);
   });
 }
@@ -120,11 +124,13 @@ describe('VehiclesSyncStep', () => {
   afterEach(() => jest.clearAllMocks());
 
   describe('crew parsing', () => {
+    // param layout (parent_uex_id is a NULL literal, not a placeholder):
+    // $1=uex_id $2=uuid $3=company_uex_id $4=name $5=name_full $6=slug
+    // $7=crew_raw $8=crew_min $9=crew_max  → array indices [6],[7],[8]
+
     it('parses single-value crew "1" → min=1 max=1', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([makeVehicle({ crew: '1' }), []]);
-      // first call vehicles, second call loaners
       uexGet
         .mockResolvedValueOnce([makeVehicle({ crew: '1' })])
         .mockResolvedValueOnce([]);
@@ -134,9 +140,9 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][8]).toBe(1); // crew_min ($9)
-      expect(vehicleInsert[1][9]).toBe(1); // crew_max ($10)
-      expect(vehicleInsert[1][7]).toBe('1'); // crew_raw ($8)
+      expect(vehicleInsert[1][6]).toBe('1'); // crew_raw  ($7)
+      expect(vehicleInsert[1][7]).toBe(1); // crew_min  ($8)
+      expect(vehicleInsert[1][8]).toBe(1); // crew_max  ($9)
     });
 
     it('parses range crew "1-4" → min=1 max=4', async () => {
@@ -151,9 +157,9 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][8]).toBe(1); // crew_min
-      expect(vehicleInsert[1][9]).toBe(4); // crew_max
-      expect(vehicleInsert[1][7]).toBe('1-4'); // crew_raw
+      expect(vehicleInsert[1][6]).toBe('1-4'); // crew_raw
+      expect(vehicleInsert[1][7]).toBe(1); // crew_min
+      expect(vehicleInsert[1][8]).toBe(4); // crew_max
     });
 
     it('crew "N/A" → min=null max=null, crew_raw preserved', async () => {
@@ -168,12 +174,12 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][7]).toBe('N/A'); // crew_raw
-      expect(vehicleInsert[1][8]).toBeNull(); // crew_min
-      expect(vehicleInsert[1][9]).toBeNull(); // crew_max
+      expect(vehicleInsert[1][6]).toBe('N/A'); // crew_raw
+      expect(vehicleInsert[1][7]).toBeNull(); // crew_min
+      expect(vehicleInsert[1][8]).toBeNull(); // crew_max
     });
 
-    it('null crew → min=null max=null, crew_raw=null', async () => {
+    it('null crew → all three columns null', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
@@ -185,14 +191,14 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][7]).toBeNull(); // crew_raw
-      expect(vehicleInsert[1][8]).toBeNull(); // crew_min
-      expect(vehicleInsert[1][9]).toBeNull(); // crew_max
+      expect(vehicleInsert[1][6]).toBeNull(); // crew_raw
+      expect(vehicleInsert[1][7]).toBeNull(); // crew_min
+      expect(vehicleInsert[1][8]).toBeNull(); // crew_max
     });
   });
 
   describe('sc_uuid storage', () => {
-    it('stores uuid field as $2 (uuid column)', async () => {
+    it('stores uuid field as $2 (uuid column, index [1])', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
@@ -204,7 +210,7 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][1]).toBe('abc-def-123'); // uuid ($2)
+      expect(vehicleInsert[1][1]).toBe('abc-def-123');
     });
 
     it('null uuid stored as null', async () => {
@@ -224,7 +230,7 @@ describe('VehiclesSyncStep', () => {
   });
 
   describe('company FK', () => {
-    it('stores id_company directly as company_uex_id ($3)', async () => {
+    it('stores id_company directly as company_uex_id ($3, index [2])', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
@@ -236,7 +242,7 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][2]).toBe(42); // company_uex_id ($3)
+      expect(vehicleInsert[1][2]).toBe(42);
     });
 
     it('null id_company stored as null', async () => {
@@ -256,6 +262,9 @@ describe('VehiclesSyncStep', () => {
   });
 
   describe('pad_type validation', () => {
+    // pad_type is $21 (index [20]) — one position earlier than before
+    // because parent_uex_id is now a NULL literal not a placeholder.
+
     it('stores valid pad_type uppercased', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
@@ -268,7 +277,7 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][21]).toBe('XL'); // pad_type ($22)
+      expect(vehicleInsert[1][20]).toBe('XL'); // pad_type ($21)
     });
 
     it('invalid pad_type stored as null', async () => {
@@ -283,13 +292,54 @@ describe('VehiclesSyncStep', () => {
       const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_vehicle'),
       );
-      expect(vehicleInsert[1][21]).toBeNull();
+      expect(vehicleInsert[1][20]).toBeNull();
+    });
+  });
+
+  describe('parent_uex_id two-pass', () => {
+    it('pass 1a inserts with NULL parent_uex_id; pass 1b issues UPDATE to set it', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet
+        .mockResolvedValueOnce([makeVehicle({ id: 2, id_parent: 1 })])
+        .mockResolvedValueOnce([]);
+
+      await step.execute(CTX);
+
+      const insertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle'),
+      );
+      // parent_uex_id is a NULL literal in VALUES — no placeholder for it
+      expect(insertCall[0]).toMatch(/VALUES\s*\(\s*\$1,\$2,\$3,NULL/);
+
+      const updateCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_vehicle') &&
+          sql.includes('parent_uex_id'),
+      );
+      expect(updateCall).toBeDefined();
+      expect(updateCall[1]).toEqual([1, 2]); // [id_parent, uex_id]
+    });
+
+    it('no UPDATE issued for vehicles without a parent', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet
+        .mockResolvedValueOnce([makeVehicle({ id: 1, id_parent: null })])
+        .mockResolvedValueOnce([]);
+
+      await step.execute(CTX);
+
+      const updateCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('UPDATE station_vehicle'),
+      );
+      expect(updateCall).toBeUndefined();
     });
   });
 
   describe('vehicle loaners two-pass', () => {
-    it('upserts loaners after vehicles using uex_ids', async () => {
-      const dsQuery = buildDsQuery();
+    it('preloads known uex_ids and upserts matching loaners', async () => {
+      const dsQuery = buildDsQuery([1, 2]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
         .mockResolvedValueOnce([
@@ -307,11 +357,8 @@ describe('VehiclesSyncStep', () => {
       expect(loanerInsert[1]).toEqual([1, 2]);
     });
 
-    it('skips loaner when one side is unknown and emits warn', async () => {
-      const dsQuery = jest.fn().mockImplementation((sql: string) => {
-        if (sql.includes('COUNT(*)')) return Promise.resolve([{ c: '1' }]); // only 1 of 2 found
-        return Promise.resolve([]);
-      });
+    it('skips loaner when one side is absent from the known Set and emits warn', async () => {
+      const dsQuery = buildDsQuery([1]); // uex_id 999 not known
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
         .mockResolvedValueOnce([makeVehicle({ id: 1 })])
@@ -328,8 +375,8 @@ describe('VehiclesSyncStep', () => {
       );
     });
 
-    it('vehicle upserts happen before loaner inserts', async () => {
-      const dsQuery = buildDsQuery();
+    it('vehicle upserts happen before loaner preload and inserts', async () => {
+      const dsQuery = buildDsQuery([1]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
         .mockResolvedValueOnce([makeVehicle({ id: 1 })])
@@ -337,21 +384,15 @@ describe('VehiclesSyncStep', () => {
 
       await step.execute(CTX);
 
-      const calls = dsQuery.mock.calls.map(
-        ([sql]: [string]) =>
-          sql.trim().split(/\s+/)[0] + ' ' + sql.trim().split(/\s+/)[2],
+      const sqls = dsQuery.mock.calls.map(([sql]: [string]) => sql.trim());
+      const vehicleInsertIdx = sqls.findIndex((s) =>
+        s.startsWith('INSERT INTO station_vehicle'),
       );
-      const vehicleIdx = calls.findIndex(
-        (s) =>
-          s.includes('station_vehicle') &&
-          !s.includes('loaner') &&
-          !s.includes('COUNT'),
+      const preloadIdx = sqls.findIndex((s) =>
+        s.includes('SELECT uex_id FROM station_vehicle'),
       );
-      const loanerIdx = calls.findIndex((s) =>
-        s.includes('station_vehicle_loaner'),
-      );
-      expect(vehicleIdx).toBeGreaterThanOrEqual(0);
-      expect(loanerIdx).toBeGreaterThan(vehicleIdx);
+      expect(vehicleInsertIdx).toBeGreaterThanOrEqual(0);
+      expect(preloadIdx).toBeGreaterThan(vehicleInsertIdx);
     });
 
     it('no loaners → no loaner inserts', async () => {
@@ -388,7 +429,7 @@ describe('VehiclesSyncStep', () => {
     });
 
     it('empty vehicle list produces no inserts', async () => {
-      const dsQuery = buildDsQuery();
+      const dsQuery = buildDsQuery([]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
@@ -400,10 +441,9 @@ describe('VehiclesSyncStep', () => {
       expect(anyInsert).toBeUndefined();
     });
 
-    it('is idempotent — ON CONFLICT DO UPDATE target is uex_id', async () => {
+    it('is idempotent — ON CONFLICT (uex_id) DO UPDATE SET present', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([makeVehicle()]);
       uexGet.mockResolvedValueOnce([makeVehicle()]).mockResolvedValueOnce([]);
 
       await step.execute(CTX);
