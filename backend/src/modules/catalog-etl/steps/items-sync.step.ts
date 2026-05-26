@@ -81,6 +81,29 @@ export class ItemsSyncStep implements EtlStep {
       'Fetched items from UEX',
     );
 
+    // Preload valid FK sets to guard company_uex_id, vehicle_uex_id, and
+    // category_attribute_uex_id before any writes.
+    const [companyRows, vehicleRows, categoryAttrRows] = await Promise.all([
+      this.dataSource.query<{ uex_id: number }[]>(
+        `SELECT uex_id FROM station_company`,
+      ),
+      this.dataSource.query<{ uex_id: number }[]>(
+        `SELECT uex_id FROM station_vehicle`,
+      ),
+      this.dataSource.query<{ uex_id: number }[]>(
+        `SELECT uex_id FROM station_category_attribute`,
+      ),
+    ]);
+    const knownCompanyUexIds = new Set<number>(
+      companyRows.map((r) => r.uex_id),
+    );
+    const knownVehicleUexIds = new Set<number>(
+      vehicleRows.map((r) => r.uex_id),
+    );
+    const knownCategoryAttributeUexIds = new Set<number>(
+      categoryAttrRows.map((r) => r.uex_id),
+    );
+
     // Pass 1a — upsert all items with parent_uex_id=NULL to satisfy the
     // self-referential FK regardless of arrival order.
     let upserted = 0;
@@ -103,6 +126,34 @@ export class ItemsSyncStep implements EtlStep {
       }
 
       const attributesSummary = buildAttributesSummary(record.attributes);
+
+      let companyUexId: number | null = record.id_company ?? null;
+      if (companyUexId !== null && !knownCompanyUexIds.has(companyUexId)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Item uex_id=${record.id} references unknown company uex_id=${companyUexId} — company_uex_id set to NULL`,
+            rawPayload: { id: record.id, id_company: companyUexId },
+          }),
+        );
+        companyUexId = null;
+      }
+
+      let vehicleUexId: number | null = record.id_vehicle ?? null;
+      if (vehicleUexId !== null && !knownVehicleUexIds.has(vehicleUexId)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Item uex_id=${record.id} references unknown vehicle uex_id=${vehicleUexId} — vehicle_uex_id set to NULL`,
+            rawPayload: { id: record.id, id_vehicle: vehicleUexId },
+          }),
+        );
+        vehicleUexId = null;
+      }
 
       // Column layout (parent_uex_id is a NULL literal — no placeholder):
       // $1  uex_id           $2  category_uex_id   $3  company_uex_id
@@ -163,8 +214,8 @@ export class ItemsSyncStep implements EtlStep {
           record.id, // $1  uex_id
           // parent_uex_id = NULL literal
           record.id_category ?? null, // $2  category_uex_id
-          record.id_company ?? null, // $3  company_uex_id
-          record.id_vehicle ?? null, // $4  vehicle_uex_id
+          companyUexId, // $3  company_uex_id
+          vehicleUexId, // $4  vehicle_uex_id
           record.name, // $5  name
           record.slug ?? null, // $6  slug
           record.uuid ?? null, // $7  uuid
@@ -251,6 +302,24 @@ export class ItemsSyncStep implements EtlStep {
               severity: 'warn',
               message: `Item attribute uex_id=${attr.id} has no category_attribute_uex_id — skipped`,
               rawPayload: { item_id: record.id, attr_id: attr.id },
+            }),
+          );
+          attrSkipped++;
+          continue;
+        }
+
+        if (!knownCategoryAttributeUexIds.has(attr.id_category_attribute)) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Item attribute uex_id=${attr.id} references unknown category_attribute uex_id=${attr.id_category_attribute} — skipped`,
+              rawPayload: {
+                item_id: record.id,
+                attr_id: attr.id,
+                id_category_attribute: attr.id_category_attribute,
+              },
             }),
           );
           attrSkipped++;

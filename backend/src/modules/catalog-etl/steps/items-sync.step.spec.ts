@@ -54,8 +54,25 @@ function makeItem(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildDsQuery(): jest.Mock {
-  return jest.fn().mockResolvedValue([]);
+function buildDsQuery(
+  knownCompanyIds: number[] = [10],
+  knownVehicleIds: number[] = [],
+  knownCategoryAttrIds: number[] = [42],
+): jest.Mock {
+  return jest.fn().mockImplementation((sql: string) => {
+    if (sql.includes('SELECT uex_id FROM station_company')) {
+      return Promise.resolve(knownCompanyIds.map((id) => ({ uex_id: id })));
+    }
+    if (sql.includes('SELECT uex_id FROM station_vehicle')) {
+      return Promise.resolve(knownVehicleIds.map((id) => ({ uex_id: id })));
+    }
+    if (sql.includes('SELECT uex_id FROM station_category_attribute')) {
+      return Promise.resolve(
+        knownCategoryAttrIds.map((id) => ({ uex_id: id })),
+      );
+    }
+    return Promise.resolve([]);
+  });
 }
 
 function buildStep(
@@ -134,7 +151,7 @@ describe('ItemsSyncStep', () => {
     });
 
     it('stores category_uex_id, company_uex_id, vehicle_uex_id correctly', async () => {
-      const dsQuery = buildDsQuery();
+      const dsQuery = buildDsQuery([3], [99]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([
         makeItem({ id_category: 7, id_company: 3, id_vehicle: 99 }),
@@ -203,6 +220,72 @@ describe('ItemsSyncStep', () => {
         sql.includes('INSERT'),
       );
       expect(anyInsert).toBeUndefined();
+    });
+  });
+
+  describe('company / vehicle FK', () => {
+    it('unknown id_company coerced to null and emits warn', async () => {
+      const dsQuery = buildDsQuery([]); // no known companies
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id_company: 99 })]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[1][2]).toBeNull(); // $3 company_uex_id
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('unknown company uex_id=99'),
+        }),
+      );
+    });
+
+    it('null id_company stored as null', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id_company: null })]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[1][2]).toBeNull();
+    });
+
+    it('unknown id_vehicle coerced to null and emits warn', async () => {
+      const dsQuery = buildDsQuery([10], []); // no known vehicles
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id_vehicle: 55 })]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[1][3]).toBeNull(); // $4 vehicle_uex_id
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('unknown vehicle uex_id=55'),
+        }),
+      );
+    });
+
+    it('null id_vehicle stored as null', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id_vehicle: null })]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(itemInsert[1][3]).toBeNull();
     });
   });
 
@@ -405,8 +488,31 @@ describe('ItemsSyncStep', () => {
       );
     });
 
+    it('skips attribute when id_category_attribute is not in station_category_attribute and emits warn', async () => {
+      const dsQuery = buildDsQuery([10], [], []); // no known category attributes
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({ attributes: [makeAttr({ id_category_attribute: 42 })] }),
+      ]);
+
+      await step.execute(CTX);
+
+      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item_attribute'),
+      );
+      expect(attrInsert).toBeUndefined();
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining(
+            'unknown category_attribute uex_id=42',
+          ),
+        }),
+      );
+    });
+
     it('upserts multiple attributes for a single item', async () => {
-      const dsQuery = buildDsQuery();
+      const dsQuery = buildDsQuery([10], [], [42, 43]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([
         makeItem({

@@ -261,7 +261,7 @@ describe('VehiclesSyncStep', () => {
       const dsQuery = buildDsQuery([]); // no known companies
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
-        .mockResolvedValueOnce([makeVehicle({ id_company: 999 })])
+        .mockResolvedValueOnce([makeVehicle({ id_company: 99 })])
         .mockResolvedValueOnce([]);
 
       await step.execute(CTX);
@@ -271,7 +271,10 @@ describe('VehiclesSyncStep', () => {
       );
       expect(vehicleInsert[1][2]).toBeNull();
       expect(repoSave).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'warn' }),
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('unknown company uex_id=99'),
+        }),
       );
     });
   });
