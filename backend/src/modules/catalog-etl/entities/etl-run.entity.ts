@@ -42,6 +42,9 @@ export class EtlRun {
   })
   status!: EtlRunStatus;
 
+  @Column({ name: 'step_name', type: 'varchar', length: 100, nullable: true })
+  stepName?: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

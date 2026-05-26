@@ -142,6 +142,7 @@ export class CatalogEtlService {
     return this.advisoryLockService.withLock('catalog_etl', async () => {
       const runState = this.etlRunRepository.create({
         status: 'running',
+        stepName,
         stepsTotal: 1,
         stepsSucceeded: 0,
         stepsFailed: 0,
@@ -179,14 +180,9 @@ export class CatalogEtlService {
     >(
       `SELECT MAX(r.completed_at) AS last_completed
        FROM station_etl_run r
-       WHERE r.status = 'completed'
-         AND r.steps_failed = 0
-         AND NOT EXISTS (
-           SELECT 1 FROM station_etl_warning w
-           WHERE w.run_id = r.run_id
-             AND w.step_name = $1
-             AND w.severity = 'error'
-         )`,
+       WHERE r.step_name = $1
+         AND r.status = 'completed'
+         AND r.steps_failed = 0`,
       [stepName],
     );
     return row?.last_completed ?? null;

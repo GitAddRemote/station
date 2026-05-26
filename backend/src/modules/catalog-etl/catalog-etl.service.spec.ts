@@ -362,7 +362,11 @@ describe('CatalogEtlService', () => {
         expect.any(Function),
       );
       expect(mockEtlRunRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'running', stepsTotal: 1 }),
+        expect.objectContaining({
+          status: 'running',
+          stepName: 'terminals-sync',
+          stepsTotal: 1,
+        }),
       );
       expect(step.execute).toHaveBeenCalledWith({ runId: initialRun.runId });
       expect(result.status).toBe('completed');
