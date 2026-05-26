@@ -334,7 +334,7 @@ describe('VehiclesSyncStep', () => {
       const updateCall = dsQuery.mock.calls.find(
         ([sql]: [string]) =>
           sql.includes('UPDATE station_vehicle') &&
-          sql.includes('parent_uex_id'),
+          sql.includes('parent_uex_id = $1'),
       );
       expect(updateCall).toBeDefined();
       expect(updateCall[1]).toEqual([1, 2]); // [id_parent, uex_id]
@@ -350,8 +350,10 @@ describe('VehiclesSyncStep', () => {
 
       await step.execute(CTX);
 
-      const updateCall = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('UPDATE station_vehicle'),
+      const updateCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_vehicle') &&
+          sql.includes('parent_uex_id = $1'),
       );
       expect(updateCall).toBeUndefined();
       expect(repoSave).toHaveBeenCalledWith(
@@ -368,10 +370,31 @@ describe('VehiclesSyncStep', () => {
 
       await step.execute(CTX);
 
-      const updateCall = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('UPDATE station_vehicle'),
+      const updateCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_vehicle') &&
+          sql.includes('parent_uex_id = $1'),
       );
       expect(updateCall).toBeUndefined();
+    });
+
+    it('pass 1c clears parent_uex_id for de-parented vehicles', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      // Vehicle has no id_parent — pass 1c should null it out
+      uexGet
+        .mockResolvedValueOnce([makeVehicle({ id: 1, id_parent: null })])
+        .mockResolvedValueOnce([]);
+
+      await step.execute(CTX);
+
+      const clearCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_vehicle') &&
+          sql.includes('parent_uex_id = NULL'),
+      );
+      expect(clearCall).toBeDefined();
+      expect(clearCall[1][0]).toContain(1);
     });
   });
 
@@ -541,7 +564,7 @@ describe('VehiclesSyncStep', () => {
       expect(anyInsert).toBeUndefined();
     });
 
-    it('is idempotent — ON CONFLICT (uex_id) DO UPDATE SET present, parent_uex_id cleared', async () => {
+    it('ON CONFLICT (uex_id) DO UPDATE SET present; parent_uex_id not overwritten on conflict', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([makeVehicle()]).mockResolvedValueOnce([]);
@@ -552,7 +575,8 @@ describe('VehiclesSyncStep', () => {
         sql.includes('INSERT INTO station_vehicle'),
       );
       expect(vehicleInsert[0]).toContain('ON CONFLICT (uex_id) DO UPDATE SET');
-      expect(vehicleInsert[0]).toContain(
+      // parent_uex_id must NOT be in the DO UPDATE list — pass 1b/1c handle it
+      expect(vehicleInsert[0]).not.toContain(
         'parent_uex_id=EXCLUDED.parent_uex_id',
       );
     });

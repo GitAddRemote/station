@@ -99,7 +99,7 @@ describe('ItemsSyncStep', () => {
       expect(itemInsert[0]).toMatch(/VALUES\s*\(\s*\$1,NULL/);
     });
 
-    it('has ON CONFLICT (uex_id) DO UPDATE SET with parent_uex_id=EXCLUDED.parent_uex_id', async () => {
+    it('has ON CONFLICT (uex_id) DO UPDATE SET; parent_uex_id not overwritten on conflict', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([makeItem()]);
@@ -110,7 +110,10 @@ describe('ItemsSyncStep', () => {
         sql.includes('INSERT INTO station_item'),
       );
       expect(itemInsert[0]).toContain('ON CONFLICT (uex_id) DO UPDATE SET');
-      expect(itemInsert[0]).toContain('parent_uex_id=EXCLUDED.parent_uex_id');
+      // parent_uex_id must NOT be in the DO UPDATE list — pass 1b/1c handle it
+      expect(itemInsert[0]).not.toContain(
+        'parent_uex_id=EXCLUDED.parent_uex_id',
+      );
     });
 
     it('params array has exactly 23 entries matching $1..$23', async () => {
@@ -204,32 +207,75 @@ describe('ItemsSyncStep', () => {
   });
 
   describe('parent_uex_id two-pass', () => {
-    it('pass 1b issues UPDATE to set parent_uex_id when id_parent is set', async () => {
+    it('pass 1b issues UPDATE to set parent_uex_id when both item and parent are in payload', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([makeItem({ id: 2, id_parent: 1 })]);
+      // Parent (id=1) and child (id=2) both in payload
+      uexGet.mockResolvedValueOnce([
+        makeItem({ id: 1 }),
+        makeItem({ id: 2, name: 'Child Item', id_parent: 1 }),
+      ]);
 
       await step.execute(CTX);
 
       const updateCall = dsQuery.mock.calls.find(
         ([sql]: [string]) =>
-          sql.includes('UPDATE station_item') && sql.includes('parent_uex_id'),
+          sql.includes('UPDATE station_item') &&
+          sql.includes('parent_uex_id = $1'),
       );
       expect(updateCall).toBeDefined();
       expect(updateCall[1]).toEqual([1, 2]); // [id_parent, uex_id]
     });
 
-    it('no UPDATE issued when id_parent is null', async () => {
+    it('skips UPDATE and emits warn when id_parent references an unknown uex_id', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      // Item references parent 999 which is not in the current payload
+      uexGet.mockResolvedValueOnce([makeItem({ id: 2, id_parent: 999 })]);
+
+      await step.execute(CTX);
+
+      const updateCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_item') &&
+          sql.includes('parent_uex_id = $1'),
+      );
+      expect(updateCall).toBeUndefined();
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'warn' }),
+      );
+    });
+
+    it('no parent UPDATE issued when id_parent is null', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([makeItem({ id_parent: null })]);
 
       await step.execute(CTX);
 
-      const updateCall = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('UPDATE station_item'),
+      const updateCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_item') &&
+          sql.includes('parent_uex_id = $1'),
       );
       expect(updateCall).toBeUndefined();
+    });
+
+    it('pass 1c clears parent_uex_id for de-parented items', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      // Item has no id_parent — pass 1c should null it out
+      uexGet.mockResolvedValueOnce([makeItem({ id: 1, id_parent: null })]);
+
+      await step.execute(CTX);
+
+      const clearCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_item') &&
+          sql.includes('parent_uex_id = NULL'),
+      );
+      expect(clearCall).toBeDefined();
+      expect(clearCall[1][0]).toContain(1);
     });
   });
 

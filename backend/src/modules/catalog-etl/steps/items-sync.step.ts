@@ -85,6 +85,7 @@ export class ItemsSyncStep implements EtlStep {
     // self-referential FK regardless of arrival order.
     let upserted = 0;
     let skipped = 0;
+    const upsertedUexIds = new Set<number>();
 
     for (const record of items) {
       if (!record.name) {
@@ -135,7 +136,6 @@ export class ItemsSyncStep implements EtlStep {
            $21,$22,$23,NOW()
          )
          ON CONFLICT (uex_id) DO UPDATE SET
-           parent_uex_id=EXCLUDED.parent_uex_id,
            category_uex_id=EXCLUDED.category_uex_id,
            company_uex_id=EXCLUDED.company_uex_id,
            vehicle_uex_id=EXCLUDED.vehicle_uex_id,
@@ -187,12 +187,27 @@ export class ItemsSyncStep implements EtlStep {
           // synced_at = NOW() literal
         ],
       );
+      upsertedUexIds.add(record.id);
       upserted++;
     }
 
-    // Pass 1b — back-fill parent_uex_id now that all rows exist.
+    // Pass 1b — set parent_uex_id for items whose parent was also upserted.
+    // ON CONFLICT in pass 1a does not touch parent_uex_id, so existing links are
+    // preserved across runs; only explicit updates (here and in pass 1c) change it.
     for (const record of items) {
       if (!record.name || !record.id_parent) continue;
+      if (!upsertedUexIds.has(record.id_parent)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Item uex_id=${record.id} references unknown parent uex_id=${record.id_parent} — parent_uex_id not set`,
+            rawPayload: { id: record.id, id_parent: record.id_parent },
+          }),
+        );
+        continue;
+      }
       await this.dataSource.query(
         `UPDATE station_item
          SET parent_uex_id = $1
@@ -200,6 +215,22 @@ export class ItemsSyncStep implements EtlStep {
            AND parent_uex_id IS DISTINCT FROM $1`,
         [record.id_parent, record.id],
       );
+    }
+
+    // Pass 1c — clear parent_uex_id for items that UEX has de-parented.
+    if (upsertedUexIds.size > 0) {
+      const deParentedIds = items
+        .filter((i) => i.name && !i.id_parent)
+        .map((i) => i.id);
+      if (deParentedIds.length > 0) {
+        await this.dataSource.query(
+          `UPDATE station_item
+           SET parent_uex_id = NULL
+           WHERE uex_id = ANY($1)
+             AND parent_uex_id IS NOT NULL`,
+          [deParentedIds],
+        );
+      }
     }
 
     this.logger.info({ runId: ctx.runId, upserted, skipped }, 'items upserted');
