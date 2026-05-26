@@ -364,7 +364,7 @@ describe('ItemsSyncStep', () => {
 
   describe('attributes_summary JSONB', () => {
     it('builds summary keyed by category_attribute_uex_id with attribute value', async () => {
-      const dsQuery = buildDsQuery();
+      const dsQuery = buildDsQuery([10], [], [42, 43]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([
         makeItem({
@@ -382,6 +382,28 @@ describe('ItemsSyncStep', () => {
       );
       const summary = JSON.parse(itemInsert[1][19] as string); // $20 attributes_summary
       expect(summary).toEqual({ '42': '150', '43': '900' });
+    });
+
+    it('excludes attributes absent from station_category_attribute from summary', async () => {
+      const dsQuery = buildDsQuery([10], [], [42]); // only 42 is known; 43 is not
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({
+          attributes: [
+            makeAttr({ id_category_attribute: 42, value: 'included' }),
+            makeAttr({ id: 102, id_category_attribute: 43, value: 'excluded' }),
+          ],
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const itemInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      const summary = JSON.parse(itemInsert[1][19] as string);
+      expect(summary).toEqual({ '42': 'included' });
+      expect(summary['43']).toBeUndefined();
     });
 
     it('produces empty object when item has no attributes', async () => {

@@ -50,11 +50,13 @@ function toDate(unixTs: number | null | undefined): Date | null {
 
 function buildAttributesSummary(
   attributes: UexItemAttribute[] | undefined,
+  knownCategoryAttributeUexIds: Set<number>,
 ): Record<string, string | null> {
   if (!attributes?.length) return {};
   const summary: Record<string, string | null> = {};
   for (const attr of attributes) {
     if (!attr.id_category_attribute) continue;
+    if (!knownCategoryAttributeUexIds.has(attr.id_category_attribute)) continue;
     summary[String(attr.id_category_attribute)] = attr.value ?? null;
   }
   return summary;
@@ -125,7 +127,10 @@ export class ItemsSyncStep implements EtlStep {
         continue;
       }
 
-      const attributesSummary = buildAttributesSummary(record.attributes);
+      const attributesSummary = buildAttributesSummary(
+        record.attributes,
+        knownCategoryAttributeUexIds,
+      );
 
       let companyUexId: number | null = record.id_company ?? null;
       if (companyUexId !== null && !knownCompanyUexIds.has(companyUexId)) {
