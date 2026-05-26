@@ -21,6 +21,7 @@ import { JumpPointsSyncStep } from './steps/jump-points-sync.step';
 import { CategoriesSyncStep } from './steps/categories-sync.step';
 import { TerminalsSyncStep } from './steps/terminals-sync.step';
 import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step';
+import { VehiclesSyncStep } from './steps/vehicles-sync.step';
 
 @Injectable()
 export class CatalogEtlService {
@@ -50,6 +51,7 @@ export class CatalogEtlService {
     private readonly categoriesSyncStep: CategoriesSyncStep,
     private readonly terminalsSyncStep: TerminalsSyncStep,
     private readonly terminalDistancesSyncStep: TerminalDistancesSyncStep,
+    private readonly vehiclesSyncStep: VehiclesSyncStep,
   ) {
     this.ETL_STEPS = [
       factionsSyncStep,
@@ -67,6 +69,7 @@ export class CatalogEtlService {
       categoriesSyncStep,
       terminalsSyncStep,
       terminalDistancesSyncStep,
+      vehiclesSyncStep,
     ];
   }
 
