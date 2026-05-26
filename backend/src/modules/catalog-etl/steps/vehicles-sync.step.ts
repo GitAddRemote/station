@@ -116,6 +116,15 @@ export class VehiclesSyncStep implements EtlStep {
       'Fetched vehicles and loaners from UEX',
     );
 
+    // Preload valid company uex_ids to guard the company_uex_id FK.
+    const knownCompanyUexIds = new Set<number>(
+      (
+        await this.dataSource.query<{ uex_id: number }[]>(
+          `SELECT uex_id FROM station_company`,
+        )
+      ).map((r) => r.uex_id),
+    );
+
     // Pass 1a — upsert all vehicles with parent_uex_id=NULL to satisfy the
     // self-referential FK regardless of arrival order in the UEX payload.
     let upserted = 0;
@@ -142,6 +151,20 @@ export class VehiclesSyncStep implements EtlStep {
         record.pad_type && VALID_PAD_TYPES.has(record.pad_type.toUpperCase())
           ? record.pad_type.toUpperCase()
           : null;
+
+      let companyUexId: number | null = record.id_company ?? null;
+      if (companyUexId !== null && !knownCompanyUexIds.has(companyUexId)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Vehicle uex_id=${record.id} references unknown company uex_id=${companyUexId} — company_uex_id set to NULL`,
+            rawPayload: { id: record.id, id_company: companyUexId },
+          }),
+        );
+        companyUexId = null;
+      }
 
       // Column layout (parent_uex_id is a NULL literal — no placeholder):
       // $1  uex_id          $2  uuid             $3  company_uex_id
@@ -248,7 +271,7 @@ export class VehiclesSyncStep implements EtlStep {
         [
           record.id, // $1  uex_id
           record.uuid ?? null, // $2  uuid
-          record.id_company ?? null, // $3  company_uex_id
+          companyUexId, // $3  company_uex_id
           // parent_uex_id = NULL literal (no placeholder — set in pass 1b)
           record.name, // $4  name
           record.name_full ?? null, // $5  name_full

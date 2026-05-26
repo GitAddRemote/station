@@ -1567,7 +1567,7 @@ CREATE INDEX idx_vehicles_container_sizes ON station_vehicle USING GIN (containe
 -- ============================================================
 -- station_vehicle_loaner
 -- Junction: vehicle <-> loaner substitute vehicle.
--- Derived from vehicles.ids_vehicles_loaners CSV.
+-- Sourced from GET /vehicle_loaners (UEX dedicated endpoint).
 -- ============================================================
 CREATE TABLE station_vehicle_loaner (
     vehicle_uex_id  INTEGER     NOT NULL REFERENCES station_vehicle (uex_id) ON DELETE CASCADE,
@@ -1949,16 +1949,15 @@ ETL must respect FK dependencies. All tables use `INSERT ... ON CONFLICT (uex_id
   - `container_sizes` CSV → `INTEGER[]`
   - `pad_type` → store as-is (validated against CHECK constraint)
   - `url_photos` (deprecated) — not stored
-  - `ids_vehicles_loaners` CSV — defer to Step 19
 
 ---
 
 ### Step 19 — `station_vehicle_loaner`
 
-- **Source:** Same `/vehicles` payload from Step 18 (no re-fetch)
+- **Source:** `GET /vehicle_loaners` (separate UEX endpoint fetched in parallel with Step 18)
 - **Upsert key:** Composite PK `(vehicle_uex_id, loaner_uex_id)`
 - **Dependencies:** Step 18
-- **Delta sync:** Derived from Step 18 delta; delete-then-insert per changed vehicle
+- **Delta sync:** Delete all rows for vehicles present in the Step 18 payload, then re-insert current loaners
 
 ---
 

@@ -82,8 +82,15 @@ function makeLoaner(overrides: Record<string, unknown> = {}) {
   return { id_vehicle: 1, id_loaner: 2, ...overrides };
 }
 
-function buildDsQuery(): jest.Mock {
-  return jest.fn().mockResolvedValue([]);
+// By default returns known company uex_id=10 (matches makeVehicle default id_company).
+// Returns [] for all other queries (INSERT, UPDATE, DELETE).
+function buildDsQuery(knownCompanyIds: number[] = [10]): jest.Mock {
+  return jest.fn().mockImplementation((sql: string) => {
+    if (sql.includes('SELECT uex_id FROM station_company')) {
+      return Promise.resolve(knownCompanyIds.map((id) => ({ uex_id: id })));
+    }
+    return Promise.resolve([]);
+  });
 }
 
 function buildStep(
@@ -187,7 +194,7 @@ describe('VehiclesSyncStep', () => {
     });
   });
 
-  describe('sc_uuid storage', () => {
+  describe('uuid storage', () => {
     it('stores uuid field as $2 (uuid column, index [1])', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
@@ -220,8 +227,8 @@ describe('VehiclesSyncStep', () => {
   });
 
   describe('company FK', () => {
-    it('stores id_company directly as company_uex_id ($3, index [2])', async () => {
-      const dsQuery = buildDsQuery();
+    it('stores known id_company as company_uex_id ($3, index [2])', async () => {
+      const dsQuery = buildDsQuery([42]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet
         .mockResolvedValueOnce([makeVehicle({ id_company: 42 })])
@@ -248,6 +255,24 @@ describe('VehiclesSyncStep', () => {
         sql.includes('INSERT INTO station_vehicle'),
       );
       expect(vehicleInsert[1][2]).toBeNull();
+    });
+
+    it('unknown id_company coerced to null and emits warn', async () => {
+      const dsQuery = buildDsQuery([]); // no known companies
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet
+        .mockResolvedValueOnce([makeVehicle({ id_company: 999 })])
+        .mockResolvedValueOnce([]);
+
+      await step.execute(CTX);
+
+      const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle'),
+      );
+      expect(vehicleInsert[1][2]).toBeNull();
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'warn' }),
+      );
     });
   });
 
