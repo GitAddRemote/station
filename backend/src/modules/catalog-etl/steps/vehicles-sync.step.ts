@@ -120,6 +120,7 @@ export class VehiclesSyncStep implements EtlStep {
     // self-referential FK regardless of arrival order in the UEX payload.
     let upserted = 0;
     let skipped = 0;
+    const upsertedUexIds = new Set<number>();
 
     for (const record of vehicles) {
       if (!record.name) {
@@ -311,14 +312,28 @@ export class VehiclesSyncStep implements EtlStep {
           // synced_at = NOW() literal
         ],
       );
+      upsertedUexIds.add(record.id);
       upserted++;
     }
 
     // Pass 1b — back-fill parent_uex_id now that all rows exist.
     // The ON CONFLICT clause sets parent_uex_id=EXCLUDED.parent_uex_id (NULL) on
     // re-insert, so this pass is only needed to set non-null parents.
+    // Skip rows whose id_parent is not in the current payload to avoid FK violations.
     for (const record of vehicles) {
       if (!record.name || !record.id_parent) continue;
+      if (!upsertedUexIds.has(record.id_parent)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Vehicle uex_id=${record.id} references unknown parent uex_id=${record.id_parent} — parent_uex_id not set`,
+            rawPayload: { id: record.id, id_parent: record.id_parent },
+          }),
+        );
+        continue;
+      }
       await this.dataSource.query(
         `UPDATE station_vehicle
          SET parent_uex_id = $1
@@ -334,27 +349,16 @@ export class VehiclesSyncStep implements EtlStep {
     );
 
     // Pass 2 — reconcile vehicle loaners.
-    // Preload all known uex_ids into a Set to avoid N+1 queries.
-    const knownUexIds = new Set(
-      (
-        await this.dataSource.query<{ uex_id: number }[]>(
-          `SELECT uex_id FROM station_vehicle`,
-        )
-      ).map((r) => r.uex_id),
-    );
-
+    // Validate both sides against the vehicles we just upserted.
     let loanerUpserted = 0;
     let loanerSkipped = 0;
 
-    // Collect valid loaners (both sides known) and the set of origin vehicles
-    // that appear in the UEX payload so we can delete stale rows for them.
     const validLoaners: { originId: number; loanerId: number }[] = [];
-    const originVehicleIds = new Set<number>();
 
     for (const record of loaners) {
       const { id_vehicle: originId, id_loaner: loanerId } = record;
 
-      if (!knownUexIds.has(originId) || !knownUexIds.has(loanerId)) {
+      if (!upsertedUexIds.has(originId) || !upsertedUexIds.has(loanerId)) {
         await this.warningsRepo.save(
           this.warningsRepo.create({
             runId: ctx.runId,
@@ -369,16 +373,15 @@ export class VehiclesSyncStep implements EtlStep {
       }
 
       validLoaners.push({ originId, loanerId });
-      originVehicleIds.add(originId);
     }
 
-    // Delete stale loaner rows for every origin vehicle present in the UEX
-    // payload. This removes relationships UEX has dropped since the last sync.
-    if (originVehicleIds.size > 0) {
+    // Delete stale loaner rows for all vehicles in the current payload,
+    // including those with zero loaners, so dropped relationships are removed.
+    if (upsertedUexIds.size > 0) {
       await this.dataSource.query(
         `DELETE FROM station_vehicle_loaner
          WHERE vehicle_uex_id = ANY($1)`,
-        [Array.from(originVehicleIds)],
+        [Array.from(upsertedUexIds)],
       );
     }
 
