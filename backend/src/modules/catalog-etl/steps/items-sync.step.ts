@@ -9,7 +9,7 @@ import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
 interface UexItemAttribute {
   id: number;
   id_category: number | null;
-  id_category_attribute: number;
+  id_category_attribute: number | null;
   value: string | null;
   unit: string | null;
   date_added: number | null;
