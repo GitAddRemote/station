@@ -21,6 +21,7 @@ import { CategoriesSyncStep } from './steps/categories-sync.step';
 import { TerminalsSyncStep } from './steps/terminals-sync.step';
 import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step';
 import { VehiclesSyncStep } from './steps/vehicles-sync.step';
+import { CommoditiesSyncStep } from './steps/commodities-sync.step';
 import { CatalogEtlScheduler } from './schedulers/catalog-etl.scheduler';
 import { UexSyncModule } from '../uex-sync/uex-sync.module';
 
@@ -47,6 +48,7 @@ import { UexSyncModule } from '../uex-sync/uex-sync.module';
     TerminalsSyncStep,
     TerminalDistancesSyncStep,
     VehiclesSyncStep,
+    CommoditiesSyncStep,
   ],
   exports: [CatalogEtlService],
 })
