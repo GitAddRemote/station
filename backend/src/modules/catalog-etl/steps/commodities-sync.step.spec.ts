@@ -19,7 +19,6 @@ function makeCommodity(overrides: Record<string, unknown> = {}) {
     slug: 'agricium',
     kind: 'Metal',
     id_parent: null,
-    id_company: 10,
     weight_scu: 1,
     price_buy: 1250.0,
     price_sell: 1300.0,
@@ -50,15 +49,8 @@ function makeCommodity(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// By default returns known company uex_id=10 (matches makeCommodity default id_company).
-// Returns [] for all other queries (UPDATE, etc.).
-function buildDsQuery(knownCompanyIds: number[] = [10]): jest.Mock {
-  return jest.fn().mockImplementation((sql: string) => {
-    if (sql.includes('SELECT uex_id FROM station_company')) {
-      return Promise.resolve(knownCompanyIds.map((id) => ({ uex_id: id })));
-    }
-    return Promise.resolve([]);
-  });
+function buildDsQuery(): jest.Mock {
+  return jest.fn().mockResolvedValue([]);
 }
 
 function buildStep(
@@ -99,7 +91,7 @@ describe('CommoditiesSyncStep', () => {
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      expect(insert[0]).toMatch(/VALUES\s*\(\s*\$1,NULL,\$2/);
+      expect(insert[0]).toMatch(/VALUES\s*\(\s*\$1,NULL,/);
     });
 
     it('has ON CONFLICT (uex_id) DO UPDATE SET; parent_uex_id not in DO UPDATE', async () => {
@@ -116,7 +108,7 @@ describe('CommoditiesSyncStep', () => {
       expect(insert[0]).not.toContain('parent_uex_id=EXCLUDED.parent_uex_id');
     });
 
-    it('params array has exactly 32 entries matching $1..$32', async () => {
+    it('params array has exactly 31 entries matching $1..$31', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([makeCommodity()]);
@@ -126,10 +118,10 @@ describe('CommoditiesSyncStep', () => {
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      expect(insert[1]).toHaveLength(32);
-      expect(insert[1][30]).toBeInstanceOf(Date); // $31 uex_date_added
-      expect(insert[1][31]).toBeInstanceOf(Date); // $32 uex_date_modified
-      expect(insert[0]).toMatch(/\$32,NOW\(\)/);
+      expect(insert[1]).toHaveLength(31);
+      expect(insert[1][29]).toBeInstanceOf(Date); // $30 uex_date_added
+      expect(insert[1][30]).toBeInstanceOf(Date); // $31 uex_date_modified
+      expect(insert[0]).toMatch(/\$31,NOW\(\)/);
     });
 
     it('stores code, slug, kind, price_buy, price_sell correctly', async () => {
@@ -150,11 +142,11 @@ describe('CommoditiesSyncStep', () => {
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      expect(insert[1][3]).toBe('DIAM'); // $4 code
-      expect(insert[1][4]).toBe('diamond'); // $5 slug
-      expect(insert[1][5]).toBe('Gem'); // $6 kind
-      expect(insert[1][7]).toBe(9999.5); // $8 price_buy
-      expect(insert[1][8]).toBe(10500.25); // $9 price_sell
+      expect(insert[1][2]).toBe('DIAM'); // $3 code
+      expect(insert[1][3]).toBe('diamond'); // $4 slug
+      expect(insert[1][4]).toBe('Gem'); // $5 kind
+      expect(insert[1][6]).toBe(9999.5); // $7 price_buy
+      expect(insert[1][7]).toBe(10500.25); // $8 price_sell
     });
 
     it('null slug and kind stored as null', async () => {
@@ -167,8 +159,8 @@ describe('CommoditiesSyncStep', () => {
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      expect(insert[1][4]).toBeNull(); // $5 slug
-      expect(insert[1][5]).toBeNull(); // $6 kind
+      expect(insert[1][3]).toBeNull(); // $4 slug
+      expect(insert[1][4]).toBeNull(); // $5 kind
     });
 
     it('boolean flags stored as booleans', async () => {
@@ -183,10 +175,10 @@ describe('CommoditiesSyncStep', () => {
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      // is_raw=$15 (index 14), is_harvestable=$19 (index 18), is_illegal=$23 (index 22)
-      expect(insert[1][14]).toBe(true); // is_raw
-      expect(insert[1][18]).toBe(true); // is_harvestable
-      expect(insert[1][22]).toBe(true); // is_illegal
+      // is_raw=$14 (index 13), is_harvestable=$18 (index 17), is_illegal=$22 (index 21)
+      expect(insert[1][13]).toBe(true); // is_raw
+      expect(insert[1][17]).toBe(true); // is_harvestable
+      expect(insert[1][21]).toBe(true); // is_illegal
     });
 
     it('skips commodity with no name and emits warn', async () => {
@@ -219,53 +211,6 @@ describe('CommoditiesSyncStep', () => {
     });
   });
 
-  describe('company FK', () => {
-    it('stores known id_company as company_uex_id ($2, index [1])', async () => {
-      const dsQuery = buildDsQuery([42]);
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([makeCommodity({ id_company: 42 })]);
-
-      await step.execute(CTX);
-
-      const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_commodity'),
-      );
-      expect(insert[1][1]).toBe(42); // $2 company_uex_id
-    });
-
-    it('null id_company stored as null', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([makeCommodity({ id_company: null })]);
-
-      await step.execute(CTX);
-
-      const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_commodity'),
-      );
-      expect(insert[1][1]).toBeNull();
-    });
-
-    it('unknown id_company coerced to null and emits warn', async () => {
-      const dsQuery = buildDsQuery([]); // no known companies
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([makeCommodity({ id_company: 99 })]);
-
-      await step.execute(CTX);
-
-      const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_commodity'),
-      );
-      expect(insert[1][1]).toBeNull();
-      expect(repoSave).toHaveBeenCalledWith(
-        expect.objectContaining({
-          severity: 'warn',
-          message: expect.stringContaining('unknown company uex_id=99'),
-        }),
-      );
-    });
-  });
-
   describe('parent_uex_id two-pass', () => {
     it('pass 1a inserts with NULL parent_uex_id; pass 1b issues UPDATE to set it', async () => {
       const dsQuery = buildDsQuery();
@@ -281,7 +226,7 @@ describe('CommoditiesSyncStep', () => {
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      expect(insert[0]).toMatch(/VALUES\s*\(\s*\$1,NULL,\$2/);
+      expect(insert[0]).toMatch(/VALUES\s*\(\s*\$1,NULL,/);
 
       const updateCall = dsQuery.mock.calls.find(
         ([sql]: [string]) =>
