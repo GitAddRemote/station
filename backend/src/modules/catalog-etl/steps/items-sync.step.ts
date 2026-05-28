@@ -291,21 +291,17 @@ export class ItemsSyncStep implements EtlStep {
 
     this.logger.info({ runId: ctx.runId, upserted, skipped }, 'items upserted');
 
-    // Pass 2 — reconcile item attributes.
-    // Delete stale rows first so attributes removed from the UEX payload don't
-    // linger and diverge from attributes_summary.
-    if (upsertedUexIds.size > 0) {
-      await this.dataSource.query(
-        `DELETE FROM station_item_attribute WHERE item_uex_id = ANY($1)`,
-        [Array.from(upsertedUexIds)],
-      );
-    }
-
+    // Pass 2 — reconcile item attributes per item inside a transaction.
+    // The DELETE and all replacement INSERTs for each item are atomic so a
+    // failed INSERT cannot leave attributes_summary and station_item_attribute
+    // in an inconsistent state.
     let attrUpserted = 0;
     let attrSkipped = 0;
 
     for (const record of items) {
       if (!record.name) continue;
+
+      const validAttrs: UexItemAttribute[] = [];
       for (const attr of record.attributes ?? []) {
         if (!attr.id_category_attribute) {
           await this.warningsRepo.save(
@@ -339,33 +335,44 @@ export class ItemsSyncStep implements EtlStep {
           continue;
         }
 
-        await this.dataSource.query(
-          `INSERT INTO station_item_attribute
-             (uex_id, item_uex_id, category_uex_id, category_attribute_uex_id,
-              value, unit, uex_date_added, uex_date_modified, synced_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
-           ON CONFLICT (uex_id) DO UPDATE SET
-             item_uex_id=EXCLUDED.item_uex_id,
-             category_uex_id=EXCLUDED.category_uex_id,
-             category_attribute_uex_id=EXCLUDED.category_attribute_uex_id,
-             value=EXCLUDED.value,
-             unit=EXCLUDED.unit,
-             uex_date_added=EXCLUDED.uex_date_added,
-             uex_date_modified=EXCLUDED.uex_date_modified,
-             synced_at=NOW()`,
-          [
-            attr.id, // $1 uex_id
-            record.id, // $2 item_uex_id
-            attr.id_category ?? null, // $3 category_uex_id
-            attr.id_category_attribute, // $4 category_attribute_uex_id
-            attr.value ?? null, // $5 value
-            attr.unit ?? null, // $6 unit
-            toDate(attr.date_added), // $7 uex_date_added
-            toDate(attr.date_modified), // $8 uex_date_modified
-          ],
-        );
-        attrUpserted++;
+        validAttrs.push(attr);
       }
+
+      await this.dataSource.transaction(async (em) => {
+        await em.query(
+          `DELETE FROM station_item_attribute WHERE item_uex_id = $1`,
+          [record.id],
+        );
+
+        for (const attr of validAttrs) {
+          await em.query(
+            `INSERT INTO station_item_attribute
+               (uex_id, item_uex_id, category_uex_id, category_attribute_uex_id,
+                value, unit, uex_date_added, uex_date_modified, synced_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+             ON CONFLICT (uex_id) DO UPDATE SET
+               item_uex_id=EXCLUDED.item_uex_id,
+               category_uex_id=EXCLUDED.category_uex_id,
+               category_attribute_uex_id=EXCLUDED.category_attribute_uex_id,
+               value=EXCLUDED.value,
+               unit=EXCLUDED.unit,
+               uex_date_added=EXCLUDED.uex_date_added,
+               uex_date_modified=EXCLUDED.uex_date_modified,
+               synced_at=NOW()`,
+            [
+              attr.id, // $1 uex_id
+              record.id, // $2 item_uex_id
+              attr.id_category ?? null, // $3 category_uex_id
+              attr.id_category_attribute, // $4 category_attribute_uex_id
+              attr.value ?? null, // $5 value
+              attr.unit ?? null, // $6 unit
+              toDate(attr.date_added), // $7 uex_date_added
+              toDate(attr.date_modified), // $8 uex_date_modified
+            ],
+          );
+          attrUpserted++;
+        }
+      });
     }
 
     this.logger.info(

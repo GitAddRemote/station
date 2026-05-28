@@ -81,9 +81,17 @@ function buildStep(
   repoCreate: jest.Mock,
   repoSave: jest.Mock,
 ) {
+  const ds = {
+    query: dsQuery,
+    transaction: jest
+      .fn()
+      .mockImplementation((cb: (em: { query: jest.Mock }) => Promise<void>) =>
+        cb({ query: dsQuery }),
+      ),
+  };
   return new ItemsSyncStep(
     { get: uexGet } as never,
-    { query: dsQuery } as never,
+    ds as never,
     { create: repoCreate, save: repoSave } as never,
     makeLogger() as never,
   );
@@ -564,7 +572,7 @@ describe('ItemsSyncStep', () => {
         sql.includes('DELETE FROM station_item_attribute'),
       );
       expect(deleteCall).toBeDefined();
-      expect(deleteCall[1][0]).toContain(1);
+      expect(deleteCall[1][0]).toBe(1); // scoped to item uex_id
 
       const deleteIdx = dsQuery.mock.calls.findIndex(([sql]: [string]) =>
         sql.includes('DELETE FROM station_item_attribute'),
