@@ -106,11 +106,18 @@ export class ItemsSyncStep implements EtlStep {
       categoryAttrRows.map((r) => r.uex_id),
     );
 
-    // Pass 1a — upsert all items with parent_uex_id=NULL to satisfy the
-    // self-referential FK regardless of arrival order.
+    // Pass 1a — for each item, upsert the item row and reconcile its attributes
+    // atomically inside a single transaction. This keeps attributes_summary (on
+    // station_item) and station_item_attribute rows consistent: if any attribute
+    // INSERT fails the entire transaction rolls back, including the item upsert.
+    //
+    // parent_uex_id is written as NULL here (self-referential FK safety). Passes
+    // 1b and 1c fill and clear it after all items are written.
     let upserted = 0;
     let skipped = 0;
     const upsertedUexIds = new Set<number>();
+    let attrUpserted = 0;
+    let attrSkipped = 0;
 
     for (const record of items) {
       if (!record.name) {
@@ -160,6 +167,43 @@ export class ItemsSyncStep implements EtlStep {
         vehicleUexId = null;
       }
 
+      const validAttrs: UexItemAttribute[] = [];
+      for (const attr of record.attributes ?? []) {
+        if (!attr.id_category_attribute) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Item attribute uex_id=${attr.id} has no category_attribute_uex_id — skipped`,
+              rawPayload: { item_id: record.id, attr_id: attr.id },
+            }),
+          );
+          attrSkipped++;
+          continue;
+        }
+
+        if (!knownCategoryAttributeUexIds.has(attr.id_category_attribute)) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Item attribute uex_id=${attr.id} references unknown category_attribute uex_id=${attr.id_category_attribute} — skipped`,
+              rawPayload: {
+                item_id: record.id,
+                attr_id: attr.id,
+                id_category_attribute: attr.id_category_attribute,
+              },
+            }),
+          );
+          attrSkipped++;
+          continue;
+        }
+
+        validAttrs.push(attr);
+      }
+
       // Column layout (parent_uex_id is a NULL literal — no placeholder):
       // $1  uex_id           $2  category_uex_id   $3  company_uex_id
       // $4  vehicle_uex_id   $5  name              $6  slug
@@ -170,82 +214,180 @@ export class ItemsSyncStep implements EtlStep {
       // $19 notification    $20 attributes_summary $21 game_version
       // $22 uex_date_added  $23 uex_date_modified
       // synced_at = NOW() literal
-      await this.dataSource.query(
-        `INSERT INTO station_item (
-           uex_id, parent_uex_id,
-           category_uex_id, company_uex_id, vehicle_uex_id,
-           name, slug, uuid, size, color, color2, quality,
-           url_store,
-           is_exclusive_pledge, is_exclusive_subscriber, is_exclusive_concierge,
-           is_commodity, is_harvestable,
-           screenshot, notification, attributes_summary,
-           game_version, uex_date_added, uex_date_modified, synced_at
-         )
-         VALUES (
-           $1,NULL,
-           $2,$3,$4,
-           $5,$6,$7,$8,$9,$10,$11,
-           $12,
-           $13,$14,$15,
-           $16,$17,
-           $18,$19,$20,
-           $21,$22,$23,NOW()
-         )
-         ON CONFLICT (uex_id) DO UPDATE SET
-           category_uex_id=EXCLUDED.category_uex_id,
-           company_uex_id=EXCLUDED.company_uex_id,
-           vehicle_uex_id=EXCLUDED.vehicle_uex_id,
-           name=EXCLUDED.name,
-           slug=EXCLUDED.slug,
-           uuid=EXCLUDED.uuid,
-           size=EXCLUDED.size,
-           color=EXCLUDED.color,
-           color2=EXCLUDED.color2,
-           quality=EXCLUDED.quality,
-           url_store=EXCLUDED.url_store,
-           is_exclusive_pledge=EXCLUDED.is_exclusive_pledge,
-           is_exclusive_subscriber=EXCLUDED.is_exclusive_subscriber,
-           is_exclusive_concierge=EXCLUDED.is_exclusive_concierge,
-           is_commodity=EXCLUDED.is_commodity,
-           is_harvestable=EXCLUDED.is_harvestable,
-           screenshot=EXCLUDED.screenshot,
-           notification=EXCLUDED.notification,
-           attributes_summary=EXCLUDED.attributes_summary,
-           game_version=EXCLUDED.game_version,
-           uex_date_added=EXCLUDED.uex_date_added,
-           uex_date_modified=EXCLUDED.uex_date_modified,
-           synced_at=NOW()`,
-        [
-          record.id, // $1  uex_id
-          // parent_uex_id = NULL literal
-          record.id_category ?? null, // $2  category_uex_id
-          companyUexId, // $3  company_uex_id
-          vehicleUexId, // $4  vehicle_uex_id
-          record.name, // $5  name
-          record.slug ?? null, // $6  slug
-          record.uuid ?? null, // $7  uuid
-          record.size ?? null, // $8  size
-          record.color ?? null, // $9  color
-          record.color2 ?? null, // $10 color2
-          record.quality ?? null, // $11 quality
-          record.url_store ?? null, // $12 url_store
-          Boolean(record.is_exclusive_pledge), // $13
-          Boolean(record.is_exclusive_subscriber), // $14
-          Boolean(record.is_exclusive_concierge), // $15
-          Boolean(record.is_commodity), // $16
-          Boolean(record.is_harvestable), // $17
-          record.screenshot ?? null, // $18 screenshot
-          record.notification ?? null, // $19 notification
-          JSON.stringify(attributesSummary), // $20 attributes_summary
-          record.game_version ?? null, // $21 game_version
-          toDate(record.date_added), // $22 uex_date_added
-          toDate(record.date_modified), // $23 uex_date_modified
-          // synced_at = NOW() literal
-        ],
-      );
+      const itemParams = [
+        record.id, // $1  uex_id
+        // parent_uex_id = NULL literal
+        record.id_category ?? null, // $2  category_uex_id
+        companyUexId, // $3  company_uex_id
+        vehicleUexId, // $4  vehicle_uex_id
+        record.name, // $5  name
+        record.slug ?? null, // $6  slug
+        record.uuid ?? null, // $7  uuid
+        record.size ?? null, // $8  size
+        record.color ?? null, // $9  color
+        record.color2 ?? null, // $10 color2
+        record.quality ?? null, // $11 quality
+        record.url_store ?? null, // $12 url_store
+        Boolean(record.is_exclusive_pledge), // $13
+        Boolean(record.is_exclusive_subscriber), // $14
+        Boolean(record.is_exclusive_concierge), // $15
+        Boolean(record.is_commodity), // $16
+        Boolean(record.is_harvestable), // $17
+        record.screenshot ?? null, // $18 screenshot
+        record.notification ?? null, // $19 notification
+        JSON.stringify(attributesSummary), // $20 attributes_summary
+        record.game_version ?? null, // $21 game_version
+        toDate(record.date_added), // $22 uex_date_added
+        toDate(record.date_modified), // $23 uex_date_modified
+        // synced_at = NOW() literal
+      ];
+
+      await this.dataSource.transaction(async (em) => {
+        // Upsert item by uex_id — the primary stable identifier for this sync pass.
+        // If the item's uex_id already exists, all columns are refreshed except
+        // parent_uex_id (handled by passes 1b/1c after all items are written).
+        await em.query(
+          `INSERT INTO station_item (
+             uex_id, parent_uex_id,
+             category_uex_id, company_uex_id, vehicle_uex_id,
+             name, slug, uuid, size, color, color2, quality,
+             url_store,
+             is_exclusive_pledge, is_exclusive_subscriber, is_exclusive_concierge,
+             is_commodity, is_harvestable,
+             screenshot, notification, attributes_summary,
+             game_version, uex_date_added, uex_date_modified, synced_at
+           )
+           VALUES (
+             $1,NULL,
+             $2,$3,$4,
+             $5,$6,$7,$8,$9,$10,$11,
+             $12,
+             $13,$14,$15,
+             $16,$17,
+             $18,$19,$20,
+             $21,$22,$23,NOW()
+           )
+           ON CONFLICT (uex_id) DO UPDATE SET
+             category_uex_id=EXCLUDED.category_uex_id,
+             company_uex_id=EXCLUDED.company_uex_id,
+             vehicle_uex_id=EXCLUDED.vehicle_uex_id,
+             name=EXCLUDED.name,
+             slug=EXCLUDED.slug,
+             uuid=EXCLUDED.uuid,
+             size=EXCLUDED.size,
+             color=EXCLUDED.color,
+             color2=EXCLUDED.color2,
+             quality=EXCLUDED.quality,
+             url_store=EXCLUDED.url_store,
+             is_exclusive_pledge=EXCLUDED.is_exclusive_pledge,
+             is_exclusive_subscriber=EXCLUDED.is_exclusive_subscriber,
+             is_exclusive_concierge=EXCLUDED.is_exclusive_concierge,
+             is_commodity=EXCLUDED.is_commodity,
+             is_harvestable=EXCLUDED.is_harvestable,
+             screenshot=EXCLUDED.screenshot,
+             notification=EXCLUDED.notification,
+             attributes_summary=EXCLUDED.attributes_summary,
+             game_version=EXCLUDED.game_version,
+             uex_date_added=EXCLUDED.uex_date_added,
+             uex_date_modified=EXCLUDED.uex_date_modified,
+             synced_at=NOW()`,
+          itemParams,
+        );
+
+        // Pass 1a-uuid — when UEX reassigns a new uex_id to an existing item
+        // (UEX ID instability), the INSERT above will insert a phantom duplicate
+        // row. Detect this by attempting a uuid-based upsert for items that have a
+        // uuid: if a row with the same uuid already exists under a different
+        // uex_id, update that row's uex_id and all other columns, then delete the
+        // phantom row inserted above.
+        if (record.uuid) {
+          await em.query(
+            `WITH uuid_match AS (
+               SELECT id FROM station_item
+               WHERE uuid = $7
+                 AND uex_id != $1
+               LIMIT 1
+             ),
+             updated AS (
+               UPDATE station_item
+               SET
+                 uex_id=$1,
+                 category_uex_id=$2,
+                 company_uex_id=$3,
+                 vehicle_uex_id=$4,
+                 name=$5,
+                 slug=$6,
+                 size=$8,
+                 color=$9,
+                 color2=$10,
+                 quality=$11,
+                 url_store=$12,
+                 is_exclusive_pledge=$13,
+                 is_exclusive_subscriber=$14,
+                 is_exclusive_concierge=$15,
+                 is_commodity=$16,
+                 is_harvestable=$17,
+                 screenshot=$18,
+                 notification=$19,
+                 attributes_summary=$20,
+                 game_version=$21,
+                 uex_date_added=$22,
+                 uex_date_modified=$23,
+                 synced_at=NOW()
+               WHERE id = (SELECT id FROM uuid_match)
+               RETURNING id
+             )
+             DELETE FROM station_item
+             WHERE uex_id = $1
+               AND id NOT IN (SELECT id FROM updated)
+               AND EXISTS (SELECT 1 FROM updated)`,
+            itemParams,
+          );
+        }
+
+        // Reconcile attributes: wipe stale rows then re-insert current set.
+        // Both operations are inside this transaction so an attribute INSERT
+        // failure rolls back the DELETE and the item upsert together.
+        await em.query(
+          `DELETE FROM station_item_attribute WHERE item_uex_id = $1`,
+          [record.id],
+        );
+
+        for (const attr of validAttrs) {
+          await em.query(
+            `INSERT INTO station_item_attribute
+               (uex_id, item_uex_id, category_uex_id, category_attribute_uex_id,
+                value, unit, uex_date_added, uex_date_modified, synced_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+             ON CONFLICT (uex_id) DO UPDATE SET
+               item_uex_id=EXCLUDED.item_uex_id,
+               category_uex_id=EXCLUDED.category_uex_id,
+               category_attribute_uex_id=EXCLUDED.category_attribute_uex_id,
+               value=EXCLUDED.value,
+               unit=EXCLUDED.unit,
+               uex_date_added=EXCLUDED.uex_date_added,
+               uex_date_modified=EXCLUDED.uex_date_modified,
+               synced_at=NOW()`,
+            [
+              attr.id, // $1 uex_id
+              record.id, // $2 item_uex_id
+              attr.id_category ?? null, // $3 category_uex_id
+              attr.id_category_attribute, // $4 category_attribute_uex_id
+              attr.value ?? null, // $5 value
+              attr.unit ?? null, // $6 unit
+              toDate(attr.date_added), // $7 uex_date_added
+              toDate(attr.date_modified), // $8 uex_date_modified
+            ],
+          );
+          attrUpserted++;
+        }
+      });
+
       upsertedUexIds.add(record.id);
       upserted++;
     }
+
+    this.logger.info({ runId: ctx.runId, upserted, skipped }, 'items upserted');
 
     // Pass 1b — set parent_uex_id for items whose parent was also upserted.
     // ON CONFLICT in pass 1a does not touch parent_uex_id, so existing links are
@@ -287,92 +429,6 @@ export class ItemsSyncStep implements EtlStep {
           [deParentedIds],
         );
       }
-    }
-
-    this.logger.info({ runId: ctx.runId, upserted, skipped }, 'items upserted');
-
-    // Pass 2 — reconcile item attributes per item inside a transaction.
-    // The DELETE and all replacement INSERTs for each item are atomic so a
-    // failed INSERT cannot leave attributes_summary and station_item_attribute
-    // in an inconsistent state.
-    let attrUpserted = 0;
-    let attrSkipped = 0;
-
-    for (const record of items) {
-      if (!record.name) continue;
-
-      const validAttrs: UexItemAttribute[] = [];
-      for (const attr of record.attributes ?? []) {
-        if (!attr.id_category_attribute) {
-          await this.warningsRepo.save(
-            this.warningsRepo.create({
-              runId: ctx.runId,
-              stepName: this.name,
-              severity: 'warn',
-              message: `Item attribute uex_id=${attr.id} has no category_attribute_uex_id — skipped`,
-              rawPayload: { item_id: record.id, attr_id: attr.id },
-            }),
-          );
-          attrSkipped++;
-          continue;
-        }
-
-        if (!knownCategoryAttributeUexIds.has(attr.id_category_attribute)) {
-          await this.warningsRepo.save(
-            this.warningsRepo.create({
-              runId: ctx.runId,
-              stepName: this.name,
-              severity: 'warn',
-              message: `Item attribute uex_id=${attr.id} references unknown category_attribute uex_id=${attr.id_category_attribute} — skipped`,
-              rawPayload: {
-                item_id: record.id,
-                attr_id: attr.id,
-                id_category_attribute: attr.id_category_attribute,
-              },
-            }),
-          );
-          attrSkipped++;
-          continue;
-        }
-
-        validAttrs.push(attr);
-      }
-
-      await this.dataSource.transaction(async (em) => {
-        await em.query(
-          `DELETE FROM station_item_attribute WHERE item_uex_id = $1`,
-          [record.id],
-        );
-
-        for (const attr of validAttrs) {
-          await em.query(
-            `INSERT INTO station_item_attribute
-               (uex_id, item_uex_id, category_uex_id, category_attribute_uex_id,
-                value, unit, uex_date_added, uex_date_modified, synced_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
-             ON CONFLICT (uex_id) DO UPDATE SET
-               item_uex_id=EXCLUDED.item_uex_id,
-               category_uex_id=EXCLUDED.category_uex_id,
-               category_attribute_uex_id=EXCLUDED.category_attribute_uex_id,
-               value=EXCLUDED.value,
-               unit=EXCLUDED.unit,
-               uex_date_added=EXCLUDED.uex_date_added,
-               uex_date_modified=EXCLUDED.uex_date_modified,
-               synced_at=NOW()`,
-            [
-              attr.id, // $1 uex_id
-              record.id, // $2 item_uex_id
-              attr.id_category ?? null, // $3 category_uex_id
-              attr.id_category_attribute, // $4 category_attribute_uex_id
-              attr.value ?? null, // $5 value
-              attr.unit ?? null, // $6 unit
-              toDate(attr.date_added), // $7 uex_date_added
-              toDate(attr.date_modified), // $8 uex_date_modified
-            ],
-          );
-          attrUpserted++;
-        }
-      });
     }
 
     this.logger.info(

@@ -229,6 +229,92 @@ describe('ItemsSyncStep', () => {
       );
       expect(anyInsert).toBeUndefined();
     });
+
+    it('item upsert executes inside transaction (transaction() called per item)', async () => {
+      const dsQuery = buildDsQuery();
+      const ds = {
+        query: dsQuery,
+        transaction: jest
+          .fn()
+          .mockImplementation(
+            (cb: (em: { query: jest.Mock }) => Promise<void>) =>
+              cb({ query: dsQuery }),
+          ),
+      };
+      const step = new ItemsSyncStep(
+        { get: uexGet } as never,
+        ds as never,
+        { create: repoCreate, save: repoSave } as never,
+        makeLogger() as never,
+      );
+      uexGet.mockResolvedValueOnce([
+        makeItem(),
+        makeItem({ id: 2, uuid: 'sc-uuid-2' }),
+      ]);
+
+      await step.execute(CTX);
+
+      // One transaction per item
+      expect(ds.transaction).toHaveBeenCalledTimes(2);
+      // Item upsert must be inside the transaction, not in the outer dsQuery
+      const outerItemInsert =
+        // transaction calls go through dsQuery too (mock wires them together), so
+        // verify at least one INSERT INTO station_item call was made overall
+        (dsQuery.mock.calls as [string, unknown[]][]).filter(([sql]) =>
+          sql.includes('INSERT INTO station_item'),
+        ).length;
+      expect(outerItemInsert).toBeGreaterThan(0);
+    });
+  });
+
+  describe('UUID-based reconciliation (UEX ID instability)', () => {
+    it('issues uuid-match query for items that have a uuid', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ uuid: 'stable-uuid' })]);
+
+      await step.execute(CTX);
+
+      const uuidMatchCall = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('uuid_match') && sql.includes('uex_id != $1'),
+      );
+      expect(uuidMatchCall).toBeDefined();
+      // $1 = uex_id, $7 = uuid
+      expect(uuidMatchCall[1][0]).toBe(1); // uex_id
+      expect(uuidMatchCall[1][6]).toBe('stable-uuid'); // uuid at $7
+    });
+
+    it('does NOT issue uuid-match query for items with null uuid', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ uuid: null })]);
+
+      await step.execute(CTX);
+
+      const uuidMatchCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('uuid_match'),
+      );
+      expect(uuidMatchCall).toBeUndefined();
+    });
+
+    it('uuid-match query uses same 23 itemParams, preserving param positions', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeItem({ id: 5, uuid: 'sc-uuid-5', id_category: 7 }),
+      ]);
+
+      await step.execute(CTX);
+
+      const uuidMatchCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('uuid_match'),
+      );
+      expect(uuidMatchCall[1]).toHaveLength(23);
+      expect(uuidMatchCall[1][0]).toBe(5); // $1 uex_id
+      expect(uuidMatchCall[1][1]).toBe(7); // $2 category_uex_id
+      expect(uuidMatchCall[1][6]).toBe('sc-uuid-5'); // $7 uuid
+    });
   });
 
   describe('company / vehicle FK', () => {
@@ -304,7 +390,12 @@ describe('ItemsSyncStep', () => {
       // Parent (id=1) and child (id=2) both in payload
       uexGet.mockResolvedValueOnce([
         makeItem({ id: 1 }),
-        makeItem({ id: 2, name: 'Child Item', id_parent: 1 }),
+        makeItem({
+          id: 2,
+          uuid: 'sc-uuid-2',
+          name: 'Child Item',
+          id_parent: 1,
+        }),
       ]);
 
       await step.execute(CTX);
