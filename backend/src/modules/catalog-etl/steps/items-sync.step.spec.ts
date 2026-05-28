@@ -553,6 +553,28 @@ describe('ItemsSyncStep', () => {
       expect(attrInserts).toHaveLength(2);
     });
 
+    it('deletes stale attributes for upserted items before inserting', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id: 1 })]);
+
+      await step.execute(CTX);
+
+      const deleteCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('DELETE FROM station_item_attribute'),
+      );
+      expect(deleteCall).toBeDefined();
+      expect(deleteCall[1][0]).toContain(1);
+
+      const deleteIdx = dsQuery.mock.calls.findIndex(([sql]: [string]) =>
+        sql.includes('DELETE FROM station_item_attribute'),
+      );
+      const attrInsertIdx = dsQuery.mock.calls.findIndex(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item_attribute'),
+      );
+      expect(deleteIdx).toBeLessThan(attrInsertIdx);
+    });
+
     it('items with no attributes produce no attribute inserts', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);

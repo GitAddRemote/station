@@ -291,8 +291,16 @@ export class ItemsSyncStep implements EtlStep {
 
     this.logger.info({ runId: ctx.runId, upserted, skipped }, 'items upserted');
 
-    // Pass 2 — upsert item attributes.
-    // Each attribute row has its own uex_id; we upsert on that.
+    // Pass 2 — reconcile item attributes.
+    // Delete stale rows first so attributes removed from the UEX payload don't
+    // linger and diverge from attributes_summary.
+    if (upsertedUexIds.size > 0) {
+      await this.dataSource.query(
+        `DELETE FROM station_item_attribute WHERE item_uex_id = ANY($1)`,
+        [Array.from(upsertedUexIds)],
+      );
+    }
+
     let attrUpserted = 0;
     let attrSkipped = 0;
 
