@@ -268,52 +268,177 @@ describe('ItemsSyncStep', () => {
   });
 
   describe('UUID-based reconciliation (UEX ID instability)', () => {
-    it('issues uuid-match query for items that have a uuid', async () => {
+    it('issues uuid lookup SELECT for items that have a uuid', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([makeItem({ uuid: 'stable-uuid' })]);
 
       await step.execute(CTX);
 
-      const uuidMatchCall = dsQuery.mock.calls.find(
+      const uuidLookup = dsQuery.mock.calls.find(
         ([sql]: [string]) =>
-          sql.includes('uuid_match') && sql.includes('uex_id != $1'),
+          sql.includes('FROM station_item') &&
+          sql.includes('uuid = $1') &&
+          sql.includes('uex_id != $2'),
       );
-      expect(uuidMatchCall).toBeDefined();
-      // $1 = uex_id, $7 = uuid
-      expect(uuidMatchCall[1][0]).toBe(1); // uex_id
-      expect(uuidMatchCall[1][6]).toBe('stable-uuid'); // uuid at $7
+      expect(uuidLookup).toBeDefined();
+      expect(uuidLookup[1][0]).toBe('stable-uuid'); // $1 uuid
+      expect(uuidLookup[1][1]).toBe(1); // $2 uex_id
     });
 
-    it('does NOT issue uuid-match query for items with null uuid', async () => {
+    it('does NOT issue uuid lookup for items with null uuid', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([makeItem({ uuid: null })]);
 
       await step.execute(CTX);
 
-      const uuidMatchCall = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('uuid_match'),
+      const uuidLookup = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('FROM station_item') &&
+          sql.includes('uuid = $1') &&
+          sql.includes('uex_id != $2'),
       );
-      expect(uuidMatchCall).toBeUndefined();
+      expect(uuidLookup).toBeUndefined();
     });
 
-    it('uuid-match query uses same 23 itemParams, preserving param positions', async () => {
-      const dsQuery = buildDsQuery();
+    it('when uuid match found: re-keys station_item_attribute.item_uex_id before updating canonical row', async () => {
+      // dsQuery returns an existing row with old uex_id=99 for the uuid lookup
+      const dsQuery = jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('SELECT uex_id FROM station_company'))
+          return Promise.resolve([{ uex_id: 10 }]);
+        if (sql.includes('SELECT uex_id FROM station_vehicle'))
+          return Promise.resolve([]);
+        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
+          return Promise.resolve([{ uex_id: 42 }]);
+        // uuid lookup — returns the old row
+        if (
+          sql.includes('FROM station_item') &&
+          sql.includes('uuid = $1') &&
+          sql.includes('uex_id != $2')
+        )
+          return Promise.resolve([{ uex_id: 99 }]);
+        return Promise.resolve([]);
+      });
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([
-        makeItem({ id: 5, uuid: 'sc-uuid-5', id_category: 7 }),
-      ]);
+      uexGet.mockResolvedValueOnce([makeItem({ id: 1, uuid: 'stable-uuid' })]);
 
       await step.execute(CTX);
 
-      const uuidMatchCall = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('uuid_match'),
+      const reKeyAttr = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_item_attribute') &&
+          sql.includes('item_uex_id = $1'),
       );
-      expect(uuidMatchCall[1]).toHaveLength(23);
-      expect(uuidMatchCall[1][0]).toBe(5); // $1 uex_id
-      expect(uuidMatchCall[1][1]).toBe(7); // $2 category_uex_id
-      expect(uuidMatchCall[1][6]).toBe('sc-uuid-5'); // $7 uuid
+      expect(reKeyAttr).toBeDefined();
+      expect(reKeyAttr[1][0]).toBe(1); // new uex_id
+      expect(reKeyAttr[1][1]).toBe(99); // old uex_id
+    });
+
+    it('when uuid match found: re-keys station_item.parent_uex_id before updating canonical row', async () => {
+      const dsQuery = jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('SELECT uex_id FROM station_company'))
+          return Promise.resolve([{ uex_id: 10 }]);
+        if (sql.includes('SELECT uex_id FROM station_vehicle'))
+          return Promise.resolve([]);
+        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
+          return Promise.resolve([{ uex_id: 42 }]);
+        if (
+          sql.includes('FROM station_item') &&
+          sql.includes('uuid = $1') &&
+          sql.includes('uex_id != $2')
+        )
+          return Promise.resolve([{ uex_id: 99 }]);
+        return Promise.resolve([]);
+      });
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id: 1, uuid: 'stable-uuid' })]);
+
+      await step.execute(CTX);
+
+      const reKeyParent = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_item') &&
+          sql.includes('parent_uex_id = $1') &&
+          sql.includes('parent_uex_id = $2'),
+      );
+      expect(reKeyParent).toBeDefined();
+      expect(reKeyParent[1][0]).toBe(1); // new uex_id
+      expect(reKeyParent[1][1]).toBe(99); // old uex_id
+    });
+
+    it('when uuid match found: updates canonical row with uex_id=$24 (old uex_id) and new columns', async () => {
+      const dsQuery = jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('SELECT uex_id FROM station_company'))
+          return Promise.resolve([{ uex_id: 10 }]);
+        if (sql.includes('SELECT uex_id FROM station_vehicle'))
+          return Promise.resolve([]);
+        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
+          return Promise.resolve([{ uex_id: 42 }]);
+        if (
+          sql.includes('FROM station_item') &&
+          sql.includes('uuid = $1') &&
+          sql.includes('uex_id != $2')
+        )
+          return Promise.resolve([{ uex_id: 99 }]);
+        return Promise.resolve([]);
+      });
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id: 1, uuid: 'stable-uuid' })]);
+
+      await step.execute(CTX);
+
+      const canonicalUpdate = dsQuery.mock.calls.find(
+        ([sql]: [string]) =>
+          sql.includes('UPDATE station_item SET') &&
+          sql.includes('uex_id=$1') &&
+          sql.includes('WHERE uex_id = $24'),
+      );
+      expect(canonicalUpdate).toBeDefined();
+      expect(canonicalUpdate[1][0]).toBe(1); // $1 = new uex_id
+      expect(canonicalUpdate[1][23]).toBe(99); // $24 = old uex_id (WHERE clause)
+    });
+
+    it('when uuid match found: skips INSERT INTO station_item (no phantom row)', async () => {
+      const dsQuery = jest.fn().mockImplementation((sql: string) => {
+        if (sql.includes('SELECT uex_id FROM station_company'))
+          return Promise.resolve([{ uex_id: 10 }]);
+        if (sql.includes('SELECT uex_id FROM station_vehicle'))
+          return Promise.resolve([]);
+        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
+          return Promise.resolve([{ uex_id: 42 }]);
+        if (
+          sql.includes('FROM station_item') &&
+          sql.includes('uuid = $1') &&
+          sql.includes('uex_id != $2')
+        )
+          return Promise.resolve([{ uex_id: 99 }]);
+        return Promise.resolve([]);
+      });
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ id: 1, uuid: 'stable-uuid' })]);
+
+      await step.execute(CTX);
+
+      // Use trim().startsWith to avoid matching INSERT INTO station_item_attribute
+      const insertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.trim().startsWith('INSERT INTO station_item '),
+      );
+      expect(insertCall).toBeUndefined();
+    });
+
+    it('when no uuid match: INSERT runs normally (stable item path)', async () => {
+      // dsQuery returns empty for uuid lookup → no match → INSERT path
+      const dsQuery = buildDsQuery(); // returns [] for uuid lookup too
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeItem({ uuid: 'stable-uuid' })]);
+
+      await step.execute(CTX);
+
+      const insertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_item'),
+      );
+      expect(insertCall).toBeDefined();
     });
   });
 

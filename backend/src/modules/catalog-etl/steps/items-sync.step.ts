@@ -111,6 +111,11 @@ export class ItemsSyncStep implements EtlStep {
     // station_item) and station_item_attribute rows consistent: if any attribute
     // INSERT fails the entire transaction rolls back, including the item upsert.
     //
+    // UEX ID instability is handled before the INSERT: if a row with the same uuid
+    // already exists under a different uex_id, we re-key its FK dependents and
+    // update the canonical row in place rather than inserting a phantom duplicate
+    // that would violate the uex_id UNIQUE constraint.
+    //
     // parent_uex_id is written as NULL here (self-referential FK safety). Passes
     // 1b and 1c fill and clear it after all items are written.
     let upserted = 0;
@@ -243,80 +248,52 @@ export class ItemsSyncStep implements EtlStep {
       ];
 
       await this.dataSource.transaction(async (em) => {
-        // Upsert item by uex_id — the primary stable identifier for this sync pass.
-        // If the item's uex_id already exists, all columns are refreshed except
-        // parent_uex_id (handled by passes 1b/1c after all items are written).
-        await em.query(
-          `INSERT INTO station_item (
-             uex_id, parent_uex_id,
-             category_uex_id, company_uex_id, vehicle_uex_id,
-             name, slug, uuid, size, color, color2, quality,
-             url_store,
-             is_exclusive_pledge, is_exclusive_subscriber, is_exclusive_concierge,
-             is_commodity, is_harvestable,
-             screenshot, notification, attributes_summary,
-             game_version, uex_date_added, uex_date_modified, synced_at
-           )
-           VALUES (
-             $1,NULL,
-             $2,$3,$4,
-             $5,$6,$7,$8,$9,$10,$11,
-             $12,
-             $13,$14,$15,
-             $16,$17,
-             $18,$19,$20,
-             $21,$22,$23,NOW()
-           )
-           ON CONFLICT (uex_id) DO UPDATE SET
-             category_uex_id=EXCLUDED.category_uex_id,
-             company_uex_id=EXCLUDED.company_uex_id,
-             vehicle_uex_id=EXCLUDED.vehicle_uex_id,
-             name=EXCLUDED.name,
-             slug=EXCLUDED.slug,
-             uuid=EXCLUDED.uuid,
-             size=EXCLUDED.size,
-             color=EXCLUDED.color,
-             color2=EXCLUDED.color2,
-             quality=EXCLUDED.quality,
-             url_store=EXCLUDED.url_store,
-             is_exclusive_pledge=EXCLUDED.is_exclusive_pledge,
-             is_exclusive_subscriber=EXCLUDED.is_exclusive_subscriber,
-             is_exclusive_concierge=EXCLUDED.is_exclusive_concierge,
-             is_commodity=EXCLUDED.is_commodity,
-             is_harvestable=EXCLUDED.is_harvestable,
-             screenshot=EXCLUDED.screenshot,
-             notification=EXCLUDED.notification,
-             attributes_summary=EXCLUDED.attributes_summary,
-             game_version=EXCLUDED.game_version,
-             uex_date_added=EXCLUDED.uex_date_added,
-             uex_date_modified=EXCLUDED.uex_date_modified,
-             synced_at=NOW()`,
-          itemParams,
-        );
-
-        // Pass 1a-uuid — when UEX reassigns a new uex_id to an existing item
-        // (UEX ID instability), the INSERT above will insert a phantom duplicate
-        // row. Detect this by attempting a uuid-based upsert for items that have a
-        // uuid: if a row with the same uuid already exists under a different
-        // uex_id, update that row's uex_id and all other columns, then delete the
-        // phantom row inserted above.
+        // Pass 1a-uuid — UEX ID instability: check whether this uuid already
+        // exists under a different uex_id before inserting. If it does, we are
+        // looking at a canonical row whose uex_id was reassigned by UEX.
+        //
+        // Strategy (avoids phantom rows and UNIQUE constraint violations):
+        //   1. Re-key station_item_attribute.item_uex_id old → new so the FK
+        //      remains valid after the canonical row's uex_id changes.
+        //   2. Re-key station_item.parent_uex_id old → new for any children
+        //      that reference the canonical row.
+        //   3. Update the canonical row's uex_id and all other columns.
+        //   4. Skip the INSERT below (no phantom is ever created).
+        //
+        // When no uuid match exists the INSERT path runs normally.
+        let uuidReconciled = false;
         if (record.uuid) {
-          await em.query(
-            `WITH uuid_match AS (
-               SELECT id FROM station_item
-               WHERE uuid = $7
-                 AND uex_id != $1
-               LIMIT 1
-             ),
-             updated AS (
-               UPDATE station_item
-               SET
+          const existing = await em.query<{ uex_id: number }[]>(
+            `SELECT uex_id FROM station_item
+             WHERE uuid = $1 AND uex_id != $2
+             LIMIT 1`,
+            [record.uuid, record.id],
+          );
+          if (existing.length > 0) {
+            const oldUexId = existing[0].uex_id;
+            // Re-key FK dependents before changing the referenced uex_id.
+            await em.query(
+              `UPDATE station_item_attribute
+               SET item_uex_id = $1
+               WHERE item_uex_id = $2`,
+              [record.id, oldUexId],
+            );
+            await em.query(
+              `UPDATE station_item
+               SET parent_uex_id = $1
+               WHERE parent_uex_id = $2`,
+              [record.id, oldUexId],
+            );
+            // Update canonical row with new uex_id and refreshed columns.
+            await em.query(
+              `UPDATE station_item SET
                  uex_id=$1,
                  category_uex_id=$2,
                  company_uex_id=$3,
                  vehicle_uex_id=$4,
                  name=$5,
                  slug=$6,
+                 uuid=$7,
                  size=$8,
                  color=$9,
                  color2=$10,
@@ -334,13 +311,61 @@ export class ItemsSyncStep implements EtlStep {
                  uex_date_added=$22,
                  uex_date_modified=$23,
                  synced_at=NOW()
-               WHERE id = (SELECT id FROM uuid_match)
-               RETURNING id
+               WHERE uex_id = $24`,
+              [...itemParams, oldUexId],
+            );
+            uuidReconciled = true;
+          }
+        }
+
+        if (!uuidReconciled) {
+          // Normal path: upsert by uex_id. parent_uex_id is always written as
+          // NULL here; passes 1b/1c handle it after all items are written.
+          await em.query(
+            `INSERT INTO station_item (
+               uex_id, parent_uex_id,
+               category_uex_id, company_uex_id, vehicle_uex_id,
+               name, slug, uuid, size, color, color2, quality,
+               url_store,
+               is_exclusive_pledge, is_exclusive_subscriber, is_exclusive_concierge,
+               is_commodity, is_harvestable,
+               screenshot, notification, attributes_summary,
+               game_version, uex_date_added, uex_date_modified, synced_at
              )
-             DELETE FROM station_item
-             WHERE uex_id = $1
-               AND id NOT IN (SELECT id FROM updated)
-               AND EXISTS (SELECT 1 FROM updated)`,
+             VALUES (
+               $1,NULL,
+               $2,$3,$4,
+               $5,$6,$7,$8,$9,$10,$11,
+               $12,
+               $13,$14,$15,
+               $16,$17,
+               $18,$19,$20,
+               $21,$22,$23,NOW()
+             )
+             ON CONFLICT (uex_id) DO UPDATE SET
+               category_uex_id=EXCLUDED.category_uex_id,
+               company_uex_id=EXCLUDED.company_uex_id,
+               vehicle_uex_id=EXCLUDED.vehicle_uex_id,
+               name=EXCLUDED.name,
+               slug=EXCLUDED.slug,
+               uuid=EXCLUDED.uuid,
+               size=EXCLUDED.size,
+               color=EXCLUDED.color,
+               color2=EXCLUDED.color2,
+               quality=EXCLUDED.quality,
+               url_store=EXCLUDED.url_store,
+               is_exclusive_pledge=EXCLUDED.is_exclusive_pledge,
+               is_exclusive_subscriber=EXCLUDED.is_exclusive_subscriber,
+               is_exclusive_concierge=EXCLUDED.is_exclusive_concierge,
+               is_commodity=EXCLUDED.is_commodity,
+               is_harvestable=EXCLUDED.is_harvestable,
+               screenshot=EXCLUDED.screenshot,
+               notification=EXCLUDED.notification,
+               attributes_summary=EXCLUDED.attributes_summary,
+               game_version=EXCLUDED.game_version,
+               uex_date_added=EXCLUDED.uex_date_added,
+               uex_date_modified=EXCLUDED.uex_date_modified,
+               synced_at=NOW()`,
             itemParams,
           );
         }
