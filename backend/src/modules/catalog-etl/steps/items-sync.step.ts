@@ -252,12 +252,14 @@ export class ItemsSyncStep implements EtlStep {
         // exists under a different uex_id before inserting. If it does, we are
         // looking at a canonical row whose uex_id was reassigned by UEX.
         //
-        // Strategy (avoids phantom rows and UNIQUE constraint violations):
-        //   1. Re-key station_item_attribute.item_uex_id old → new so the FK
-        //      remains valid after the canonical row's uex_id changes.
-        //   2. Re-key station_item.parent_uex_id old → new for any children
-        //      that reference the canonical row.
-        //   3. Update the canonical row's uex_id and all other columns.
+        // Strategy (no phantom rows; FK-safe via DEFERRABLE INITIALLY DEFERRED
+        // constraints added by migration 1780020000000):
+        //   1. Update the canonical row's uex_id to the new value first.
+        //      The FK constraints on dependents are deferred — PostgreSQL will
+        //      not check them until COMMIT, so the dependent rows may
+        //      temporarily reference a uex_id that no longer exists.
+        //   2. Re-key station_item_attribute.item_uex_id old → new.
+        //   3. Re-key station_item.parent_uex_id old → new for any children.
         //   4. Skip the INSERT below (no phantom is ever created).
         //
         // When no uuid match exists the INSERT path runs normally.
@@ -271,20 +273,8 @@ export class ItemsSyncStep implements EtlStep {
           );
           if (existing.length > 0) {
             const oldUexId = existing[0].uex_id;
-            // Re-key FK dependents before changing the referenced uex_id.
-            await em.query(
-              `UPDATE station_item_attribute
-               SET item_uex_id = $1
-               WHERE item_uex_id = $2`,
-              [record.id, oldUexId],
-            );
-            await em.query(
-              `UPDATE station_item
-               SET parent_uex_id = $1
-               WHERE parent_uex_id = $2`,
-              [record.id, oldUexId],
-            );
-            // Update canonical row with new uex_id and refreshed columns.
+            // Update the canonical row first so the new uex_id is present in
+            // station_item before dependents are re-keyed to it.
             await em.query(
               `UPDATE station_item SET
                  uex_id=$1,
@@ -313,6 +303,19 @@ export class ItemsSyncStep implements EtlStep {
                  synced_at=NOW()
                WHERE uex_id = $24`,
               [...itemParams, oldUexId],
+            );
+            // Re-key FK dependents now that the new uex_id exists in station_item.
+            await em.query(
+              `UPDATE station_item_attribute
+               SET item_uex_id = $1
+               WHERE item_uex_id = $2`,
+              [record.id, oldUexId],
+            );
+            await em.query(
+              `UPDATE station_item
+               SET parent_uex_id = $1
+               WHERE parent_uex_id = $2`,
+              [record.id, oldUexId],
             );
             uuidReconciled = true;
           }
