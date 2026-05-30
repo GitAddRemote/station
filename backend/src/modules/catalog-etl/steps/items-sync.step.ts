@@ -1,0 +1,467 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
+import { EtlWarning } from '../entities/etl-warning.entity';
+import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
+
+interface UexItemAttribute {
+  id: number;
+  id_category: number | null;
+  id_category_attribute: number | null;
+  value: string | null;
+  unit: string | null;
+  date_added: number | null;
+  date_modified: number | null;
+}
+
+interface UexItem {
+  id: number;
+  uuid: string | null;
+  id_parent: number | null;
+  id_category: number | null;
+  id_company: number | null;
+  id_vehicle: number | null;
+  name: string;
+  slug: string | null;
+  size: string | null;
+  color: string | null;
+  color2: string | null;
+  quality: number | null;
+  url_store: string | null;
+  is_exclusive_pledge: number;
+  is_exclusive_subscriber: number;
+  is_exclusive_concierge: number;
+  is_commodity: number;
+  is_harvestable: number;
+  screenshot: string | null;
+  notification: unknown | null;
+  game_version: string | null;
+  date_added: number | null;
+  date_modified: number | null;
+  attributes?: UexItemAttribute[];
+}
+
+function toDate(unixTs: number | null | undefined): Date | null {
+  if (!unixTs) return null;
+  return new Date(unixTs * 1000);
+}
+
+function buildAttributesSummary(
+  attributes: UexItemAttribute[] | undefined,
+  knownCategoryAttributeUexIds: Set<number>,
+): Record<string, string | null> {
+  if (!attributes?.length) return {};
+  const summary: Record<string, string | null> = {};
+  for (const attr of attributes) {
+    if (!attr.id_category_attribute) continue;
+    if (!knownCategoryAttributeUexIds.has(attr.id_category_attribute)) continue;
+    summary[String(attr.id_category_attribute)] = attr.value ?? null;
+  }
+  return summary;
+}
+
+@Injectable()
+export class ItemsSyncStep implements EtlStep {
+  readonly name = 'items-sync';
+
+  constructor(
+    private readonly uexApiClient: UexApiClient,
+    private readonly dataSource: DataSource,
+    @InjectRepository(EtlWarning)
+    private readonly warningsRepo: Repository<EtlWarning>,
+    @InjectPinoLogger(ItemsSyncStep.name)
+    private readonly logger: PinoLogger,
+  ) {}
+
+  async execute(ctx: EtlStepContext): Promise<void> {
+    const items = await this.uexApiClient.get<UexItem[]>('/items');
+
+    this.logger.info(
+      { runId: ctx.runId, count: items.length },
+      'Fetched items from UEX',
+    );
+
+    // Preload valid FK sets to guard company_uex_id, vehicle_uex_id, and
+    // category_attribute_uex_id before any writes.
+    const [companyRows, vehicleRows, categoryAttrRows] = await Promise.all([
+      this.dataSource.query<{ uex_id: number }[]>(
+        `SELECT uex_id FROM station_company`,
+      ),
+      this.dataSource.query<{ uex_id: number }[]>(
+        `SELECT uex_id FROM station_vehicle`,
+      ),
+      this.dataSource.query<{ uex_id: number }[]>(
+        `SELECT uex_id FROM station_category_attribute`,
+      ),
+    ]);
+    const knownCompanyUexIds = new Set<number>(
+      companyRows.map((r) => r.uex_id),
+    );
+    const knownVehicleUexIds = new Set<number>(
+      vehicleRows.map((r) => r.uex_id),
+    );
+    const knownCategoryAttributeUexIds = new Set<number>(
+      categoryAttrRows.map((r) => r.uex_id),
+    );
+
+    // Pass 1a — for each item, upsert the item row and reconcile its attributes
+    // atomically inside a single transaction. This keeps attributes_summary (on
+    // station_item) and station_item_attribute rows consistent: if any attribute
+    // INSERT fails the entire transaction rolls back, including the item upsert.
+    //
+    // UEX ID instability is handled before the INSERT: if a row with the same uuid
+    // already exists under a different uex_id, we re-key its FK dependents and
+    // update the canonical row in place rather than inserting a phantom duplicate
+    // that would violate the uex_id UNIQUE constraint.
+    //
+    // parent_uex_id is written as NULL here (self-referential FK safety). Passes
+    // 1b and 1c fill and clear it after all items are written.
+    let upserted = 0;
+    let skipped = 0;
+    const upsertedUexIds = new Set<number>();
+    let attrUpserted = 0;
+    let attrSkipped = 0;
+
+    for (const record of items) {
+      if (!record.name) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Item uex_id=${record.id} has no name — skipped`,
+            rawPayload: { id: record.id },
+          }),
+        );
+        skipped++;
+        continue;
+      }
+
+      const attributesSummary = buildAttributesSummary(
+        record.attributes,
+        knownCategoryAttributeUexIds,
+      );
+
+      let companyUexId: number | null = record.id_company ?? null;
+      if (companyUexId !== null && !knownCompanyUexIds.has(companyUexId)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Item uex_id=${record.id} references unknown company uex_id=${companyUexId} — company_uex_id set to NULL`,
+            rawPayload: { id: record.id, id_company: companyUexId },
+          }),
+        );
+        companyUexId = null;
+      }
+
+      let vehicleUexId: number | null = record.id_vehicle ?? null;
+      if (vehicleUexId !== null && !knownVehicleUexIds.has(vehicleUexId)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Item uex_id=${record.id} references unknown vehicle uex_id=${vehicleUexId} — vehicle_uex_id set to NULL`,
+            rawPayload: { id: record.id, id_vehicle: vehicleUexId },
+          }),
+        );
+        vehicleUexId = null;
+      }
+
+      const validAttrs: UexItemAttribute[] = [];
+      for (const attr of record.attributes ?? []) {
+        if (!attr.id_category_attribute) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Item attribute uex_id=${attr.id} has no category_attribute_uex_id — skipped`,
+              rawPayload: { item_id: record.id, attr_id: attr.id },
+            }),
+          );
+          attrSkipped++;
+          continue;
+        }
+
+        if (!knownCategoryAttributeUexIds.has(attr.id_category_attribute)) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Item attribute uex_id=${attr.id} references unknown category_attribute uex_id=${attr.id_category_attribute} — skipped`,
+              rawPayload: {
+                item_id: record.id,
+                attr_id: attr.id,
+                id_category_attribute: attr.id_category_attribute,
+              },
+            }),
+          );
+          attrSkipped++;
+          continue;
+        }
+
+        validAttrs.push(attr);
+      }
+
+      // Column layout (parent_uex_id is a NULL literal — no placeholder):
+      // $1  uex_id           $2  category_uex_id   $3  company_uex_id
+      // $4  vehicle_uex_id   $5  name              $6  slug
+      // $7  uuid             $8  size              $9  color
+      // $10 color2           $11 quality           $12 url_store
+      // $13 is_exclusive_pledge  $14 is_exclusive_subscriber  $15 is_exclusive_concierge
+      // $16 is_commodity    $17 is_harvestable     $18 screenshot
+      // $19 notification    $20 attributes_summary $21 game_version
+      // $22 uex_date_added  $23 uex_date_modified
+      // synced_at = NOW() literal
+      const itemParams = [
+        record.id, // $1  uex_id
+        // parent_uex_id = NULL literal
+        record.id_category ?? null, // $2  category_uex_id
+        companyUexId, // $3  company_uex_id
+        vehicleUexId, // $4  vehicle_uex_id
+        record.name, // $5  name
+        record.slug ?? null, // $6  slug
+        record.uuid ?? null, // $7  uuid
+        record.size ?? null, // $8  size
+        record.color ?? null, // $9  color
+        record.color2 ?? null, // $10 color2
+        record.quality ?? null, // $11 quality
+        record.url_store ?? null, // $12 url_store
+        Boolean(record.is_exclusive_pledge), // $13
+        Boolean(record.is_exclusive_subscriber), // $14
+        Boolean(record.is_exclusive_concierge), // $15
+        Boolean(record.is_commodity), // $16
+        Boolean(record.is_harvestable), // $17
+        record.screenshot ?? null, // $18 screenshot
+        record.notification ?? null, // $19 notification
+        JSON.stringify(attributesSummary), // $20 attributes_summary
+        record.game_version ?? null, // $21 game_version
+        toDate(record.date_added), // $22 uex_date_added
+        toDate(record.date_modified), // $23 uex_date_modified
+        // synced_at = NOW() literal
+      ];
+
+      await this.dataSource.transaction(async (em) => {
+        // Pass 1a-uuid — UEX ID instability: check whether this uuid already
+        // exists under a different uex_id before inserting. If it does, we are
+        // looking at a canonical row whose uex_id was reassigned by UEX.
+        //
+        // Strategy (no phantom rows; FK-safe via DEFERRABLE INITIALLY DEFERRED
+        // constraints added by migration 1780020000000):
+        //   1. Update the canonical row's uex_id to the new value first.
+        //      The FK constraints on dependents are deferred — PostgreSQL will
+        //      not check them until COMMIT, so the dependent rows may
+        //      temporarily reference a uex_id that no longer exists.
+        //   2. Re-key station_item_attribute.item_uex_id old → new.
+        //   3. Re-key station_item.parent_uex_id old → new for any children.
+        //   4. Skip the INSERT below (no phantom is ever created).
+        //
+        // When no uuid match exists the INSERT path runs normally.
+        let uuidReconciled = false;
+        if (record.uuid) {
+          const existing = await em.query<{ uex_id: number }[]>(
+            `SELECT uex_id FROM station_item
+             WHERE uuid = $1 AND uex_id != $2
+             LIMIT 1`,
+            [record.uuid, record.id],
+          );
+          if (existing.length > 0) {
+            const oldUexId = existing[0].uex_id;
+            // Update the canonical row first so the new uex_id is present in
+            // station_item before dependents are re-keyed to it.
+            await em.query(
+              `UPDATE station_item SET
+                 uex_id=$1,
+                 category_uex_id=$2,
+                 company_uex_id=$3,
+                 vehicle_uex_id=$4,
+                 name=$5,
+                 slug=$6,
+                 uuid=$7,
+                 size=$8,
+                 color=$9,
+                 color2=$10,
+                 quality=$11,
+                 url_store=$12,
+                 is_exclusive_pledge=$13,
+                 is_exclusive_subscriber=$14,
+                 is_exclusive_concierge=$15,
+                 is_commodity=$16,
+                 is_harvestable=$17,
+                 screenshot=$18,
+                 notification=$19,
+                 attributes_summary=$20,
+                 game_version=$21,
+                 uex_date_added=$22,
+                 uex_date_modified=$23,
+                 synced_at=NOW()
+               WHERE uex_id = $24`,
+              [...itemParams, oldUexId],
+            );
+            // Re-key FK dependents now that the new uex_id exists in station_item.
+            await em.query(
+              `UPDATE station_item_attribute
+               SET item_uex_id = $1
+               WHERE item_uex_id = $2`,
+              [record.id, oldUexId],
+            );
+            await em.query(
+              `UPDATE station_item
+               SET parent_uex_id = $1
+               WHERE parent_uex_id = $2`,
+              [record.id, oldUexId],
+            );
+            uuidReconciled = true;
+          }
+        }
+
+        if (!uuidReconciled) {
+          // Normal path: upsert by uex_id. parent_uex_id is always written as
+          // NULL here; passes 1b/1c handle it after all items are written.
+          await em.query(
+            `INSERT INTO station_item (
+               uex_id, parent_uex_id,
+               category_uex_id, company_uex_id, vehicle_uex_id,
+               name, slug, uuid, size, color, color2, quality,
+               url_store,
+               is_exclusive_pledge, is_exclusive_subscriber, is_exclusive_concierge,
+               is_commodity, is_harvestable,
+               screenshot, notification, attributes_summary,
+               game_version, uex_date_added, uex_date_modified, synced_at
+             )
+             VALUES (
+               $1,NULL,
+               $2,$3,$4,
+               $5,$6,$7,$8,$9,$10,$11,
+               $12,
+               $13,$14,$15,
+               $16,$17,
+               $18,$19,$20,
+               $21,$22,$23,NOW()
+             )
+             ON CONFLICT (uex_id) DO UPDATE SET
+               category_uex_id=EXCLUDED.category_uex_id,
+               company_uex_id=EXCLUDED.company_uex_id,
+               vehicle_uex_id=EXCLUDED.vehicle_uex_id,
+               name=EXCLUDED.name,
+               slug=EXCLUDED.slug,
+               uuid=EXCLUDED.uuid,
+               size=EXCLUDED.size,
+               color=EXCLUDED.color,
+               color2=EXCLUDED.color2,
+               quality=EXCLUDED.quality,
+               url_store=EXCLUDED.url_store,
+               is_exclusive_pledge=EXCLUDED.is_exclusive_pledge,
+               is_exclusive_subscriber=EXCLUDED.is_exclusive_subscriber,
+               is_exclusive_concierge=EXCLUDED.is_exclusive_concierge,
+               is_commodity=EXCLUDED.is_commodity,
+               is_harvestable=EXCLUDED.is_harvestable,
+               screenshot=EXCLUDED.screenshot,
+               notification=EXCLUDED.notification,
+               attributes_summary=EXCLUDED.attributes_summary,
+               game_version=EXCLUDED.game_version,
+               uex_date_added=EXCLUDED.uex_date_added,
+               uex_date_modified=EXCLUDED.uex_date_modified,
+               synced_at=NOW()`,
+            itemParams,
+          );
+        }
+
+        // Reconcile attributes: wipe stale rows then re-insert current set.
+        // Both operations are inside this transaction so an attribute INSERT
+        // failure rolls back the DELETE and the item upsert together.
+        await em.query(
+          `DELETE FROM station_item_attribute WHERE item_uex_id = $1`,
+          [record.id],
+        );
+
+        for (const attr of validAttrs) {
+          await em.query(
+            `INSERT INTO station_item_attribute
+               (uex_id, item_uex_id, category_uex_id, category_attribute_uex_id,
+                value, unit, uex_date_added, uex_date_modified, synced_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+             ON CONFLICT (uex_id) DO UPDATE SET
+               item_uex_id=EXCLUDED.item_uex_id,
+               category_uex_id=EXCLUDED.category_uex_id,
+               category_attribute_uex_id=EXCLUDED.category_attribute_uex_id,
+               value=EXCLUDED.value,
+               unit=EXCLUDED.unit,
+               uex_date_added=EXCLUDED.uex_date_added,
+               uex_date_modified=EXCLUDED.uex_date_modified,
+               synced_at=NOW()`,
+            [
+              attr.id, // $1 uex_id
+              record.id, // $2 item_uex_id
+              attr.id_category ?? null, // $3 category_uex_id
+              attr.id_category_attribute, // $4 category_attribute_uex_id
+              attr.value ?? null, // $5 value
+              attr.unit ?? null, // $6 unit
+              toDate(attr.date_added), // $7 uex_date_added
+              toDate(attr.date_modified), // $8 uex_date_modified
+            ],
+          );
+          attrUpserted++;
+        }
+      });
+
+      upsertedUexIds.add(record.id);
+      upserted++;
+    }
+
+    this.logger.info({ runId: ctx.runId, upserted, skipped }, 'items upserted');
+
+    // Pass 1b — set parent_uex_id for items whose parent was also upserted.
+    // ON CONFLICT in pass 1a does not touch parent_uex_id, so existing links are
+    // preserved across runs; only explicit updates (here and in pass 1c) change it.
+    for (const record of items) {
+      if (!record.name || !record.id_parent) continue;
+      if (!upsertedUexIds.has(record.id_parent)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Item uex_id=${record.id} references unknown parent uex_id=${record.id_parent} — parent_uex_id not set`,
+            rawPayload: { id: record.id, id_parent: record.id_parent },
+          }),
+        );
+        continue;
+      }
+      await this.dataSource.query(
+        `UPDATE station_item
+         SET parent_uex_id = $1
+         WHERE uex_id = $2
+           AND parent_uex_id IS DISTINCT FROM $1`,
+        [record.id_parent, record.id],
+      );
+    }
+
+    // Pass 1c — clear parent_uex_id for items that UEX has de-parented.
+    if (upsertedUexIds.size > 0) {
+      const deParentedIds = items
+        .filter((i) => i.name && !i.id_parent)
+        .map((i) => i.id);
+      if (deParentedIds.length > 0) {
+        await this.dataSource.query(
+          `UPDATE station_item
+           SET parent_uex_id = NULL
+           WHERE uex_id = ANY($1)
+             AND parent_uex_id IS NOT NULL`,
+          [deParentedIds],
+        );
+      }
+    }
+
+    this.logger.info(
+      { runId: ctx.runId, attrUpserted, attrSkipped },
+      'item attributes upserted',
+    );
+  }
+}

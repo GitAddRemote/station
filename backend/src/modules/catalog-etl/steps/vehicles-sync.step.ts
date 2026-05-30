@@ -207,7 +207,6 @@ export class VehiclesSyncStep implements EtlStep {
          ON CONFLICT (uex_id) DO UPDATE SET
            uuid=EXCLUDED.uuid,
            company_uex_id=EXCLUDED.company_uex_id,
-           parent_uex_id=EXCLUDED.parent_uex_id,
            name=EXCLUDED.name,
            name_full=EXCLUDED.name_full,
            slug=EXCLUDED.slug,
@@ -339,9 +338,9 @@ export class VehiclesSyncStep implements EtlStep {
       upserted++;
     }
 
-    // Pass 1b — back-fill parent_uex_id now that all rows exist.
-    // The ON CONFLICT clause sets parent_uex_id=EXCLUDED.parent_uex_id (NULL) on
-    // re-insert, so this pass is only needed to set non-null parents.
+    // Pass 1b — set parent_uex_id for vehicles whose parent was also upserted.
+    // ON CONFLICT in pass 1a does not touch parent_uex_id, so existing links are
+    // preserved across runs; only explicit updates (here and in pass 1c) change it.
     // Skip rows whose id_parent is not in the current payload to avoid FK violations.
     for (const record of vehicles) {
       if (!record.name || !record.id_parent) continue;
@@ -364,6 +363,23 @@ export class VehiclesSyncStep implements EtlStep {
            AND parent_uex_id IS DISTINCT FROM $1`,
         [record.id_parent, record.id],
       );
+    }
+
+    // Pass 1c — clear parent_uex_id for vehicles that UEX has de-parented.
+    // Only runs for upserted rows with no id_parent in the current payload.
+    if (upsertedUexIds.size > 0) {
+      const deParentedIds = vehicles
+        .filter((v) => v.name && !v.id_parent)
+        .map((v) => v.id);
+      if (deParentedIds.length > 0) {
+        await this.dataSource.query(
+          `UPDATE station_vehicle
+           SET parent_uex_id = NULL
+           WHERE uex_id = ANY($1)
+             AND parent_uex_id IS NOT NULL`,
+          [deParentedIds],
+        );
+      }
     }
 
     this.logger.info(
