@@ -29,6 +29,13 @@ import { OauthClient } from './modules/oauth-clients/oauth-client.entity';
 import { BigBangBaselineMigration1748000000000 } from './migrations/1748000000000-BigBangBaselineMigration';
 import { CatalogEtlSchemaMigration1748000000001 } from './migrations/1748000000001-CatalogEtlSchemaMigration';
 import { AddNoStepsEtlStatus1748000000002 } from './migrations/1748000000002-AddNoStepsEtlStatus';
+import { AddDiscordAuthToUsers1779608598950 } from './migrations/1779608598950-1748100000000-AddDiscordAuthToUsers';
+import { AddPasswordExpiryToUsers1779642418093 } from './migrations/1779642418093-AddPasswordExpiryToUsers';
+import { AlterJumpPointsForSyntheticRows1779664556916 } from './migrations/1779664556916-AlterJumpPointsForSyntheticRows';
+import { FixCategoriesSectionTypeExpressionIndex1779700000000 } from './migrations/1779700000000-FixCategoriesSectionTypeExpressionIndex';
+import { AddStepNameToEtlRun1779710000000 } from './migrations/1779710000000-AddStepNameToEtlRun';
+import { AddUniqueUuidToStationItem1780010901444 } from './migrations/1780010901444-AddUniqueUuidToStationItem';
+import { MakeItemFksDeferrable1780020000000 } from './migrations/1780020000000-MakeItemFksDeferrable';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -67,6 +74,13 @@ export const AppDataSource = new DataSource({
     BigBangBaselineMigration1748000000000,
     CatalogEtlSchemaMigration1748000000001,
     AddNoStepsEtlStatus1748000000002,
+    AddDiscordAuthToUsers1779608598950,
+    AddPasswordExpiryToUsers1779642418093,
+    AlterJumpPointsForSyntheticRows1779664556916,
+    FixCategoriesSectionTypeExpressionIndex1779700000000,
+    AddStepNameToEtlRun1779710000000,
+    AddUniqueUuidToStationItem1780010901444,
+    MakeItemFksDeferrable1780020000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },
