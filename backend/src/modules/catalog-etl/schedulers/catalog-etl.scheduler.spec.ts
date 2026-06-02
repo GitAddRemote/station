@@ -89,7 +89,7 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     mockRunStep
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('distances failed'));
-    await expect(makeScheduler().scheduledTerminalEtl()).resolves.not.toThrow();
+    await expect(makeScheduler().scheduledTerminalEtl()).resolves.toBeUndefined();
     expect(mockRunStep).toHaveBeenCalledTimes(2);
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(Error) }),
@@ -101,7 +101,7 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     mockRunStep
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new ConflictException());
-    await expect(makeScheduler().scheduledTerminalEtl()).resolves.not.toThrow();
+    await expect(makeScheduler().scheduledTerminalEtl()).resolves.toBeUndefined();
     expect(mockRunStep).toHaveBeenCalledTimes(2);
     expect(mockLogger.debug).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(ConflictException) }),
@@ -140,6 +140,18 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     expect(mockRunStep).toHaveBeenCalledWith('terminals-sync');
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Starting scheduled terminal ETL',
+    );
+  });
+
+  it('logs error and does not throw when the skip guard throws', async () => {
+    mockGetLastSuccessfulStepRun.mockRejectedValueOnce(
+      new Error('db connection lost'),
+    );
+    await expect(makeScheduler().scheduledTerminalEtl()).resolves.toBeUndefined();
+    expect(mockRunStep).not.toHaveBeenCalled();
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.any(Error) }),
+      'terminal ETL skip guard failed',
     );
   });
 });

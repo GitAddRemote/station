@@ -15,10 +15,18 @@ export class CatalogEtlScheduler {
 
   @Cron('0 * * * *', { name: 'terminal-etl' })
   async scheduledTerminalEtl(): Promise<void> {
-    const [skipTerminalsSync, skipTerminalDistancesSync] = await Promise.all([
-      this.shouldSkip('terminals-sync'),
-      this.shouldSkip('terminal-distances-sync'),
-    ]);
+    let skipTerminalsSync: boolean;
+    let skipTerminalDistancesSync: boolean;
+
+    try {
+      [skipTerminalsSync, skipTerminalDistancesSync] = await Promise.all([
+        this.shouldSkip('terminals-sync'),
+        this.shouldSkip('terminal-distances-sync'),
+      ]);
+    } catch (err: unknown) {
+      this.logger.error({ err }, 'terminal ETL skip guard failed');
+      return;
+    }
 
     if (skipTerminalsSync && skipTerminalDistancesSync) return;
 
