@@ -189,7 +189,7 @@ export class CatalogEtlService {
     >(
       `SELECT MAX(r.completed_at) AS last_completed
        FROM station_etl_run r
-       WHERE r.step_name = $1
+       WHERE (r.step_name = $1 OR r.step_name IS NULL)
          AND r.status = 'completed'
          AND r.steps_failed = 0
          AND NOT EXISTS (

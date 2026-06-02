@@ -45,6 +45,7 @@ describe('CatalogEtlService', () => {
   let mockEtlRunRepository: Record<string, jest.Mock>;
   let mockEtlWarningRepository: Record<string, jest.Mock>;
   let mockAdvisoryLockService: { withLock: jest.Mock };
+  let mockDataSourceQuery: jest.Mock;
 
   beforeEach(async () => {
     mockEtlRunRepository = {
@@ -93,7 +94,9 @@ describe('CatalogEtlService', () => {
         {
           provide: DataSource,
           useValue: {
-            query: jest.fn().mockResolvedValue([{ last_completed: null }]),
+            query: (mockDataSourceQuery = jest
+              .fn()
+              .mockResolvedValue([{ last_completed: null }])),
           },
         },
         {
@@ -441,6 +444,29 @@ describe('CatalogEtlService', () => {
         ConflictException,
       );
       expect(mockEtlRunRepository.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getLastSuccessfulStepRun', () => {
+    it('returns null when no completed run exists for the step', async () => {
+      mockDataSourceQuery.mockResolvedValueOnce([{ last_completed: null }]);
+      const result = await service.getLastSuccessfulStepRun('terminals-sync');
+      expect(result).toBeNull();
+    });
+
+    it('returns completed_at from a runStep() run matching step_name', async () => {
+      const ts = new Date('2026-01-01T00:00:00Z');
+      mockDataSourceQuery.mockResolvedValueOnce([{ last_completed: ts }]);
+      const result = await service.getLastSuccessfulStepRun('terminals-sync');
+      expect(result).toEqual(ts);
+    });
+
+    it('includes step_name IS NULL in the query to account for full runEtl() runs', async () => {
+      const ts = new Date('2026-01-01T00:00:00Z');
+      mockDataSourceQuery.mockResolvedValueOnce([{ last_completed: ts }]);
+      await service.getLastSuccessfulStepRun('terminals-sync');
+      const [sql] = mockDataSourceQuery.mock.calls[0] as [string];
+      expect(sql).toContain('r.step_name IS NULL');
     });
   });
 });
