@@ -12,10 +12,11 @@ const mockCreateOrgItem = jest.fn();
 const mockUpdateOrgItem = jest.fn();
 const mockSearchItems = jest.fn();
 const mockGetUserPermissions = jest.fn();
+const mockGetCategories = jest.fn();
 
 jest.mock('../services/inventory.service', () => ({
   inventoryService: {
-    getCategories: jest.fn().mockResolvedValue([]),
+    getCategories: (...args: unknown[]) => mockGetCategories(...args),
     getUserOrganizations: (...args: unknown[]) =>
       mockGetUserOrganizations(...args),
     getInventory: (...args: unknown[]) => mockGetInventory(...args),
@@ -65,6 +66,7 @@ const mockItem = {
 describe('Inventory editor mode inline controls', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockGetCategories.mockResolvedValue([]);
     mockGetInventory.mockResolvedValue({
       items: [mockItem],
       total: 1,
@@ -385,6 +387,11 @@ describe('Inventory editor mode inline controls', () => {
   });
 
   it('hides the add button for view-only org users but still shows org inventory', async () => {
+    const orgExclusiveItem = {
+      ...mockItem,
+      id: 'org-item-view',
+      itemName: 'Org Exclusive Item',
+    };
     mockGetUserOrganizations.mockResolvedValue([
       {
         id: 1,
@@ -395,6 +402,12 @@ describe('Inventory editor mode inline controls', () => {
       },
     ]);
     mockGetUserPermissions.mockResolvedValue(['can_view_org_inventory']);
+    mockGetOrgInventory.mockResolvedValue({
+      items: [orgExclusiveItem],
+      total: 1,
+      limit: 25,
+      offset: 0,
+    });
 
     render(
       <MemoryRouter initialEntries={['/inventory']}>
@@ -411,9 +424,10 @@ describe('Inventory editor mode inline controls', () => {
     fireEvent.click(await screen.findByText('Test Org'));
 
     await waitFor(() =>
-      expect(screen.getByText('Test Org')).toBeInTheDocument(),
+      expect(screen.getByText('Org Exclusive Item')).toBeInTheDocument(),
     );
 
+    expect(mockGetOrgInventory).toHaveBeenCalledWith(42, expect.any(Object));
     expect(
       screen.queryByRole('button', { name: 'Add org item' }),
     ).not.toBeInTheDocument();
