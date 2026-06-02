@@ -13,40 +13,41 @@ export class CatalogEtlScheduler {
     private readonly catalogEtlService: CatalogEtlService,
   ) {}
 
-  @Cron('0 * * * *', { name: 'terminals-sync' })
-  async scheduledTerminalsSync(): Promise<void> {
+  @Cron('0 * * * *', { name: 'terminal-etl' })
+  async scheduledTerminalEtl(): Promise<void> {
     if (await this.shouldSkip('terminals-sync')) return;
-    this.logger.info('Starting scheduled terminals sync');
+    this.logger.info('Starting scheduled terminal ETL');
+
     try {
       await this.catalogEtlService.runStep('terminals-sync');
     } catch (err: unknown) {
       if (err instanceof ConflictException) {
         this.logger.debug(
           { err },
-          'Scheduled terminals sync skipped: ETL lock already held',
+          'Scheduled terminal ETL skipped: ETL lock already held',
         );
         return;
       }
-      this.logger.error({ err }, 'Scheduled terminals sync failed');
+      this.logger.error(
+        { err },
+        'terminals-sync failed; skipping terminal-distances-sync',
+      );
+      return;
     }
-  }
 
-  // Runs 5 minutes after terminals-sync to ensure station_terminal is populated first
-  @Cron('5 * * * *', { name: 'terminal-distances-sync' })
-  async scheduledTerminalDistancesSync(): Promise<void> {
     if (await this.shouldSkip('terminal-distances-sync')) return;
-    this.logger.info('Starting scheduled terminal distances sync');
+
     try {
       await this.catalogEtlService.runStep('terminal-distances-sync');
     } catch (err: unknown) {
       if (err instanceof ConflictException) {
         this.logger.debug(
           { err },
-          'Scheduled terminal distances sync skipped: ETL lock already held',
+          'terminal-distances-sync skipped: ETL lock already held',
         );
         return;
       }
-      this.logger.error({ err }, 'Scheduled terminal distances sync failed');
+      this.logger.error({ err }, 'terminal-distances-sync failed');
     }
   }
 
