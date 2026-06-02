@@ -244,31 +244,96 @@ export class TerminalsSyncStep implements EtlStep {
       const poiId =
         record.id_poi !== null ? (poiByUexId.get(record.id_poi) ?? null) : null;
 
-      // Resolve secondary FK columns — all nullable, stored as null when not found
-      const starSystemId =
-        record.id_star_system !== null
-          ? (starSystemByUexId.get(record.id_star_system) ?? null)
-          : null;
-      const planetId =
-        record.id_planet !== null
-          ? (planetByUexId.get(record.id_planet) ?? null)
-          : null;
-      const orbitId =
-        record.id_orbit !== null
-          ? (orbitByUexId.get(record.id_orbit) ?? null)
-          : null;
-      const moonId =
-        record.id_moon !== null
-          ? (moonByUexId.get(record.id_moon) ?? null)
-          : null;
-      const factionId =
-        record.id_faction !== null
-          ? (factionByUexId.get(record.id_faction) ?? null)
-          : null;
-      const companyId =
-        record.id_company !== null
-          ? (companyByUexId.get(record.id_company) ?? null)
-          : null;
+      // Resolve secondary FK columns — warn when source has a UEX ID that can't be resolved
+      let starSystemId: number | null = null;
+      if (record.id_star_system !== null) {
+        starSystemId = starSystemByUexId.get(record.id_star_system) ?? null;
+        if (starSystemId === null) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Terminal ${record.id} references unknown star system ${record.id_star_system} — FK stored as null`,
+            }),
+          );
+        }
+      }
+
+      let planetId: number | null = null;
+      if (record.id_planet !== null) {
+        planetId = planetByUexId.get(record.id_planet) ?? null;
+        if (planetId === null) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Terminal ${record.id} references unknown planet ${record.id_planet} — FK stored as null`,
+            }),
+          );
+        }
+      }
+
+      let orbitId: number | null = null;
+      if (record.id_orbit !== null) {
+        orbitId = orbitByUexId.get(record.id_orbit) ?? null;
+        if (orbitId === null) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Terminal ${record.id} references unknown orbit ${record.id_orbit} — FK stored as null`,
+            }),
+          );
+        }
+      }
+
+      let moonId: number | null = null;
+      if (record.id_moon !== null) {
+        moonId = moonByUexId.get(record.id_moon) ?? null;
+        if (moonId === null) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Terminal ${record.id} references unknown moon ${record.id_moon} — FK stored as null`,
+            }),
+          );
+        }
+      }
+
+      let factionId: number | null = null;
+      if (record.id_faction !== null) {
+        factionId = factionByUexId.get(record.id_faction) ?? null;
+        if (factionId === null) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Terminal ${record.id} references unknown faction ${record.id_faction} — FK stored as null`,
+            }),
+          );
+        }
+      }
+
+      let companyId: number | null = null;
+      if (record.id_company !== null) {
+        companyId = companyByUexId.get(record.id_company) ?? null;
+        if (companyId === null) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Terminal ${record.id} references unknown company ${record.id_company} — FK stored as null`,
+            }),
+          );
+        }
+      }
 
       await this.dataSource.query(
         `INSERT INTO station_terminal
