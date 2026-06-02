@@ -17,8 +17,8 @@ import { UexMoon } from './uex-moon.entity';
 @Index('idx_uex_outposts_planet', ['planetId'], { where: 'deleted = FALSE' })
 @Index('idx_uex_outposts_moon', ['moonId'], { where: 'deleted = FALSE' })
 export class UexOutpost extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ name: 'planet_id', type: 'integer', nullable: true })
   planetId?: number;

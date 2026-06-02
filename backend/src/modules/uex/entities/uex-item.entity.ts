@@ -25,8 +25,8 @@ import { UexCompany } from './uex-company.entity';
   where: 'deleted = FALSE AND is_commodity = TRUE',
 })
 export class UexItem extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ name: 'star_citizen_uuid', length: 255, nullable: true })
   starCitizenUuid?: string;

@@ -4,7 +4,7 @@ import { UexStarSystem } from './uex-star-system.entity';
 describe('UexPlanet Entity', () => {
   it('should create a UexPlanet instance', () => {
     const planet = new UexPlanet();
-    planet.id = 1;
+    planet.id = 'uuid-test-1';
     planet.uexId = 10;
     planet.starSystemId = 1;
     planet.name = 'Hurston';
@@ -15,7 +15,7 @@ describe('UexPlanet Entity', () => {
     planet.deleted = false;
 
     expect(planet).toBeDefined();
-    expect(planet.id).toBe(1);
+    expect(planet.id).toBe('uuid-test-1');
     expect(planet.uexId).toBe(10);
     expect(planet.starSystemId).toBe(1);
     expect(planet.name).toBe('Hurston');

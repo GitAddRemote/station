@@ -8,8 +8,8 @@ import { BaseUexEntity } from './base-uex.entity';
   where: 'deleted = FALSE',
 })
 export class UexCompany extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ length: 255 })
   name!: string;

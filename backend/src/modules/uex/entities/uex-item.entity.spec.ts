@@ -5,7 +5,7 @@ import { UexCompany } from './uex-company.entity';
 describe('UexItem Entity', () => {
   it('should create a UexItem instance', () => {
     const item = new UexItem();
-    item.id = 1;
+    item.id = 'uuid-test-1';
     item.uexId = 300;
     item.name = 'F7C Hornet';
     item.starCitizenUuid = 'uuid-12345';
@@ -22,7 +22,7 @@ describe('UexItem Entity', () => {
     item.deleted = false;
 
     expect(item).toBeDefined();
-    expect(item.id).toBe(1);
+    expect(item.id).toBe('uuid-test-1');
     expect(item.uexId).toBe(300);
     expect(item.name).toBe('F7C Hornet');
     expect(item.starCitizenUuid).toBe('uuid-12345');

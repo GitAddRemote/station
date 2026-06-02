@@ -7,8 +7,8 @@ import { BaseUexEntity } from './base-uex.entity';
 })
 @Index('idx_uex_star_systems_code', ['code'], { where: 'deleted = FALSE' })
 export class UexStarSystem extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ length: 255 })
   name!: string;
