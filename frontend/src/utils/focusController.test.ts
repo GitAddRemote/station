@@ -14,6 +14,19 @@ const makeController = (
   });
 
 describe('FocusController', () => {
+  const originalRequestAnimationFrame = global.requestAnimationFrame;
+
+  beforeEach(() => {
+    global.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    };
+  });
+
+  afterEach(() => {
+    global.requestAnimationFrame = originalRequestAnimationFrame;
+  });
+
   it('focuses next field within a row', async () => {
     const calls: string[] = [];
     const controller = makeController(['row-1']);
