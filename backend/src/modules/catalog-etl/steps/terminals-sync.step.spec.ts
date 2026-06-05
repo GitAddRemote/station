@@ -396,14 +396,23 @@ describe('TerminalsSyncStep', () => {
 
       await step.execute(CTX);
 
-      const warnings: { runId: string; severity: string; message: string }[] =
-        repoCreate.mock.calls.map(
-          ([dto]: [{ runId: string; severity: string; message: string }]) =>
-            dto,
-        );
-      const warnMessages = warnings
-        .filter((w) => w.severity === 'warn')
-        .map((w) => w.message);
+      const warnings: {
+        runId: string;
+        severity: string;
+        message: string;
+        rawPayload?: Record<string, unknown>;
+      }[] = repoCreate.mock.calls.map(
+        ([dto]: [
+          {
+            runId: string;
+            severity: string;
+            message: string;
+            rawPayload?: Record<string, unknown>;
+          },
+        ]) => dto,
+      );
+      const warnWarnings = warnings.filter((w) => w.severity === 'warn');
+      const warnMessages = warnWarnings.map((w) => w.message);
 
       expect(warnMessages).toContain(
         'Terminal 1 references unknown star system 42 — FK stored as null',
@@ -413,6 +422,20 @@ describe('TerminalsSyncStep', () => {
       );
       expect(warnMessages).toContain(
         'Terminal 1 references unknown company 88 — FK stored as null',
+      );
+      expect(warnWarnings).toHaveLength(3);
+      expect(warnWarnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            rawPayload: { terminal_id: 1, id_star_system: 42 },
+          }),
+          expect.objectContaining({
+            rawPayload: { terminal_id: 1, id_faction: 77 },
+          }),
+          expect.objectContaining({
+            rawPayload: { terminal_id: 1, id_company: 88 },
+          }),
+        ]),
       );
     });
 
