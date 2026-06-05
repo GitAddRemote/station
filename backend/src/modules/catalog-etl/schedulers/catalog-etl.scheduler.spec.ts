@@ -71,6 +71,16 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     expect(mockRunStep).not.toHaveBeenCalled();
   });
 
+  it('still runs terminal-distances-sync when terminals-sync is skipped but distances is not', async () => {
+    mockGetLastSuccessfulStepRun
+      .mockResolvedValueOnce(new Date().toISOString())
+      .mockResolvedValueOnce(null);
+    mockRunStep.mockResolvedValue(undefined);
+    await makeScheduler().scheduledTerminalEtl();
+    expect(mockRunStep).toHaveBeenCalledTimes(1);
+    expect(mockRunStep).toHaveBeenCalledWith('terminal-distances-sync');
+  });
+
   it('skips terminal-distances-sync when it was completed within SKIP_HOURS', async () => {
     mockGetLastSuccessfulStepRun
       .mockResolvedValueOnce(null)

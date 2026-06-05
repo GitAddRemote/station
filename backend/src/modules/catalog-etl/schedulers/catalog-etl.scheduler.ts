@@ -15,24 +15,26 @@ export class CatalogEtlScheduler {
 
   @Cron('0 * * * *', { name: 'terminal-etl' })
   async scheduledTerminalEtl(): Promise<void> {
-    if (await this.shouldSkip('terminals-sync')) return;
     this.logger.info('Starting scheduled terminal ETL');
+    const skipTerminalsSync = await this.shouldSkip('terminals-sync');
 
-    try {
-      await this.catalogEtlService.runStep('terminals-sync');
-    } catch (err: unknown) {
-      if (err instanceof ConflictException) {
-        this.logger.debug(
+    if (!skipTerminalsSync) {
+      try {
+        await this.catalogEtlService.runStep('terminals-sync');
+      } catch (err: unknown) {
+        if (err instanceof ConflictException) {
+          this.logger.debug(
+            { err },
+            'Scheduled terminal ETL skipped: ETL lock already held',
+          );
+          return;
+        }
+        this.logger.error(
           { err },
-          'Scheduled terminal ETL skipped: ETL lock already held',
+          'terminals-sync failed; skipping terminal-distances-sync',
         );
         return;
       }
-      this.logger.error(
-        { err },
-        'terminals-sync failed; skipping terminal-distances-sync',
-      );
-      return;
     }
 
     if (await this.shouldSkip('terminal-distances-sync')) return;
