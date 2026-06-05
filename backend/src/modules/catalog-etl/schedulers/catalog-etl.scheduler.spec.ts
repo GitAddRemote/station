@@ -65,10 +65,24 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     );
   });
 
+  it('skips terminal-distances-sync cleanly when it throws ConflictException', async () => {
+    mockRunStep
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new ConflictException());
+    await expect(makeScheduler().scheduledTerminalEtl()).resolves.not.toThrow();
+    expect(mockRunStep).toHaveBeenCalledTimes(2);
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.any(ConflictException) }),
+      'terminal-distances-sync skipped: ETL lock already held',
+    );
+    expect(mockLogger.error).not.toHaveBeenCalled();
+  });
+
   it('skips when terminals-sync was completed within SKIP_HOURS', async () => {
     mockGetLastSuccessfulStepRun.mockResolvedValue(new Date().toISOString());
     await makeScheduler().scheduledTerminalEtl();
     expect(mockRunStep).not.toHaveBeenCalled();
+    expect(mockLogger.info).not.toHaveBeenCalled();
   });
 
   it('still runs terminal-distances-sync when terminals-sync is skipped but distances is not', async () => {
@@ -79,6 +93,9 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     await makeScheduler().scheduledTerminalEtl();
     expect(mockRunStep).toHaveBeenCalledTimes(1);
     expect(mockRunStep).toHaveBeenCalledWith('terminal-distances-sync');
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Starting scheduled terminal ETL',
+    );
   });
 
   it('skips terminal-distances-sync when it was completed within SKIP_HOURS', async () => {
@@ -89,5 +106,8 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     await makeScheduler().scheduledTerminalEtl();
     expect(mockRunStep).toHaveBeenCalledTimes(1);
     expect(mockRunStep).toHaveBeenCalledWith('terminals-sync');
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Starting scheduled terminal ETL',
+    );
   });
 });

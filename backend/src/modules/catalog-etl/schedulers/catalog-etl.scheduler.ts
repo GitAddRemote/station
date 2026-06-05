@@ -15,8 +15,14 @@ export class CatalogEtlScheduler {
 
   @Cron('0 * * * *', { name: 'terminal-etl' })
   async scheduledTerminalEtl(): Promise<void> {
-    this.logger.info('Starting scheduled terminal ETL');
     const skipTerminalsSync = await this.shouldSkip('terminals-sync');
+    const skipTerminalDistancesSync = await this.shouldSkip(
+      'terminal-distances-sync',
+    );
+
+    if (skipTerminalsSync && skipTerminalDistancesSync) return;
+
+    this.logger.info('Starting scheduled terminal ETL');
 
     if (!skipTerminalsSync) {
       try {
@@ -37,7 +43,7 @@ export class CatalogEtlScheduler {
       }
     }
 
-    if (await this.shouldSkip('terminal-distances-sync')) return;
+    if (skipTerminalDistancesSync) return;
 
     try {
       await this.catalogEtlService.runStep('terminal-distances-sync');
