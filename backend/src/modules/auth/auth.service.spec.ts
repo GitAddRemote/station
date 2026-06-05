@@ -7,8 +7,10 @@ import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PasswordReset } from './password-reset.entity';
+import { OauthClient } from '../oauth-clients/oauth-client.entity';
 import {
   BadRequestException,
+  ForbiddenException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -29,6 +31,7 @@ describe('AuthService', () => {
     email: 'test@example.com',
     password: '$2b$10$hashedpassword',
     isSystemUser: false,
+    isStationSuperAdmin: false,
     isActive: true,
     discordId: null,
     discordAvatarUrl: null,
@@ -124,11 +127,13 @@ describe('AuthService', () => {
       const signCall = mockJwtService.sign.mock.calls[0][0] as {
         sub: number;
         username: string;
+        isStationSuperAdmin: boolean;
         jti: string;
         sid: string;
       };
       const jti = signCall.jti;
       expect(jti).toBeDefined();
+      expect(signCall.isStationSuperAdmin).toBe(false);
       // SID is embedded in the access token so JwtStrategy can check session liveness
       expect(signCall.sid).toBeDefined();
       expect(result.refreshToken).toMatch(
@@ -147,6 +152,50 @@ describe('AuthService', () => {
       const [, storedHash] = refreshSetCall[1].split(':');
       expect(storedHash).toBe(sha256(result.refreshToken));
       expect(storedHash).not.toBe(result.refreshToken);
+    });
+  });
+
+  describe('auth provider config helpers', () => {
+    it('reports Discord enabled only when feature flag is on and credentials are configured', () => {
+      (
+        mockConfigService.get as jest.Mock<string | null, [string]>
+      ).mockImplementation((key: string): string | null => {
+        if (key === 'AUTH_DISCORD_ENABLED') return 'true';
+        if (key === 'DISCORD_CLIENT_ID') return 'client-id';
+        if (key === 'DISCORD_CLIENT_SECRET') return 'client-secret';
+        if (key === 'DISCORD_CALLBACK_URL') {
+          return 'http://localhost:3001/auth/discord/callback';
+        }
+        if (key === 'USE_REDIS_CACHE') return 'false';
+        if (key === 'FRONTEND_URL') return 'http://localhost:5173';
+        if (key === 'JWT_SECRET') return 'test-secret';
+        if (key === 'AUTH_LOCAL_SUPER_ADMIN_USERNAMES') return '';
+        if (key === 'AUTH_LOCAL_SUPER_ADMIN_EMAILS') return '';
+        return null;
+      });
+
+      expect(service.isDiscordConfigured()).toBe(true);
+      expect(service.isDiscordEnabled()).toBe(true);
+    });
+
+    it('reports Discord disabled when credentials are missing even if the flag is on', () => {
+      (
+        mockConfigService.get as jest.Mock<string | null, [string]>
+      ).mockImplementation((key: string): string | null => {
+        if (key === 'AUTH_DISCORD_ENABLED') return 'true';
+        if (key === 'DISCORD_CLIENT_ID') return '';
+        if (key === 'DISCORD_CLIENT_SECRET') return '';
+        if (key === 'DISCORD_CALLBACK_URL') return '';
+        if (key === 'USE_REDIS_CACHE') return 'false';
+        if (key === 'FRONTEND_URL') return 'http://localhost:5173';
+        if (key === 'JWT_SECRET') return 'test-secret';
+        if (key === 'AUTH_LOCAL_SUPER_ADMIN_USERNAMES') return '';
+        if (key === 'AUTH_LOCAL_SUPER_ADMIN_EMAILS') return '';
+        return null;
+      });
+
+      expect(service.isDiscordConfigured()).toBe(false);
+      expect(service.isDiscordEnabled()).toBe(false);
     });
   });
 
@@ -181,6 +230,69 @@ describe('AuthService', () => {
       expect(jtiKey).toBe(`jti:${jti}`);
       expect(jtiValue).toBe(sid);
       expect(jtiTtl).toBe(7 * 24 * 3600 * 1000);
+    });
+  });
+
+  describe('issueClientToken', () => {
+    it('tracks issued client tokens so they can be revoked later', async () => {
+      mockJwtService.sign.mockReturnValue('signed-client-token');
+      mockCacheManager.get.mockResolvedValue(null);
+      mockCacheManager.set.mockResolvedValue(undefined);
+
+      const result = await service.issueClientToken({
+        clientId: 'station-bot',
+        scopes: ['bot:api'],
+      } as OauthClient);
+
+      expect(result).toEqual({
+        access_token: 'signed-client-token',
+        token_type: 'Bearer',
+        expires_in: 3600,
+      });
+      expect(mockCacheManager.set).toHaveBeenCalledTimes(2);
+      expect(mockCacheManager.set).toHaveBeenNthCalledWith(
+        1,
+        expect.stringMatching(/^client-token:station-bot:/),
+        expect.any(String),
+        3600 * 1000,
+      );
+      expect(mockCacheManager.set).toHaveBeenNthCalledWith(
+        2,
+        'client-tokens:station-bot',
+        expect.stringContaining('['),
+        3600 * 1000,
+      );
+    });
+  });
+
+  describe('revokeClientTokens', () => {
+    it('blacklists all still-live client tokens for a client and clears tracking keys', async () => {
+      const futureExpiryMs = Date.now() + 30_000;
+      mockCacheManager.get
+        .mockResolvedValueOnce(JSON.stringify(['jti-1', 'jti-2']))
+        .mockResolvedValueOnce(String(futureExpiryMs))
+        .mockResolvedValueOnce(null);
+      mockCacheManager.set.mockResolvedValue(undefined);
+      mockCacheManager.del.mockResolvedValue(undefined);
+
+      await service.revokeClientTokens('station-bot');
+
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
+        'blacklist:jti-1',
+        '1',
+        expect.any(Number),
+      );
+      expect(mockCacheManager.del).toHaveBeenCalledWith(
+        'client-token:station-bot:jti-1',
+      );
+      expect(mockCacheManager.del).toHaveBeenCalledWith(
+        'client-tokens:station-bot',
+      );
+      expect(mockCacheManager.set).not.toHaveBeenCalledWith(
+        'blacklist:jti-2',
+        '1',
+        expect.any(Number),
+      );
     });
   });
 
@@ -283,6 +395,21 @@ describe('AuthService', () => {
       await expect(service.refreshAccessToken(rawToken, jti)).rejects.toThrow(
         UnauthorizedException,
       );
+    });
+  });
+
+  describe('validateLocalUser', () => {
+    it('blocks local login for non-super-admin users', async () => {
+      const hashedPassword = await bcrypt.hash('password', 10);
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        password: hashedPassword,
+      });
+      mockUsersService.findById.mockResolvedValue(mockUser);
+
+      await expect(
+        service.validateLocalUser('testuser', 'password'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -457,7 +584,10 @@ describe('AuthService', () => {
 
   describe('requestPasswordReset', () => {
     it('should create a reset token for existing user', async () => {
-      mockUsersService.findByEmail.mockResolvedValue(mockUser);
+      mockUsersService.findByEmail.mockResolvedValue({
+        ...mockUser,
+        isStationSuperAdmin: true,
+      });
       mockPasswordResetRepository.save.mockResolvedValue({});
 
       const result = await service.requestPasswordReset(mockUser.email);
@@ -484,7 +614,7 @@ describe('AuthService', () => {
         token: 'valid-token',
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
         used: false,
-        user: mockUser,
+        user: { ...mockUser, isStationSuperAdmin: true },
       };
 
       mockPasswordResetRepository.findOne.mockResolvedValue(validToken);
@@ -533,7 +663,7 @@ describe('AuthService', () => {
         token: 'valid-token',
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
         used: false,
-        user: mockUser,
+        user: { ...mockUser, isStationSuperAdmin: true },
       };
 
       mockPasswordResetRepository.findOne.mockResolvedValue(validToken);
@@ -554,6 +684,7 @@ describe('AuthService', () => {
       const hashedCurrentPassword = await bcrypt.hash(currentPassword, 10);
       mockUsersService.findById.mockResolvedValue({
         ...mockUser,
+        isStationSuperAdmin: true,
         password: hashedCurrentPassword,
       });
       mockUsersService.updatePasswordWithExpiry.mockResolvedValue(undefined);
@@ -579,6 +710,7 @@ describe('AuthService', () => {
       const hashedPassword = await bcrypt.hash('correctPassword', 10);
       mockUsersService.findById.mockResolvedValue({
         ...mockUser,
+        isStationSuperAdmin: true,
         password: hashedPassword,
       });
 

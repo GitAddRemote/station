@@ -28,6 +28,10 @@ export class User {
   @Index()
   isSystemUser!: boolean;
 
+  @Column({ default: false })
+  @Index()
+  isStationSuperAdmin!: boolean;
+
   @Column({ length: 100, nullable: true })
   firstName?: string;
 

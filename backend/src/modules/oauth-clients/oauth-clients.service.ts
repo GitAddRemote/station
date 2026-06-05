@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   InternalServerErrorException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -54,6 +55,29 @@ export class OauthClientsService {
 
   async findByClientId(clientId: string): Promise<OauthClient | null> {
     return this.repo.findOne({ where: { clientId } });
+  }
+
+  async rotateSecret(
+    clientId: string,
+    plainSecret: string,
+  ): Promise<OauthClient> {
+    const client = await this.findByClientId(clientId);
+    if (!client) {
+      throw new NotFoundException(`Client '${clientId}' not found`);
+    }
+
+    client.clientSecretHash = await bcrypt.hash(plainSecret, 12);
+    return this.repo.save(client);
+  }
+
+  async deactivate(clientId: string): Promise<OauthClient> {
+    const client = await this.findByClientId(clientId);
+    if (!client) {
+      throw new NotFoundException(`Client '${clientId}' not found`);
+    }
+
+    client.isActive = false;
+    return this.repo.save(client);
   }
 
   async validateSecret(client: OauthClient, secret: string): Promise<boolean> {

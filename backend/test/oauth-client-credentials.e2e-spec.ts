@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import cookieParser from 'cookie-parser';
-import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
 import { OauthClient } from '../src/modules/oauth-clients/oauth-client.entity';
 import { OauthClientsService } from '../src/modules/oauth-clients/oauth-clients.service';
@@ -17,13 +16,21 @@ describe('OAuth Client Credentials (e2e)', () => {
   const CLIENT_ID = 'e2e-test-bot';
   const CLIENT_SECRET = 'e2e-test-secret-value-min-32-chars!!';
   let previousInternalApiKey: string | undefined;
+  let previousTokenThrottleLimit: string | undefined;
+  let previousTokenThrottleTtlMs: string | undefined;
 
   beforeAll(async () => {
     // Set before the module compiles so ConfigService sees it during app init.
     // Capture the prior value so afterAll can restore it and avoid leaking
     // into other e2e suites that share the same Jest worker process.
     previousInternalApiKey = process.env['INTERNAL_API_KEY'];
+    previousTokenThrottleLimit = process.env['AUTH_TOKEN_THROTTLE_LIMIT'];
+    previousTokenThrottleTtlMs = process.env['AUTH_TOKEN_THROTTLE_TTL_MS'];
     process.env['INTERNAL_API_KEY'] = INTERNAL_API_KEY;
+    process.env['AUTH_TOKEN_THROTTLE_LIMIT'] = '100';
+    process.env['AUTH_TOKEN_THROTTLE_TTL_MS'] = '60000';
+
+    const { AppModule } = await import('../src/app.module');
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -57,7 +64,35 @@ describe('OAuth Client Credentials (e2e)', () => {
     } else {
       process.env['INTERNAL_API_KEY'] = previousInternalApiKey;
     }
+    if (previousTokenThrottleLimit === undefined) {
+      delete process.env['AUTH_TOKEN_THROTTLE_LIMIT'];
+    } else {
+      process.env['AUTH_TOKEN_THROTTLE_LIMIT'] = previousTokenThrottleLimit;
+    }
+    if (previousTokenThrottleTtlMs === undefined) {
+      delete process.env['AUTH_TOKEN_THROTTLE_TTL_MS'];
+    } else {
+      process.env['AUTH_TOKEN_THROTTLE_TTL_MS'] = previousTokenThrottleTtlMs;
+    }
   });
+
+  const mintClientToken = async (
+    clientId: string,
+    clientSecret: string,
+    scope?: string,
+  ): Promise<string> => {
+    const res = await request(app.getHttpServer())
+      .post('/auth/token')
+      .send({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+        ...(scope ? { scope } : {}),
+      })
+      .expect(200);
+
+    return res.body.access_token as string;
+  };
 
   // ---------------------------------------------------------------------------
   // 1. Happy path — valid credentials → token response
@@ -174,7 +209,28 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 7. Admin /oauth-clients endpoint requires INTERNAL_API_KEY
+  // 7. Issued client tokens can introspect themselves through /auth/client/me
+  // ---------------------------------------------------------------------------
+  it('should return client identity and scopes for a valid client bearer token', async () => {
+    const accessToken = await mintClientToken(
+      CLIENT_ID,
+      CLIENT_SECRET,
+      'bot:api',
+    );
+
+    const res = await request(app.getHttpServer())
+      .get('/auth/client/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(res.body).toEqual({
+      clientId: CLIENT_ID,
+      scopes: ['bot:api'],
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 8. Admin /oauth-clients endpoint requires INTERNAL_API_KEY
   // ---------------------------------------------------------------------------
   it('should reject POST /oauth-clients without the internal API key', async () => {
     await request(app.getHttpServer())
@@ -188,7 +244,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 8. Happy-path POST /oauth-clients with a valid INTERNAL_API_KEY
+  // 9. Happy-path POST /oauth-clients with a valid INTERNAL_API_KEY
   // ---------------------------------------------------------------------------
   it('should register a client when the internal API key is valid', async () => {
     const repo = dataSource.getRepository(OauthClient);
@@ -214,7 +270,92 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 9. Authorization: Basic header is accepted as an alternative to body params
+  // 10. Rotating a client secret revokes issued tokens and requires the new secret
+  // ---------------------------------------------------------------------------
+  it('should rotate a client secret, revoke issued tokens, and accept only the new secret', async () => {
+    const repo = dataSource.getRepository(OauthClient);
+    const rotateClientId = 'e2e-rotate-bot';
+    const oldSecret = 'e2e-rotate-secret-value-min-32!!';
+    const newSecret = 'e2e-rotate-secret-value-replacement!!';
+
+    await oauthClientsService.register(rotateClientId, oldSecret, ['bot:api']);
+
+    try {
+      const issuedToken = await mintClientToken(rotateClientId, oldSecret);
+
+      await request(app.getHttpServer())
+        .put(`/oauth-clients/${rotateClientId}/secret`)
+        .set('x-internal-api-key', INTERNAL_API_KEY)
+        .send({ clientSecret: newSecret })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get('/auth/client/me')
+        .set('Authorization', `Bearer ${issuedToken}`)
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/auth/token')
+        .send({
+          grant_type: 'client_credentials',
+          client_id: rotateClientId,
+          client_secret: oldSecret,
+        })
+        .expect(401);
+
+      const rotatedToken = await mintClientToken(rotateClientId, newSecret);
+      await request(app.getHttpServer())
+        .get('/auth/client/me')
+        .set('Authorization', `Bearer ${rotatedToken}`)
+        .expect(200);
+    } finally {
+      await repo.delete({ clientId: rotateClientId });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 11. Deactivating a client revokes issued tokens and blocks future token minting
+  // ---------------------------------------------------------------------------
+  it('should deactivate a client, revoke issued tokens, and block future token requests', async () => {
+    const repo = dataSource.getRepository(OauthClient);
+    const deactivateClientId = 'e2e-deactivate-bot';
+    const deactivateSecret = 'e2e-deactivate-secret-value-min-32!';
+
+    await oauthClientsService.register(deactivateClientId, deactivateSecret, [
+      'bot:api',
+    ]);
+
+    try {
+      const issuedToken = await mintClientToken(
+        deactivateClientId,
+        deactivateSecret,
+      );
+
+      await request(app.getHttpServer())
+        .patch(`/oauth-clients/${deactivateClientId}/deactivate`)
+        .set('x-internal-api-key', INTERNAL_API_KEY)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get('/auth/client/me')
+        .set('Authorization', `Bearer ${issuedToken}`)
+        .expect(401);
+
+      await request(app.getHttpServer())
+        .post('/auth/token')
+        .send({
+          grant_type: 'client_credentials',
+          client_id: deactivateClientId,
+          client_secret: deactivateSecret,
+        })
+        .expect(401);
+    } finally {
+      await repo.delete({ clientId: deactivateClientId });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // 12. Authorization: Basic header is accepted as an alternative to body params
   // ---------------------------------------------------------------------------
   it('should accept client credentials via Authorization: Basic header', async () => {
     const credentials = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString(
@@ -232,7 +373,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 10. application/x-www-form-urlencoded body is accepted (OAuth spec format)
+  // 13. application/x-www-form-urlencoded body is accepted (OAuth spec format)
   // ---------------------------------------------------------------------------
   it('should accept credentials submitted as application/x-www-form-urlencoded', async () => {
     const res = await request(app.getHttpServer())
@@ -248,7 +389,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 11. Requested scope is a valid subset of the registered scopes
+  // 14. Requested scope is a valid subset of the registered scopes
   // ---------------------------------------------------------------------------
   it('should mint a token containing only the requested subset of scopes', async () => {
     const repo = dataSource.getRepository(OauthClient);
@@ -281,7 +422,7 @@ describe('OAuth Client Credentials (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 12. Requesting a scope not in the registered set → 401
+  // 15. Requesting a scope not in the registered set → 401
   // ---------------------------------------------------------------------------
   it('should reject a scope not registered for the client', async () => {
     await request(app.getHttpServer())

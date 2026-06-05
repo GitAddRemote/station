@@ -12,7 +12,8 @@ export class LocalLoginEnabledGuard implements CanActivate {
 
   canActivate(_context: ExecutionContext): boolean {
     const enabled =
-      this.configService.get<string>('AUTH_LOCAL_LOGIN_ENABLED', 'true') ===
+      (process.env['AUTH_LOCAL_LOGIN_ENABLED'] ??
+        this.configService.get<string>('AUTH_LOCAL_LOGIN_ENABLED', 'false')) ===
       'true';
     if (!enabled) {
       throw new ForbiddenException('Local login is disabled');
@@ -27,8 +28,11 @@ export class LocalRegisterEnabledGuard implements CanActivate {
 
   canActivate(_context: ExecutionContext): boolean {
     const enabled =
-      this.configService.get<string>('AUTH_LOCAL_REGISTER_ENABLED', 'true') ===
-      'true';
+      (process.env['AUTH_LOCAL_REGISTER_ENABLED'] ??
+        this.configService.get<string>(
+          'AUTH_LOCAL_REGISTER_ENABLED',
+          'false',
+        )) === 'true';
     if (!enabled) {
       throw new ForbiddenException('Local registration is disabled');
     }

@@ -3,9 +3,11 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedRequest } from './interfaces/authenticated-request.interface';
 import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 import { OauthClientsService } from '../oauth-clients/oauth-clients.service';
+import { ClientAuthGuard } from './guards/client-auth.guard';
 
 describe('AuthController - Password Reset', () => {
   let controller: AuthController;
@@ -24,9 +26,11 @@ describe('AuthController - Password Reset', () => {
     isAccessTokenBlacklisted: jest.fn(),
     isSessionAlive: jest.fn(),
     parseRefreshTokenJti: jest.fn(),
-    isLocalLoginEnabled: jest.fn().mockResolvedValue(true),
-    isLocalRegisterEnabled: jest.fn().mockResolvedValue(true),
+    revokeClientTokens: jest.fn(),
+    isLocalLoginEnabled: jest.fn().mockReturnValue(true),
+    isLocalRegisterEnabled: jest.fn().mockReturnValue(true),
     isDiscordEnabled: jest.fn().mockReturnValue(true),
+    isDiscordConfigured: jest.fn().mockReturnValue(true),
     generateDiscordState: jest.fn().mockResolvedValue('state'),
     validateAndConsumeDiscordState: jest.fn().mockResolvedValue(true),
     handleDiscordCallback: jest.fn(),
@@ -47,7 +51,15 @@ describe('AuthController - Password Reset', () => {
             get: jest.fn().mockReturnValue('test'),
           },
         },
+        {
+          provide: JwtService,
+          useValue: { verify: jest.fn(), decode: jest.fn() },
+        },
         RefreshTokenAuthGuard,
+        {
+          provide: ClientAuthGuard,
+          useValue: { canActivate: jest.fn().mockReturnValue(true) },
+        },
         {
           provide: OauthClientsService,
           useValue: { validateClient: jest.fn(), register: jest.fn() },
@@ -59,6 +71,58 @@ describe('AuthController - Password Reset', () => {
     authService = module.get<AuthService>(AuthService);
 
     jest.clearAllMocks();
+  });
+
+  describe('me', () => {
+    it('should return the authenticated user including station super admin status', () => {
+      const mockRequest = {
+        user: {
+          userId: 7,
+          username: 'support-admin',
+          isStationSuperAdmin: true,
+        },
+      } as unknown as AuthenticatedRequest;
+
+      expect(controller.me(mockRequest)).toEqual({
+        userId: 7,
+        username: 'support-admin',
+        isStationSuperAdmin: true,
+      });
+    });
+  });
+
+  describe('clientMe', () => {
+    it('should return the authenticated OAuth client and granted scopes', () => {
+      const mockRequest = {
+        clientToken: {
+          sub: 'station-bot',
+          scopes: ['bot:api', 'bot:read'],
+        },
+      } as never;
+
+      expect(controller.clientMe(mockRequest)).toEqual({
+        clientId: 'station-bot',
+        scopes: ['bot:api', 'bot:read'],
+      });
+    });
+  });
+
+  describe('authConfig', () => {
+    it('should return the frontend auth posture for Discord-first login', () => {
+      mockAuthService.isLocalLoginEnabled.mockReturnValue(false);
+      mockAuthService.isLocalRegisterEnabled.mockReturnValue(false);
+      mockAuthService.isDiscordEnabled.mockReturnValue(true);
+      mockAuthService.isDiscordConfigured.mockReturnValue(true);
+
+      expect(controller.authConfig()).toEqual({
+        localLoginEnabled: false,
+        localRegisterEnabled: false,
+        discordEnabled: true,
+        discordConfigured: true,
+        localAuthMode: 'disabled',
+        primaryLoginProvider: 'discord',
+      });
+    });
   });
 
   describe('forgotPassword', () => {

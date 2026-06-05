@@ -42,7 +42,10 @@ export class UsersService {
     return this.usersRepository.find({ where: { isSystemUser: false } });
   }
 
-  async create(userDto: UserDto): Promise<User> {
+  async create(
+    userDto: UserDto,
+    options?: { isStationSuperAdmin?: boolean },
+  ): Promise<User> {
     // 1. Destructure so we don't accidentally mutate the DTO
     const { password, ...rest } = userDto;
 
@@ -55,6 +58,7 @@ export class UsersService {
     const user = this.usersRepository.create({
       ...rest,
       password: hashedPassword,
+      isStationSuperAdmin: options?.isStationSuperAdmin ?? false,
     });
 
     // 4. Persist and return with proper error handling

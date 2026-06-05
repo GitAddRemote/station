@@ -47,6 +47,7 @@ async function createLocalUser(
     email: `user_${suffix}@example.com`,
     password: hashedPassword,
     isActive: true,
+    isStationSuperAdmin: true,
     passwordChangeRequired: false,
     passwordExpiresAt: null,
     ...overrides,
@@ -99,6 +100,7 @@ describe('DatabaseSeederAdminService (integration)', () => {
       .getRepository(User)
       .findOne({ where: { email: SEED_EMAIL } });
     expect(user).toBeDefined();
+    expect(user!.isStationSuperAdmin).toBe(true);
     expect(user!.passwordChangeRequired).toBe(true);
     expect(user!.passwordExpiresAt).toBeDefined();
     expect(user!.passwordExpiresAt!.getTime()).toBeGreaterThan(Date.now());

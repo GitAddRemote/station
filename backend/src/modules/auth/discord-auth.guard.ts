@@ -17,7 +17,9 @@ export class DiscordAuthGuard extends AuthGuard('discord') {
 
   override async canActivate(context: ExecutionContext): Promise<boolean> {
     const enabled =
-      this.configService.get<string>('AUTH_DISCORD_ENABLED', 'true') === 'true';
+      (process.env['AUTH_DISCORD_ENABLED'] ??
+        this.configService.get<string>('AUTH_DISCORD_ENABLED', 'true')) ===
+      'true';
     if (!enabled) {
       throw new NotFoundException('Discord auth is disabled');
     }

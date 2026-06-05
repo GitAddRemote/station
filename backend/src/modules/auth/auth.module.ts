@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -25,7 +25,7 @@ import { createClient } from 'redis';
 @Module({
   imports: [
     UsersModule,
-    OauthClientsModule,
+    forwardRef(() => OauthClientsModule),
     PassportModule,
     TypeOrmModule.forFeature([PasswordReset]),
     JwtModule.registerAsync({

@@ -30,7 +30,14 @@ export class DatabaseSeederAdminService {
 
     const existing = await this.userRepository.findOne({ where: { email } });
     if (existing) {
-      console.log('Admin account already exists, skipping');
+      if (!existing.isStationSuperAdmin) {
+        await this.userRepository.update(existing.id, {
+          isStationSuperAdmin: true,
+        });
+        console.log('Existing admin account promoted to station super admin');
+      } else {
+        console.log('Admin account already exists, skipping');
+      }
       return;
     }
 
@@ -44,20 +51,12 @@ export class DatabaseSeederAdminService {
       email,
       password: hashedPassword,
       isActive: true,
+      isStationSuperAdmin: true,
       passwordChangeRequired: true,
       passwordExpiresAt,
     });
 
     console.log(`Admin account created: ${email} / ${username}`);
-    console.log('⚠️  Admin account created without a role assignment.');
-    console.log(
-      '    The account has no elevated privileges until an Owner role is manually',
-    );
-    console.log(
-      '    assigned to the user in an organization via the admin UI or a follow-up',
-    );
-    console.log(
-      '    seed step. This is a known limitation — see the issue for future work.',
-    );
+    console.log('Admin account created with station super admin access.');
   }
 }

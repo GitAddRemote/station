@@ -44,10 +44,12 @@ import { OauthClientsService } from '../oauth-clients/oauth-clients.service';
 import { DiscordAuthGuard } from './discord-auth.guard';
 import { DiscordProfile } from './discord.strategy';
 import { DISCORD_NONCE_COOKIE, DISCORD_STATE_TTL_MS } from './auth.service';
+import { ClientAuthGuard } from './guards/client-auth.guard';
 import {
   LocalLoginEnabledGuard,
   LocalRegisterEnabledGuard,
 } from './local-feature-flags.guard';
+import { ClientJwtPayload } from './interfaces/client-jwt-payload.interface';
 
 // Parse throttle config once at module load time.
 // Number() handles numeric strings and NaN from non-numeric input; the
@@ -202,10 +204,18 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Active auth feature flags' })
   @Get('config')
   authConfig() {
+    const discordConfigured = this.authService.isDiscordConfigured();
+    const discordEnabled = this.authService.isDiscordEnabled();
+    const localLoginEnabled = this.authService.isLocalLoginEnabled();
+    const localRegisterEnabled = this.authService.isLocalRegisterEnabled();
+
     return {
-      localLoginEnabled: this.authService.isLocalLoginEnabled(),
-      localRegisterEnabled: this.authService.isLocalRegisterEnabled(),
-      discordEnabled: this.authService.isDiscordEnabled(),
+      localLoginEnabled,
+      localRegisterEnabled,
+      discordEnabled,
+      discordConfigured,
+      localAuthMode: localLoginEnabled ? 'break_glass' : 'disabled',
+      primaryLoginProvider: discordEnabled ? 'discord' : 'local',
     };
   }
 
@@ -282,7 +292,24 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@Request() req: AuthenticatedRequest) {
-    return { userId: req.user.userId, username: req.user.username };
+    return {
+      userId: req.user.userId,
+      username: req.user.username,
+      isStationSuperAdmin: req.user.isStationSuperAdmin,
+    };
+  }
+
+  @ApiOperation({ summary: 'Get the current authenticated OAuth client' })
+  @ApiBearerAuth('access-token')
+  @ApiResponse({ status: 200, description: 'Current client token info' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(ClientAuthGuard)
+  @Get('client/me')
+  clientMe(@Request() req: ExpressRequest & { clientToken: ClientJwtPayload }) {
+    return {
+      clientId: req.clientToken.sub,
+      scopes: req.clientToken.scopes,
+    };
   }
 
   @ApiOperation({ summary: 'Refresh access token using refresh token cookie' })

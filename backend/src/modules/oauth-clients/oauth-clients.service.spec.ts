@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { OauthClientsService } from './oauth-clients.service';
 import { OauthClient } from './oauth-client.entity';
 import * as bcrypt from 'bcrypt';
@@ -85,6 +89,56 @@ describe('OauthClientsService', () => {
       await expect(
         service.validateSecret(client, 'wrong-secret'),
       ).resolves.toBe(false);
+    });
+  });
+
+  describe('rotateSecret', () => {
+    it('rehashes and saves the new client secret', async () => {
+      const existing = makeClient({
+        clientSecretHash: await bcrypt.hash('old-secret', 12),
+      });
+      repo.findOne.mockResolvedValue(existing);
+      repo.save.mockImplementation(async (client: OauthClient) => client);
+
+      const updated = await service.rotateSecret(
+        'station-bot',
+        'new-secret-value',
+      );
+
+      expect(updated).toBe(existing);
+      expect(updated.clientSecretHash).not.toBe('new-secret-value');
+      await expect(
+        bcrypt.compare('new-secret-value', updated.clientSecretHash),
+      ).resolves.toBe(true);
+    });
+
+    it('throws NotFoundException when the client does not exist', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.rotateSecret('missing-client', 'new-secret-value'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deactivate', () => {
+    it('marks the client inactive and saves it', async () => {
+      const existing = makeClient({ isActive: true });
+      repo.findOne.mockResolvedValue(existing);
+      repo.save.mockImplementation(async (client: OauthClient) => client);
+
+      const updated = await service.deactivate('station-bot');
+
+      expect(updated.isActive).toBe(false);
+      expect(repo.save).toHaveBeenCalledWith(existing);
+    });
+
+    it('throws NotFoundException when the client does not exist', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(service.deactivate('missing-client')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

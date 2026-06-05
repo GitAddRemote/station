@@ -37,6 +37,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.sid && !(await this.authService.isSessionAlive(payload.sid))) {
       throw new UnauthorizedException('Session has been revoked');
     }
-    return { userId: payload.sub, username: payload.username };
+    return {
+      userId: payload.sub,
+      username: payload.username,
+      isStationSuperAdmin: payload.isStationSuperAdmin ?? false,
+    };
   }
 }

@@ -50,11 +50,17 @@ export interface RedisClientLike {
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 days
 const REFRESH_TTL_MS = REFRESH_TTL_SECONDS * 1000;
 const PRE_AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CLIENT_TTL_SECONDS = 3600;
+const CLIENT_TTL_MS = CLIENT_TTL_SECONDS * 1000;
 
 @Injectable()
 export class AuthService implements OnModuleDestroy {
   private readonly dummyHash =
     '$2b$10$CwTycUXWue0Thq9StjUM0uJ8WZ0p/7eJYJg6eW9j5Cnz4Gf5Eme1e';
+
+  private getRuntimeConfig(key: string, fallback = ''): string {
+    return process.env[key] ?? this.configService.get<string>(key, fallback);
+  }
 
   constructor(
     @InjectPinoLogger(AuthService.name)
@@ -116,6 +122,32 @@ export class AuthService implements OnModuleDestroy {
     return null;
   }
 
+  async validateLocalUser(
+    username: string,
+    pass: string,
+  ): Promise<ValidatedUser> {
+    const user = await this.validateUser(username, pass);
+    if (!user) {
+      throw new UnauthorizedException('Invalid username or password');
+    }
+
+    const fullUser = await this.usersService.findById(user.id);
+    if (!fullUser) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!this.isLocalLoginAllowedForUser(fullUser)) {
+      this.logger.warn(
+        `Blocked local login for non-super-admin user: ${fullUser.username}`,
+      );
+      throw new ForbiddenException(
+        'Local login is restricted to station super admin accounts',
+      );
+    }
+
+    return user;
+  }
+
   /**
    * Core login — issues tokens after credential validation.
    *
@@ -156,38 +188,38 @@ export class AuthService implements OnModuleDestroy {
       }
     }
 
-    return this.issueTokenPair(user.id, user.username);
+    return this.issueTokenPair(user);
   }
 
   /** Issues a new access+refresh token pair and maintains the user-sessions index. */
   private async issueTokenPair(
-    userId: number,
-    username: string,
+    user: Pick<User, 'id' | 'username' | 'isStationSuperAdmin'>,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const jti = crypto.randomUUID();
     // A session ID (SID) is stable across token rotations for this login.
     // Deleting session:{sid} invalidates the entire token family regardless of
     // which JTI the client currently holds.
     const sid = crypto.randomUUID();
-    await this.authSet(`session:${sid}`, String(userId), REFRESH_TTL_MS);
+    await this.authSet(`session:${sid}`, String(user.id), REFRESH_TTL_MS);
 
     // Maintain the reverse index so all sessions for a user can be revoked at once.
     if (this.redisClient) {
-      await this.redisClient.sAdd(`user-sessions:${userId}`, sid);
+      await this.redisClient.sAdd(`user-sessions:${user.id}`, sid);
       await this.redisClient.expire(
-        `user-sessions:${userId}`,
+        `user-sessions:${user.id}`,
         REFRESH_TTL_SECONDS,
       );
     }
 
     const payload: JwtPayload = {
-      username,
-      sub: userId,
+      username: user.username,
+      sub: user.id,
+      isStationSuperAdmin: user.isStationSuperAdmin,
       jti,
       sid,
     };
     const accessToken = this.jwtService.sign(payload);
-    const refreshToken = await this.generateRefreshToken(userId, jti, sid);
+    const refreshToken = await this.generateRefreshToken(user.id, jti, sid);
     return { accessToken, refreshToken };
   }
 
@@ -209,7 +241,15 @@ export class AuthService implements OnModuleDestroy {
   }
 
   async register(userDto: UserDto): Promise<Omit<User, 'password'>> {
-    const newUser = await this.usersService.create(userDto);
+    if (!this.isLocalRegistrationAllowedForIdentity(userDto)) {
+      throw new ForbiddenException(
+        'Local registration is restricted to station super admin accounts',
+      );
+    }
+
+    const newUser = await this.usersService.create(userDto, {
+      isStationSuperAdmin: true,
+    });
     const { password: _password, ...result } = newUser;
     return result;
   }
@@ -353,6 +393,7 @@ export class AuthService implements OnModuleDestroy {
     const payload: JwtPayload = {
       username: user.username,
       sub: user.id,
+      isStationSuperAdmin: user.isStationSuperAdmin,
       jti: newJti,
       sid,
     };
@@ -504,6 +545,13 @@ export class AuthService implements OnModuleDestroy {
       return successMessage;
     }
 
+    if (!user.isStationSuperAdmin) {
+      this.logger.warn(
+        `Blocked local password reset request for non-super-admin email: ${email}`,
+      );
+      return successMessage;
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
 
     const expiresAt = new Date();
@@ -538,6 +586,10 @@ export class AuthService implements OnModuleDestroy {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
+    if (!resetToken.user.isStationSuperAdmin) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword.trim(), saltRounds);
 
@@ -564,8 +616,8 @@ export class AuthService implements OnModuleDestroy {
     token_type: 'Bearer';
     expires_in: number;
   }> {
-    const CLIENT_TTL_SECONDS = 3600;
     const jti = crypto.randomUUID();
+    const expiresAtMs = Date.now() + CLIENT_TTL_MS;
     const payload: ClientJwtPayload = {
       sub: client.clientId,
       type: 'client',
@@ -575,20 +627,40 @@ export class AuthService implements OnModuleDestroy {
     const access_token = this.jwtService.sign(payload, {
       expiresIn: CLIENT_TTL_SECONDS,
     });
-    // Track live client tokens so a future admin revoke endpoint can enumerate
-    // and invalidate them per client. Key: client-token:{clientId}:{jti}.
-    // Revocation itself uses the existing blacklist:{jti} mechanism checked by
-    // isAccessTokenBlacklisted.
-    await this.authSet(
-      `client-token:${client.clientId}:${jti}`,
-      '1',
-      CLIENT_TTL_SECONDS * 1000,
+    await this.trackClientToken(
+      client.clientId,
+      jti,
+      expiresAtMs,
+      CLIENT_TTL_MS,
     );
     return {
       access_token,
       token_type: 'Bearer',
       expires_in: CLIENT_TTL_SECONDS,
     };
+  }
+
+  async revokeClientTokens(clientId: string): Promise<void> {
+    const indexKey = this.getClientTokenIndexKey(clientId);
+    const trackedJtis = await this.getTrackedClientTokenJtis(clientId);
+
+    for (const jti of trackedJtis) {
+      const tokenKey = this.getClientTokenKey(clientId, jti);
+      const expiresAtRaw = await this.authGet(tokenKey);
+      if (!expiresAtRaw) {
+        continue;
+      }
+
+      const expiresAtMs = Number(expiresAtRaw);
+      const remainingMs = expiresAtMs - Date.now();
+      if (Number.isFinite(expiresAtMs) && remainingMs > 0) {
+        await this.authSet(`blacklist:${jti}`, '1', remainingMs);
+      }
+
+      await this.authDel(tokenKey);
+    }
+
+    await this.authDel(indexKey);
   }
 
   /**
@@ -619,6 +691,12 @@ export class AuthService implements OnModuleDestroy {
       throw new UnauthorizedException('User not found');
     }
 
+    if (!user.isStationSuperAdmin) {
+      throw new ForbiddenException(
+        'Local password changes are restricted to station super admin accounts',
+      );
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
     await this.usersService.updatePasswordWithExpiry(
       userId,
@@ -628,7 +706,7 @@ export class AuthService implements OnModuleDestroy {
 
     await this.revokeAllUserSessions(userId);
 
-    return this.issueTokenPair(userId, user.username);
+    return this.issueTokenPair(user);
   }
 
   /** Returns the password expiry date based on AUTH_PASSWORD_EXPIRY_DAYS (default 90). */
@@ -650,6 +728,57 @@ export class AuthService implements OnModuleDestroy {
     await this.redisClient.del(`user-sessions:${userId}`);
   }
 
+  private getClientTokenKey(clientId: string, jti: string): string {
+    return `client-token:${clientId}:${jti}`;
+  }
+
+  private getClientTokenIndexKey(clientId: string): string {
+    return `client-tokens:${clientId}`;
+  }
+
+  private async trackClientToken(
+    clientId: string,
+    jti: string,
+    expiresAtMs: number,
+    ttlMs: number,
+  ): Promise<void> {
+    const tokenKey = this.getClientTokenKey(clientId, jti);
+    const indexKey = this.getClientTokenIndexKey(clientId);
+
+    await this.authSet(tokenKey, String(expiresAtMs), ttlMs);
+
+    if (this.redisClient) {
+      await this.redisClient.sAdd(indexKey, jti);
+      await this.redisClient.expire(indexKey, Math.ceil(ttlMs / 1000));
+      return;
+    }
+
+    const tracked = await this.getTrackedClientTokenJtis(clientId);
+    const nextTracked = [...new Set([...tracked, jti])];
+    await this.authSet(indexKey, JSON.stringify(nextTracked), ttlMs);
+  }
+
+  private async getTrackedClientTokenJtis(clientId: string): Promise<string[]> {
+    const indexKey = this.getClientTokenIndexKey(clientId);
+    if (this.redisClient) {
+      return this.redisClient.sMembers(indexKey);
+    }
+
+    const raw = await this.authGet(indexKey);
+    if (!raw) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === 'string')
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
   async changePassword(
     userId: number,
     currentPassword: string,
@@ -659,6 +788,12 @@ export class AuthService implements OnModuleDestroy {
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (!user.isStationSuperAdmin) {
+      throw new ForbiddenException(
+        'Local password changes are restricted to station super admin accounts',
+      );
     }
 
     const isMatch = await bcrypt.compare(currentPassword.trim(), user.password);
@@ -806,21 +941,75 @@ export class AuthService implements OnModuleDestroy {
 
   isLocalLoginEnabled(): boolean {
     return (
-      this.configService.get<string>('AUTH_LOCAL_LOGIN_ENABLED', 'true') ===
-      'true'
+      this.getRuntimeConfig('AUTH_LOCAL_LOGIN_ENABLED', 'false') === 'true'
     );
   }
 
   isLocalRegisterEnabled(): boolean {
     return (
-      this.configService.get<string>('AUTH_LOCAL_REGISTER_ENABLED', 'true') ===
-      'true'
+      this.getRuntimeConfig('AUTH_LOCAL_REGISTER_ENABLED', 'false') === 'true'
+    );
+  }
+
+  private isLocalLoginAllowedForUser(
+    user: Pick<User, 'username' | 'email' | 'isStationSuperAdmin'>,
+  ) {
+    if (user.isStationSuperAdmin) {
+      return true;
+    }
+
+    const allowedUsernames = this.getConfiguredIdentitySet(
+      'AUTH_LOCAL_SUPER_ADMIN_USERNAMES',
+    );
+    const allowedEmails = this.getConfiguredIdentitySet(
+      'AUTH_LOCAL_SUPER_ADMIN_EMAILS',
+    );
+
+    return (
+      allowedUsernames.has(user.username.trim().toLowerCase()) ||
+      allowedEmails.has(user.email.trim().toLowerCase())
+    );
+  }
+
+  private isLocalRegistrationAllowedForIdentity(
+    userDto: Pick<UserDto, 'username' | 'email'>,
+  ) {
+    const allowedUsernames = this.getConfiguredIdentitySet(
+      'AUTH_LOCAL_SUPER_ADMIN_USERNAMES',
+    );
+    const allowedEmails = this.getConfiguredIdentitySet(
+      'AUTH_LOCAL_SUPER_ADMIN_EMAILS',
+    );
+
+    return (
+      allowedUsernames.has(userDto.username.trim().toLowerCase()) ||
+      allowedEmails.has(userDto.email.trim().toLowerCase())
+    );
+  }
+
+  private getConfiguredIdentitySet(configKey: string): Set<string> {
+    const raw = this.getRuntimeConfig(configKey, '');
+    return new Set(
+      raw
+        .split(',')
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
     );
   }
 
   isDiscordEnabled(): boolean {
-    return (
-      this.configService.get<string>('AUTH_DISCORD_ENABLED', 'true') === 'true'
+    const enabled =
+      this.getRuntimeConfig('AUTH_DISCORD_ENABLED', 'true') === 'true';
+    return enabled && this.isDiscordConfigured();
+  }
+
+  isDiscordConfigured(): boolean {
+    const clientId = this.getRuntimeConfig('DISCORD_CLIENT_ID', '');
+    const clientSecret = this.getRuntimeConfig('DISCORD_CLIENT_SECRET', '');
+    const callbackUrl = this.getRuntimeConfig('DISCORD_CALLBACK_URL', '');
+
+    return Boolean(
+      clientId.trim() && clientSecret.trim() && callbackUrl.trim(),
     );
   }
 
@@ -828,6 +1017,6 @@ export class AuthService implements OnModuleDestroy {
   async loginDiscordUser(
     user: Omit<User, 'password'>,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    return this.issueTokenPair(user.id, user.username);
+    return this.issueTokenPair(user);
   }
 }

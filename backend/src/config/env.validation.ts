@@ -60,6 +60,18 @@ export const envValidationSchema = Joi.object({
 
   // Password expiry — number of days before a changed password expires.
   AUTH_PASSWORD_EXPIRY_DAYS: Joi.number().integer().min(1).default(90),
+  AUTH_LOCAL_LOGIN_ENABLED: Joi.string()
+    .valid('true', 'false')
+    .default('false'),
+  AUTH_LOCAL_REGISTER_ENABLED: Joi.string()
+    .valid('true', 'false')
+    .default('false'),
+  AUTH_DISCORD_ENABLED: Joi.string().valid('true', 'false').default('true'),
+  AUTH_LOCAL_SUPER_ADMIN_USERNAMES: Joi.string().allow('').default(''),
+  AUTH_LOCAL_SUPER_ADMIN_EMAILS: Joi.string().allow('').default(''),
+  DISCORD_CLIENT_ID: Joi.string().allow('').default(''),
+  DISCORD_CLIENT_SECRET: Joi.string().allow('').default(''),
+  DISCORD_CALLBACK_URL: Joi.string().uri().allow('').default(''),
 
   // Token cleanup scheduler (optional — defaults to 3 AM daily)
   REFRESH_TOKEN_CLEANUP_CRON: Joi.string().default(DEFAULT_CLEANUP_CRON),

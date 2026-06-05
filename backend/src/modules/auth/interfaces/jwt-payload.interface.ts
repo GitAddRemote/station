@@ -6,6 +6,8 @@ export interface JwtPayload {
   sub: number;
   /** Username */
   username: string;
+  /** Platform-level break-glass super-admin marker */
+  isStationSuperAdmin: boolean;
   /** JWT ID — unique identifier used for per-token blacklisting on logout */
   jti: string;
   /** Session ID — stable across token rotations; deleting session:{sid} in
