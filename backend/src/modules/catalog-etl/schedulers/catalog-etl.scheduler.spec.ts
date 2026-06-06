@@ -160,16 +160,4 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
       'terminal ETL skip guard failed',
     );
   });
-
-  it('logs error and does not throw when the skip guard throws', async () => {
-    mockGetLastSuccessfulStepRun.mockRejectedValueOnce(
-      new Error('db connection lost'),
-    );
-    await expect(makeScheduler().scheduledTerminalEtl()).resolves.not.toThrow();
-    expect(mockRunStep).not.toHaveBeenCalled();
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ err: expect.any(Error) }),
-      'terminal ETL skip guard failed',
-    );
-  });
 });
