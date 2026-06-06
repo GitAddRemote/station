@@ -89,7 +89,9 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     mockRunStep
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('distances failed'));
-    await expect(makeScheduler().scheduledTerminalEtl()).resolves.toBeUndefined();
+    await expect(
+      makeScheduler().scheduledTerminalEtl(),
+    ).resolves.toBeUndefined();
     expect(mockRunStep).toHaveBeenCalledTimes(2);
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(Error) }),
@@ -101,7 +103,9 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     mockRunStep
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new ConflictException());
-    await expect(makeScheduler().scheduledTerminalEtl()).resolves.toBeUndefined();
+    await expect(
+      makeScheduler().scheduledTerminalEtl(),
+    ).resolves.toBeUndefined();
     expect(mockRunStep).toHaveBeenCalledTimes(2);
     expect(mockLogger.debug).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(ConflictException) }),
@@ -147,7 +151,9 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     mockGetLastSuccessfulStepRun.mockRejectedValueOnce(
       new Error('db connection lost'),
     );
-    await expect(makeScheduler().scheduledTerminalEtl()).resolves.toBeUndefined();
+    await expect(
+      makeScheduler().scheduledTerminalEtl(),
+    ).resolves.toBeUndefined();
     expect(mockRunStep).not.toHaveBeenCalled();
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(Error) }),
