@@ -376,6 +376,69 @@ describe('TerminalsSyncStep', () => {
       expect(upsertCall[1][19]).toBeNull();
     });
 
+    it('emits warn-severity EtlWarning for each unresolvable secondary FK', async () => {
+      const dsQuery = buildDsQuery({
+        starSystems: {},
+        factions: {},
+        companies: {},
+      });
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([
+        makeTerminal({
+          id_star_system: 42,
+          id_planet: null,
+          id_orbit: null,
+          id_moon: null,
+          id_faction: 77,
+          id_company: 88,
+        }),
+      ]);
+
+      await step.execute(CTX);
+
+      const warnings: {
+        runId: string;
+        severity: string;
+        message: string;
+        rawPayload?: Record<string, unknown>;
+      }[] = repoCreate.mock.calls.map(
+        ([dto]: [
+          {
+            runId: string;
+            severity: string;
+            message: string;
+            rawPayload?: Record<string, unknown>;
+          },
+        ]) => dto,
+      );
+      const warnWarnings = warnings.filter((w) => w.severity === 'warn');
+      const warnMessages = warnWarnings.map((w) => w.message);
+
+      expect(warnMessages).toContain(
+        'Terminal 1 references unknown star system 42 — FK stored as null',
+      );
+      expect(warnMessages).toContain(
+        'Terminal 1 references unknown faction 77 — FK stored as null',
+      );
+      expect(warnMessages).toContain(
+        'Terminal 1 references unknown company 88 — FK stored as null',
+      );
+      expect(warnWarnings).toHaveLength(3);
+      expect(warnWarnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            rawPayload: { terminal_id: 1, id_star_system: 42 },
+          }),
+          expect.objectContaining({
+            rawPayload: { terminal_id: 1, id_faction: 77 },
+          }),
+          expect.objectContaining({
+            rawPayload: { terminal_id: 1, id_company: 88 },
+          }),
+        ]),
+      );
+    });
+
     it('passes null for secondary FKs when UEX fields are null', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
