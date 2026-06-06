@@ -27,8 +27,8 @@ beforeEach(() => {
 
 describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
   it('checks both skip windows in parallel before running ETL steps', async () => {
-    let resolveTerminalsSkip: (value: string | null) => void = () => undefined;
-    const terminalsSkipPromise = new Promise<string | null>((resolve) => {
+    let resolveTerminalsSkip: (value: Date | null) => void = () => undefined;
+    const terminalsSkipPromise = new Promise<Date | null>((resolve) => {
       resolveTerminalsSkip = resolve;
     });
 
@@ -89,7 +89,9 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     mockRunStep
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('distances failed'));
-    await expect(makeScheduler().scheduledTerminalEtl()).resolves.not.toThrow();
+    await expect(
+      makeScheduler().scheduledTerminalEtl(),
+    ).resolves.toBeUndefined();
     expect(mockRunStep).toHaveBeenCalledTimes(2);
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(Error) }),
@@ -101,7 +103,9 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
     mockRunStep
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new ConflictException());
-    await expect(makeScheduler().scheduledTerminalEtl()).resolves.not.toThrow();
+    await expect(
+      makeScheduler().scheduledTerminalEtl(),
+    ).resolves.toBeUndefined();
     expect(mockRunStep).toHaveBeenCalledTimes(2);
     expect(mockLogger.debug).toHaveBeenCalledWith(
       expect.objectContaining({ err: expect.any(ConflictException) }),
@@ -111,7 +115,7 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
   });
 
   it('skips when terminals-sync was completed within SKIP_HOURS', async () => {
-    mockGetLastSuccessfulStepRun.mockResolvedValue(new Date().toISOString());
+    mockGetLastSuccessfulStepRun.mockResolvedValue(new Date());
     await makeScheduler().scheduledTerminalEtl();
     expect(mockRunStep).not.toHaveBeenCalled();
     expect(mockLogger.info).not.toHaveBeenCalled();
@@ -119,7 +123,7 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
 
   it('still runs terminal-distances-sync when terminals-sync is skipped but distances is not', async () => {
     mockGetLastSuccessfulStepRun
-      .mockResolvedValueOnce(new Date().toISOString())
+      .mockResolvedValueOnce(new Date())
       .mockResolvedValueOnce(null);
     mockRunStep.mockResolvedValue(undefined);
     await makeScheduler().scheduledTerminalEtl();
@@ -133,7 +137,7 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
   it('skips terminal-distances-sync when it was completed within SKIP_HOURS', async () => {
     mockGetLastSuccessfulStepRun
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(new Date().toISOString());
+      .mockResolvedValueOnce(new Date());
     mockRunStep.mockResolvedValue(undefined);
     await makeScheduler().scheduledTerminalEtl();
     expect(mockRunStep).toHaveBeenCalledTimes(1);
