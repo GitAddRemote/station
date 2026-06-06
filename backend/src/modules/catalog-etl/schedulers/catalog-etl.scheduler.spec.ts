@@ -146,4 +146,18 @@ describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
       'Starting scheduled terminal ETL',
     );
   });
+
+  it('logs error and does not throw when the skip guard throws', async () => {
+    mockGetLastSuccessfulStepRun.mockRejectedValueOnce(
+      new Error('db connection lost'),
+    );
+    await expect(
+      makeScheduler().scheduledTerminalEtl(),
+    ).resolves.toBeUndefined();
+    expect(mockRunStep).not.toHaveBeenCalled();
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: expect.any(Error) }),
+      'terminal ETL skip guard failed',
+    );
+  });
 });
