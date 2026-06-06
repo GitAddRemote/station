@@ -26,6 +26,38 @@ beforeEach(() => {
 });
 
 describe('CatalogEtlScheduler.scheduledTerminalEtl', () => {
+  it('checks both skip windows in parallel before running ETL steps', async () => {
+    let resolveTerminalsSkip: (value: string | null) => void = () => undefined;
+    const terminalsSkipPromise = new Promise<string | null>((resolve) => {
+      resolveTerminalsSkip = resolve;
+    });
+
+    mockGetLastSuccessfulStepRun
+      .mockReturnValueOnce(terminalsSkipPromise)
+      .mockResolvedValueOnce(null);
+    mockRunStep.mockResolvedValue(undefined);
+
+    const scheduledRun = makeScheduler().scheduledTerminalEtl();
+
+    await Promise.resolve();
+
+    expect(mockGetLastSuccessfulStepRun).toHaveBeenCalledTimes(2);
+    expect(mockGetLastSuccessfulStepRun).toHaveBeenNthCalledWith(
+      1,
+      'terminals-sync',
+    );
+    expect(mockGetLastSuccessfulStepRun).toHaveBeenNthCalledWith(
+      2,
+      'terminal-distances-sync',
+    );
+    expect(mockRunStep).not.toHaveBeenCalled();
+
+    resolveTerminalsSkip(null);
+    await scheduledRun;
+
+    expect(mockRunStep).toHaveBeenCalledTimes(2);
+  });
+
   it('runs terminals-sync then terminal-distances-sync on success', async () => {
     mockRunStep.mockResolvedValue(undefined);
     await makeScheduler().scheduledTerminalEtl();
