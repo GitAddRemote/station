@@ -7,7 +7,7 @@ describe('BaseUexRepository', () => {
 
   // Mock data
   const mockCategory = {
-    id: 1,
+    id: '1',
     uexId: 100,
     name: 'Test Category',
     type: 'item',
@@ -18,7 +18,7 @@ describe('BaseUexRepository', () => {
   };
 
   const mockInactiveCategory = {
-    id: 3,
+    id: '3',
     uexId: 102,
     name: 'Inactive Category',
     type: 'item',
@@ -156,9 +156,9 @@ describe('BaseUexRepository', () => {
         .spyOn(repository, 'update')
         .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
-      await repository.markAsDeleted(1, 999);
+      await repository.markAsDeleted('1', 999);
 
-      expect(updateSpy).toHaveBeenCalledWith(1, {
+      expect(updateSpy).toHaveBeenCalledWith('1', {
         deleted: true,
         modifiedById: 999,
       });
@@ -189,9 +189,9 @@ describe('BaseUexRepository', () => {
         .spyOn(repository, 'update')
         .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
-      await repository.deactivate(1, 999);
+      await repository.deactivate('1', 999);
 
-      expect(updateSpy).toHaveBeenCalledWith(1, {
+      expect(updateSpy).toHaveBeenCalledWith('1', {
         active: false,
         modifiedById: 999,
       });
@@ -204,9 +204,9 @@ describe('BaseUexRepository', () => {
         .spyOn(repository, 'update')
         .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
-      await repository.activate(1, 999);
+      await repository.activate('1', 999);
 
-      expect(updateSpy).toHaveBeenCalledWith(1, {
+      expect(updateSpy).toHaveBeenCalledWith('1', {
         active: true,
         modifiedById: 999,
       });
