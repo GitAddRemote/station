@@ -3,7 +3,7 @@ import { UexStarSystem } from './uex-star-system.entity';
 describe('UexStarSystem Entity', () => {
   it('should create a UexStarSystem instance', () => {
     const starSystem = new UexStarSystem();
-    starSystem.id = 1;
+    starSystem.id = 'uuid-test-1';
     starSystem.uexId = 1;
     starSystem.name = 'Stanton';
     starSystem.code = 'STAN';
@@ -12,7 +12,7 @@ describe('UexStarSystem Entity', () => {
     starSystem.deleted = false;
 
     expect(starSystem).toBeDefined();
-    expect(starSystem.id).toBe(1);
+    expect(starSystem.id).toBe('uuid-test-1');
     expect(starSystem.uexId).toBe(1);
     expect(starSystem.name).toBe('Stanton');
     expect(starSystem.code).toBe('STAN');

@@ -21,8 +21,8 @@ import { UexMoon } from './uex-moon.entity';
   `(planet_id IS NOT NULL AND moon_id IS NULL) OR (planet_id IS NULL AND moon_id IS NOT NULL)`,
 )
 export class UexCity extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ name: 'planet_id', type: 'integer', nullable: true })
   planetId?: number;

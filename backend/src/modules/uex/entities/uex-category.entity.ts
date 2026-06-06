@@ -10,8 +10,8 @@ import { BaseUexEntity } from './base-uex.entity';
   where: 'deleted = FALSE',
 })
 export class UexCategory extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ length: 50, nullable: true })
   type?: string;

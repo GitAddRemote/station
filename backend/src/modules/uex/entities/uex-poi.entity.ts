@@ -18,8 +18,8 @@ import { UexMoon } from './uex-moon.entity';
 @Index('idx_uex_poi_system', ['starSystemId'], { where: 'deleted = FALSE' })
 @Index('idx_uex_poi_type', ['type'], { where: 'deleted = FALSE' })
 export class UexPoi extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ name: 'star_system_id', type: 'integer', nullable: true })
   starSystemId?: number;

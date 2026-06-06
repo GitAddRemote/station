@@ -3,7 +3,7 @@ import { UexCompany } from './uex-company.entity';
 describe('UexCompany Entity', () => {
   it('should create a UexCompany instance', () => {
     const company = new UexCompany();
-    company.id = 1;
+    company.id = 'uuid-test-1';
     company.uexId = 200;
     company.name = 'Anvil Aerospace';
     company.code = 'ANVL';
@@ -11,7 +11,7 @@ describe('UexCompany Entity', () => {
     company.deleted = false;
 
     expect(company).toBeDefined();
-    expect(company.id).toBe(1);
+    expect(company.id).toBe('uuid-test-1');
     expect(company.uexId).toBe(200);
     expect(company.name).toBe('Anvil Aerospace');
     expect(company.code).toBe('ANVL');

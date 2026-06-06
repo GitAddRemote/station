@@ -17,8 +17,8 @@ import { UexStarSystem } from './uex-star-system.entity';
   where: 'deleted = FALSE',
 })
 export class UexPlanet extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ name: 'star_system_id', type: 'integer' })
   starSystemId!: number;

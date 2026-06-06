@@ -36,6 +36,7 @@ import { FixCategoriesSectionTypeExpressionIndex1779700000000 } from './migratio
 import { AddStepNameToEtlRun1779710000000 } from './migrations/1779710000000-AddStepNameToEtlRun';
 import { AddUniqueUuidToStationItem1780010901444 } from './migrations/1780010901444-AddUniqueUuidToStationItem';
 import { MakeItemFksDeferrable1780020000000 } from './migrations/1780020000000-MakeItemFksDeferrable';
+import { MigrateTablePksToUuidV71780030000000 } from './migrations/1780030000000-MigrateTablePksToUuidV7';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -81,6 +82,7 @@ export const AppDataSource = new DataSource({
     AddStepNameToEtlRun1779710000000,
     AddUniqueUuidToStationItem1780010901444,
     MakeItemFksDeferrable1780020000000,
+    MigrateTablePksToUuidV71780030000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },

@@ -6,6 +6,8 @@ export class AlterJumpPointsForSyntheticRows1779664556916
   name = 'AlterJumpPointsForSyntheticRows1779664556916';
 
   async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+
     // Replace BIGSERIAL PK with UUIDv7 (supplied by application; fallback to
     // gen_random_uuid() for any rows inserted outside the ETL step)
     await queryRunner.query(

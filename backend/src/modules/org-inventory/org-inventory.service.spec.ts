@@ -28,7 +28,11 @@ describe('OrgInventoryService', () => {
 
   const mockOrg: Organization = { id: 1, name: 'Test Org' } as Organization;
   const mockGame: Game = { id: 1, name: 'Star Citizen' } as Game;
-  const mockItem: UexItem = { id: 1, uexId: 100, name: 'Test Item' } as UexItem;
+  const mockItem: UexItem = {
+    id: 'uuid-test-1',
+    uexId: 100,
+    name: 'Test Item',
+  } as UexItem;
   const mockUser: User = { id: 1, username: 'testuser' } as User;
 
   const mockOrgInventoryItem: OrgInventoryItem = {

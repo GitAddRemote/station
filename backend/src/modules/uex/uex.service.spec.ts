@@ -18,7 +18,7 @@ describe('UexService', () => {
   };
 
   const mockItem = {
-    id: 1,
+    id: '1',
     uexId: 100,
     name: 'Test Item',
     idCategory: 5,
@@ -123,7 +123,7 @@ describe('UexService', () => {
     expect(result.limit).toBe(10);
     expect(result.offset).toBe(20);
     expect(result.items[0]).toMatchObject({
-      id: 1,
+      id: '1',
       uexId: 100,
       name: 'Test Item',
       categoryId: 5,
@@ -150,7 +150,7 @@ describe('UexService', () => {
       orderBy: jest.fn().mockReturnThis(),
       getMany: jest.fn().mockResolvedValue([
         {
-          id: 1,
+          id: '1',
           uexId: 10,
           name: 'Stanton',
           code: 'STANTON',
@@ -177,7 +177,7 @@ describe('UexService', () => {
     );
     expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith('system.name', 'ASC');
     expect(systems[0]).toMatchObject({
-      id: 1,
+      id: '1',
       uexId: 10,
       name: 'Stanton',
       code: 'STANTON',
@@ -249,7 +249,7 @@ describe('UexService', () => {
 
       expect(result.total).toBe(1);
       expect(result.commodities[0]).toMatchObject({
-        id: 1,
+        id: '1',
         uexId: 42,
         name: 'Laranite',
         code: 'LAR',

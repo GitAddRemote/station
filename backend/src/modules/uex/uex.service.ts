@@ -23,7 +23,7 @@ export class UexService {
   ) {}
 
   async getActiveCategories(): Promise<
-    Array<{ id: number; name: string; section?: string; type?: string }>
+    Array<{ id: string; name: string; section?: string; type?: string }>
   > {
     const categories = await this.categoryRepository.find({
       where: { active: true, deleted: false },
@@ -32,7 +32,7 @@ export class UexService {
     });
 
     return categories.map((category) => ({
-      id: Number(category.id),
+      id: category.id,
       name: category.name,
       section: category.section || undefined,
       type: category.type || undefined,
@@ -41,7 +41,7 @@ export class UexService {
 
   async searchItems(searchDto: UexItemSearchDto): Promise<{
     items: Array<{
-      id: number;
+      id: string;
       uexId: number;
       name: string;
       categoryId?: number;
@@ -78,7 +78,7 @@ export class UexService {
 
     return {
       items: items.map((item) => ({
-        id: Number(item.id),
+        id: item.id,
         uexId: item.uexId,
         name: item.name,
         categoryId: item.idCategory || undefined,
@@ -92,7 +92,7 @@ export class UexService {
 
   async searchCommodities(searchDto: UexCommoditySearchDto): Promise<{
     commodities: Array<{
-      id: number;
+      id: string;
       uexId: number;
       name: string;
       code?: string;
@@ -163,7 +163,7 @@ export class UexService {
 
     return {
       commodities: commodities.map((c) => ({
-        id: Number(c.id),
+        id: c.id,
         uexId: c.uexId,
         name: c.name,
         code: c.code ?? undefined,
@@ -185,7 +185,7 @@ export class UexService {
 
   async getStarSystems(filters: UexStarSystemFilterDto = {}): Promise<
     Array<{
-      id: number;
+      id: string;
       uexId: number;
       name: string;
       code: string;
@@ -205,7 +205,7 @@ export class UexService {
     const systems = await queryBuilder.getMany();
 
     return systems.map((system) => ({
-      id: Number(system.id),
+      id: system.id,
       uexId: system.uexId,
       name: system.name,
       code: system.code,

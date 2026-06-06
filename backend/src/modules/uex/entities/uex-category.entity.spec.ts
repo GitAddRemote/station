@@ -3,7 +3,7 @@ import { UexCategory } from './uex-category.entity';
 describe('UexCategory Entity', () => {
   it('should create a UexCategory instance', () => {
     const category = new UexCategory();
-    category.id = 1;
+    category.id = 'uuid-test-1';
     category.uexId = 100;
     category.name = 'Test Category';
     category.type = 'item';
@@ -13,7 +13,7 @@ describe('UexCategory Entity', () => {
     category.deleted = false;
 
     expect(category).toBeDefined();
-    expect(category.id).toBe(1);
+    expect(category.id).toBe('uuid-test-1');
     expect(category.uexId).toBe(100);
     expect(category.name).toBe('Test Category');
     expect(category.type).toBe('item');

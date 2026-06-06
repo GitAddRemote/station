@@ -27,8 +27,8 @@ import { UexCategory } from './uex-category.entity';
 })
 @Index('idx_uex_commodities_name', ['name'], { where: 'deleted = FALSE' })
 export class UexCommodity extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ name: 'id_category', type: 'integer', nullable: true })
   idCategory?: number;

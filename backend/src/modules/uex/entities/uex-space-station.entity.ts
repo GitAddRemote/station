@@ -19,8 +19,8 @@ import { UexMoon } from './uex-moon.entity';
   where: 'deleted = FALSE',
 })
 export class UexSpaceStation extends BaseUexEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
   @Column({ name: 'star_system_id', type: 'integer', nullable: true })
   starSystemId?: number;
