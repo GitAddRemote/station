@@ -433,6 +433,7 @@ export class MigrateTablePksToUuidV71780030000000
         "legacy_id" = "id",
         "id_uuid" = "uuid_generate_v7"()
     `);
+    await this.preserveLegacySequence(queryRunner, table);
     await queryRunner.query(`
       ALTER TABLE "${table}"
         ALTER COLUMN "legacy_id" SET NOT NULL,
@@ -490,6 +491,33 @@ export class MigrateTablePksToUuidV71780030000000
         COALESCE((SELECT MAX("id") FROM "${table}"), 1),
         EXISTS(SELECT 1 FROM "${table}")
       )
+    `);
+  }
+
+  private async preserveLegacySequence(
+    queryRunner: QueryRunner,
+    table: string,
+  ): Promise<void> {
+    const sequenceRows = (await queryRunner.query(
+      `
+        SELECT pg_get_serial_sequence($1, 'id') AS sequence_name
+      `,
+      [`"${table}"`],
+    )) as Array<{ sequence_name: string | null }>;
+
+    const sequenceName = sequenceRows[0]?.sequence_name;
+
+    if (!sequenceName) {
+      return;
+    }
+
+    await queryRunner.query(`
+      ALTER TABLE "${table}"
+        ALTER COLUMN "legacy_id" SET DEFAULT nextval('${sequenceName}')
+    `);
+    await queryRunner.query(`
+      ALTER SEQUENCE ${sequenceName}
+        OWNED BY "${table}"."legacy_id"
     `);
   }
 }
