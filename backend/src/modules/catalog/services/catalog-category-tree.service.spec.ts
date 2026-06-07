@@ -200,4 +200,133 @@ describe('CatalogCategoryTreeService', () => {
       ),
     ).toThrow('must appear at the end of pathIds');
   });
+
+  describe('rebuildDescendantTreeFields', () => {
+    const ID1 = '00000000-0000-7000-8000-000000000001';
+    const ID2 = '00000000-0000-7000-8000-000000000002';
+    const ID3 = '00000000-0000-7000-8000-000000000003';
+    const ID4 = '00000000-0000-7000-8000-000000000004';
+
+    it('returns empty array when node has no descendants', () => {
+      const reparented = {
+        id: ID2,
+        slug: 'ship',
+        path: 'transport.ship',
+        pathIds: [ID1, ID2],
+        depth: 1,
+      };
+      expect(service.rebuildDescendantTreeFields(reparented, [])).toEqual([]);
+    });
+
+    it('updates a single direct child after reparenting its parent', () => {
+      const reparented = {
+        id: ID2,
+        slug: 'ship',
+        path: 'transport.ship',
+        pathIds: [ID1, ID2],
+        depth: 1,
+      };
+      const child = {
+        id: ID3,
+        slug: 'cargo',
+        path: 'vehicle.ship.cargo',
+        pathIds: [ID1, ID2, ID3],
+        depth: 2,
+        parentId: ID2,
+      };
+
+      const result = service.rebuildDescendantTreeFields(reparented, [child]);
+
+      expect(result).toEqual([
+        {
+          id: ID3,
+          path: 'transport.ship.cargo',
+          pathIds: [ID1, ID2, ID3],
+          depth: 2,
+        },
+      ]);
+    });
+
+    it('cascades updates through multiple levels', () => {
+      // Original tree: vehicle > ship > cargo > container
+      // After reparenting "ship" to a new root "transport":
+      // transport.ship, transport.ship.cargo, transport.ship.cargo.container
+      const reparented = {
+        id: ID2,
+        slug: 'ship',
+        path: 'transport.ship',
+        pathIds: [ID1, ID2],
+        depth: 1,
+      };
+      const grandchild = {
+        id: ID3,
+        slug: 'cargo',
+        path: 'vehicle.ship.cargo',
+        pathIds: ['old-root', ID2, ID3],
+        depth: 2,
+        parentId: ID2,
+      };
+      const greatGrandchild = {
+        id: ID4,
+        slug: 'container',
+        path: 'vehicle.ship.cargo.container',
+        pathIds: ['old-root', ID2, ID3, ID4],
+        depth: 3,
+        parentId: ID3,
+      };
+
+      const result = service.rebuildDescendantTreeFields(reparented, [
+        grandchild,
+        greatGrandchild,
+      ]);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        id: ID3,
+        path: 'transport.ship.cargo',
+        pathIds: [ID1, ID2, ID3],
+        depth: 2,
+      });
+      expect(result[1]).toEqual({
+        id: ID4,
+        path: 'transport.ship.cargo.container',
+        pathIds: [ID1, ID2, ID3, ID4],
+        depth: 3,
+      });
+    });
+
+    it('throws when a descendant references a parent not yet processed (out-of-order input)', () => {
+      const reparented = {
+        id: ID2,
+        slug: 'ship',
+        path: 'transport.ship',
+        pathIds: [ID1, ID2],
+        depth: 1,
+      };
+      const grandchild = {
+        id: ID3,
+        slug: 'cargo',
+        path: 'vehicle.ship.cargo',
+        pathIds: ['old-root', ID2, ID3],
+        depth: 2,
+        parentId: ID2,
+      };
+      const greatGrandchild = {
+        id: ID4,
+        slug: 'container',
+        path: 'vehicle.ship.cargo.container',
+        pathIds: ['old-root', ID2, ID3, ID4],
+        depth: 3,
+        parentId: ID3,
+      };
+
+      // Pass descendants in reverse order — great-grandchild before grandchild
+      expect(() =>
+        service.rebuildDescendantTreeFields(reparented, [
+          greatGrandchild,
+          grandchild,
+        ]),
+      ).toThrow('top-down (ancestor-first) order');
+    });
+  });
 });
