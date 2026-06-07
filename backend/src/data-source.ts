@@ -25,6 +25,7 @@ import { UexPoi } from './modules/uex/entities/uex-poi.entity';
 import { UexSyncState } from './modules/uex-sync/uex-sync-state.entity';
 import { UexSyncConfig } from './modules/uex-sync/uex-sync-config.entity';
 import { OauthClient } from './modules/oauth-clients/oauth-client.entity';
+import { StationCatalogCategory } from './modules/catalog/entities/station-catalog-category.entity';
 
 import { BigBangBaselineMigration1748000000000 } from './migrations/1748000000000-BigBangBaselineMigration';
 import { CatalogEtlSchemaMigration1748000000001 } from './migrations/1748000000001-CatalogEtlSchemaMigration';
@@ -37,6 +38,7 @@ import { AddStepNameToEtlRun1779710000000 } from './migrations/1779710000000-Add
 import { AddUniqueUuidToStationItem1780010901444 } from './migrations/1780010901444-AddUniqueUuidToStationItem';
 import { MakeItemFksDeferrable1780020000000 } from './migrations/1780020000000-MakeItemFksDeferrable';
 import { MigrateTablePksToUuidV71780030000000 } from './migrations/1780030000000-MigrateTablePksToUuidV7';
+import { AddStationCatalogCategory1780040000000 } from './migrations/1780040000000-AddStationCatalogCategory';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -70,6 +72,7 @@ export const AppDataSource = new DataSource({
     UexSyncState,
     UexSyncConfig,
     OauthClient,
+    StationCatalogCategory,
   ],
   migrations: [
     BigBangBaselineMigration1748000000000,
@@ -83,6 +86,7 @@ export const AppDataSource = new DataSource({
     AddUniqueUuidToStationItem1780010901444,
     MakeItemFksDeferrable1780020000000,
     MigrateTablePksToUuidV71780030000000,
+    AddStationCatalogCategory1780040000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },

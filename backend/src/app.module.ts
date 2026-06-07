@@ -29,6 +29,7 @@ import { OrgInventoryModule } from './modules/org-inventory/org-inventory.module
 import { HealthModule } from './health/health.module';
 import { OauthClientsModule } from './modules/oauth-clients/oauth-clients.module';
 import { CatalogEtlModule } from './modules/catalog-etl/catalog-etl.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
 
 const isTest =
   process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
@@ -175,6 +176,7 @@ if (!isTest) {
     HealthModule,
     OauthClientsModule,
     CatalogEtlModule,
+    CatalogModule,
   ],
   controllers: [AppController],
   providers: [
