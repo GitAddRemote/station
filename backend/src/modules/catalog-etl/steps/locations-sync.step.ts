@@ -72,6 +72,8 @@ export class LocationsSyncStep implements EtlStep {
     }
 
     for (const source of SOURCE_CONFIGS) {
+      // Only live rows are eligible for projection; locally-managed rows are
+      // admin-authored and must not be overwritten by ETL (DoD: skip + warn).
       const rows = await this.dataSource.query<SourceRow[]>(
         `
           SELECT
@@ -83,18 +85,36 @@ export class LocationsSyncStep implements EtlStep {
             "is_available_live",
             "is_locally_managed"
           FROM "${source.table}"
-          WHERE "is_available_live" = TRUE OR "is_locally_managed" = TRUE
+          WHERE "is_available_live" = TRUE
         `,
       );
 
       const activeSlugs: string[] = [];
 
       for (const row of rows) {
+        // Locally-managed rows exist in the live set only if someone toggled
+        // is_available_live on an admin row — warn and skip, never overwrite.
+        if (row.is_locally_managed) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `${source.sourceType} source row ${row.id} is locally managed — ETL skipped`,
+              rawPayload: {
+                source_table: source.table,
+                source_type: source.sourceType,
+                source_id: row.id,
+              },
+            }),
+          );
+          continue;
+        }
+
         const slug = buildLocationSlug(source.sourceType, row.id);
 
-        // All fetched rows are in-scope (SQL WHERE pre-filters). Protect each
-        // slug upfront so a bad-name row never triggers stale pruning of the
-        // existing projected record that other rows may FK-reference.
+        // Protect from stale pruning regardless of name validity so a
+        // transient bad-name row doesn't delete an existing projected record.
         activeSlugs.push(slug);
 
         if (!row.name?.trim()) {
@@ -146,7 +166,7 @@ export class LocationsSyncStep implements EtlStep {
               "updated_at" = NOW()
           `,
           [
-            row.is_locally_managed ? systemDataSourceId : uexApiDataSourceId,
+            uexApiDataSourceId,
             source.sourceType,
             row.id,
             slug,
@@ -154,8 +174,8 @@ export class LocationsSyncStep implements EtlStep {
             row.star_system_uex_id ?? null,
             row.planet_uex_id ?? null,
             row.moon_uex_id ?? null,
-            Boolean(row.is_available_live),
-            Boolean(row.is_locally_managed),
+            true,
+            false,
           ],
         );
       }

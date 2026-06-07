@@ -92,7 +92,7 @@ describe('LocationsSyncStep', () => {
     ]);
   });
 
-  it('projects locally managed rows under the system data source', async () => {
+  it('warns and skips locally managed rows without projecting them', async () => {
     const dsQuery = jest.fn().mockImplementation((sql: string) => {
       if (sql.includes('FROM "station_data_source"')) {
         return Promise.resolve([
@@ -109,7 +109,7 @@ describe('LocationsSyncStep', () => {
             star_system_uex_id: 1,
             planet_uex_id: 2,
             moon_uex_id: 3,
-            is_available_live: false,
+            is_available_live: true,
             is_locally_managed: true,
           },
         ]);
@@ -129,14 +129,19 @@ describe('LocationsSyncStep', () => {
     const step = buildStep(dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
+    // No INSERT should have been issued for the locally managed row
     const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
       sql.includes('INSERT INTO "station_location"'),
     );
-    expect(upsertCall[1][0]).toBe('system-id');
-    expect(upsertCall[1][1]).toBe('outpost');
-    expect(upsertCall[1][3]).toBe('outpost-outpost-uuid');
-    expect(upsertCall[1][8]).toBe(false);
-    expect(upsertCall[1][9]).toBe(true);
+    expect(upsertCall).toBeUndefined();
+
+    // A warning must have been emitted
+    expect(repoCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        message: expect.stringContaining('locally managed'),
+      }),
+    );
   });
 
   it('deletes stale projected rows not present in the current source snapshot', async () => {
