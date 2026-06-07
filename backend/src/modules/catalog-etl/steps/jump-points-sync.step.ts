@@ -13,9 +13,6 @@ interface UexJumpPoint {
   id_star_system_destination: number;
   id_orbit_entry: number | null;
   id_orbit_exit: number | null;
-  name: string;
-  size: string | null;
-  is_available_live: number;
   date_added: number;
   date_modified: number;
 }
@@ -27,27 +24,9 @@ function syntheticJpId(sourceUexId: number): string {
   return uuidv5(`synthetic-jp-${sourceUexId}`, SYNTHETIC_JP_NS);
 }
 
-const SIZE_MAP: Record<string, string> = {
-  small: 'S',
-  medium: 'M',
-  large: 'L',
-  'extra-large': 'XL',
-  'xx-large': 'XXL',
-  s: 'S',
-  m: 'M',
-  l: 'L',
-  xl: 'XL',
-  xxl: 'XXL',
-};
-
 function toDate(unixTs: number | null | undefined): Date | null {
   if (!unixTs) return null;
   return new Date(unixTs * 1000);
-}
-
-function mapSize(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  return SIZE_MAP[raw.toLowerCase()] ?? null;
 }
 
 @Injectable()
@@ -84,19 +63,6 @@ export class JumpPointsSyncStep implements EtlStep {
     const knownOrbits = new Set(orbitRows.map((r) => r.uex_id));
 
     for (const record of jumpPoints) {
-      if (!record.name) {
-        await this.warningsRepo.save(
-          this.warningsRepo.create({
-            runId: ctx.runId,
-            stepName: this.name,
-            severity: 'warn',
-            message: 'Jump point missing name',
-            rawPayload: { id: record.id },
-          }),
-        );
-        continue;
-      }
-
       // Both star system FKs are NOT NULL in the schema — skip if either is unknown
       if (!knownStarSystems.has(record.id_star_system_origin)) {
         await this.warningsRepo.save(
@@ -165,36 +131,19 @@ export class JumpPointsSyncStep implements EtlStep {
         continue;
       }
 
-      const size = mapSize(record.size);
-      if (record.size && size === null) {
-        await this.warningsRepo.save(
-          this.warningsRepo.create({
-            runId: ctx.runId,
-            stepName: this.name,
-            severity: 'warn',
-            message: `Jump point ${record.id} has unknown size '${record.size}' — stored as null`,
-            rawPayload: { jp_id: record.id, raw_size: record.size },
-          }),
-        );
-      }
-
       // Upsert the real row — UUIDv7 id (time-ordered, supplied by application)
       await this.dataSource.query(
         `INSERT INTO station_jump_point
            (id, uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
             orbit_origin_uex_id, orbit_dest_uex_id,
-            name, size, is_available_live,
             is_synthetic, source_uex_id,
             uex_date_added, uex_date_modified, synced_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,NULL,$10,$11,NOW())
+         VALUES ($1,$2,$3,$4,$5,$6,FALSE,NULL,$7,$8,NOW())
          ON CONFLICT (uex_id) WHERE is_synthetic = FALSE DO UPDATE SET
            star_system_origin_uex_id=EXCLUDED.star_system_origin_uex_id,
            star_system_dest_uex_id=EXCLUDED.star_system_dest_uex_id,
            orbit_origin_uex_id=EXCLUDED.orbit_origin_uex_id,
            orbit_dest_uex_id=EXCLUDED.orbit_dest_uex_id,
-           name=EXCLUDED.name,
-           size=EXCLUDED.size,
-           is_available_live=EXCLUDED.is_available_live,
            uex_date_added=EXCLUDED.uex_date_added,
            uex_date_modified=EXCLUDED.uex_date_modified,
            synced_at=NOW()`,
@@ -205,9 +154,6 @@ export class JumpPointsSyncStep implements EtlStep {
           record.id_star_system_destination,
           orbitEntryUexId,
           orbitExitUexId,
-          record.name,
-          size,
-          Boolean(record.is_available_live),
           toDate(record.date_added),
           toDate(record.date_modified),
         ],
@@ -219,18 +165,14 @@ export class JumpPointsSyncStep implements EtlStep {
         `INSERT INTO station_jump_point
            (id, uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
             orbit_origin_uex_id, orbit_dest_uex_id,
-            name, size, is_available_live,
             is_synthetic, source_uex_id,
             uex_date_added, uex_date_modified, synced_at)
-         VALUES ($1,NULL,$2,$3,$4,$5,$6,$7,$8,TRUE,$9,$10,$11,NOW())
+         VALUES ($1,NULL,$2,$3,$4,$5,TRUE,$6,$7,$8,NOW())
          ON CONFLICT (source_uex_id) WHERE is_synthetic = TRUE DO UPDATE SET
            star_system_origin_uex_id=EXCLUDED.star_system_origin_uex_id,
            star_system_dest_uex_id=EXCLUDED.star_system_dest_uex_id,
            orbit_origin_uex_id=EXCLUDED.orbit_origin_uex_id,
            orbit_dest_uex_id=EXCLUDED.orbit_dest_uex_id,
-           name=EXCLUDED.name,
-           size=EXCLUDED.size,
-           is_available_live=EXCLUDED.is_available_live,
            uex_date_added=EXCLUDED.uex_date_added,
            uex_date_modified=EXCLUDED.uex_date_modified,
            synced_at=NOW()`,
@@ -241,9 +183,6 @@ export class JumpPointsSyncStep implements EtlStep {
           record.id_star_system_origin,
           orbitExitUexId,
           orbitEntryUexId,
-          record.name,
-          size,
-          Boolean(record.is_available_live),
           record.id,
           toDate(record.date_added),
           toDate(record.date_modified),

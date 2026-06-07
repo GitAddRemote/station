@@ -57,7 +57,6 @@ function makeItem(overrides: Record<string, unknown> = {}) {
 function buildDsQuery(
   knownCompanyIds: number[] = [10],
   knownVehicleIds: number[] = [],
-  knownCategoryAttrIds: number[] = [42],
 ): jest.Mock {
   return jest.fn().mockImplementation((sql: string) => {
     if (sql.includes('SELECT uex_id FROM station_company')) {
@@ -65,11 +64,6 @@ function buildDsQuery(
     }
     if (sql.includes('SELECT uex_id FROM station_vehicle')) {
       return Promise.resolve(knownVehicleIds.map((id) => ({ uex_id: id })));
-    }
-    if (sql.includes('SELECT uex_id FROM station_category_attribute')) {
-      return Promise.resolve(
-        knownCategoryAttrIds.map((id) => ({ uex_id: id })),
-      );
     }
     return Promise.resolve([]);
   });
@@ -309,8 +303,6 @@ describe('ItemsSyncStep', () => {
           return Promise.resolve([{ uex_id: 10 }]);
         if (sql.includes('SELECT uex_id FROM station_vehicle'))
           return Promise.resolve([]);
-        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
-          return Promise.resolve([{ uex_id: 42 }]);
         // uuid lookup — returns the old row
         if (
           sql.includes('FROM station_item') &&
@@ -341,8 +333,6 @@ describe('ItemsSyncStep', () => {
           return Promise.resolve([{ uex_id: 10 }]);
         if (sql.includes('SELECT uex_id FROM station_vehicle'))
           return Promise.resolve([]);
-        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
-          return Promise.resolve([{ uex_id: 42 }]);
         if (
           sql.includes('FROM station_item') &&
           sql.includes('uuid = $1') &&
@@ -373,8 +363,6 @@ describe('ItemsSyncStep', () => {
           return Promise.resolve([{ uex_id: 10 }]);
         if (sql.includes('SELECT uex_id FROM station_vehicle'))
           return Promise.resolve([]);
-        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
-          return Promise.resolve([{ uex_id: 42 }]);
         if (
           sql.includes('FROM station_item') &&
           sql.includes('uuid = $1') &&
@@ -415,8 +403,6 @@ describe('ItemsSyncStep', () => {
           return Promise.resolve([{ uex_id: 10 }]);
         if (sql.includes('SELECT uex_id FROM station_vehicle'))
           return Promise.resolve([]);
-        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
-          return Promise.resolve([{ uex_id: 42 }]);
         if (
           sql.includes('FROM station_item') &&
           sql.includes('uuid = $1') &&
@@ -447,8 +433,6 @@ describe('ItemsSyncStep', () => {
           return Promise.resolve([{ uex_id: 10 }]);
         if (sql.includes('SELECT uex_id FROM station_vehicle'))
           return Promise.resolve([]);
-        if (sql.includes('SELECT uex_id FROM station_category_attribute'))
-          return Promise.resolve([{ uex_id: 42 }]);
         if (
           sql.includes('FROM station_item') &&
           sql.includes('uuid = $1') &&
@@ -630,7 +614,7 @@ describe('ItemsSyncStep', () => {
 
   describe('attributes_summary JSONB', () => {
     it('builds summary keyed by category_attribute_uex_id with attribute value', async () => {
-      const dsQuery = buildDsQuery([10], [], [42, 43]);
+      const dsQuery = buildDsQuery([10]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([
         makeItem({
@@ -650,14 +634,14 @@ describe('ItemsSyncStep', () => {
       expect(summary).toEqual({ '42': '150', '43': '900' });
     });
 
-    it('excludes attributes absent from station_category_attribute from summary', async () => {
-      const dsQuery = buildDsQuery([10], [], [42]); // only 42 is known; 43 is not
+    it('includes all attributes regardless of category_attribute_uex_id value', async () => {
+      const dsQuery = buildDsQuery([10]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([
         makeItem({
           attributes: [
-            makeAttr({ id_category_attribute: 42, value: 'included' }),
-            makeAttr({ id: 102, id_category_attribute: 43, value: 'excluded' }),
+            makeAttr({ id_category_attribute: 42, value: 'first' }),
+            makeAttr({ id: 102, id_category_attribute: 43, value: 'second' }),
           ],
         }),
       ]);
@@ -668,8 +652,7 @@ describe('ItemsSyncStep', () => {
         sql.includes('INSERT INTO station_item'),
       );
       const summary = JSON.parse(itemInsert[1][19] as string);
-      expect(summary).toEqual({ '42': 'included' });
-      expect(summary['43']).toBeUndefined();
+      expect(summary).toEqual({ '42': 'first', '43': 'second' });
     });
 
     it('produces empty object when item has no attributes', async () => {
@@ -776,31 +759,8 @@ describe('ItemsSyncStep', () => {
       );
     });
 
-    it('skips attribute when id_category_attribute is not in station_category_attribute and emits warn', async () => {
-      const dsQuery = buildDsQuery([10], [], []); // no known category attributes
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([
-        makeItem({ attributes: [makeAttr({ id_category_attribute: 42 })] }),
-      ]);
-
-      await step.execute(CTX);
-
-      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_item_attribute'),
-      );
-      expect(attrInsert).toBeUndefined();
-      expect(repoSave).toHaveBeenCalledWith(
-        expect.objectContaining({
-          severity: 'warn',
-          message: expect.stringContaining(
-            'unknown category_attribute uex_id=42',
-          ),
-        }),
-      );
-    });
-
     it('upserts multiple attributes for a single item', async () => {
-      const dsQuery = buildDsQuery([10], [], [42, 43]);
+      const dsQuery = buildDsQuery([10]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([
         makeItem({

@@ -26,6 +26,7 @@ function makePoi(overrides: Record<string, unknown> = {}) {
     id_jurisdiction: null,
     name: 'R&R HUR-L1',
     nickname: null,
+    subtype: null,
     is_available: 1,
     is_available_live: 1,
     is_visible: 1,
@@ -127,7 +128,7 @@ describe('PoisSyncStep', () => {
     const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
-    expect(uexGet).toHaveBeenCalledWith('/pois');
+    expect(uexGet).toHaveBeenCalledWith('/poi');
     const upserts = dsQuery.mock.calls.filter((c) =>
       (c[0] as string).includes('INSERT INTO station_poi'),
     );
@@ -189,9 +190,27 @@ describe('PoisSyncStep', () => {
     expect(p[9]).toBe(7); // jurisdiction_uex_id
     expect(p[10]).toBe('R&R HUR-L1'); // name
     expect(p[11]).toBe('HUR-L1'); // nickname
-    expect(p[12]).toBe(false); // is_available
-    expect(p[34]).toEqual(['S', 'M']); // pad_types
-    expect(p[35]).toEqual(new Date(1600000000 * 1000)); // uex_date_added
+    expect(p[12]).toBeNull(); // subtype
+    expect(p[13]).toBe(false); // is_available
+    expect(p[35]).toEqual(['S', 'M']); // pad_types
+    expect(p[36]).toEqual(new Date(1600000000 * 1000)); // uex_date_added
+  });
+
+  it('stores subtype when present, null when absent', async () => {
+    uexGet.mockResolvedValue([
+      makePoi({ id: 20, subtype: 'rest_stop' }),
+      makePoi({ id: 21, name: 'No Subtype POI', subtype: null }),
+    ]);
+    const dsQuery = buildDsQuery([10], [20], [], [], [], [], []);
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    const upserts = dsQuery.mock.calls.filter((c) =>
+      (c[0] as string).includes('INSERT INTO station_poi'),
+    );
+    expect(upserts).toHaveLength(2);
+    expect(upserts[0][1][12]).toBe('rest_stop'); // subtype at index 12
+    expect(upserts[1][1][12]).toBeNull();
   });
 
   it('warns and skips when POI has no name', async () => {

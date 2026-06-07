@@ -19,6 +19,7 @@ interface UexPoi {
   id_jurisdiction: number | null;
   name: string;
   nickname: string | null;
+  subtype: string | null;
   is_available: number;
   is_available_live: number;
   is_visible: number;
@@ -73,7 +74,7 @@ export class PoisSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    const pois = await this.uexApiClient.get<UexPoi[]>('/pois');
+    const pois = await this.uexApiClient.get<UexPoi[]>('/poi');
     this.logger.info(
       { runId: ctx.runId, count: pois.length },
       'Fetched POIs from UEX',
@@ -310,7 +311,7 @@ export class PoisSyncStep implements EtlStep {
            (uex_id, star_system_uex_id, planet_uex_id, moon_uex_id, orbit_uex_id,
             space_station_uex_id, city_uex_id, outpost_uex_id,
             faction_uex_id, jurisdiction_uex_id,
-            name, nickname,
+            name, nickname, subtype,
             is_available, is_available_live, is_visible, is_default,
             is_monitored, is_armistice, is_landable, is_decommissioned,
             has_quantum_marker, has_trade_terminal, has_habitation, has_refinery,
@@ -319,7 +320,7 @@ export class PoisSyncStep implements EtlStep {
             pad_types,
             uex_date_added, uex_date_modified, synced_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-                 $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,NOW())
+                 $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,NOW())
          ON CONFLICT (uex_id) DO UPDATE SET
            star_system_uex_id=EXCLUDED.star_system_uex_id,
            planet_uex_id=EXCLUDED.planet_uex_id,
@@ -332,6 +333,7 @@ export class PoisSyncStep implements EtlStep {
            jurisdiction_uex_id=EXCLUDED.jurisdiction_uex_id,
            name=EXCLUDED.name,
            nickname=EXCLUDED.nickname,
+           subtype=EXCLUDED.subtype,
            is_available=EXCLUDED.is_available,
            is_available_live=EXCLUDED.is_available_live,
            is_visible=EXCLUDED.is_visible,
@@ -371,6 +373,7 @@ export class PoisSyncStep implements EtlStep {
           jurisdictionUexId,
           record.name,
           record.nickname ?? null,
+          record.subtype ?? null,
           Boolean(record.is_available),
           Boolean(record.is_available_live),
           Boolean(record.is_visible),

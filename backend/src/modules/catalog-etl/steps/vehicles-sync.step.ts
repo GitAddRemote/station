@@ -65,14 +65,13 @@ interface UexVehicle {
   url_brochure: string | null;
   url_hotsite: string | null;
   url_video: string | null;
+  ids_vehicles_loaners?: number[] | string | null;
+  loaners?: Array<
+    number | { id?: number | null; id_vehicle?: number | null }
+  > | null;
   game_version: string | null;
   date_added: number | null;
   date_modified: number | null;
-}
-
-interface UexVehicleLoaner {
-  id_vehicle: number;
-  id_loaner: number;
 }
 
 function toDate(unixTs: number | null | undefined): Date | null {
@@ -92,6 +91,26 @@ function parseCrew(raw: string | null): {
 
 const VALID_PAD_TYPES = new Set(['XS', 'S', 'M', 'L', 'XL']);
 
+function normalizeLoanerIds(record: UexVehicle): number[] {
+  const embedded = record.loaners ?? [];
+  const normalizedEmbedded = embedded
+    .map((loaner) => {
+      if (typeof loaner === 'number') return loaner;
+      return loaner.id ?? loaner.id_vehicle ?? null;
+    })
+    .filter((loanerId): loanerId is number => Number.isInteger(loanerId));
+
+  const raw = record.ids_vehicles_loaners ?? [];
+  const explicitIds: number[] =
+    typeof raw === 'string'
+      ? raw
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => Number.isInteger(n) && n > 0)
+      : (raw as number[]).filter((n) => Number.isInteger(n));
+  return Array.from(new Set([...normalizedEmbedded, ...explicitIds]));
+}
+
 @Injectable()
 export class VehiclesSyncStep implements EtlStep {
   readonly name = 'vehicles-sync';
@@ -106,10 +125,13 @@ export class VehiclesSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    const [vehicles, loaners] = await Promise.all([
-      this.uexApiClient.get<UexVehicle[]>('/vehicles'),
-      this.uexApiClient.get<UexVehicleLoaner[]>('/vehicle_loaners'),
-    ]);
+    const vehicles = await this.uexApiClient.get<UexVehicle[]>('/vehicles');
+    const loaners = vehicles.flatMap((vehicle) =>
+      normalizeLoanerIds(vehicle).map((loanerId) => ({
+        id_vehicle: vehicle.id,
+        id_loaner: loanerId,
+      })),
+    );
 
     this.logger.info(
       { runId: ctx.runId, vehicles: vehicles.length, loaners: loaners.length },

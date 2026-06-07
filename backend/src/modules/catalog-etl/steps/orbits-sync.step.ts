@@ -28,18 +28,6 @@ interface UexOrbit {
   date_modified: number;
 }
 
-interface UexOrbitDistance {
-  id: number;
-  id_star_system_origin: number | null;
-  id_star_system_destination: number | null;
-  id_orbit_origin: number;
-  id_orbit_destination: number;
-  distance_gm: number;
-  game_version: string | null;
-  date_added: number;
-  date_modified: number;
-}
-
 function toDate(unixTs: number | null | undefined): Date | null {
   if (!unixTs) return null;
   return new Date(unixTs * 1000);
@@ -60,7 +48,6 @@ export class OrbitsSyncStep implements EtlStep {
 
   async execute(ctx: EtlStepContext): Promise<void> {
     await this.syncOrbits(ctx);
-    await this.syncOrbitDistances(ctx);
     this.logger.info({ runId: ctx.runId }, 'orbits-sync step complete');
   }
 
@@ -207,113 +194,6 @@ export class OrbitsSyncStep implements EtlStep {
           Boolean(record.is_planet),
           Boolean(record.is_star),
           Boolean(record.is_jump_point),
-          toDate(record.date_added),
-          toDate(record.date_modified),
-        ],
-      );
-    }
-  }
-
-  private async syncOrbitDistances(ctx: EtlStepContext): Promise<void> {
-    const distances =
-      await this.uexApiClient.get<UexOrbitDistance[]>('/orbit_distances');
-    this.logger.info(
-      { runId: ctx.runId, count: distances.length },
-      'Fetched orbit distances from UEX',
-    );
-
-    const orbitRows = await this.dataSource.query<{ uex_id: number }[]>(
-      `SELECT uex_id FROM station_orbit`,
-    );
-    const knownOrbits = new Set(orbitRows.map((r) => r.uex_id));
-
-    const ssRows = await this.dataSource.query<{ uex_id: number }[]>(
-      `SELECT uex_id FROM station_star_system`,
-    );
-    const knownStarSystems = new Set(ssRows.map((r) => r.uex_id));
-
-    for (const record of distances) {
-      if (
-        !knownOrbits.has(record.id_orbit_origin) ||
-        !knownOrbits.has(record.id_orbit_destination)
-      ) {
-        const warning = this.warningsRepo.create({
-          runId: ctx.runId,
-          stepName: this.name,
-          severity: 'warn',
-          message:
-            `Orbit distance ${record.id} references unknown orbit(s) ` +
-            `(origin=${record.id_orbit_origin}, dest=${record.id_orbit_destination}) — skipped`,
-          rawPayload: {
-            id: record.id,
-            id_orbit_origin: record.id_orbit_origin,
-            id_orbit_destination: record.id_orbit_destination,
-          },
-        });
-        await this.warningsRepo.save(warning);
-        continue;
-      }
-
-      let starSystemOriginUexId = record.id_star_system_origin ?? null;
-      if (
-        starSystemOriginUexId !== null &&
-        !knownStarSystems.has(starSystemOriginUexId)
-      ) {
-        const warning = this.warningsRepo.create({
-          runId: ctx.runId,
-          stepName: this.name,
-          severity: 'warn',
-          message: `Orbit distance ${record.id} references unknown origin star system ${starSystemOriginUexId} — stored as null`,
-          rawPayload: {
-            id: record.id,
-            missing_star_system_origin_id: starSystemOriginUexId,
-          },
-        });
-        await this.warningsRepo.save(warning);
-        starSystemOriginUexId = null;
-      }
-
-      let starSystemDestUexId = record.id_star_system_destination ?? null;
-      if (
-        starSystemDestUexId !== null &&
-        !knownStarSystems.has(starSystemDestUexId)
-      ) {
-        const warning = this.warningsRepo.create({
-          runId: ctx.runId,
-          stepName: this.name,
-          severity: 'warn',
-          message: `Orbit distance ${record.id} references unknown destination star system ${starSystemDestUexId} — stored as null`,
-          rawPayload: {
-            id: record.id,
-            missing_star_system_dest_id: starSystemDestUexId,
-          },
-        });
-        await this.warningsRepo.save(warning);
-        starSystemDestUexId = null;
-      }
-
-      await this.dataSource.query(
-        `INSERT INTO station_orbit_distance
-           (uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
-            orbit_origin_uex_id, orbit_dest_uex_id,
-            distance_gm, game_version, uex_date_added, uex_date_modified, synced_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
-         ON CONFLICT (orbit_origin_uex_id, orbit_dest_uex_id) DO UPDATE SET
-           star_system_origin_uex_id=EXCLUDED.star_system_origin_uex_id,
-           star_system_dest_uex_id=EXCLUDED.star_system_dest_uex_id,
-           distance_gm=EXCLUDED.distance_gm,
-           game_version=EXCLUDED.game_version,
-           uex_date_added=EXCLUDED.uex_date_added,
-           uex_date_modified=EXCLUDED.uex_date_modified,
-           synced_at=NOW()`,
-        [
-          record.id,
-          starSystemOriginUexId,
-          starSystemDestUexId,
-          record.id_orbit_origin,
-          record.id_orbit_destination,
-          record.distance_gm,
-          record.game_version ?? null,
           toDate(record.date_added),
           toDate(record.date_modified),
         ],

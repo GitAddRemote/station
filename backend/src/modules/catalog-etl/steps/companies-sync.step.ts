@@ -8,7 +8,6 @@ import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
 
 interface UexCompany {
   id: number;
-  id_faction: number | null;
   name: string;
   nickname: string | null;
   wiki: string | null;
@@ -59,9 +58,9 @@ export class CompaniesSyncStep implements EtlStep {
 
       await this.dataSource.query(
         `INSERT INTO station_company (uex_id, faction_uex_id, name, nickname, wiki, industry, is_item_manufacturer, is_vehicle_manufacturer, uex_date_added, uex_date_modified, synced_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
+         VALUES ($1,NULL,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
          ON CONFLICT (uex_id) DO UPDATE SET
-           faction_uex_id=EXCLUDED.faction_uex_id, name=EXCLUDED.name, nickname=EXCLUDED.nickname,
+           faction_uex_id=NULL, name=EXCLUDED.name, nickname=EXCLUDED.nickname,
            wiki=EXCLUDED.wiki, industry=EXCLUDED.industry,
            is_item_manufacturer=EXCLUDED.is_item_manufacturer,
            is_vehicle_manufacturer=EXCLUDED.is_vehicle_manufacturer,
@@ -69,7 +68,6 @@ export class CompaniesSyncStep implements EtlStep {
            synced_at=NOW()`,
         [
           record.id,
-          record.id_faction ?? null,
           record.name,
           record.nickname ?? null,
           record.wiki ?? null,
