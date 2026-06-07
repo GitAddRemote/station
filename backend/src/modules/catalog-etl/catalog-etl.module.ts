@@ -25,9 +25,13 @@ import { ItemsSyncStep } from './steps/items-sync.step';
 import { CommoditiesSyncStep } from './steps/commodities-sync.step';
 import { CatalogEtlScheduler } from './schedulers/catalog-etl.scheduler';
 import { UexSyncModule } from '../uex-sync/uex-sync.module';
+import { UexCommodityCategoryMap } from '../uex/entities/uex-commodity-category-map.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([EtlRun, EtlWarning]), UexSyncModule],
+  imports: [
+    TypeOrmModule.forFeature([EtlRun, EtlWarning, UexCommodityCategoryMap]),
+    UexSyncModule,
+  ],
   controllers: [CatalogEtlController],
   providers: [
     CatalogEtlService,

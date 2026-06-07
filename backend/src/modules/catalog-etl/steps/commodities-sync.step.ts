@@ -5,6 +5,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
+import { UexCommodityCategoryMap } from '../../uex/entities/uex-commodity-category-map.entity';
 
 interface UexCommodity {
   id: number;
@@ -54,11 +55,20 @@ export class CommoditiesSyncStep implements EtlStep {
     private readonly dataSource: DataSource,
     @InjectRepository(EtlWarning)
     private readonly warningsRepo: Repository<EtlWarning>,
+    @InjectRepository(UexCommodityCategoryMap)
+    private readonly commodityCategoryMapRepo: Repository<UexCommodityCategoryMap>,
     @InjectPinoLogger(CommoditiesSyncStep.name)
     private readonly logger: PinoLogger,
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
+    const commodityCategoryMapRows = await this.commodityCategoryMapRepo.find({
+      select: ['commodityUexId'],
+    });
+    const mappedCommodityUexIds = new Set(
+      commodityCategoryMapRows.map((row) => row.commodityUexId),
+    );
+
     const commodities =
       await this.uexApiClient.get<UexCommodity[]>('/commodities');
 
@@ -88,7 +98,23 @@ export class CommoditiesSyncStep implements EtlStep {
         continue;
       }
 
-      // Column layout (parent_uex_id and slug are NULL literals — no placeholders):
+      if (!mappedCommodityUexIds.has(record.id)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Commodity uex_id=${record.id} has no local catalog category mapping`,
+            rawPayload: {
+              id: record.id,
+              name: record.name,
+              kind: record.kind ?? null,
+            },
+          }),
+        );
+      }
+
+      // Column layout (parent_uex_id is a NULL literal — no placeholder):
       // $1  uex_id        $2  name           $3  code
       // $4  kind          $5  weight_scu     $6  price_buy        $7  price_sell
       // $8  is_available  $9  is_available_live  $10 is_visible   $11 is_extractable

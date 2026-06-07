@@ -1,5 +1,6 @@
 export { BaseUexEntity } from './base-uex.entity';
 export { UexCategory } from './uex-category.entity';
+export { UexCommodityCategoryMap } from './uex-commodity-category-map.entity';
 export { UexCommodity } from './uex-commodity.entity';
 export { UexCompany } from './uex-company.entity';
 export { UexItem } from './uex-item.entity';
