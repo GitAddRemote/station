@@ -334,4 +334,36 @@ describe('CitiesSyncStep', () => {
     expect(upserts).toHaveLength(2);
     expect(upserts[0][1]).toEqual(upserts[1][1]);
   });
+
+  it('warns and skips locally managed rows — does not upsert', async () => {
+    uexGet.mockResolvedValue([makeCity({ id: 42 })]);
+    const dsQuery = jest.fn().mockImplementation((sql: string) => {
+      if (sql.includes('WHERE is_locally_managed = TRUE'))
+        return Promise.resolve([{ uex_id: 42 }]);
+      if (sql.includes('FROM station_star_system'))
+        return Promise.resolve([{ uex_id: 10 }]);
+      if (sql.includes('FROM station_planet'))
+        return Promise.resolve([{ uex_id: 20 }]);
+      if (sql.includes('FROM station_moon')) return Promise.resolve([]);
+      if (sql.includes('FROM station_orbit'))
+        return Promise.resolve([{ uex_id: 100 }]);
+      if (sql.includes('FROM station_faction')) return Promise.resolve([]);
+      if (sql.includes('FROM station_jurisdiction')) return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    expect(repoCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        message: expect.stringContaining('locally managed'),
+      }),
+    );
+    expect(
+      dsQuery.mock.calls.filter((c) =>
+        (c[0] as string).includes('INSERT INTO station_city'),
+      ),
+    ).toHaveLength(0);
+  });
 });

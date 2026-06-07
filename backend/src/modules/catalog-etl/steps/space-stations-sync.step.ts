@@ -88,6 +88,7 @@ export class SpaceStationsSyncStep implements EtlStep {
       cityRows,
       factionRows,
       jurisdictionRows,
+      locallyManagedRows,
     ] = await Promise.all([
       this.dataSource.query<{ uex_id: number }[]>(
         `SELECT uex_id FROM station_star_system`,
@@ -110,6 +111,9 @@ export class SpaceStationsSyncStep implements EtlStep {
       this.dataSource.query<{ uex_id: number }[]>(
         `SELECT uex_id FROM station_jurisdiction`,
       ),
+      this.dataSource.query<{ uex_id: number }[]>(
+        `SELECT uex_id FROM station_space_station WHERE is_locally_managed = TRUE`,
+      ),
     ]);
 
     const knownStarSystems = new Set(starSystemRows.map((r) => r.uex_id));
@@ -119,6 +123,9 @@ export class SpaceStationsSyncStep implements EtlStep {
     const knownCities = new Set(cityRows.map((r) => r.uex_id));
     const knownFactions = new Set(factionRows.map((r) => r.uex_id));
     const knownJurisdictions = new Set(jurisdictionRows.map((r) => r.uex_id));
+    const locallyManagedUexIds = new Set<number>(
+      locallyManagedRows.map((r) => r.uex_id),
+    );
 
     for (const record of stations) {
       if (!record.name) {
@@ -128,6 +135,19 @@ export class SpaceStationsSyncStep implements EtlStep {
             stepName: this.name,
             severity: 'warn',
             message: 'Space station missing name',
+            rawPayload: { id: record.id },
+          }),
+        );
+        continue;
+      }
+
+      if (locallyManagedUexIds.has(record.id)) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Space station uex_id=${record.id} is locally managed — ETL skipped`,
             rawPayload: { id: record.id },
           }),
         );
