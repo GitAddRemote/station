@@ -57,11 +57,13 @@ function buildStep(
   dsQuery: jest.Mock,
   repoCreate: jest.Mock,
   repoSave: jest.Mock,
+  mapFind: jest.Mock,
 ) {
   return new CommoditiesSyncStep(
     { get: uexGet } as never,
     { query: dsQuery } as never,
     { create: repoCreate, save: repoSave } as never,
+    { find: mapFind } as never,
     makeLogger() as never,
   );
 }
@@ -70,11 +72,13 @@ describe('CommoditiesSyncStep', () => {
   let uexGet: jest.Mock;
   let repoCreate: jest.Mock;
   let repoSave: jest.Mock;
+  let mapFind: jest.Mock;
 
   beforeEach(() => {
     uexGet = jest.fn();
     repoCreate = jest.fn().mockImplementation((dto) => dto);
     repoSave = jest.fn().mockResolvedValue({});
+    mapFind = jest.fn().mockResolvedValue([]);
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -82,7 +86,7 @@ describe('CommoditiesSyncStep', () => {
   describe('commodity upsert', () => {
     it('inserts with parent_uex_id=NULL literal in pass 1a', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([makeCommodity()]);
 
       await step.execute(CTX);
@@ -95,7 +99,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('has ON CONFLICT (uex_id) DO UPDATE SET; parent_uex_id not in DO UPDATE', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([makeCommodity()]);
 
       await step.execute(CTX);
@@ -109,7 +113,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('params array has exactly 31 entries matching $1..$31', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([makeCommodity()]);
 
       await step.execute(CTX);
@@ -125,7 +129,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('stores code, kind, price_buy, price_sell and clears slug to null', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([
         makeCommodity({
           code: 'DIAM',
@@ -149,8 +153,8 @@ describe('CommoditiesSyncStep', () => {
 
     it('null kind is stored as null and slug is always cleared', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([makeCommodity({ kind: null })]);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
+      uexGet.mockResolvedValueOnce([makeCommodity({ slug: null, kind: null })]);
 
       await step.execute(CTX);
 
@@ -163,7 +167,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('boolean flags stored as booleans', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([
         makeCommodity({ is_illegal: 1, is_harvestable: 1, is_raw: 1 }),
       ]);
@@ -181,7 +185,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('skips commodity with no name and emits warn', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([makeCommodity({ name: '' })]);
 
       await step.execute(CTX);
@@ -197,7 +201,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('empty commodity list produces no inserts', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([]);
 
       await step.execute(CTX);
@@ -212,7 +216,7 @@ describe('CommoditiesSyncStep', () => {
   describe('parent_uex_id two-pass', () => {
     it('pass 1a inserts with NULL parent_uex_id; pass 1b issues UPDATE to set it', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       // Parent (id=1) and child (id=2, id_parent=1) both in payload
       uexGet.mockResolvedValueOnce([
         makeCommodity({ id: 1 }),
@@ -237,7 +241,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('skips UPDATE and emits warn when id_parent is not in the upserted set', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       // Commodity references parent 999 which is not in the current payload
       uexGet.mockResolvedValueOnce([makeCommodity({ id: 2, id_parent: 999 })]);
 
@@ -259,7 +263,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('no UPDATE issued for commodities without a parent', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([makeCommodity({ id_parent: null })]);
 
       await step.execute(CTX);
@@ -274,7 +278,7 @@ describe('CommoditiesSyncStep', () => {
 
     it('pass 1c clears parent_uex_id for de-parented commodities', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([makeCommodity({ id: 1, id_parent: null })]);
 
       await step.execute(CTX);
@@ -290,7 +294,8 @@ describe('CommoditiesSyncStep', () => {
 
     it('root-level commodities (no id_parent) emit no warning', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      mapFind.mockResolvedValueOnce([{ commodityUexId: 1 }]);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([makeCommodity({ id_parent: null })]);
 
       await step.execute(CTX);
@@ -302,7 +307,7 @@ describe('CommoditiesSyncStep', () => {
   describe('idempotency', () => {
     it('ON CONFLICT (uex_id) DO UPDATE SET present; parent_uex_id not overwritten on conflict', async () => {
       const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
       uexGet.mockResolvedValueOnce([makeCommodity()]);
 
       await step.execute(CTX);
@@ -312,6 +317,68 @@ describe('CommoditiesSyncStep', () => {
       );
       expect(insert[0]).toContain('ON CONFLICT (uex_id) DO UPDATE SET');
       expect(insert[0]).not.toContain('parent_uex_id=EXCLUDED.parent_uex_id');
+    });
+  });
+
+  describe('commodity category mapping coverage', () => {
+    it('does not warn when a commodity has a local category mapping', async () => {
+      const dsQuery = buildDsQuery();
+      mapFind.mockResolvedValueOnce([{ commodityUexId: 1 }]);
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
+      uexGet.mockResolvedValueOnce([makeCommodity()]);
+
+      await step.execute(CTX);
+
+      expect(repoSave).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining(
+            'has no local catalog category mapping',
+          ),
+        }),
+      );
+    });
+
+    it('warns when a commodity is missing from the local category map', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
+      uexGet.mockResolvedValueOnce([
+        makeCommodity({ id: 42, name: 'Unmapped' }),
+      ]);
+
+      await step.execute(CTX);
+
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: 'Commodity uex_id=42 has no local catalog category mapping',
+          rawPayload: expect.objectContaining({
+            id: 42,
+            name: 'Unmapped',
+          }),
+        }),
+      );
+    });
+
+    it('warns for every commodity when the local category map is empty', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
+      uexGet.mockResolvedValueOnce([
+        makeCommodity({ id: 1, name: 'Agricium' }),
+        makeCommodity({ id: 2, name: 'Agricium (Ore)' }),
+      ]);
+
+      await step.execute(CTX);
+
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Commodity uex_id=1 has no local catalog category mapping',
+        }),
+      );
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Commodity uex_id=2 has no local catalog category mapping',
+        }),
+      );
     });
   });
 });
