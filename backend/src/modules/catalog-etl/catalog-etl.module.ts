@@ -23,6 +23,7 @@ import { TerminalDistancesSyncStep } from './steps/terminal-distances-sync.step'
 import { VehiclesSyncStep } from './steps/vehicles-sync.step';
 import { ItemsSyncStep } from './steps/items-sync.step';
 import { CommoditiesSyncStep } from './steps/commodities-sync.step';
+import { LocationsSyncStep } from './steps/locations-sync.step';
 import { CatalogEtlScheduler } from './schedulers/catalog-etl.scheduler';
 import { UexSyncModule } from '../uex-sync/uex-sync.module';
 import { UexCommodityCategoryMap } from '../uex/entities/uex-commodity-category-map.entity';
@@ -55,6 +56,7 @@ import { UexCommodityCategoryMap } from '../uex/entities/uex-commodity-category-
     VehiclesSyncStep,
     ItemsSyncStep,
     CommoditiesSyncStep,
+    LocationsSyncStep,
   ],
   exports: [CatalogEtlService],
 })
