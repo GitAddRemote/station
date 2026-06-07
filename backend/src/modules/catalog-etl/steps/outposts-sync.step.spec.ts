@@ -310,11 +310,108 @@ describe('OutpostsSyncStep', () => {
     expect(upserts[0][1]).toEqual(upserts[1][1]);
   });
 
-  it('warns and skips locally managed rows — does not upsert', async () => {
-    uexGet.mockResolvedValue([makeOutpost({ id: 42 })]);
+  it('skips locally managed rows silently when upstream data matches', async () => {
+    const outpost = makeOutpost({ id: 42 });
+    uexGet.mockResolvedValue([outpost]);
+    const storedRow = {
+      uex_id: 42,
+      star_system_uex_id: outpost.id_star_system,
+      planet_uex_id: outpost.id_planet,
+      moon_uex_id: outpost.id_moon,
+      orbit_uex_id: outpost.id_orbit,
+      faction_uex_id: outpost.id_faction,
+      jurisdiction_uex_id: outpost.id_jurisdiction,
+      name: outpost.name,
+      is_available: Boolean(outpost.is_available),
+      is_available_live: Boolean(outpost.is_available_live),
+      is_visible: Boolean(outpost.is_visible),
+      is_default: Boolean(outpost.is_default),
+      is_monitored: Boolean(outpost.is_monitored),
+      is_armistice: Boolean(outpost.is_armistice),
+      is_landable: Boolean(outpost.is_landable),
+      is_decommissioned: Boolean(outpost.is_decommissioned),
+      has_quantum_marker: Boolean(outpost.has_quantum_marker),
+      has_trade_terminal: Boolean(outpost.has_trade_terminal),
+      has_habitation: Boolean(outpost.has_habitation),
+      has_refinery: Boolean(outpost.has_refinery),
+      has_cargo_center: Boolean(outpost.has_cargo_center),
+      has_clinic: Boolean(outpost.has_clinic),
+      has_food: Boolean(outpost.has_food),
+      has_shops: Boolean(outpost.has_shops),
+      has_refuel: Boolean(outpost.has_refuel),
+      has_repair: Boolean(outpost.has_repair),
+      has_gravity: Boolean(outpost.has_gravity),
+      has_loading_dock: Boolean(outpost.has_loading_dock),
+      has_docking_port: Boolean(outpost.has_docking_port),
+      has_freight_elevator: Boolean(outpost.has_freight_elevator),
+    };
     const dsQuery = jest.fn().mockImplementation((sql: string) => {
       if (sql.includes('WHERE is_locally_managed = TRUE'))
-        return Promise.resolve([{ uex_id: 42 }]);
+        return Promise.resolve([storedRow]);
+      if (sql.includes('FROM station_star_system'))
+        return Promise.resolve([{ uex_id: 10 }]);
+      if (sql.includes('FROM station_planet'))
+        return Promise.resolve([{ uex_id: 20 }]);
+      if (sql.includes('FROM station_moon')) return Promise.resolve([]);
+      if (sql.includes('FROM station_orbit'))
+        return Promise.resolve([{ uex_id: 100 }]);
+      if (sql.includes('FROM station_faction')) return Promise.resolve([]);
+      if (sql.includes('FROM station_jurisdiction')) return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    expect(repoCreate).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('locally managed'),
+      }),
+    );
+    expect(
+      dsQuery.mock.calls.filter((c) =>
+        (c[0] as string).includes('INSERT INTO station_outpost'),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('warns when locally managed row has upstream drift — does not upsert', async () => {
+    const outpost = makeOutpost({ id: 42, is_decommissioned: 1 });
+    uexGet.mockResolvedValue([outpost]);
+    const storedRow = {
+      uex_id: 42,
+      star_system_uex_id: outpost.id_star_system,
+      planet_uex_id: outpost.id_planet,
+      moon_uex_id: outpost.id_moon,
+      orbit_uex_id: outpost.id_orbit,
+      faction_uex_id: outpost.id_faction,
+      jurisdiction_uex_id: outpost.id_jurisdiction,
+      name: outpost.name,
+      is_available: Boolean(outpost.is_available),
+      is_available_live: Boolean(outpost.is_available_live),
+      is_visible: Boolean(outpost.is_visible),
+      is_default: Boolean(outpost.is_default),
+      is_monitored: Boolean(outpost.is_monitored),
+      is_armistice: Boolean(outpost.is_armistice),
+      is_landable: Boolean(outpost.is_landable),
+      is_decommissioned: false, // stored=false, upstream=true → drift
+      has_quantum_marker: Boolean(outpost.has_quantum_marker),
+      has_trade_terminal: Boolean(outpost.has_trade_terminal),
+      has_habitation: Boolean(outpost.has_habitation),
+      has_refinery: Boolean(outpost.has_refinery),
+      has_cargo_center: Boolean(outpost.has_cargo_center),
+      has_clinic: Boolean(outpost.has_clinic),
+      has_food: Boolean(outpost.has_food),
+      has_shops: Boolean(outpost.has_shops),
+      has_refuel: Boolean(outpost.has_refuel),
+      has_repair: Boolean(outpost.has_repair),
+      has_gravity: Boolean(outpost.has_gravity),
+      has_loading_dock: Boolean(outpost.has_loading_dock),
+      has_docking_port: Boolean(outpost.has_docking_port),
+      has_freight_elevator: Boolean(outpost.has_freight_elevator),
+    };
+    const dsQuery = jest.fn().mockImplementation((sql: string) => {
+      if (sql.includes('WHERE is_locally_managed = TRUE'))
+        return Promise.resolve([storedRow]);
       if (sql.includes('FROM station_star_system'))
         return Promise.resolve([{ uex_id: 10 }]);
       if (sql.includes('FROM station_planet'))
@@ -332,7 +429,10 @@ describe('OutpostsSyncStep', () => {
     expect(repoCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         severity: 'warn',
-        message: expect.stringContaining('locally managed'),
+        message: expect.stringContaining('drifted'),
+        rawPayload: expect.objectContaining({
+          drifted_fields: expect.arrayContaining(['is_decommissioned']),
+        }),
       }),
     );
     expect(

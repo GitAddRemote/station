@@ -43,6 +43,39 @@ interface UexOutpost {
   date_modified: number;
 }
 
+interface StoredOutpost {
+  uex_id: number;
+  star_system_uex_id: number | null;
+  planet_uex_id: number | null;
+  moon_uex_id: number | null;
+  orbit_uex_id: number | null;
+  faction_uex_id: number | null;
+  jurisdiction_uex_id: number | null;
+  name: string;
+  is_available: boolean;
+  is_available_live: boolean;
+  is_visible: boolean;
+  is_default: boolean;
+  is_monitored: boolean;
+  is_armistice: boolean;
+  is_landable: boolean;
+  is_decommissioned: boolean;
+  has_quantum_marker: boolean;
+  has_trade_terminal: boolean;
+  has_habitation: boolean;
+  has_refinery: boolean;
+  has_cargo_center: boolean;
+  has_clinic: boolean;
+  has_food: boolean;
+  has_shops: boolean;
+  has_refuel: boolean;
+  has_repair: boolean;
+  has_gravity: boolean;
+  has_loading_dock: boolean;
+  has_docking_port: boolean;
+  has_freight_elevator: boolean;
+}
+
 function toDate(unixTs: number | null | undefined): Date | null {
   if (!unixTs) return null;
   return new Date(unixTs * 1000);
@@ -103,8 +136,15 @@ export class OutpostsSyncStep implements EtlStep {
       this.dataSource.query<{ uex_id: number }[]>(
         `SELECT uex_id FROM station_jurisdiction`,
       ),
-      this.dataSource.query<{ uex_id: number }[]>(
-        `SELECT uex_id FROM station_outpost WHERE is_locally_managed = TRUE`,
+      this.dataSource.query<StoredOutpost[]>(
+        `SELECT uex_id, star_system_uex_id, planet_uex_id, moon_uex_id, orbit_uex_id,
+                faction_uex_id, jurisdiction_uex_id, name,
+                is_available, is_available_live, is_visible, is_default,
+                is_monitored, is_armistice, is_landable, is_decommissioned,
+                has_quantum_marker, has_trade_terminal, has_habitation, has_refinery,
+                has_cargo_center, has_clinic, has_food, has_shops, has_refuel, has_repair,
+                has_gravity, has_loading_dock, has_docking_port, has_freight_elevator
+         FROM station_outpost WHERE is_locally_managed = TRUE`,
       ),
     ]);
 
@@ -114,8 +154,8 @@ export class OutpostsSyncStep implements EtlStep {
     const knownOrbits = new Set(orbitRows.map((r) => r.uex_id));
     const knownFactions = new Set(factionRows.map((r) => r.uex_id));
     const knownJurisdictions = new Set(jurisdictionRows.map((r) => r.uex_id));
-    const locallyManagedUexIds = new Set<number>(
-      locallyManagedRows.map((r) => r.uex_id),
+    const locallyManagedByUexId = new Map<number, StoredOutpost>(
+      locallyManagedRows.map((r) => [r.uex_id, r]),
     );
 
     for (const record of outposts) {
@@ -132,16 +172,94 @@ export class OutpostsSyncStep implements EtlStep {
         continue;
       }
 
-      if (locallyManagedUexIds.has(record.id)) {
-        await this.warningsRepo.save(
-          this.warningsRepo.create({
-            runId: ctx.runId,
-            stepName: this.name,
-            severity: 'warn',
-            message: `Outpost uex_id=${record.id} is locally managed — ETL skipped`,
-            rawPayload: { id: record.id },
-          }),
-        );
+      const storedOutpost = locallyManagedByUexId.get(record.id);
+      if (storedOutpost !== undefined) {
+        const drifted: string[] = [];
+        if (
+          (record.id_star_system ?? null) !== storedOutpost.star_system_uex_id
+        )
+          drifted.push('id_star_system');
+        if ((record.id_planet ?? null) !== storedOutpost.planet_uex_id)
+          drifted.push('id_planet');
+        if ((record.id_moon ?? null) !== storedOutpost.moon_uex_id)
+          drifted.push('id_moon');
+        if ((record.id_orbit ?? null) !== storedOutpost.orbit_uex_id)
+          drifted.push('id_orbit');
+        if ((record.id_faction ?? null) !== storedOutpost.faction_uex_id)
+          drifted.push('id_faction');
+        if (
+          (record.id_jurisdiction ?? null) !== storedOutpost.jurisdiction_uex_id
+        )
+          drifted.push('id_jurisdiction');
+        if (record.name !== storedOutpost.name) drifted.push('name');
+        if (Boolean(record.is_available) !== storedOutpost.is_available)
+          drifted.push('is_available');
+        if (
+          Boolean(record.is_available_live) !== storedOutpost.is_available_live
+        )
+          drifted.push('is_available_live');
+        if (Boolean(record.is_visible) !== storedOutpost.is_visible)
+          drifted.push('is_visible');
+        if (Boolean(record.is_default) !== storedOutpost.is_default)
+          drifted.push('is_default');
+        if (Boolean(record.is_monitored) !== storedOutpost.is_monitored)
+          drifted.push('is_monitored');
+        if (Boolean(record.is_armistice) !== storedOutpost.is_armistice)
+          drifted.push('is_armistice');
+        if (Boolean(record.is_landable) !== storedOutpost.is_landable)
+          drifted.push('is_landable');
+        if (
+          Boolean(record.is_decommissioned) !== storedOutpost.is_decommissioned
+        )
+          drifted.push('is_decommissioned');
+        if (
+          Boolean(record.has_quantum_marker) !==
+          storedOutpost.has_quantum_marker
+        )
+          drifted.push('has_quantum_marker');
+        if (
+          Boolean(record.has_trade_terminal) !==
+          storedOutpost.has_trade_terminal
+        )
+          drifted.push('has_trade_terminal');
+        if (Boolean(record.has_habitation) !== storedOutpost.has_habitation)
+          drifted.push('has_habitation');
+        if (Boolean(record.has_refinery) !== storedOutpost.has_refinery)
+          drifted.push('has_refinery');
+        if (Boolean(record.has_cargo_center) !== storedOutpost.has_cargo_center)
+          drifted.push('has_cargo_center');
+        if (Boolean(record.has_clinic) !== storedOutpost.has_clinic)
+          drifted.push('has_clinic');
+        if (Boolean(record.has_food) !== storedOutpost.has_food)
+          drifted.push('has_food');
+        if (Boolean(record.has_shops) !== storedOutpost.has_shops)
+          drifted.push('has_shops');
+        if (Boolean(record.has_refuel) !== storedOutpost.has_refuel)
+          drifted.push('has_refuel');
+        if (Boolean(record.has_repair) !== storedOutpost.has_repair)
+          drifted.push('has_repair');
+        if (Boolean(record.has_gravity) !== storedOutpost.has_gravity)
+          drifted.push('has_gravity');
+        if (Boolean(record.has_loading_dock) !== storedOutpost.has_loading_dock)
+          drifted.push('has_loading_dock');
+        if (Boolean(record.has_docking_port) !== storedOutpost.has_docking_port)
+          drifted.push('has_docking_port');
+        if (
+          Boolean(record.has_freight_elevator) !==
+          storedOutpost.has_freight_elevator
+        )
+          drifted.push('has_freight_elevator');
+        if (drifted.length > 0) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Outpost uex_id=${record.id} is locally managed but upstream data has drifted — ETL skipped`,
+              rawPayload: { id: record.id, drifted_fields: drifted },
+            }),
+          );
+        }
         continue;
       }
 
