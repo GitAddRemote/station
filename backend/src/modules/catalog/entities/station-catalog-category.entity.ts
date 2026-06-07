@@ -23,7 +23,7 @@ export class StationCatalogCategory {
 
   @ManyToOne(() => StationCatalogCategory, (category) => category.children, {
     nullable: true,
-    onDelete: 'SET NULL',
+    onDelete: 'RESTRICT',
   })
   @JoinColumn({ name: 'parent_id' })
   parent?: StationCatalogCategory | null;

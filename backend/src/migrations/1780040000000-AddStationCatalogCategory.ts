@@ -349,7 +349,7 @@ export class AddStationCatalogCategory1780040000000
         CONSTRAINT "fk_station_catalog_category_parent_id"
           FOREIGN KEY ("parent_id")
           REFERENCES "station_catalog_category"("id")
-          ON DELETE SET NULL
+          ON DELETE RESTRICT
       )
     `);
     await queryRunner.query(`
