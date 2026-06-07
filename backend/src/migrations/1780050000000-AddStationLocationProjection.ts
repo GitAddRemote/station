@@ -132,7 +132,7 @@ export class AddStationLocationProjection1780050000000
           "updated_at"
         )
         VALUES (
-          $1,$2,'system',$3,'unknown','Unknown',NULL,NULL,NULL,FALSE,TRUE,NOW(),NOW()
+          $1,$2,'system',$3,'unknown','Unknown',NULL,NULL,NULL,TRUE,TRUE,NOW(),NOW()
         )
       `,
       [unknownLocationId, systemDataSourceId, unknownSourceId],

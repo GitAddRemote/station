@@ -37,7 +37,7 @@ export class StationLocation {
   dataSource!: StationDataSource;
 
   @Column({ name: 'source_type', type: 'varchar', length: 20 })
-  sourceType!: string;
+  sourceType!: 'city' | 'space_station' | 'outpost' | 'poi' | 'system';
 
   @Column({ name: 'source_id', type: 'uuid' })
   sourceId!: string;

@@ -83,12 +83,20 @@ export class LocationsSyncStep implements EtlStep {
             "is_available_live",
             "is_locally_managed"
           FROM "${source.table}"
+          WHERE "is_available_live" = TRUE OR "is_locally_managed" = TRUE
         `,
       );
 
       const activeSlugs: string[] = [];
 
       for (const row of rows) {
+        const slug = buildLocationSlug(source.sourceType, row.id);
+
+        // All fetched rows are in-scope (SQL WHERE pre-filters). Protect each
+        // slug upfront so a bad-name row never triggers stale pruning of the
+        // existing projected record that other rows may FK-reference.
+        activeSlugs.push(slug);
+
         if (!row.name?.trim()) {
           await this.warningsRepo.save(
             this.warningsRepo.create({
@@ -105,13 +113,6 @@ export class LocationsSyncStep implements EtlStep {
           );
           continue;
         }
-
-        if (!row.is_available_live && !row.is_locally_managed) {
-          continue;
-        }
-
-        const slug = buildLocationSlug(source.sourceType, row.id);
-        activeSlugs.push(slug);
 
         await this.dataSource.query(
           `

@@ -184,6 +184,64 @@ describe('LocationsSyncStep', () => {
     expect(deleteCall[1]).toEqual(['poi', ['poi-poi-uuid']]);
   });
 
+  it('protects existing projected row from stale deletion when source row has a missing name', async () => {
+    const dsQuery = jest.fn().mockImplementation((sql: string) => {
+      if (sql.includes('FROM "station_data_source"')) {
+        return Promise.resolve([
+          { id: 'system-id', code: 'system' },
+          { id: 'uex-api-id', code: 'uex-api' },
+        ]);
+      }
+
+      if (sql.includes('FROM "station_city"')) {
+        return Promise.resolve([
+          {
+            id: 'city-uuid',
+            name: '',
+            star_system_uex_id: 1,
+            planet_uex_id: null,
+            moon_uex_id: null,
+            is_available_live: true,
+            is_locally_managed: false,
+          },
+        ]);
+      }
+
+      if (
+        sql.includes('FROM "station_space_station"') ||
+        sql.includes('FROM "station_outpost"') ||
+        sql.includes('FROM "station_poi"')
+      ) {
+        return Promise.resolve([]);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    const step = buildStep(dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    // Slug must appear in activeSlugs so the DELETE excludes it
+    const deleteCall = dsQuery.mock.calls.find(
+      ([sql, params]: [string, unknown[]]) =>
+        sql.includes('DELETE FROM "station_location"') && params[0] === 'city',
+    );
+    expect(deleteCall).toBeDefined();
+    // activeSlugs includes 'city-city-uuid', so the NOT IN prune form is used
+    expect(deleteCall[1]).toEqual(['city', ['city-city-uuid']]);
+
+    // No upsert was issued (name was blank)
+    const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+      sql.includes('INSERT INTO "station_location"'),
+    );
+    expect(upsertCall).toBeUndefined();
+
+    // Warning was emitted
+    expect(repoCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'warn' }),
+    );
+  });
+
   it('fails fast when required station_data_source seed rows are missing', async () => {
     const dsQuery = jest
       .fn()
