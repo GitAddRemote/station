@@ -24,13 +24,24 @@ import { VehiclesSyncStep } from './steps/vehicles-sync.step';
 import { ItemsSyncStep } from './steps/items-sync.step';
 import { CommoditiesSyncStep } from './steps/commodities-sync.step';
 import { LocationsSyncStep } from './steps/locations-sync.step';
+import { VehiclesCatalogSyncStep } from './steps/vehicles-catalog-sync.step';
+import { CommoditiesCatalogSyncStep } from './steps/commodities-catalog-sync.step';
+import { ItemsCatalogSyncStep } from './steps/items-catalog-sync.step';
 import { CatalogEtlScheduler } from './schedulers/catalog-etl.scheduler';
 import { UexSyncModule } from '../uex-sync/uex-sync.module';
 import { UexCommodityCategoryMap } from '../uex/entities/uex-commodity-category-map.entity';
+import { StationCatalogEntry } from '../catalog/entities/station-catalog-entry.entity';
+import { StationUexCategoryMap } from '../catalog/entities/station-uex-category-map.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([EtlRun, EtlWarning, UexCommodityCategoryMap]),
+    TypeOrmModule.forFeature([
+      EtlRun,
+      EtlWarning,
+      UexCommodityCategoryMap,
+      StationCatalogEntry,
+      StationUexCategoryMap,
+    ]),
     UexSyncModule,
   ],
   controllers: [CatalogEtlController],
@@ -57,6 +68,9 @@ import { UexCommodityCategoryMap } from '../uex/entities/uex-commodity-category-
     ItemsSyncStep,
     CommoditiesSyncStep,
     LocationsSyncStep,
+    VehiclesCatalogSyncStep,
+    CommoditiesCatalogSyncStep,
+    ItemsCatalogSyncStep,
   ],
   exports: [CatalogEtlService],
 })
