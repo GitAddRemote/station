@@ -10,7 +10,6 @@ interface UexCommodity {
   id: number;
   name: string;
   code: string;
-  slug: string | null;
   kind: string | null;
   id_parent: number | null;
   weight_scu: number | null;
@@ -91,14 +90,13 @@ export class CommoditiesSyncStep implements EtlStep {
 
       // Column layout (parent_uex_id is a NULL literal — no placeholder):
       // $1  uex_id        $2  name           $3  code
-      // $4  slug          $5  kind           $6  weight_scu
-      // $7  price_buy     $8  price_sell
-      // $9  is_available  $10 is_available_live  $11 is_visible   $12 is_extractable
-      // $13 is_mineral    $14 is_raw         $15 is_pure          $16 is_refined
-      // $17 is_refinable  $18 is_harvestable $19 is_buyable       $20 is_sellable
-      // $21 is_temporary  $22 is_illegal     $23 is_volatile_qt   $24 is_volatile_time
-      // $25 is_inert      $26 is_explosive   $27 is_buggy         $28 is_fuel
-      // $29 wiki          $30 uex_date_added $31 uex_date_modified
+      // $4  kind          $5  weight_scu     $6  price_buy        $7  price_sell
+      // $8  is_available  $9  is_available_live  $10 is_visible   $11 is_extractable
+      // $12 is_mineral    $13 is_raw             $14 is_pure      $15 is_refined
+      // $16 is_refinable  $17 is_harvestable     $18 is_buyable   $19 is_sellable
+      // $20 is_temporary  $21 is_illegal         $22 is_volatile_qt   $23 is_volatile_time
+      // $24 is_inert      $25 is_explosive       $26 is_buggy         $27 is_fuel
+      // $28 wiki          $29 uex_date_added     $30 uex_date_modified
       // synced_at = NOW() literal
       await this.dataSource.query(
         `INSERT INTO station_commodity (
@@ -114,19 +112,19 @@ export class CommoditiesSyncStep implements EtlStep {
          )
          VALUES (
            $1,NULL,
-           $2,$3,$4,$5,$6,
-           $7,$8,
-           $9,$10,$11,$12,
-           $13,$14,$15,$16,$17,
-           $18,$19,$20,$21,
-           $22,$23,$24,
-           $25,$26,$27,$28,
-           $29,$30,$31,NOW()
+           $2,$3,NULL,$4,$5,
+           $6,$7,
+           $8,$9,$10,$11,
+           $12,$13,$14,$15,$16,
+           $17,$18,$19,$20,
+           $21,$22,$23,
+           $24,$25,$26,$27,
+           $28,$29,$30,NOW()
          )
          ON CONFLICT (uex_id) DO UPDATE SET
            name=EXCLUDED.name,
            code=EXCLUDED.code,
-           slug=EXCLUDED.slug,
+           slug=NULL,
            kind=EXCLUDED.kind,
            weight_scu=EXCLUDED.weight_scu,
            price_buy=EXCLUDED.price_buy,
@@ -160,34 +158,33 @@ export class CommoditiesSyncStep implements EtlStep {
           // parent_uex_id = NULL literal (set in pass 1b)
           record.name, // $2  name
           record.code, // $3  code
-          record.slug ?? null, // $4  slug
-          record.kind ?? null, // $5  kind
-          record.weight_scu ?? null, // $6  weight_scu
-          record.price_buy ?? null, // $7  price_buy
-          record.price_sell ?? null, // $8  price_sell
-          Boolean(record.is_available), // $9
-          Boolean(record.is_available_live), // $10
-          Boolean(record.is_visible), // $11
-          Boolean(record.is_extractable), // $12
-          Boolean(record.is_mineral), // $13
-          Boolean(record.is_raw), // $14
-          Boolean(record.is_pure), // $15
-          Boolean(record.is_refined), // $16
-          Boolean(record.is_refinable), // $17
-          Boolean(record.is_harvestable), // $18
-          Boolean(record.is_buyable), // $19
-          Boolean(record.is_sellable), // $20
-          Boolean(record.is_temporary), // $21
-          Boolean(record.is_illegal), // $22
-          Boolean(record.is_volatile_qt), // $23
-          Boolean(record.is_volatile_time), // $24
-          Boolean(record.is_inert), // $25
-          Boolean(record.is_explosive), // $26
-          Boolean(record.is_buggy), // $27
-          Boolean(record.is_fuel), // $28
-          record.wiki ?? null, // $29 wiki
-          toDate(record.date_added), // $30 uex_date_added
-          toDate(record.date_modified), // $31 uex_date_modified
+          record.kind ?? null, // $4  kind
+          record.weight_scu ?? null, // $5  weight_scu
+          record.price_buy ?? null, // $6  price_buy
+          record.price_sell ?? null, // $7  price_sell
+          Boolean(record.is_available), // $8
+          Boolean(record.is_available_live), // $9
+          Boolean(record.is_visible), // $10
+          Boolean(record.is_extractable), // $11
+          Boolean(record.is_mineral), // $12
+          Boolean(record.is_raw), // $13
+          Boolean(record.is_pure), // $14
+          Boolean(record.is_refined), // $15
+          Boolean(record.is_refinable), // $16
+          Boolean(record.is_harvestable), // $17
+          Boolean(record.is_buyable), // $18
+          Boolean(record.is_sellable), // $19
+          Boolean(record.is_temporary), // $20
+          Boolean(record.is_illegal), // $21
+          Boolean(record.is_volatile_qt), // $22
+          Boolean(record.is_volatile_time), // $23
+          Boolean(record.is_inert), // $24
+          Boolean(record.is_explosive), // $25
+          Boolean(record.is_buggy), // $26
+          Boolean(record.is_fuel), // $27
+          record.wiki ?? null, // $28 wiki
+          toDate(record.date_added), // $29 uex_date_added
+          toDate(record.date_modified), // $30 uex_date_modified
           // synced_at = NOW() literal
         ],
       );

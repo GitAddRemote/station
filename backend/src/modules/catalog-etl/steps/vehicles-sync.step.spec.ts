@@ -71,15 +71,13 @@ function makeVehicle(overrides: Record<string, unknown> = {}) {
     url_brochure: null,
     url_hotsite: null,
     url_video: null,
+    ids_vehicles_loaners: null,
+    loaners: null,
     game_version: '3.22',
     date_added: 1700000000,
     date_modified: 1710000000,
     ...overrides,
   };
-}
-
-function makeLoaner(overrides: Record<string, unknown> = {}) {
-  return { id_vehicle: 1, id_loaner: 2, ...overrides };
 }
 
 // By default returns known company uex_id=10 (matches makeVehicle default id_company).
@@ -128,9 +126,7 @@ describe('VehiclesSyncStep', () => {
     it('parses single-value crew "1" → min=1 max=1', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ crew: '1' })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ crew: '1' })]);
 
       await step.execute(CTX);
 
@@ -145,9 +141,7 @@ describe('VehiclesSyncStep', () => {
     it('parses range crew "1-4" → min=1 max=4', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ crew: '1-4' })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ crew: '1-4' })]);
 
       await step.execute(CTX);
 
@@ -162,9 +156,7 @@ describe('VehiclesSyncStep', () => {
     it('crew "N/A" → min=null max=null, crew_raw preserved', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ crew: 'N/A' })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ crew: 'N/A' })]);
 
       await step.execute(CTX);
 
@@ -179,9 +171,7 @@ describe('VehiclesSyncStep', () => {
     it('null crew → all three columns null', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ crew: null })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ crew: null })]);
 
       await step.execute(CTX);
 
@@ -198,9 +188,7 @@ describe('VehiclesSyncStep', () => {
     it('stores uuid field as $2 (uuid column, index [1])', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ uuid: 'abc-def-123' })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ uuid: 'abc-def-123' })]);
 
       await step.execute(CTX);
 
@@ -213,9 +201,7 @@ describe('VehiclesSyncStep', () => {
     it('null uuid stored as null', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ uuid: null })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ uuid: null })]);
 
       await step.execute(CTX);
 
@@ -230,9 +216,7 @@ describe('VehiclesSyncStep', () => {
     it('stores known id_company as company_uex_id ($3, index [2])', async () => {
       const dsQuery = buildDsQuery([42]);
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ id_company: 42 })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ id_company: 42 })]);
 
       await step.execute(CTX);
 
@@ -245,9 +229,7 @@ describe('VehiclesSyncStep', () => {
     it('null id_company stored as null', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ id_company: null })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ id_company: null })]);
 
       await step.execute(CTX);
 
@@ -260,9 +242,7 @@ describe('VehiclesSyncStep', () => {
     it('unknown id_company coerced to null and emits warn', async () => {
       const dsQuery = buildDsQuery([]); // no known companies
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ id_company: 99 })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ id_company: 99 })]);
 
       await step.execute(CTX);
 
@@ -286,9 +266,7 @@ describe('VehiclesSyncStep', () => {
     it('stores valid pad_type uppercased', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ pad_type: 'xl' })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ pad_type: 'xl' })]);
 
       await step.execute(CTX);
 
@@ -301,9 +279,7 @@ describe('VehiclesSyncStep', () => {
     it('invalid pad_type stored as null', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ pad_type: 'GIANT' })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ pad_type: 'GIANT' })]);
 
       await step.execute(CTX);
 
@@ -319,12 +295,10 @@ describe('VehiclesSyncStep', () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       // Both parent (id=1) and child (id=2) are in the payload
-      uexGet
-        .mockResolvedValueOnce([
-          makeVehicle({ id: 1 }),
-          makeVehicle({ id: 2, name: 'Child Ship', id_parent: 1 }),
-        ])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ id: 1 }),
+        makeVehicle({ id: 2, name: 'Child Ship', id_parent: 1 }),
+      ]);
 
       await step.execute(CTX);
 
@@ -347,9 +321,7 @@ describe('VehiclesSyncStep', () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       // Vehicle 2 references parent 999 which is not in the current payload
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ id: 2, id_parent: 999 })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ id: 2, id_parent: 999 })]);
 
       await step.execute(CTX);
 
@@ -367,9 +339,7 @@ describe('VehiclesSyncStep', () => {
     it('no UPDATE issued for vehicles without a parent', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ id: 1, id_parent: null })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ id: 1, id_parent: null })]);
 
       await step.execute(CTX);
 
@@ -385,9 +355,7 @@ describe('VehiclesSyncStep', () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       // Vehicle has no id_parent — pass 1c should null it out
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ id: 1, id_parent: null })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ id: 1, id_parent: null })]);
 
       await step.execute(CTX);
 
@@ -405,12 +373,10 @@ describe('VehiclesSyncStep', () => {
     it('upserts valid loaners when both sides were upserted in this run', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([
-          makeVehicle({ id: 1 }),
-          makeVehicle({ id: 2, name: 'Titan 2' }),
-        ])
-        .mockResolvedValueOnce([makeLoaner({ id_vehicle: 1, id_loaner: 2 })]);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ id: 1, loaners: [2] }),
+        makeVehicle({ id: 2, name: 'Titan 2' }),
+      ]);
 
       await step.execute(CTX);
 
@@ -424,13 +390,10 @@ describe('VehiclesSyncStep', () => {
     it('deletes stale loaner rows for ALL upserted vehicles (not just loaner origins) before re-inserting', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([
-          makeVehicle({ id: 1 }),
-          makeVehicle({ id: 2, name: 'Titan 2' }),
-        ])
-        // Only vehicle 1 appears as loaner origin; vehicle 2 has no loaners
-        .mockResolvedValueOnce([makeLoaner({ id_vehicle: 1, id_loaner: 2 })]);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ id: 1, loaners: [2] }),
+        makeVehicle({ id: 2, name: 'Titan 2' }),
+      ]);
 
       await step.execute(CTX);
 
@@ -457,9 +420,7 @@ describe('VehiclesSyncStep', () => {
     it('DELETE fires for all upserted vehicles even when loaner payload is empty', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ id: 1 })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ id: 1 })]);
 
       await step.execute(CTX);
 
@@ -474,9 +435,7 @@ describe('VehiclesSyncStep', () => {
     it('skips loaner when one side is absent from the known Set and emits warn', async () => {
       const dsQuery = buildDsQuery(); // uex_id 999 not known
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ id: 1 })])
-        .mockResolvedValueOnce([makeLoaner({ id_vehicle: 1, id_loaner: 999 })]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ id: 1, loaners: [999] })]);
 
       await step.execute(CTX);
 
@@ -492,12 +451,10 @@ describe('VehiclesSyncStep', () => {
     it('vehicle upserts → DELETE stale → INSERT loaners, in order', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([
-          makeVehicle({ id: 1 }),
-          makeVehicle({ id: 2, name: 'Titan 2' }),
-        ])
-        .mockResolvedValueOnce([makeLoaner({ id_vehicle: 1, id_loaner: 2 })]);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ id: 1, loaners: [2] }),
+        makeVehicle({ id: 2, name: 'Titan 2' }),
+      ]);
 
       await step.execute(CTX);
 
@@ -519,7 +476,7 @@ describe('VehiclesSyncStep', () => {
     it('no loaners → no loaner inserts, but DELETE still fires to clear stale rows', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([makeVehicle()]).mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle()]);
 
       await step.execute(CTX);
 
@@ -539,9 +496,7 @@ describe('VehiclesSyncStep', () => {
     it('skips vehicle with no name and emits warn', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([makeVehicle({ name: '' })])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle({ name: '' })]);
 
       await step.execute(CTX);
 
@@ -557,7 +512,7 @@ describe('VehiclesSyncStep', () => {
     it('empty vehicle list produces no inserts', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([]);
 
       await step.execute(CTX);
 
@@ -570,7 +525,7 @@ describe('VehiclesSyncStep', () => {
     it('ON CONFLICT (uex_id) DO UPDATE SET present; parent_uex_id not overwritten on conflict', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([makeVehicle()]).mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([makeVehicle()]);
 
       await step.execute(CTX);
 
@@ -587,11 +542,9 @@ describe('VehiclesSyncStep', () => {
     it('params array has exactly 62 entries matching $1..$62 placeholders', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet
-        .mockResolvedValueOnce([
-          makeVehicle({ date_added: 1700000000, date_modified: 1710000000 }),
-        ])
-        .mockResolvedValueOnce([]);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ date_added: 1700000000, date_modified: 1710000000 }),
+      ]);
 
       await step.execute(CTX);
 

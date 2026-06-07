@@ -16,7 +16,6 @@ function makeCommodity(overrides: Record<string, unknown> = {}) {
     id: 1,
     name: 'Agricium',
     code: 'AGRI',
-    slug: 'agricium',
     kind: 'Metal',
     id_parent: null,
     weight_scu: 1,
@@ -118,19 +117,18 @@ describe('CommoditiesSyncStep', () => {
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      expect(insert[1]).toHaveLength(31);
-      expect(insert[1][29]).toBeInstanceOf(Date); // $30 uex_date_added
-      expect(insert[1][30]).toBeInstanceOf(Date); // $31 uex_date_modified
-      expect(insert[0]).toMatch(/\$31,NOW\(\)/);
+      expect(insert[1]).toHaveLength(30);
+      expect(insert[1][28]).toBeInstanceOf(Date); // $29 uex_date_added
+      expect(insert[1][29]).toBeInstanceOf(Date); // $30 uex_date_modified
+      expect(insert[0]).toMatch(/\$30,NOW\(\)/);
     });
 
-    it('stores code, slug, kind, price_buy, price_sell correctly', async () => {
+    it('stores code, kind, price_buy, price_sell and clears slug to null', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValueOnce([
         makeCommodity({
           code: 'DIAM',
-          slug: 'diamond',
           kind: 'Gem',
           price_buy: 9999.5,
           price_sell: 10500.25,
@@ -143,24 +141,24 @@ describe('CommoditiesSyncStep', () => {
         sql.includes('INSERT INTO station_commodity'),
       );
       expect(insert[1][2]).toBe('DIAM'); // $3 code
-      expect(insert[1][3]).toBe('diamond'); // $4 slug
-      expect(insert[1][4]).toBe('Gem'); // $5 kind
-      expect(insert[1][6]).toBe(9999.5); // $7 price_buy
-      expect(insert[1][7]).toBe(10500.25); // $8 price_sell
+      expect(insert[1][3]).toBe('Gem'); // $4 kind
+      expect(insert[1][5]).toBe(9999.5); // $6 price_buy
+      expect(insert[1][6]).toBe(10500.25); // $7 price_sell
+      expect(insert[0]).toContain('$2,$3,NULL,$4,$5');
     });
 
-    it('null slug and kind stored as null', async () => {
+    it('null kind is stored as null and slug is always cleared', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValueOnce([makeCommodity({ slug: null, kind: null })]);
+      uexGet.mockResolvedValueOnce([makeCommodity({ kind: null })]);
 
       await step.execute(CTX);
 
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      expect(insert[1][3]).toBeNull(); // $4 slug
-      expect(insert[1][4]).toBeNull(); // $5 kind
+      expect(insert[1][3]).toBeNull(); // $4 kind
+      expect(insert[0]).toContain('slug=NULL');
     });
 
     it('boolean flags stored as booleans', async () => {
@@ -175,10 +173,10 @@ describe('CommoditiesSyncStep', () => {
       const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_commodity'),
       );
-      // is_raw=$14 (index 13), is_harvestable=$18 (index 17), is_illegal=$22 (index 21)
-      expect(insert[1][13]).toBe(true); // is_raw
-      expect(insert[1][17]).toBe(true); // is_harvestable
-      expect(insert[1][21]).toBe(true); // is_illegal
+      // is_raw=$13 (index 12), is_harvestable=$17 (index 16), is_illegal=$21 (index 20)
+      expect(insert[1][12]).toBe(true); // is_raw
+      expect(insert[1][16]).toBe(true); // is_harvestable
+      expect(insert[1][20]).toBe(true); // is_illegal
     });
 
     it('skips commodity with no name and emits warn', async () => {

@@ -73,7 +73,7 @@ export class PoisSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    const pois = await this.uexApiClient.get<UexPoi[]>('/pois');
+    const pois = await this.uexApiClient.get<UexPoi[]>('/poi');
     this.logger.info(
       { runId: ctx.runId, count: pois.length },
       'Fetched POIs from UEX',

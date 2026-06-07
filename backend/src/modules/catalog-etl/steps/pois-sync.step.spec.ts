@@ -127,7 +127,7 @@ describe('PoisSyncStep', () => {
     const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
-    expect(uexGet).toHaveBeenCalledWith('/pois');
+    expect(uexGet).toHaveBeenCalledWith('/poi');
     const upserts = dsQuery.mock.calls.filter((c) =>
       (c[0] as string).includes('INSERT INTO station_poi'),
     );

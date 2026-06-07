@@ -15,7 +15,6 @@ function makeLogger() {
 function makeCompany(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
-    id_faction: 5,
     name: 'Roberts Space Industries',
     nickname: 'RSI',
     wiki: 'https://wiki.example.com/rsi',
@@ -75,16 +74,16 @@ describe('CompaniesSyncStep', () => {
       expect(dsQuery.mock.calls[0][1][0]).toBe(1);
     });
 
-    it('handles null faction correctly (no faction affiliation)', async () => {
-      const companies = [makeCompany({ id: 1, id_faction: null })];
+    it('stores null faction_uex_id because the live API no longer provides company faction ids', async () => {
+      const companies = [makeCompany({ id: 1 })];
       uexGet.mockResolvedValue(companies);
 
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       await step.execute({ runId: RUN_ID });
 
       expect(dsQuery).toHaveBeenCalledTimes(1);
-      // faction_uex_id param (index 1) should be null
-      expect(dsQuery.mock.calls[0][1][1]).toBeNull();
+      expect(dsQuery.mock.calls[0][0]).toContain('VALUES ($1,NULL,$2');
+      expect(dsQuery.mock.calls[0][0]).toContain('faction_uex_id=NULL');
     });
   });
 

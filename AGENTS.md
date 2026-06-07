@@ -56,7 +56,9 @@
 
 ## Commit Workflow
 
-- Never commit code directly. Provide git commands only, formatted for terminal execution with `-m` per line, blank lines via `-m ""`, and conventional first-line type (feat/fix/docs/test/refactor/perf/chore). Group related changes with bullet points; no attribution or AI notices. User executes commands manually.
+- Create a dedicated feature branch for each issue.
+- Stage, commit, and push changes directly when the scoped work is complete.
+- Open a properly documented pull request with a conventional first-line commit type (`feat/fix/docs/test/refactor/perf/chore`), grouped bullet points in the body where useful, and no attribution or AI notices.
 
 ## Common Gotchas
 
