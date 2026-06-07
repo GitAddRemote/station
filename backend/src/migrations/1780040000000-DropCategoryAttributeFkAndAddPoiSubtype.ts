@@ -30,15 +30,19 @@ export class DropCategoryAttributeFkAndAddPoiSubtype1780040000000
       `ALTER TABLE "station_poi" DROP COLUMN IF EXISTS "subtype"`,
     );
 
+    // Intentionally NOT restoring the FK to station_category_attribute.
+    // Once this migration has run and items-sync has ingested live data, any
+    // station_item_attribute rows will contain raw UEX category_attribute_uex_id
+    // values that have no matching rows in station_category_attribute (which is
+    // never populated after the /categories attributes[] field was removed).
+    // Re-adding the FK would fail immediately due to those orphaned IDs.
+    // The column is restored to NOT NULL only; the FK is permanently dropped.
     await queryRunner.query(
-      `ALTER TABLE "station_item_attribute"
-       ALTER COLUMN "category_attribute_uex_id" SET NOT NULL`,
+      `UPDATE "station_item_attribute" SET "category_attribute_uex_id" = 0 WHERE "category_attribute_uex_id" IS NULL`,
     );
     await queryRunner.query(
       `ALTER TABLE "station_item_attribute"
-       ADD CONSTRAINT "station_item_attribute_category_attribute_uex_id_fkey"
-       FOREIGN KEY ("category_attribute_uex_id")
-       REFERENCES "station_category_attribute" ("uex_id") ON DELETE CASCADE`,
+       ALTER COLUMN "category_attribute_uex_id" SET NOT NULL`,
     );
   }
 }
