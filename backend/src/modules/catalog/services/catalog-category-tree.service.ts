@@ -52,6 +52,16 @@ export class CatalogCategoryTreeService {
     if (!slug?.trim()) {
       throw new Error('Category slug is required to build tree fields');
     }
+    if (slug !== slug.trim()) {
+      throw new Error(
+        `Category slug "${slug}" must not have leading or trailing whitespace`,
+      );
+    }
+    if (slug.includes('.')) {
+      throw new Error(
+        `Category slug "${slug}" must not contain "." (used as path separator)`,
+      );
+    }
   }
 
   private assertValidParent(parent: CatalogCategoryTreeNodeRef): void {
