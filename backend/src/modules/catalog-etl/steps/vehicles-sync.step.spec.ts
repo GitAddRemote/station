@@ -490,6 +490,81 @@ describe('VehiclesSyncStep', () => {
       );
       expect(deleteCall).toBeDefined();
     });
+
+    it('ids_vehicles_loaners as number array resolves loaner relationships', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ id: 1, ids_vehicles_loaners: [2], loaners: null }),
+        makeVehicle({ id: 2, name: 'Loaner Ship' }),
+      ]);
+
+      await step.execute(CTX);
+
+      const loanerInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle_loaner'),
+      );
+      expect(loanerInsert).toBeDefined();
+      expect(loanerInsert[1]).toEqual([1, 2]);
+    });
+
+    it('ids_vehicles_loaners as CSV string resolves loaner relationships', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ id: 1, ids_vehicles_loaners: '2,3', loaners: null }),
+        makeVehicle({ id: 2, name: 'Loaner A' }),
+        makeVehicle({ id: 3, name: 'Loaner B' }),
+      ]);
+
+      await step.execute(CTX);
+
+      const loanerInserts = dsQuery.mock.calls.filter(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle_loaner'),
+      );
+      const insertedPairs = loanerInserts.map(
+        ([, params]: [string, number[]]) => params,
+      );
+      expect(insertedPairs).toContainEqual([1, 2]);
+      expect(insertedPairs).toContainEqual([1, 3]);
+    });
+
+    it('ids_vehicles_loaners CSV with invalid entries ignores non-positive values', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({
+          id: 1,
+          ids_vehicles_loaners: '2, -1, abc, 0',
+          loaners: null,
+        }),
+        makeVehicle({ id: 2, name: 'Loaner A' }),
+      ]);
+
+      await step.execute(CTX);
+
+      const loanerInserts = dsQuery.mock.calls.filter(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle_loaner'),
+      );
+      expect(loanerInserts).toHaveLength(1);
+      expect(loanerInserts[0][1]).toEqual([1, 2]);
+    });
+
+    it('deduplicates loaners when ids_vehicles_loaners and loaners field overlap', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ id: 1, ids_vehicles_loaners: [2], loaners: [2] }),
+        makeVehicle({ id: 2, name: 'Loaner Ship' }),
+      ]);
+
+      await step.execute(CTX);
+
+      const loanerInserts = dsQuery.mock.calls.filter(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle_loaner'),
+      );
+      expect(loanerInserts).toHaveLength(1);
+    });
   });
 
   describe('edge cases', () => {

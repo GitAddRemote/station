@@ -88,7 +88,7 @@ export class CommoditiesSyncStep implements EtlStep {
         continue;
       }
 
-      // Column layout (parent_uex_id is a NULL literal — no placeholder):
+      // Column layout (parent_uex_id and slug are NULL literals — no placeholders):
       // $1  uex_id        $2  name           $3  code
       // $4  kind          $5  weight_scu     $6  price_buy        $7  price_sell
       // $8  is_available  $9  is_available_live  $10 is_visible   $11 is_extractable

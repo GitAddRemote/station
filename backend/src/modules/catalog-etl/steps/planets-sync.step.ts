@@ -9,7 +9,6 @@ import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
 interface UexPlanet {
   id: number;
   id_star_system: number | null;
-  id_orbit: number | null;
   id_faction: number | null;
   id_jurisdiction: number | null;
   name: string;
@@ -19,7 +18,6 @@ interface UexPlanet {
   is_available_live: number;
   is_visible: number;
   is_default: number;
-  is_lagrange: number;
   date_added: number;
   date_modified: number;
 }
@@ -53,11 +51,6 @@ export class PlanetsSyncStep implements EtlStep {
       `SELECT uex_id FROM station_star_system`,
     );
     const knownStarSystems = new Set(starSystemRows.map((r) => r.uex_id));
-
-    const orbitRows = await this.dataSource.query<{ uex_id: number }[]>(
-      `SELECT uex_id FROM station_orbit`,
-    );
-    const knownOrbits = new Set(orbitRows.map((r) => r.uex_id));
 
     const factionRows = await this.dataSource.query<{ uex_id: number }[]>(
       `SELECT uex_id FROM station_faction`,
@@ -102,20 +95,6 @@ export class PlanetsSyncStep implements EtlStep {
         continue;
       }
 
-      let orbitUexId = record.id_orbit ?? null;
-      if (orbitUexId !== null && !knownOrbits.has(orbitUexId)) {
-        await this.warningsRepo.save(
-          this.warningsRepo.create({
-            runId: ctx.runId,
-            stepName: this.name,
-            severity: 'warn',
-            message: `Planet ${record.id} references unknown orbit ${orbitUexId} — stored as null`,
-            rawPayload: { planet_id: record.id, missing_orbit_id: orbitUexId },
-          }),
-        );
-        orbitUexId = null;
-      }
-
       let factionUexId = record.id_faction ?? null;
       if (factionUexId !== null && !knownFactions.has(factionUexId)) {
         await this.warningsRepo.save(
@@ -155,14 +134,13 @@ export class PlanetsSyncStep implements EtlStep {
 
       await this.dataSource.query(
         `INSERT INTO station_planet
-           (uex_id, star_system_uex_id, orbit_uex_id, faction_uex_id, jurisdiction_uex_id,
+           (uex_id, star_system_uex_id, faction_uex_id, jurisdiction_uex_id,
             name, name_origin, code,
-            is_available, is_available_live, is_visible, is_default, is_lagrange,
+            is_available, is_available_live, is_visible, is_default,
             uex_date_added, uex_date_modified, synced_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
          ON CONFLICT (uex_id) DO UPDATE SET
            star_system_uex_id=EXCLUDED.star_system_uex_id,
-           orbit_uex_id=EXCLUDED.orbit_uex_id,
            faction_uex_id=EXCLUDED.faction_uex_id,
            jurisdiction_uex_id=EXCLUDED.jurisdiction_uex_id,
            name=EXCLUDED.name,
@@ -172,14 +150,12 @@ export class PlanetsSyncStep implements EtlStep {
            is_available_live=EXCLUDED.is_available_live,
            is_visible=EXCLUDED.is_visible,
            is_default=EXCLUDED.is_default,
-           is_lagrange=EXCLUDED.is_lagrange,
            uex_date_added=EXCLUDED.uex_date_added,
            uex_date_modified=EXCLUDED.uex_date_modified,
            synced_at=NOW()`,
         [
           record.id,
           record.id_star_system,
-          orbitUexId,
           factionUexId,
           jurisdictionUexId,
           record.name,
@@ -189,7 +165,6 @@ export class PlanetsSyncStep implements EtlStep {
           Boolean(record.is_available_live),
           Boolean(record.is_visible),
           Boolean(record.is_default),
-          Boolean(record.is_lagrange),
           toDate(record.date_added),
           toDate(record.date_modified),
         ],

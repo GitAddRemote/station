@@ -22,19 +22,6 @@ function makeCategory(overrides: Record<string, unknown> = {}) {
     is_mining: 0,
     date_added: 1700000000,
     date_modified: 1710000000,
-    attributes: [],
-    ...overrides,
-  };
-}
-
-function makeAttribute(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 10,
-    name: 'damage',
-    description: 'Damage per shot',
-    is_lower_better: 0,
-    date_added: 1700000000,
-    date_modified: 1710000000,
     ...overrides,
   };
 }
@@ -287,100 +274,6 @@ describe('CategoriesSyncStep', () => {
           !sql.includes('RETURNING id'),
       );
       expect(leafInsert).toBeDefined();
-    });
-  });
-
-  describe('attribute upsert', () => {
-    it('upserts attributes keyed by uex_id with category_uex_id set', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([
-        makeCategory({
-          id: 3,
-          attributes: [
-            makeAttribute({ id: 10 }),
-            makeAttribute({ id: 11, name: 'range' }),
-          ],
-        }),
-      ]);
-
-      await step.execute(CTX);
-
-      const attrInserts = dsQuery.mock.calls.filter(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_category_attribute'),
-      );
-      expect(attrInserts).toHaveLength(2);
-      expect(attrInserts[0][1][0]).toBe(10); // uex_id = $1
-      expect(attrInserts[0][1][1]).toBe(3); // category_uex_id = $2
-      expect(attrInserts[1][1][0]).toBe(11);
-    });
-
-    it('upserts attributes ON CONFLICT (uex_id)', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([
-        makeCategory({ attributes: [makeAttribute()] }),
-      ]);
-
-      await step.execute(CTX);
-
-      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_category_attribute'),
-      );
-      expect(attrInsert[0]).toContain('ON CONFLICT (uex_id)');
-    });
-
-    it('maps is_lower_better as boolean', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([
-        makeCategory({ attributes: [makeAttribute({ is_lower_better: 1 })] }),
-      ]);
-
-      await step.execute(CTX);
-
-      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_category_attribute'),
-      );
-      expect(attrInsert[1][4]).toBe(true); // is_lower_better = $5
-    });
-
-    it('stores null for is_lower_better when not provided', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([
-        makeCategory({
-          attributes: [makeAttribute({ is_lower_better: null })],
-        }),
-      ]);
-
-      await step.execute(CTX);
-
-      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_category_attribute'),
-      );
-      expect(attrInsert[1][4]).toBeNull();
-    });
-
-    it('skips attribute with missing name and emits warning', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([
-        makeCategory({ attributes: [makeAttribute({ name: '' })] }),
-      ]);
-
-      await step.execute(CTX);
-
-      expect(repoSave).toHaveBeenCalledWith(
-        expect.objectContaining({
-          severity: 'warn',
-          message: expect.stringContaining('attribute'),
-        }),
-      );
-      const attrInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_category_attribute'),
-      );
-      expect(attrInsert).toBeUndefined();
     });
   });
 

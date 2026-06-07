@@ -6,15 +6,6 @@ import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
 
-interface UexCategoryAttribute {
-  id: number;
-  name: string;
-  description: string | null;
-  is_lower_better: number | null;
-  date_added: number | null;
-  date_modified: number | null;
-}
-
 interface UexCategory {
   id: number;
   name: string;
@@ -25,7 +16,6 @@ interface UexCategory {
   is_mining: number;
   date_added: number | null;
   date_modified: number | null;
-  attributes?: UexCategoryAttribute[];
 }
 
 function toDate(unixTs: number | null | undefined): Date | null {
@@ -165,48 +155,6 @@ export class CategoriesSyncStep implements EtlStep {
         ],
       );
       upserted++;
-
-      // Step 3 — upsert attributes for this category
-      for (const attr of record.attributes ?? []) {
-        if (!attr.name) {
-          await this.warningsRepo.save(
-            this.warningsRepo.create({
-              runId: ctx.runId,
-              stepName: this.name,
-              severity: 'warn',
-              message: `Category ${record.id} attribute ${attr.id} missing name — skipped`,
-              rawPayload: { category_id: record.id, attribute_id: attr.id },
-            }),
-          );
-          continue;
-        }
-
-        await this.dataSource.query(
-          `INSERT INTO station_category_attribute
-             (uex_id, category_uex_id, name, description, is_lower_better,
-              uex_date_added, uex_date_modified, synced_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
-           ON CONFLICT (uex_id) DO UPDATE SET
-             category_uex_id=EXCLUDED.category_uex_id,
-             name=EXCLUDED.name,
-             description=EXCLUDED.description,
-             is_lower_better=EXCLUDED.is_lower_better,
-             uex_date_added=EXCLUDED.uex_date_added,
-             uex_date_modified=EXCLUDED.uex_date_modified,
-             synced_at=NOW()`,
-          [
-            attr.id,
-            record.id,
-            attr.name,
-            attr.description ?? null,
-            attr.is_lower_better !== null && attr.is_lower_better !== undefined
-              ? Boolean(attr.is_lower_better)
-              : null,
-            toDate(attr.date_added),
-            toDate(attr.date_modified),
-          ],
-        );
-      }
     }
 
     this.logger.info(

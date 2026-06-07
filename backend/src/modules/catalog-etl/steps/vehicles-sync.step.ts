@@ -65,7 +65,7 @@ interface UexVehicle {
   url_brochure: string | null;
   url_hotsite: string | null;
   url_video: string | null;
-  ids_vehicles_loaners?: number[] | null;
+  ids_vehicles_loaners?: number[] | string | null;
   loaners?: Array<
     number | { id?: number | null; id_vehicle?: number | null }
   > | null;
@@ -100,7 +100,14 @@ function normalizeLoanerIds(record: UexVehicle): number[] {
     })
     .filter((loanerId): loanerId is number => Number.isInteger(loanerId));
 
-  const explicitIds = record.ids_vehicles_loaners ?? [];
+  const raw = record.ids_vehicles_loaners ?? [];
+  const explicitIds: number[] =
+    typeof raw === 'string'
+      ? raw
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => Number.isInteger(n) && n > 0)
+      : (raw as number[]).filter((n) => Number.isInteger(n));
   return Array.from(new Set([...normalizedEmbedded, ...explicitIds]));
 }
 
