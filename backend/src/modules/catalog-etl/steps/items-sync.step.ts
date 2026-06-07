@@ -50,13 +50,11 @@ function toDate(unixTs: number | null | undefined): Date | null {
 
 function buildAttributesSummary(
   attributes: UexItemAttribute[] | undefined,
-  knownCategoryAttributeUexIds: Set<number>,
 ): Record<string, string | null> {
   if (!attributes?.length) return {};
   const summary: Record<string, string | null> = {};
   for (const attr of attributes) {
     if (!attr.id_category_attribute) continue;
-    if (!knownCategoryAttributeUexIds.has(attr.id_category_attribute)) continue;
     summary[String(attr.id_category_attribute)] = attr.value ?? null;
   }
   return summary;
@@ -83,17 +81,15 @@ export class ItemsSyncStep implements EtlStep {
       'Fetched items from UEX',
     );
 
-    // Preload valid FK sets to guard company_uex_id, vehicle_uex_id, and
-    // category_attribute_uex_id before any writes.
-    const [companyRows, vehicleRows, categoryAttrRows] = await Promise.all([
+    // Preload valid FK sets to guard company_uex_id and vehicle_uex_id before any writes.
+    // station_category_attribute is no longer populated (UEX /categories dropped attributes[])
+    // so category_attribute_uex_id is stored as a raw denormalized ID without FK validation.
+    const [companyRows, vehicleRows] = await Promise.all([
       this.dataSource.query<{ uex_id: number }[]>(
         `SELECT uex_id FROM station_company`,
       ),
       this.dataSource.query<{ uex_id: number }[]>(
         `SELECT uex_id FROM station_vehicle`,
-      ),
-      this.dataSource.query<{ uex_id: number }[]>(
-        `SELECT uex_id FROM station_category_attribute`,
       ),
     ]);
     const knownCompanyUexIds = new Set<number>(
@@ -101,9 +97,6 @@ export class ItemsSyncStep implements EtlStep {
     );
     const knownVehicleUexIds = new Set<number>(
       vehicleRows.map((r) => r.uex_id),
-    );
-    const knownCategoryAttributeUexIds = new Set<number>(
-      categoryAttrRows.map((r) => r.uex_id),
     );
 
     // Pass 1a — for each item, upsert the item row and reconcile its attributes
@@ -139,10 +132,7 @@ export class ItemsSyncStep implements EtlStep {
         continue;
       }
 
-      const attributesSummary = buildAttributesSummary(
-        record.attributes,
-        knownCategoryAttributeUexIds,
-      );
+      const attributesSummary = buildAttributesSummary(record.attributes);
 
       let companyUexId: number | null = record.id_company ?? null;
       if (companyUexId !== null && !knownCompanyUexIds.has(companyUexId)) {
@@ -182,24 +172,6 @@ export class ItemsSyncStep implements EtlStep {
               severity: 'warn',
               message: `Item attribute uex_id=${attr.id} has no category_attribute_uex_id — skipped`,
               rawPayload: { item_id: record.id, attr_id: attr.id },
-            }),
-          );
-          attrSkipped++;
-          continue;
-        }
-
-        if (!knownCategoryAttributeUexIds.has(attr.id_category_attribute)) {
-          await this.warningsRepo.save(
-            this.warningsRepo.create({
-              runId: ctx.runId,
-              stepName: this.name,
-              severity: 'warn',
-              message: `Item attribute uex_id=${attr.id} references unknown category_attribute uex_id=${attr.id_category_attribute} — skipped`,
-              rawPayload: {
-                item_id: record.id,
-                attr_id: attr.id,
-                id_category_attribute: attr.id_category_attribute,
-              },
             }),
           );
           attrSkipped++;
