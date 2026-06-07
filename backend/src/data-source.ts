@@ -31,6 +31,8 @@ import { UexCommodityCategoryMap } from './modules/uex/entities/uex-commodity-ca
 import { StationDataSource } from './modules/locations/entities/station-data-source.entity';
 import { StationLocation } from './modules/locations/entities/station-location.entity';
 import { StationCatalogEntry } from './modules/catalog/entities/station-catalog-entry.entity';
+import { StationUnitOfMeasure } from './modules/inventory/entities/station-unit-of-measure.entity';
+import { StationInventoryItem } from './modules/inventory/entities/station-inventory-item.entity';
 
 import { BigBangBaselineMigration1748000000000 } from './migrations/1748000000000-BigBangBaselineMigration';
 import { CatalogEtlSchemaMigration1748000000001 } from './migrations/1748000000001-CatalogEtlSchemaMigration';
@@ -47,6 +49,7 @@ import { AddStationCatalogCategory1780040000000 } from './migrations/17800400000
 import { AddStationLocationProjection1780050000000 } from './migrations/1780050000000-AddStationLocationProjection';
 import { AddCatalogCategoryMaps1780060000000 } from './migrations/1780060000000-AddCatalogCategoryMaps';
 import { AddStationCatalogEntry1780070000000 } from './migrations/1780070000000-AddStationCatalogEntry';
+import { AddInventoryTables1780080000000 } from './migrations/1780080000000-AddInventoryTables';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -86,6 +89,8 @@ export const AppDataSource = new DataSource({
     StationDataSource,
     StationLocation,
     StationCatalogEntry,
+    StationUnitOfMeasure,
+    StationInventoryItem,
   ],
   migrations: [
     BigBangBaselineMigration1748000000000,
@@ -103,6 +108,7 @@ export const AppDataSource = new DataSource({
     AddStationLocationProjection1780050000000,
     AddCatalogCategoryMaps1780060000000,
     AddStationCatalogEntry1780070000000,
+    AddInventoryTables1780080000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },
