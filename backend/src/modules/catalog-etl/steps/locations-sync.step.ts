@@ -72,8 +72,6 @@ export class LocationsSyncStep implements EtlStep {
     }
 
     for (const source of SOURCE_CONFIGS) {
-      // Only live rows are eligible for projection; locally-managed rows are
-      // admin-authored and must not be overwritten by ETL (DoD: skip + warn).
       const rows = await this.dataSource.query<SourceRow[]>(
         `
           SELECT
@@ -89,33 +87,22 @@ export class LocationsSyncStep implements EtlStep {
         `,
       );
 
-      const activeSlugs: string[] = [];
+      // Two separate slug sets — pruning is scoped per data source so UEX-API
+      // rows and system rows don't collide with each other during prune.
+      const uexActiveSlugs: string[] = [];
+      const systemActiveSlugs: string[] = [];
 
       for (const row of rows) {
-        // Locally-managed rows exist in the live set only if someone toggled
-        // is_available_live on an admin row — warn and skip, never overwrite.
-        if (row.is_locally_managed) {
-          await this.warningsRepo.save(
-            this.warningsRepo.create({
-              runId: ctx.runId,
-              stepName: this.name,
-              severity: 'warn',
-              message: `${source.sourceType} source row ${row.id} is locally managed — ETL skipped`,
-              rawPayload: {
-                source_table: source.table,
-                source_type: source.sourceType,
-                source_id: row.id,
-              },
-            }),
-          );
-          continue;
-        }
-
         const slug = buildLocationSlug(source.sourceType, row.id);
 
-        // Protect from stale pruning regardless of name validity so a
-        // transient bad-name row doesn't delete an existing projected record.
-        activeSlugs.push(slug);
+        // Track slug in the appropriate prune set before any name/validity check
+        // so a transient bad-name row doesn't cause an existing projection to be
+        // pruned as stale.
+        if (row.is_locally_managed) {
+          systemActiveSlugs.push(slug);
+        } else {
+          uexActiveSlugs.push(slug);
+        }
 
         if (!row.name?.trim()) {
           await this.warningsRepo.save(
@@ -133,6 +120,12 @@ export class LocationsSyncStep implements EtlStep {
           );
           continue;
         }
+
+        // Locally-managed rows are admin-authored; project them under the system
+        // data source so their provenance is explicit in station_location.
+        const dataSourceId = row.is_locally_managed
+          ? systemDataSourceId
+          : uexApiDataSourceId;
 
         await this.dataSource.query(
           `
@@ -166,7 +159,7 @@ export class LocationsSyncStep implements EtlStep {
               "updated_at" = NOW()
           `,
           [
-            uexApiDataSourceId,
+            dataSourceId,
             source.sourceType,
             row.id,
             slug,
@@ -175,28 +168,37 @@ export class LocationsSyncStep implements EtlStep {
             row.planet_uex_id ?? null,
             row.moon_uex_id ?? null,
             true,
-            false,
+            row.is_locally_managed,
           ],
         );
       }
 
-      if (activeSlugs.length === 0) {
-        await this.dataSource.query(
-          `
-            DELETE FROM "station_location"
-            WHERE "source_type" = $1
-          `,
-          [source.sourceType],
-        );
-      } else {
-        await this.dataSource.query(
-          `
-            DELETE FROM "station_location"
-            WHERE "source_type" = $1
-              AND NOT ("slug" = ANY($2::varchar[]))
-          `,
-          [source.sourceType, activeSlugs],
-        );
+      // Prune stale rows scoped by (source_type, data_source_id) so UEX-API
+      // and system rows never prune each other.
+      for (const [dataSourceId, activeSlugs] of [
+        [uexApiDataSourceId, uexActiveSlugs],
+        [systemDataSourceId, systemActiveSlugs],
+      ] as [string, string[]][]) {
+        if (activeSlugs.length === 0) {
+          await this.dataSource.query(
+            `
+              DELETE FROM "station_location"
+              WHERE "source_type" = $1
+                AND "data_source_id" = $2
+            `,
+            [source.sourceType, dataSourceId],
+          );
+        } else {
+          await this.dataSource.query(
+            `
+              DELETE FROM "station_location"
+              WHERE "source_type" = $1
+                AND "data_source_id" = $2
+                AND NOT ("slug" = ANY($3::varchar[]))
+            `,
+            [source.sourceType, dataSourceId, activeSlugs],
+          );
+        }
       }
     }
 

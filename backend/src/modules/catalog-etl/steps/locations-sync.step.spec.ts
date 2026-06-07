@@ -37,7 +37,7 @@ describe('LocationsSyncStep', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  it('projects live rows into station_location and uses the uex-api data source by default', async () => {
+  it('projects live UEX rows under the uex-api data source', async () => {
     const dsQuery = jest.fn().mockImplementation((sql: string) => {
       if (sql.includes('FROM "station_data_source"')) {
         return Promise.resolve([
@@ -92,7 +92,7 @@ describe('LocationsSyncStep', () => {
     ]);
   });
 
-  it('warns and skips locally managed rows without projecting them', async () => {
+  it('projects locally managed rows under the system data source with is_locally_managed=true', async () => {
     const dsQuery = jest.fn().mockImplementation((sql: string) => {
       if (sql.includes('FROM "station_data_source"')) {
         return Promise.resolve([
@@ -129,22 +129,18 @@ describe('LocationsSyncStep', () => {
     const step = buildStep(dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
-    // No INSERT should have been issued for the locally managed row
     const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
       sql.includes('INSERT INTO "station_location"'),
     );
-    expect(upsertCall).toBeUndefined();
-
-    // A warning must have been emitted
-    expect(repoCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        severity: 'warn',
-        message: expect.stringContaining('locally managed'),
-      }),
-    );
+    expect(upsertCall).toBeDefined();
+    expect(upsertCall[1][0]).toBe('system-id'); // data_source_id = system
+    expect(upsertCall[1][1]).toBe('outpost'); // source_type
+    expect(upsertCall[1][3]).toBe('outpost-outpost-uuid'); // slug
+    expect(upsertCall[1][8]).toBe(true); // is_available_live
+    expect(upsertCall[1][9]).toBe(true); // is_locally_managed
   });
 
-  it('deletes stale projected rows not present in the current source snapshot', async () => {
+  it('prunes stale uex-api rows without touching system rows for the same source_type', async () => {
     const dsQuery = jest.fn().mockImplementation((sql: string) => {
       if (sql.includes('FROM "station_data_source"')) {
         return Promise.resolve([
@@ -181,12 +177,27 @@ describe('LocationsSyncStep', () => {
     const step = buildStep(dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
-    const deleteCall = dsQuery.mock.calls.find(
+    // The uex-api prune should scope by data_source_id
+    const uexPrune = dsQuery.mock.calls.find(
       ([sql, params]: [string, unknown[]]) =>
-        sql.includes('DELETE FROM "station_location"') && params[0] === 'poi',
+        sql.includes('DELETE FROM "station_location"') &&
+        params[0] === 'poi' &&
+        params[1] === 'uex-api-id',
     );
-    expect(deleteCall).toBeDefined();
-    expect(deleteCall[1]).toEqual(['poi', ['poi-poi-uuid']]);
+    expect(uexPrune).toBeDefined();
+    expect(uexPrune[1]).toEqual(['poi', 'uex-api-id', ['poi-poi-uuid']]);
+
+    // The system prune must also be scoped by data_source_id (system-id) and
+    // deletes nothing since system activeSlugs is empty
+    const systemPrune = dsQuery.mock.calls.find(
+      ([sql, params]: [string, unknown[]]) =>
+        sql.includes('DELETE FROM "station_location"') &&
+        params[0] === 'poi' &&
+        params[1] === 'system-id',
+    );
+    expect(systemPrune).toBeDefined();
+    // Empty system slugs → broad delete scoped to (source_type, data_source_id)
+    expect(systemPrune[1]).toEqual(['poi', 'system-id']);
   });
 
   it('protects existing projected row from stale deletion when source row has a missing name', async () => {
@@ -226,14 +237,15 @@ describe('LocationsSyncStep', () => {
     const step = buildStep(dsQuery, repoCreate, repoSave);
     await step.execute({ runId: RUN_ID });
 
-    // Slug must appear in activeSlugs so the DELETE excludes it
-    const deleteCall = dsQuery.mock.calls.find(
+    // Slug must appear in activeSlugs so the NOT IN prune form is used
+    const uexPrune = dsQuery.mock.calls.find(
       ([sql, params]: [string, unknown[]]) =>
-        sql.includes('DELETE FROM "station_location"') && params[0] === 'city',
+        sql.includes('DELETE FROM "station_location"') &&
+        params[0] === 'city' &&
+        params[1] === 'uex-api-id',
     );
-    expect(deleteCall).toBeDefined();
-    // activeSlugs includes 'city-city-uuid', so the NOT IN prune form is used
-    expect(deleteCall[1]).toEqual(['city', ['city-city-uuid']]);
+    expect(uexPrune).toBeDefined();
+    expect(uexPrune[1]).toEqual(['city', 'uex-api-id', ['city-city-uuid']]);
 
     // No upsert was issued (name was blank)
     const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
