@@ -46,6 +46,42 @@ interface UexSpaceStation {
   date_modified: number;
 }
 
+interface StoredSpaceStation {
+  uex_id: number;
+  star_system_uex_id: number | null;
+  planet_uex_id: number | null;
+  moon_uex_id: number | null;
+  orbit_uex_id: number | null;
+  city_uex_id: number | null;
+  faction_uex_id: number | null;
+  jurisdiction_uex_id: number | null;
+  name: string;
+  is_available: boolean;
+  is_available_live: boolean;
+  is_visible: boolean;
+  is_default: boolean;
+  is_monitored: boolean;
+  is_armistice: boolean;
+  is_landable: boolean;
+  is_decommissioned: boolean;
+  is_lagrange: boolean;
+  is_jump_point: boolean;
+  has_quantum_marker: boolean;
+  has_trade_terminal: boolean;
+  has_habitation: boolean;
+  has_refinery: boolean;
+  has_cargo_center: boolean;
+  has_clinic: boolean;
+  has_food: boolean;
+  has_shops: boolean;
+  has_refuel: boolean;
+  has_repair: boolean;
+  has_gravity: boolean;
+  has_loading_dock: boolean;
+  has_docking_port: boolean;
+  has_freight_elevator: boolean;
+}
+
 function toDate(unixTs: number | null | undefined): Date | null {
   if (!unixTs) return null;
   return new Date(unixTs * 1000);
@@ -88,6 +124,7 @@ export class SpaceStationsSyncStep implements EtlStep {
       cityRows,
       factionRows,
       jurisdictionRows,
+      locallyManagedRows,
     ] = await Promise.all([
       this.dataSource.query<{ uex_id: number }[]>(
         `SELECT uex_id FROM station_star_system`,
@@ -110,6 +147,17 @@ export class SpaceStationsSyncStep implements EtlStep {
       this.dataSource.query<{ uex_id: number }[]>(
         `SELECT uex_id FROM station_jurisdiction`,
       ),
+      this.dataSource.query<StoredSpaceStation[]>(
+        `SELECT uex_id, star_system_uex_id, planet_uex_id, moon_uex_id, orbit_uex_id,
+                city_uex_id, faction_uex_id, jurisdiction_uex_id, name,
+                is_available, is_available_live, is_visible, is_default,
+                is_monitored, is_armistice, is_landable, is_decommissioned,
+                is_lagrange, is_jump_point,
+                has_quantum_marker, has_trade_terminal, has_habitation, has_refinery,
+                has_cargo_center, has_clinic, has_food, has_shops, has_refuel, has_repair,
+                has_gravity, has_loading_dock, has_docking_port, has_freight_elevator
+         FROM station_space_station WHERE is_locally_managed = TRUE`,
+      ),
     ]);
 
     const knownStarSystems = new Set(starSystemRows.map((r) => r.uex_id));
@@ -119,6 +167,9 @@ export class SpaceStationsSyncStep implements EtlStep {
     const knownCities = new Set(cityRows.map((r) => r.uex_id));
     const knownFactions = new Set(factionRows.map((r) => r.uex_id));
     const knownJurisdictions = new Set(jurisdictionRows.map((r) => r.uex_id));
+    const locallyManagedByUexId = new Map<number, StoredSpaceStation>(
+      locallyManagedRows.map((r) => [r.uex_id, r]),
+    );
 
     for (const record of stations) {
       if (!record.name) {
@@ -131,6 +182,103 @@ export class SpaceStationsSyncStep implements EtlStep {
             rawPayload: { id: record.id },
           }),
         );
+        continue;
+      }
+
+      const storedStation = locallyManagedByUexId.get(record.id);
+      if (storedStation !== undefined) {
+        const drifted: string[] = [];
+        if (
+          (record.id_star_system ?? null) !== storedStation.star_system_uex_id
+        )
+          drifted.push('id_star_system');
+        if ((record.id_planet ?? null) !== storedStation.planet_uex_id)
+          drifted.push('id_planet');
+        if ((record.id_moon ?? null) !== storedStation.moon_uex_id)
+          drifted.push('id_moon');
+        if ((record.id_orbit ?? null) !== storedStation.orbit_uex_id)
+          drifted.push('id_orbit');
+        if ((record.id_city ?? null) !== storedStation.city_uex_id)
+          drifted.push('id_city');
+        if ((record.id_faction ?? null) !== storedStation.faction_uex_id)
+          drifted.push('id_faction');
+        if (
+          (record.id_jurisdiction ?? null) !== storedStation.jurisdiction_uex_id
+        )
+          drifted.push('id_jurisdiction');
+        if (record.name !== storedStation.name) drifted.push('name');
+        if (Boolean(record.is_available) !== storedStation.is_available)
+          drifted.push('is_available');
+        if (
+          Boolean(record.is_available_live) !== storedStation.is_available_live
+        )
+          drifted.push('is_available_live');
+        if (Boolean(record.is_visible) !== storedStation.is_visible)
+          drifted.push('is_visible');
+        if (Boolean(record.is_default) !== storedStation.is_default)
+          drifted.push('is_default');
+        if (Boolean(record.is_monitored) !== storedStation.is_monitored)
+          drifted.push('is_monitored');
+        if (Boolean(record.is_armistice) !== storedStation.is_armistice)
+          drifted.push('is_armistice');
+        if (Boolean(record.is_landable) !== storedStation.is_landable)
+          drifted.push('is_landable');
+        if (
+          Boolean(record.is_decommissioned) !== storedStation.is_decommissioned
+        )
+          drifted.push('is_decommissioned');
+        if (Boolean(record.is_lagrange) !== storedStation.is_lagrange)
+          drifted.push('is_lagrange');
+        if (Boolean(record.is_jump_point) !== storedStation.is_jump_point)
+          drifted.push('is_jump_point');
+        if (
+          Boolean(record.has_quantum_marker) !==
+          storedStation.has_quantum_marker
+        )
+          drifted.push('has_quantum_marker');
+        if (
+          Boolean(record.has_trade_terminal) !==
+          storedStation.has_trade_terminal
+        )
+          drifted.push('has_trade_terminal');
+        if (Boolean(record.has_habitation) !== storedStation.has_habitation)
+          drifted.push('has_habitation');
+        if (Boolean(record.has_refinery) !== storedStation.has_refinery)
+          drifted.push('has_refinery');
+        if (Boolean(record.has_cargo_center) !== storedStation.has_cargo_center)
+          drifted.push('has_cargo_center');
+        if (Boolean(record.has_clinic) !== storedStation.has_clinic)
+          drifted.push('has_clinic');
+        if (Boolean(record.has_food) !== storedStation.has_food)
+          drifted.push('has_food');
+        if (Boolean(record.has_shops) !== storedStation.has_shops)
+          drifted.push('has_shops');
+        if (Boolean(record.has_refuel) !== storedStation.has_refuel)
+          drifted.push('has_refuel');
+        if (Boolean(record.has_repair) !== storedStation.has_repair)
+          drifted.push('has_repair');
+        if (Boolean(record.has_gravity) !== storedStation.has_gravity)
+          drifted.push('has_gravity');
+        if (Boolean(record.has_loading_dock) !== storedStation.has_loading_dock)
+          drifted.push('has_loading_dock');
+        if (Boolean(record.has_docking_port) !== storedStation.has_docking_port)
+          drifted.push('has_docking_port');
+        if (
+          Boolean(record.has_freight_elevator) !==
+          storedStation.has_freight_elevator
+        )
+          drifted.push('has_freight_elevator');
+        if (drifted.length > 0) {
+          await this.warningsRepo.save(
+            this.warningsRepo.create({
+              runId: ctx.runId,
+              stepName: this.name,
+              severity: 'warn',
+              message: `Space station uex_id=${record.id} is locally managed but upstream data has drifted — ETL skipped`,
+              rawPayload: { id: record.id, drifted_fields: drifted },
+            }),
+          );
+        }
         continue;
       }
 

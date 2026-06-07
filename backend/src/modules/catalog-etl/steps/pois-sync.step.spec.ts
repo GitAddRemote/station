@@ -395,4 +395,148 @@ describe('PoisSyncStep', () => {
     expect(upserts).toHaveLength(2);
     expect(upserts[0][1]).toEqual(upserts[1][1]);
   });
+
+  it('skips locally managed rows silently when upstream data matches', async () => {
+    const poi = makePoi({ id: 42 });
+    uexGet.mockResolvedValue([poi]);
+    const storedRow = {
+      uex_id: 42,
+      star_system_uex_id: poi.id_star_system,
+      planet_uex_id: poi.id_planet,
+      moon_uex_id: poi.id_moon,
+      orbit_uex_id: poi.id_orbit,
+      space_station_uex_id: poi.id_space_station,
+      city_uex_id: poi.id_city,
+      outpost_uex_id: poi.id_outpost,
+      faction_uex_id: poi.id_faction,
+      jurisdiction_uex_id: poi.id_jurisdiction,
+      name: poi.name,
+      is_available: Boolean(poi.is_available),
+      is_available_live: Boolean(poi.is_available_live),
+      is_visible: Boolean(poi.is_visible),
+      is_default: Boolean(poi.is_default),
+      is_monitored: Boolean(poi.is_monitored),
+      is_armistice: Boolean(poi.is_armistice),
+      is_landable: Boolean(poi.is_landable),
+      is_decommissioned: Boolean(poi.is_decommissioned),
+      has_quantum_marker: Boolean(poi.has_quantum_marker),
+      has_trade_terminal: Boolean(poi.has_trade_terminal),
+      has_habitation: Boolean(poi.has_habitation),
+      has_refinery: Boolean(poi.has_refinery),
+      has_cargo_center: Boolean(poi.has_cargo_center),
+      has_clinic: Boolean(poi.has_clinic),
+      has_food: Boolean(poi.has_food),
+      has_shops: Boolean(poi.has_shops),
+      has_refuel: Boolean(poi.has_refuel),
+      has_repair: Boolean(poi.has_repair),
+      has_gravity: Boolean(poi.has_gravity),
+      has_loading_dock: Boolean(poi.has_loading_dock),
+      has_docking_port: Boolean(poi.has_docking_port),
+      has_freight_elevator: Boolean(poi.has_freight_elevator),
+    };
+    const dsQuery = jest.fn().mockImplementation((sql: string) => {
+      if (sql.includes('WHERE is_locally_managed = TRUE'))
+        return Promise.resolve([storedRow]);
+      if (sql.includes('FROM station_star_system'))
+        return Promise.resolve([{ uex_id: 10 }]);
+      if (sql.includes('FROM station_planet'))
+        return Promise.resolve([{ uex_id: 20 }]);
+      if (sql.includes('FROM station_moon')) return Promise.resolve([]);
+      if (sql.includes('FROM station_orbit')) return Promise.resolve([]);
+      if (sql.includes('FROM station_space_station'))
+        return Promise.resolve([]);
+      if (sql.includes('FROM station_city')) return Promise.resolve([]);
+      if (sql.includes('FROM station_outpost')) return Promise.resolve([]);
+      if (sql.includes('FROM station_faction')) return Promise.resolve([]);
+      if (sql.includes('FROM station_jurisdiction')) return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    expect(repoCreate).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('locally managed'),
+      }),
+    );
+    expect(
+      dsQuery.mock.calls.filter((c) =>
+        (c[0] as string).includes('INSERT INTO station_poi'),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('warns when locally managed row has upstream drift — does not upsert', async () => {
+    const poi = makePoi({ id: 42, id_star_system: 99 });
+    uexGet.mockResolvedValue([poi]);
+    const storedRow = {
+      uex_id: 42,
+      star_system_uex_id: 10, // stored=10, upstream=99 → drift
+      planet_uex_id: poi.id_planet,
+      moon_uex_id: poi.id_moon,
+      orbit_uex_id: poi.id_orbit,
+      space_station_uex_id: poi.id_space_station,
+      city_uex_id: poi.id_city,
+      outpost_uex_id: poi.id_outpost,
+      faction_uex_id: poi.id_faction,
+      jurisdiction_uex_id: poi.id_jurisdiction,
+      name: poi.name,
+      is_available: Boolean(poi.is_available),
+      is_available_live: Boolean(poi.is_available_live),
+      is_visible: Boolean(poi.is_visible),
+      is_default: Boolean(poi.is_default),
+      is_monitored: Boolean(poi.is_monitored),
+      is_armistice: Boolean(poi.is_armistice),
+      is_landable: Boolean(poi.is_landable),
+      is_decommissioned: Boolean(poi.is_decommissioned),
+      has_quantum_marker: Boolean(poi.has_quantum_marker),
+      has_trade_terminal: Boolean(poi.has_trade_terminal),
+      has_habitation: Boolean(poi.has_habitation),
+      has_refinery: Boolean(poi.has_refinery),
+      has_cargo_center: Boolean(poi.has_cargo_center),
+      has_clinic: Boolean(poi.has_clinic),
+      has_food: Boolean(poi.has_food),
+      has_shops: Boolean(poi.has_shops),
+      has_refuel: Boolean(poi.has_refuel),
+      has_repair: Boolean(poi.has_repair),
+      has_gravity: Boolean(poi.has_gravity),
+      has_loading_dock: Boolean(poi.has_loading_dock),
+      has_docking_port: Boolean(poi.has_docking_port),
+      has_freight_elevator: Boolean(poi.has_freight_elevator),
+    };
+    const dsQuery = jest.fn().mockImplementation((sql: string) => {
+      if (sql.includes('WHERE is_locally_managed = TRUE'))
+        return Promise.resolve([storedRow]);
+      if (sql.includes('FROM station_star_system'))
+        return Promise.resolve([{ uex_id: 99 }]);
+      if (sql.includes('FROM station_planet'))
+        return Promise.resolve([{ uex_id: 20 }]);
+      if (sql.includes('FROM station_moon')) return Promise.resolve([]);
+      if (sql.includes('FROM station_orbit')) return Promise.resolve([]);
+      if (sql.includes('FROM station_space_station'))
+        return Promise.resolve([]);
+      if (sql.includes('FROM station_city')) return Promise.resolve([]);
+      if (sql.includes('FROM station_outpost')) return Promise.resolve([]);
+      if (sql.includes('FROM station_faction')) return Promise.resolve([]);
+      if (sql.includes('FROM station_jurisdiction')) return Promise.resolve([]);
+      return Promise.resolve([]);
+    });
+    const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+    await step.execute({ runId: RUN_ID });
+
+    expect(repoCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warn',
+        message: expect.stringContaining('drifted'),
+        rawPayload: expect.objectContaining({
+          drifted_fields: expect.arrayContaining(['id_star_system']),
+        }),
+      }),
+    );
+    expect(
+      dsQuery.mock.calls.filter((c) =>
+        (c[0] as string).includes('INSERT INTO station_poi'),
+      ),
+    ).toHaveLength(0);
+  });
 });

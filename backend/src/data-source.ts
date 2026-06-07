@@ -28,6 +28,8 @@ import { OauthClient } from './modules/oauth-clients/oauth-client.entity';
 import { StationCatalogCategory } from './modules/catalog/entities/station-catalog-category.entity';
 import { StationUexCategoryMap } from './modules/catalog/entities/station-uex-category-map.entity';
 import { UexCommodityCategoryMap } from './modules/uex/entities/uex-commodity-category-map.entity';
+import { StationDataSource } from './modules/locations/entities/station-data-source.entity';
+import { StationLocation } from './modules/locations/entities/station-location.entity';
 
 import { BigBangBaselineMigration1748000000000 } from './migrations/1748000000000-BigBangBaselineMigration';
 import { CatalogEtlSchemaMigration1748000000001 } from './migrations/1748000000001-CatalogEtlSchemaMigration';
@@ -41,6 +43,7 @@ import { AddUniqueUuidToStationItem1780010901444 } from './migrations/1780010901
 import { MakeItemFksDeferrable1780020000000 } from './migrations/1780020000000-MakeItemFksDeferrable';
 import { MigrateTablePksToUuidV71780030000000 } from './migrations/1780030000000-MigrateTablePksToUuidV7';
 import { AddStationCatalogCategory1780040000000 } from './migrations/1780040000000-AddStationCatalogCategory';
+import { AddStationLocationProjection1780050000000 } from './migrations/1780050000000-AddStationLocationProjection';
 import { AddCatalogCategoryMaps1780060000000 } from './migrations/1780060000000-AddCatalogCategoryMaps';
 
 export const AppDataSource = new DataSource({
@@ -78,6 +81,8 @@ export const AppDataSource = new DataSource({
     StationCatalogCategory,
     StationUexCategoryMap,
     UexCommodityCategoryMap,
+    StationDataSource,
+    StationLocation,
   ],
   migrations: [
     BigBangBaselineMigration1748000000000,
@@ -92,6 +97,7 @@ export const AppDataSource = new DataSource({
     MakeItemFksDeferrable1780020000000,
     MigrateTablePksToUuidV71780030000000,
     AddStationCatalogCategory1780040000000,
+    AddStationLocationProjection1780050000000,
     AddCatalogCategoryMaps1780060000000,
   ],
   synchronize: false,
