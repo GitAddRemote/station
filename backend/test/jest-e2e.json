@@ -3,6 +3,7 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "globalSetup": "<rootDir>/global-setup-e2e.ts",
   "setupFilesAfterEnv": ["<rootDir>/setup-e2e.ts"],
   "detectOpenHandles": true,
   "forceExit": true,
