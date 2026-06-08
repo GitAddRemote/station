@@ -28,6 +28,21 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
         ('uscu',  'μSCU',  'Micro-SCU (1/1,000,000 SCU)')
     `);
 
+    // Resolve the seeded unknown location UUID so we can use it as a literal
+    // column default. PostgreSQL does not allow subquery expressions in DEFAULT
+    // clauses, so we query the value here and apply it via ALTER COLUMN after
+    // the table is created.
+    const unknownLocationRows: { id: string }[] = await queryRunner.query(
+      `SELECT "id" FROM "station_location" WHERE "slug" = 'unknown' LIMIT 1`,
+    );
+    const unknownLocationId: string = unknownLocationRows[0]?.id;
+    if (!unknownLocationId) {
+      throw new Error(
+        'station_location row with slug="unknown" not found. ' +
+          'Run 1780050000000-AddStationLocationProjection before this migration.',
+      );
+    }
+
     // ── station_inventory_item ──────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE "station_inventory_item" (
@@ -36,7 +51,7 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
         "owner_id"             UUID           NOT NULL,
         "catalog_entry_id"     UUID           NOT NULL,
         "catalog_kind"         VARCHAR(20)    NOT NULL,
-        "location_id"          UUID           NOT NULL DEFAULT (SELECT "id" FROM "station_location" WHERE "slug" = 'unknown'),
+        "location_id"          UUID           NOT NULL,
         "unit_of_measure_id"   UUID           NOT NULL,
         "quantity"             NUMERIC(12,6)  NOT NULL DEFAULT 1,
         "quality"              INTEGER        NULL,
@@ -70,6 +85,12 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
           ON DELETE RESTRICT
       )
     `);
+
+    // Apply the resolved unknown location UUID as the column default.
+    await queryRunner.query(
+      `ALTER TABLE "station_inventory_item"
+         ALTER COLUMN "location_id" SET DEFAULT '${unknownLocationId}'`,
+    );
 
     // General lookup indexes
     await queryRunner.query(`
