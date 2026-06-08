@@ -33,6 +33,8 @@ import { StationLocation } from './modules/locations/entities/station-location.e
 import { StationCatalogEntry } from './modules/catalog/entities/station-catalog-entry.entity';
 import { StationUnitOfMeasure } from './modules/inventory/entities/station-unit-of-measure.entity';
 import { StationInventoryItem } from './modules/inventory/entities/station-inventory-item.entity';
+import { StationInventoryList } from './modules/inventory/entities/station-inventory-list.entity';
+import { StationInventoryListItem } from './modules/inventory/entities/station-inventory-list-item.entity';
 
 import { BigBangBaselineMigration1748000000000 } from './migrations/1748000000000-BigBangBaselineMigration';
 import { CatalogEtlSchemaMigration1748000000001 } from './migrations/1748000000001-CatalogEtlSchemaMigration';
@@ -50,6 +52,7 @@ import { AddStationLocationProjection1780050000000 } from './migrations/17800500
 import { AddCatalogCategoryMaps1780060000000 } from './migrations/1780060000000-AddCatalogCategoryMaps';
 import { AddStationCatalogEntry1780070000000 } from './migrations/1780070000000-AddStationCatalogEntry';
 import { AddInventoryTables1780080000000 } from './migrations/1780080000000-AddInventoryTables';
+import { AddInventoryListTables1780090000000 } from './migrations/1780090000000-AddInventoryListTables';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -91,6 +94,8 @@ export const AppDataSource = new DataSource({
     StationCatalogEntry,
     StationUnitOfMeasure,
     StationInventoryItem,
+    StationInventoryList,
+    StationInventoryListItem,
   ],
   migrations: [
     BigBangBaselineMigration1748000000000,
@@ -109,6 +114,7 @@ export const AppDataSource = new DataSource({
     AddCatalogCategoryMaps1780060000000,
     AddStationCatalogEntry1780070000000,
     AddInventoryTables1780080000000,
+    AddInventoryListTables1780090000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },
