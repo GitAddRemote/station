@@ -25,6 +25,9 @@ import { VehiclesSyncStep } from './steps/vehicles-sync.step';
 import { ItemsSyncStep } from './steps/items-sync.step';
 import { CommoditiesSyncStep } from './steps/commodities-sync.step';
 import { LocationsSyncStep } from './steps/locations-sync.step';
+import { VehiclesCatalogSyncStep } from './steps/vehicles-catalog-sync.step';
+import { CommoditiesCatalogSyncStep } from './steps/commodities-catalog-sync.step';
+import { ItemsCatalogSyncStep } from './steps/items-catalog-sync.step';
 
 @Injectable()
 export class CatalogEtlService {
@@ -58,6 +61,9 @@ export class CatalogEtlService {
     private readonly itemsSyncStep: ItemsSyncStep,
     private readonly commoditiesSyncStep: CommoditiesSyncStep,
     private readonly locationsSyncStep: LocationsSyncStep,
+    private readonly vehiclesCatalogSyncStep: VehiclesCatalogSyncStep,
+    private readonly commoditiesCatalogSyncStep: CommoditiesCatalogSyncStep,
+    private readonly itemsCatalogSyncStep: ItemsCatalogSyncStep,
   ) {
     this.ETL_STEPS = [
       factionsSyncStep,
@@ -79,6 +85,9 @@ export class CatalogEtlService {
       vehiclesSyncStep,
       itemsSyncStep,
       commoditiesSyncStep,
+      vehiclesCatalogSyncStep,
+      commoditiesCatalogSyncStep,
+      itemsCatalogSyncStep,
     ];
   }
 
