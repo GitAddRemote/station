@@ -1,5 +1,6 @@
 import * as Joi from 'joi';
 import { DEFAULT_CLEANUP_CRON } from '../modules/auth/token-cleanup.constants';
+import { DEFAULT_INVENTORY_QUALITY_MAX } from './inventory-quality.config';
 
 export const envValidationSchema = Joi.object({
   // Application
@@ -60,6 +61,14 @@ export const envValidationSchema = Joi.object({
 
   // Password expiry — number of days before a changed password expires.
   AUTH_PASSWORD_EXPIRY_DAYS: Joi.number().integer().min(1).default(90),
+
+  // Inventory quality policy — current observed values are integer-based and
+  // roughly 0..1000, but the upper bound remains configurable until the game
+  // semantics are stable enough to harden further.
+  INVENTORY_QUALITY_MAX: Joi.number()
+    .integer()
+    .min(0)
+    .default(DEFAULT_INVENTORY_QUALITY_MAX),
 
   // Token cleanup scheduler (optional — defaults to 3 AM daily)
   REFRESH_TOKEN_CLEANUP_CRON: Joi.string().default(DEFAULT_CLEANUP_CRON),
