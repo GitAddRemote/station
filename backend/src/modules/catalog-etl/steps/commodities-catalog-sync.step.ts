@@ -188,7 +188,8 @@ export class CommoditiesCatalogSyncStep implements EtlStep {
            scu=EXCLUDED.scu,
            base_properties=EXCLUDED.base_properties,
            attributes=EXCLUDED.attributes,
-           updated_at=NOW()`,
+           updated_at=NOW()
+         WHERE station_catalog_entry.is_locally_managed = FALSE`,
         [
           record.catalog_category_id, // $1  category_id
           record.uex_id, // $2  uex_id

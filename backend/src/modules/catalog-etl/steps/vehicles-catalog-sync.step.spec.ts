@@ -233,6 +233,7 @@ describe('VehiclesCatalogSyncStep', () => {
         [
           {
             uex_id: 1,
+            category_id: 'cat-ship-uuid',
             name: 'Avenger Titan',
             slug: 'avenger-titan',
             scu: '8.0000',
@@ -268,6 +269,7 @@ describe('VehiclesCatalogSyncStep', () => {
         [
           {
             uex_id: 1,
+            category_id: 'cat-ship-uuid',
             name: 'Avenger Titan',
             slug: 'avenger-titan',
             scu: '8.0000',
@@ -295,6 +297,51 @@ describe('VehiclesCatalogSyncStep', () => {
           rawPayload: expect.objectContaining({
             id: 1,
             drifted_fields: expect.arrayContaining(['name']),
+          }),
+        }),
+      );
+    });
+
+    it('warns with category_id in drifted_fields when upstream reclassifies ship → ground vehicle', async () => {
+      // Stored row has ship category; upstream now has is_ground_vehicle=true
+      const dsQuery = buildDsQuery(
+        [makeVehicle({ is_ground_vehicle: true, is_spaceship: false })],
+        [
+          { id: 'cat-ground-uuid', slug: 'ground-vehicle' },
+          { id: 'cat-addon-uuid', slug: 'addon-module' },
+          { id: 'cat-ship-uuid', slug: 'ship' },
+        ],
+        [
+          {
+            uex_id: 1,
+            category_id: 'cat-ship-uuid',
+            name: 'Avenger Titan',
+            slug: 'avenger-titan',
+            scu: '8.0000',
+            crew_min: 1,
+            crew_max: 1,
+            mass: '25000.00',
+            length: '24.50',
+            width: '18.00',
+            height: '6.00',
+            is_concept: false,
+          },
+        ],
+      );
+      const step = buildStep(dsQuery, repoCreate, repoSave);
+
+      await step.execute(CTX);
+
+      const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_catalog_entry'),
+      );
+      expect(insert).toBeUndefined();
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          rawPayload: expect.objectContaining({
+            id: 1,
+            drifted_fields: expect.arrayContaining(['category_id']),
           }),
         }),
       );

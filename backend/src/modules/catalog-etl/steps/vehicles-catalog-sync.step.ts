@@ -65,6 +65,7 @@ interface StationVehicleRow {
 
 interface StoredCatalogEntry {
   uex_id: number;
+  category_id: string;
   name: string;
   slug: string;
   scu: string | null;
@@ -108,7 +109,7 @@ export class VehiclesCatalogSyncStep implements EtlStep {
     const locallyManagedRows = await this.dataSource.query<
       StoredCatalogEntry[]
     >(
-      `SELECT uex_id, name, slug, scu, crew_min, crew_max, mass, length, width, height, is_concept
+      `SELECT uex_id, category_id, name, slug, scu, crew_min, crew_max, mass, length, width, height, is_concept
        FROM station_catalog_entry
        WHERE is_locally_managed = TRUE AND catalog_kind = 'vehicle'`,
     );
@@ -171,6 +172,7 @@ export class VehiclesCatalogSyncStep implements EtlStep {
       const stored = locallyManagedByUexId.get(record.uex_id);
       if (stored !== undefined) {
         const drifted: string[] = [];
+        if (categoryId !== stored.category_id) drifted.push('category_id');
         if (record.name !== stored.name) drifted.push('name');
         const slug = record.slug ?? `vehicle-${record.uex_id}`;
         if (slug !== stored.slug) drifted.push('slug');
@@ -273,7 +275,8 @@ export class VehiclesCatalogSyncStep implements EtlStep {
            height=EXCLUDED.height,
            base_properties=EXCLUDED.base_properties,
            attributes=EXCLUDED.attributes,
-           updated_at=NOW()`,
+           updated_at=NOW()
+         WHERE station_catalog_entry.is_locally_managed = FALSE`,
         [
           categoryId, // $1  category_id
           record.uex_id, // $2  uex_id
