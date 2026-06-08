@@ -985,7 +985,7 @@ const InventoryPage = () => {
       setNewRowErrors({});
       const payload = {
         gameId: GAME_ID,
-        catalogEntryId: selectedItemId as string,
+        catalogEntryId: selectedItemId!,
         quantity: parsedQuantity,
       };
       if (viewMode === 'org' && selectedOrgId) {
