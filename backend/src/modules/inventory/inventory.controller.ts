@@ -7,9 +7,12 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
+  Query,
   Req,
   UseGuards,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -20,9 +23,16 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { AddInventoryListItemDto } from './dto/add-inventory-list-item.dto';
+import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { CreateInventoryListDto } from './dto/create-inventory-list.dto';
 import { InventoryListDto } from './dto/inventory-list.dto';
 import { InventoryListItemDto } from './dto/inventory-list-item.dto';
+import {
+  InventoryItemDto,
+  PaginatedInventoryItemsDto,
+} from './dto/inventory-item.dto';
+import { ListInventoryItemsDto } from './dto/list-inventory-items.dto';
+import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { InventoryService } from './inventory.service';
 
 @ApiTags('inventory')
@@ -31,6 +41,51 @@ import { InventoryService } from './inventory.service';
 @Controller('api/inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
+
+  @ApiOperation({ summary: 'Create an inventory item' })
+  @ApiResponse({ status: 201, type: InventoryItemDto })
+  @Post()
+  createItem(
+    @Req() req: AuthenticatedRequest,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: CreateInventoryItemDto,
+  ): Promise<InventoryItemDto> {
+    return this.inventoryService.createItem(req.user.userId, dto);
+  }
+
+  @ApiOperation({ summary: 'List inventory items' })
+  @ApiResponse({ status: 200, type: PaginatedInventoryItemsDto })
+  @Get()
+  listItems(
+    @Req() req: AuthenticatedRequest,
+    @Query(new ValidationPipe({ transform: true, whitelist: true }))
+    query: ListInventoryItemsDto,
+  ): Promise<PaginatedInventoryItemsDto> {
+    return this.inventoryService.listItems(req.user.userId, query);
+  }
+
+  @ApiOperation({ summary: 'Update an inventory item' })
+  @ApiResponse({ status: 200, type: InventoryItemDto })
+  @Patch(':id')
+  updateItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ValidationPipe({ transform: true, whitelist: true }))
+    dto: UpdateInventoryItemDto,
+  ): Promise<InventoryItemDto> {
+    return this.inventoryService.updateItem(req.user.userId, id, dto);
+  }
+
+  @ApiOperation({ summary: 'Delete an inventory item' })
+  @ApiResponse({ status: 204 })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete(':id')
+  deleteItem(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.inventoryService.deleteItem(req.user.userId, id);
+  }
 
   @ApiOperation({
     summary: 'Create an inventory list for the authenticated user',
