@@ -226,9 +226,9 @@ export class CatalogService {
       id: unit.id,
       name: unit.name,
       abbreviation: unit.abbreviation,
-      catalog_kind: unit.catalogKind,
-      scale_factor: Number(unit.scaleFactor),
-      sort_order: unit.sortOrder,
+      catalogKind: unit.catalogKind,
+      scaleFactor: Number(unit.scaleFactor),
+      sortOrder: unit.sortOrder,
     };
   }
 }

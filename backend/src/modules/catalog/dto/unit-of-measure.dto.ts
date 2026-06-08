@@ -14,11 +14,11 @@ export class UnitOfMeasureDto {
     enum: ['item', 'commodity', 'vehicle'],
     nullable: true,
   })
-  catalog_kind!: 'item' | 'commodity' | 'vehicle' | null;
+  catalogKind!: 'item' | 'commodity' | 'vehicle' | null;
 
   @ApiProperty()
-  scale_factor!: number;
+  scaleFactor!: number;
 
   @ApiProperty()
-  sort_order!: number;
+  sortOrder!: number;
 }

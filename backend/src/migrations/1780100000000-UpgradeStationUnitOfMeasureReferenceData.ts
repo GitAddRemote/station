@@ -13,7 +13,18 @@ export class UpgradeStationUnitOfMeasureReferenceData1780100000000
 
     await queryRunner.query(`
       ALTER TABLE "station_unit_of_measure"
+        RENAME CONSTRAINT "uq_station_unit_of_measure_code"
+        TO "uq_station_unit_of_measure_abbreviation"
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "station_unit_of_measure"
         RENAME COLUMN "label" TO "name"
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "station_unit_of_measure"
+        DROP COLUMN "description"
     `);
 
     await queryRunner.query(`
@@ -82,7 +93,18 @@ export class UpgradeStationUnitOfMeasureReferenceData1780100000000
 
     await queryRunner.query(`
       ALTER TABLE "station_unit_of_measure"
+        ADD COLUMN "description" TEXT NULL
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "station_unit_of_measure"
         RENAME COLUMN "name" TO "label"
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "station_unit_of_measure"
+        RENAME CONSTRAINT "uq_station_unit_of_measure_abbreviation"
+        TO "uq_station_unit_of_measure_code"
     `);
 
     await queryRunner.query(`

@@ -12,9 +12,9 @@ describe('UnitsOfMeasureController', () => {
         id: 'uom-1',
         name: 'Unit',
         abbreviation: 'unit',
-        catalog_kind: null,
-        scale_factor: 1,
-        sort_order: 1,
+        catalogKind: null,
+        scaleFactor: 1,
+        sortOrder: 1,
       },
     ]),
   };
@@ -35,10 +35,21 @@ describe('UnitsOfMeasureController', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   it('delegates list requests to the service', async () => {
+    mockCatalogService.getUnitsOfMeasure.mockResolvedValueOnce([
+      {
+        id: 'uom-1',
+        name: 'Unit',
+        abbreviation: 'unit',
+        catalogKind: null,
+        scaleFactor: 1,
+        sortOrder: 1,
+      },
+    ]);
+
     const result = await controller.listUnitsOfMeasure();
 
     expect(service.getUnitsOfMeasure).toHaveBeenCalled();
@@ -47,9 +58,9 @@ describe('UnitsOfMeasureController', () => {
         id: 'uom-1',
         name: 'Unit',
         abbreviation: 'unit',
-        catalog_kind: null,
-        scale_factor: 1,
-        sort_order: 1,
+        catalogKind: null,
+        scaleFactor: 1,
+        sortOrder: 1,
       },
     ]);
   });

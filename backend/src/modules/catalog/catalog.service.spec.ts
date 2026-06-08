@@ -239,9 +239,9 @@ describe('CatalogService', () => {
         id: 'uom-1',
         name: 'Unit',
         abbreviation: 'unit',
-        catalog_kind: null,
-        scale_factor: 1,
-        sort_order: 1,
+        catalogKind: null,
+        scaleFactor: 1,
+        sortOrder: 1,
       },
     ];
     mockCacheManager.get.mockResolvedValueOnce(cachedUnits);
@@ -286,17 +286,17 @@ describe('CatalogService', () => {
         id: 'uom-1',
         name: 'Unit',
         abbreviation: 'unit',
-        catalog_kind: null,
-        scale_factor: 1,
-        sort_order: 1,
+        catalogKind: null,
+        scaleFactor: 1,
+        sortOrder: 1,
       },
       {
         id: 'uom-2',
         name: 'Standard Cargo Unit',
         abbreviation: 'SCU',
-        catalog_kind: 'commodity',
-        scale_factor: 1,
-        sort_order: 2,
+        catalogKind: 'commodity',
+        scaleFactor: 1,
+        sortOrder: 2,
       },
     ]);
     expect(mockCacheManager.set).toHaveBeenCalledWith(
@@ -304,6 +304,37 @@ describe('CatalogService', () => {
       result,
       300000,
     );
+  });
+
+  it('preserves micro-precision scale factors through the DTO mapper', async () => {
+    mockCacheManager.get.mockResolvedValueOnce(null);
+    mockUnitOfMeasureRepository.find.mockResolvedValueOnce([
+      {
+        id: 'uom-3',
+        name: 'Centi-SCU',
+        abbreviation: 'cSCU',
+        catalogKind: 'commodity',
+        scaleFactor: '0.010000',
+        sortOrder: 3,
+        isActive: true,
+      },
+      {
+        id: 'uom-4',
+        name: 'Micro-SCU',
+        abbreviation: 'μSCU',
+        catalogKind: 'commodity',
+        scaleFactor: '0.000001',
+        sortOrder: 4,
+        isActive: true,
+      },
+    ]);
+
+    const result = await service.getUnitsOfMeasure();
+
+    expect(result).toEqual([
+      expect.objectContaining({ abbreviation: 'cSCU', scaleFactor: 0.01 }),
+      expect.objectContaining({ abbreviation: 'μSCU', scaleFactor: 0.000001 }),
+    ]);
   });
 
   it('loads and caches entry detail on cache miss', async () => {
