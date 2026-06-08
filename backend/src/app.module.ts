@@ -24,13 +24,12 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { GamesModule } from './modules/games/games.module';
 import { UexModule } from './modules/uex/uex.module';
 import { UexSyncModule } from './modules/uex-sync/uex-sync.module';
-import { UserInventoryModule } from './modules/user-inventory/user-inventory.module';
-import { OrgInventoryModule } from './modules/org-inventory/org-inventory.module';
 import { HealthModule } from './health/health.module';
 import { OauthClientsModule } from './modules/oauth-clients/oauth-clients.module';
 import { CatalogEtlModule } from './modules/catalog-etl/catalog-etl.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { LocationsModule } from './modules/locations/locations.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 
 const isTest =
   process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
@@ -172,8 +171,7 @@ if (!isTest) {
     GamesModule,
     UexModule,
     UexSyncModule,
-    UserInventoryModule,
-    OrgInventoryModule,
+    InventoryModule,
     HealthModule,
     OauthClientsModule,
     CatalogEtlModule,
