@@ -17,6 +17,14 @@ export class Organization {
   @PrimaryGeneratedColumn()
   id!: number;
 
+  @Column({
+    name: 'id_uuid',
+    type: 'uuid',
+    unique: true,
+    default: () => 'uuid_generate_v7()',
+  })
+  idUuid!: string;
+
   @Column()
   name!: string;
 

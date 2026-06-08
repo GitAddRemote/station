@@ -25,6 +25,7 @@ describe('AuthService', () => {
 
   const mockUser = {
     id: 1,
+    idUuid: '00000000-0000-0000-0000-000000000001',
     username: 'testuser',
     email: 'test@example.com',
     password: '$2b$10$hashedpassword',
