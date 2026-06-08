@@ -1,12 +1,10 @@
 import {
-  BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { AddInventoryListItemDto } from './dto/add-inventory-list-item.dto';
 import { CreateInventoryListDto } from './dto/create-inventory-list.dto';
@@ -29,6 +27,7 @@ export class InventoryService {
     private readonly inventoryListRepository: Repository<StationInventoryList>,
     @InjectRepository(StationInventoryListItem)
     private readonly inventoryListItemRepository: Repository<StationInventoryListItem>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async createList(
@@ -38,28 +37,30 @@ export class InventoryService {
     const ownerId = await this.getUserOwnerUuid(userId);
     const name = dto.name.trim();
 
-    if (!name) {
-      throw new BadRequestException('List name is required');
-    }
+    const saved = await this.dataSource.transaction(
+      'REPEATABLE READ',
+      async (manager) => {
+        const existingCount = await manager.count(StationInventoryList, {
+          where: { ownerType: 'user', ownerId },
+        });
 
-    const existingCount = await this.inventoryListRepository.count({
-      where: { ownerType: 'user', ownerId },
-    });
+        if (existingCount >= InventoryService.MAX_USER_LISTS) {
+          throw new UnprocessableEntityException(
+            'Users may only have up to 5 inventory lists',
+          );
+        }
 
-    if (existingCount >= InventoryService.MAX_USER_LISTS) {
-      throw new UnprocessableEntityException(
-        'Users may only have up to 5 inventory lists',
-      );
-    }
+        const list = manager.create(StationInventoryList, {
+          ownerType: 'user',
+          ownerId,
+          name,
+          isShared: false,
+        });
 
-    const list = this.inventoryListRepository.create({
-      ownerType: 'user',
-      ownerId,
-      name,
-      isShared: false,
-    });
+        return manager.save(StationInventoryList, list);
+      },
+    );
 
-    const saved = await this.inventoryListRepository.save(list);
     return this.toInventoryListDto(saved);
   }
 
@@ -74,7 +75,7 @@ export class InventoryService {
   }
 
   async deleteList(userId: number, listId: string): Promise<void> {
-    const list = await this.getOwnedListOrThrow(userId, listId);
+    const list = await this.getOwnedUserListOrThrow(userId, listId);
     await this.inventoryListRepository.delete({ id: list.id });
   }
 
@@ -84,7 +85,7 @@ export class InventoryService {
     dto: AddInventoryListItemDto,
   ): Promise<InventoryListItemDto> {
     const ownerId = await this.getUserOwnerUuid(userId);
-    await this.getOwnedListByOwnerIdOrThrow(ownerId, listId);
+    await this.getOwnedUserListByOwnerIdOrThrow(ownerId, listId);
 
     const inventoryItem = await this.inventoryItemRepository.findOne({
       where: {
@@ -98,17 +99,6 @@ export class InventoryService {
       throw new NotFoundException('Inventory item not found');
     }
 
-    const existing = await this.inventoryListItemRepository.findOne({
-      where: {
-        listId,
-        inventoryItemId: dto.inventoryItemId,
-      },
-    });
-
-    if (existing) {
-      return this.toInventoryListItemDto(existing);
-    }
-
     const listItem = this.inventoryListItemRepository.create({
       listId,
       inventoryItemId: dto.inventoryItemId,
@@ -118,20 +108,12 @@ export class InventoryService {
       const saved = await this.inventoryListItemRepository.save(listItem);
       return this.toInventoryListItemDto(saved);
     } catch (error: unknown) {
-      const isUniqueViolation =
-        error &&
-        typeof error === 'object' &&
-        (('code' in error && error.code === '23505') ||
-          ('driverError' in error &&
-            error.driverError &&
-            typeof error.driverError === 'object' &&
-            'code' in error.driverError &&
-            error.driverError.code === '23505'));
-
-      if (isUniqueViolation) {
-        throw new ConflictException('Inventory item is already in this list');
+      if (isUniqueViolation(error)) {
+        const existing = await this.inventoryListItemRepository.findOne({
+          where: { listId, inventoryItemId: dto.inventoryItemId },
+        });
+        return this.toInventoryListItemDto(existing!);
       }
-
       throw error;
     }
   }
@@ -141,7 +123,7 @@ export class InventoryService {
     listId: string,
     inventoryItemId: string,
   ): Promise<void> {
-    await this.getOwnedListOrThrow(userId, listId);
+    await this.getOwnedUserListOrThrow(userId, listId);
 
     const result = await this.inventoryListItemRepository.delete({
       listId,
@@ -165,15 +147,16 @@ export class InventoryService {
     return user.idUuid;
   }
 
-  private async getOwnedListOrThrow(
+  private async getOwnedUserListOrThrow(
     userId: number,
     listId: string,
   ): Promise<StationInventoryList> {
     const ownerId = await this.getUserOwnerUuid(userId);
-    return this.getOwnedListByOwnerIdOrThrow(ownerId, listId);
+    return this.getOwnedUserListByOwnerIdOrThrow(ownerId, listId);
   }
 
-  private async getOwnedListByOwnerIdOrThrow(
+  // Intentionally user-only; org lists are not yet supported
+  private async getOwnedUserListByOwnerIdOrThrow(
     ownerId: string,
     listId: string,
   ): Promise<StationInventoryList> {
@@ -211,4 +194,17 @@ export class InventoryService {
       createdAt: listItem.createdAt,
     };
   }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    (('code' in error && error.code === '23505') ||
+      ('driverError' in error &&
+        error.driverError !== null &&
+        typeof error.driverError === 'object' &&
+        'code' in error.driverError &&
+        error.driverError.code === '23505'))
+  );
 }

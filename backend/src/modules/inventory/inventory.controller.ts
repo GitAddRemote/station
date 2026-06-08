@@ -65,7 +65,8 @@ export class InventoryController {
   }
 
   @ApiOperation({ summary: 'Add an inventory item to a list' })
-  @ApiResponse({ status: 201, type: InventoryListItemDto })
+  @ApiResponse({ status: 200, type: InventoryListItemDto })
+  @HttpCode(HttpStatus.OK)
   @Post('lists/:id/items')
   addItemToList(
     @Req() req: AuthenticatedRequest,
