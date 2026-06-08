@@ -65,6 +65,8 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
           PRIMARY KEY ("id"),
         CONSTRAINT "chk_station_inventory_item_quantity_positive"
           CHECK ("quantity" > 0),
+        CONSTRAINT "chk_station_inventory_item_quality_non_negative"
+          CHECK ("quality" IS NULL OR "quality" >= 0),
         CONSTRAINT "chk_station_inventory_item_unit_quantity_whole"
           CHECK ("catalog_kind" NOT IN ('item', 'vehicle') OR floor("quantity") = "quantity"),
         CONSTRAINT "chk_station_inventory_item_owner_type"
@@ -116,8 +118,8 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
     // Commodity stacks: same owner + catalog entry + location + UoM + exact quality.
     // COALESCE(quality, -1) treats NULL quality as a shared bucket: two commodity rows
     // with NULL quality for the same owner/entry/location/uom will collide and merge
-    // rather than creating separate stack rows. -1 is safe because quality is a
-    // non-negative game value; the sentinel is index-only and never stored.
+    // rather than creating separate stack rows. -1 is safe because the schema
+    // enforces non-negative quality; the sentinel is index-only and never stored.
     await queryRunner.query(`
       CREATE UNIQUE INDEX "uq_station_inventory_item_commodity_stack"
         ON "station_inventory_item" (
