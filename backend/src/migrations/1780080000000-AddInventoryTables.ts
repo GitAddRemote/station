@@ -91,9 +91,10 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
     `);
 
     // Commodity stacks: same owner + catalog entry + location + UoM + exact quality.
-    // NULL quality has its own bucket (two NULLs are treated as equal here via the
-    // partial-index predicate — the unique constraint covers NULLs because the index
-    // only applies to rows where catalog_kind = 'commodity').
+    // COALESCE(quality, -1) treats NULL quality as a shared bucket: two commodity rows
+    // with NULL quality for the same owner/entry/location/uom will collide and merge
+    // rather than creating separate stack rows. -1 is safe because quality is a
+    // non-negative game value; the sentinel is index-only and never stored.
     await queryRunner.query(`
       CREATE UNIQUE INDEX "uq_station_inventory_item_commodity_stack"
         ON "station_inventory_item" (
@@ -102,7 +103,7 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
           "catalog_entry_id",
           "location_id",
           "unit_of_measure_id",
-          ("quality")
+          COALESCE("quality", -1)
         )
         WHERE "catalog_kind" = 'commodity'
     `);

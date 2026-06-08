@@ -21,31 +21,6 @@ import { StationUnitOfMeasure } from './station-unit-of-measure.entity';
   'ownerId',
   'catalogEntryId',
 ])
-// Commodity stacks: same owner + catalog entry + location + UoM + exact quality
-@Index(
-  'uq_station_inventory_item_commodity_stack',
-  [
-    'ownerType',
-    'ownerId',
-    'catalogEntryId',
-    'locationId',
-    'unitOfMeasureId',
-    'quality',
-  ],
-  {
-    unique: true,
-    where: `"catalog_kind" = 'commodity'`,
-  },
-)
-// Fungible item stacks: same owner + catalog entry + location + UoM, no customization
-@Index(
-  'uq_station_inventory_item_fungible_item_stack',
-  ['ownerType', 'ownerId', 'catalogEntryId', 'locationId', 'unitOfMeasureId'],
-  {
-    unique: true,
-    where: `"catalog_kind" = 'item' AND "effective_properties" IS NULL`,
-  },
-)
 export class StationInventoryItem {
   @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
   id!: string;
