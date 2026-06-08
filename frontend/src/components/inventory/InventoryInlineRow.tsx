@@ -119,9 +119,9 @@ const InventoryInlineRow = ({
             variant={density === 'compact' ? 'body2' : 'subtitle1'}
             sx={{ fontWeight: 600 }}
             noWrap
-            title={item.itemName || `Item #${item.uexItemId}`}
+            title={item.itemName || `Item #${item.catalogEntryId}`}
           >
-            {item.itemName || `Item #${item.uexItemId}`}
+            {item.itemName || `Item #${item.catalogEntryId}`}
           </Typography>
           <Chip
             label={item.categoryName || 'General'}
@@ -262,7 +262,7 @@ const InventoryInlineRow = ({
                     outlineOffset: 2,
                   },
                 }}
-                aria-label={`Edit quantity for ${item.itemName ?? `Item ${item.uexItemId}`}`}
+                aria-label={`Edit quantity for ${item.itemName ?? `Item ${item.catalogEntryId}`}`}
               >
                 <Typography
                   variant="body2"

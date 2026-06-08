@@ -63,7 +63,7 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
-  const [categoryId, setCategoryId] = useState<number | ''>('');
+  const [categoryId, setCategoryId] = useState<string | ''>('');
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -89,7 +89,7 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
         offset: page * rowsPerPage,
         search: debouncedSearch || undefined,
         sharedOnly,
-        categoryId: typeof categoryId === 'number' ? categoryId : undefined,
+        categoryId: categoryId || undefined,
       };
 
       const { items: fetchedItems, total } =
@@ -174,11 +174,7 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
               labelId="inventory-category-label"
               label="Category"
               value={categoryId}
-              onChange={(e) =>
-                setCategoryId(
-                  e.target.value === '' ? '' : Number(e.target.value),
-                )
-              }
+              onChange={(e) => setCategoryId(e.target.value as string)}
             >
               <MenuItem value="">
                 <em>All categories</em>
@@ -237,7 +233,7 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
                     >
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {item.itemName || `Item #${item.uexItemId}`}
+                          {item.itemName || `Item #${item.catalogEntryId}`}
                         </Typography>
                       </TableCell>
                       <TableCell>

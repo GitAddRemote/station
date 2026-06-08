@@ -9,17 +9,17 @@ import {
   Typography,
 } from '@mui/material';
 import type { RefObject } from 'react';
-import type { CatalogItem } from '../../services/uex.service';
+import type { CatalogEntryDto } from '../../services/catalog.service';
 
 interface InventoryNewRowProps {
   isEditorMode: boolean;
-  itemOptions: CatalogItem[];
+  itemOptions: CatalogEntryDto[];
   itemInput: string;
-  selectedItem: CatalogItem | null;
+  selectedItem: CatalogEntryDto | null;
   itemLoading: boolean;
   itemError: string | null;
   draft: {
-    itemId: number | '';
+    itemId: string | '';
     quantity: number | '';
   };
   errors: {
@@ -33,7 +33,7 @@ interface InventoryNewRowProps {
   orgBlocked: boolean;
   showQuantityWarning: boolean;
   onItemInputChange: (value: string, reason: string) => void;
-  onItemSelect: (item: CatalogItem | null) => void;
+  onItemSelect: (item: CatalogEntryDto | null) => void;
   onQuantityChange: (value: string) => void;
   onQuantityEnter: () => void;
   onSave: () => void;
@@ -107,9 +107,9 @@ export const InventoryNewRow = ({
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {option.name}
                 </Typography>
-                {option.categoryName && (
+                {option.categoryPath && (
                   <Typography variant="caption" color="text.secondary">
-                    {option.categoryName}
+                    {option.categoryPath}
                   </Typography>
                 )}
               </Stack>

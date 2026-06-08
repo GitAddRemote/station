@@ -1,7 +1,10 @@
 import { MemoryRouter } from 'react-router-dom';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import InventoryPage from './Inventory';
+
+const getInput = (container: HTMLElement) =>
+  (container.querySelector('input') as HTMLInputElement) ?? container;
 
 const mockUpdateItem = jest.fn();
 const mockGetInventory = jest.fn();
@@ -30,10 +33,10 @@ jest.mock('../services/inventory.service', () => ({
   },
 }));
 
-jest.mock('../services/uex.service', () => ({
-  uexService: {
-    searchItems: (...args: unknown[]) => mockSearchItems(...args),
-    getStarSystems: jest.fn(),
+jest.mock('../services/catalog.service', () => ({
+  catalogService: {
+    getCatalogItems: (...args: unknown[]) => mockSearchItems(...args),
+    getCatalogCategories: jest.fn().mockResolvedValue([]),
   },
 }));
 jest.mock('../services/permissions.service', () => ({
@@ -52,7 +55,7 @@ const mockItem = {
   id: 'item-1',
   userId: 1,
   gameId: 1,
-  uexItemId: 100,
+  catalogEntryId: 'catalog-entry-100',
   quantity: 2,
   notes: '',
   sharedOrgId: null,
@@ -84,17 +87,20 @@ describe('Inventory editor mode inline controls', () => {
     mockUpdateOrgItem.mockResolvedValue({});
     mockCreateItem.mockResolvedValue({});
     mockSearchItems.mockResolvedValue({
-      items: [
+      data: [
         {
-          id: 101,
-          uexId: 300,
+          id: 'catalog-entry-300',
+          catalogKind: 'item',
           name: 'New Catalog Item',
-          categoryName: 'Category',
+          slug: 'new-catalog-item',
+          categoryId: 'cat-uuid-1',
+          categoryPath: 'item.weapons',
+          isAvailableLive: true,
         },
       ],
       total: 1,
+      page: 1,
       limit: 20,
-      offset: 0,
     });
     mockGetUserPermissions.mockResolvedValue(['can_edit_org_inventory']);
     // minimal profile fetch
@@ -121,7 +127,10 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const quantityInput = await screen.findByTestId('inline-quantity-item-1');
+    const editBox = await screen.findByLabelText('Edit quantity for Test Item');
+    fireEvent.click(editBox);
+
+    const quantityInput = getInput(await screen.findByTestId('inline-quantity-item-1'));
     fireEvent.change(quantityInput, { target: { value: '5' } });
 
     const saveButton = screen.getByTestId('inline-save-item-1');
@@ -149,14 +158,14 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const itemInput = await screen.findByTestId('new-row-item-input');
+    const itemInput = getInput(await screen.findByTestId('new-row-item-input'));
     fireEvent.focus(itemInput);
     fireEvent.change(itemInput, { target: { value: 'New' } });
 
     const itemOption = await screen.findByText('New Catalog Item');
     fireEvent.click(itemOption);
 
-    const quantityInput = screen.getByTestId('new-row-quantity');
+    const quantityInput = getInput(screen.getByTestId('new-row-quantity'));
     fireEvent.change(quantityInput, { target: { value: '7' } });
 
     const saveButton = screen.getByTestId('new-row-save');
@@ -165,7 +174,7 @@ describe('Inventory editor mode inline controls', () => {
     await waitFor(() => expect(mockCreateItem).toHaveBeenCalled());
     expect(mockCreateItem).toHaveBeenCalledWith({
       gameId: 1,
-      uexItemId: 300,
+      catalogEntryId: 'catalog-entry-300',
       quantity: 7,
     });
   });
@@ -200,11 +209,11 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const itemInput = await screen.findByTestId('new-row-item-input');
+    const itemInput = getInput(await screen.findByTestId('new-row-item-input'));
     fireEvent.change(itemInput, { target: { value: 'New' } });
     fireEvent.click(await screen.findByText('New Catalog Item'));
 
-    const quantityInput = screen.getByTestId('new-row-quantity');
+    const quantityInput = getInput(screen.getByTestId('new-row-quantity'));
     fireEvent.change(quantityInput, { target: { value: '9' } });
 
     const saveButton = screen.getByTestId('new-row-save');
@@ -213,7 +222,7 @@ describe('Inventory editor mode inline controls', () => {
     await waitFor(() => expect(mockCreateOrgItem).toHaveBeenCalled());
     expect(mockCreateOrgItem).toHaveBeenCalledWith(42, {
       gameId: 1,
-      uexItemId: 300,
+      catalogEntryId: 'catalog-entry-300',
       quantity: 9,
     });
     expect(mockCreateItem).not.toHaveBeenCalled();
@@ -286,7 +295,7 @@ describe('Inventory editor mode inline controls', () => {
     await waitFor(() =>
       expect(screen.getByText('Select an item')).toBeInTheDocument(),
     );
-    const itemInput = await screen.findByTestId('new-row-item-input');
+    const itemInput = getInput(await screen.findByTestId('new-row-item-input'));
     await waitFor(() => expect(document.activeElement).toBe(itemInput));
   });
 
@@ -305,11 +314,11 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const itemInput = await screen.findByTestId('new-row-item-input');
+    const itemInput = getInput(await screen.findByTestId('new-row-item-input'));
     fireEvent.change(itemInput, { target: { value: 'New' } });
     fireEvent.click(await screen.findByText('New Catalog Item'));
 
-    const quantityInput = screen.getByTestId('new-row-quantity');
+    const quantityInput = getInput(screen.getByTestId('new-row-quantity'));
     fireEvent.change(quantityInput, { target: { value: '0' } });
     const saveButton = screen.getByTestId('new-row-save');
     fireEvent.click(saveButton);
@@ -337,12 +346,12 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    fireEvent.change(await screen.findByTestId('new-row-item-input'), {
+    fireEvent.change(getInput(await screen.findByTestId('new-row-item-input')), {
       target: { value: 'New' },
     });
     fireEvent.click(await screen.findByText('New Catalog Item'));
 
-    const quantityInput = screen.getByTestId('new-row-quantity');
+    const quantityInput = getInput(screen.getByTestId('new-row-quantity'));
     fireEvent.change(quantityInput, { target: { value: '7' } });
 
     fireEvent.click(screen.getByTestId('new-row-save'));
@@ -352,9 +361,7 @@ describe('Inventory editor mode inline controls', () => {
         screen.getByText('Unable to add item. Please try again.'),
       ).toBeInTheDocument(),
     );
-    expect(
-      (screen.getByTestId('new-row-quantity') as HTMLInputElement).value,
-    ).toBe('7');
+    expect(getInput(screen.getByTestId('new-row-quantity')).value).toBe('7');
     const retryButton = screen.getByTestId('new-row-retry');
     fireEvent.click(retryButton);
     await waitFor(() => expect(mockCreateItem).toHaveBeenCalledTimes(2));
@@ -375,7 +382,10 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const quantityInput = await screen.findByTestId('inline-quantity-item-1');
+    const editBox = await screen.findByLabelText('Edit quantity for Test Item');
+    fireEvent.click(editBox);
+
+    const quantityInput = getInput(await screen.findByTestId('inline-quantity-item-1'));
     fireEvent.change(quantityInput, { target: { value: '3.5' } });
     fireEvent.click(screen.getByTestId('inline-save-item-1'));
 
@@ -463,7 +473,7 @@ describe('Inventory editor mode inline controls', () => {
             id: 'org-item-1',
             orgId: 42,
             gameId: 1,
-            uexItemId: 300,
+            catalogEntryId: 'catalog-entry-300',
             quantity: 4,
             notes: '',
             active: true,
@@ -527,6 +537,9 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
+    const editBox = await screen.findByLabelText('Edit quantity for Test Item');
+    fireEvent.click(editBox);
+
     const saveButton = await screen.findByTestId('inline-save-item-1');
     fireEvent.click(saveButton);
 
@@ -554,18 +567,18 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const itemInput = await screen.findByTestId('new-row-item-input');
+    const itemInput = getInput(await screen.findByTestId('new-row-item-input'));
     fireEvent.change(itemInput, { target: { value: 'New' } });
     fireEvent.click(await screen.findByText('New Catalog Item'));
 
-    const quantityInput = screen.getByTestId('new-row-quantity');
+    const quantityInput = getInput(screen.getByTestId('new-row-quantity'));
     fireEvent.change(quantityInput, { target: { value: '11' } });
 
     fireEvent.click(screen.getByTestId('new-row-save'));
 
     await waitFor(() => expect(mockCreateItem).toHaveBeenCalled());
-    const refreshedItemInput = await screen.findByTestId('new-row-item-input');
-    expect((refreshedItemInput as HTMLInputElement).value).toBe('');
+    const refreshedItemInput = getInput(await screen.findByTestId('new-row-item-input'));
+    expect(refreshedItemInput.value).toBe('');
     await waitFor(() =>
       expect(document.activeElement).toBe(refreshedItemInput),
     );
@@ -586,7 +599,10 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const quantityInput = await screen.findByTestId('inline-quantity-item-1');
+    const editBox = await screen.findByLabelText('Edit quantity for Test Item');
+    fireEvent.click(editBox);
+
+    const quantityInput = getInput(await screen.findByTestId('inline-quantity-item-1'));
     fireEvent.keyDown(quantityInput, { key: 'Enter', code: 'Enter' });
 
     const saveButton = await screen.findByTestId('inline-save-item-1');
@@ -608,7 +624,7 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const quantityInput = await screen.findByTestId('new-row-quantity');
+    const quantityInput = getInput(await screen.findByTestId('new-row-quantity'));
     fireEvent.change(quantityInput, { target: { value: '999999.999999' } });
     expect(
       screen.getByText('Large quantity entered - verify value.'),
@@ -646,7 +662,10 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const quantityInput = await screen.findByTestId('inline-quantity-item-1');
+    const editBox = await screen.findByLabelText('Edit quantity for Test Item');
+    fireEvent.click(editBox);
+
+    const quantityInput = getInput(await screen.findByTestId('inline-quantity-item-1'));
     await user.click(quantityInput);
     fireEvent.keyDown(quantityInput, { key: 'Enter', code: 'Enter' });
 
@@ -654,9 +673,9 @@ describe('Inventory editor mode inline controls', () => {
     await waitFor(() => expect(document.activeElement).toBe(saveButton));
 
     await user.keyboard('{Enter}');
-    const nextQuantityInput = await screen.findByTestId(
+    const nextQuantityInput = getInput(await screen.findByTestId(
       'inline-quantity-item-2',
-    );
+    ));
     await waitFor(() => expect(document.activeElement).toBe(nextQuantityInput));
   });
 
@@ -700,12 +719,15 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
+    const editBox = await screen.findByLabelText('Edit quantity for Test Item');
+    fireEvent.click(editBox);
+
     const saveButton = await screen.findByTestId('inline-save-item-1');
     await user.click(saveButton);
 
-    const nextQuantityInput = await screen.findByTestId(
+    const nextQuantityInput = getInput(await screen.findByTestId(
       'inline-quantity-item-2',
-    );
+    ));
     await waitFor(() => expect(document.activeElement).toBe(nextQuantityInput));
   });
 
@@ -725,12 +747,12 @@ describe('Inventory editor mode inline controls', () => {
     const editorOption = await screen.findByText('Editor Mode');
     fireEvent.click(editorOption);
 
-    const itemInput = await screen.findByTestId('new-row-item-input');
+    const itemInput = getInput(await screen.findByTestId('new-row-item-input'));
     itemInput.focus();
 
     await user.tab();
     expect(document.activeElement).toBe(
-      await screen.findByTestId('new-row-quantity'),
+      getInput(await screen.findByTestId('new-row-quantity')),
     );
 
     await user.tab();

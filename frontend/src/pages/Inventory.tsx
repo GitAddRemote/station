@@ -58,7 +58,7 @@ import {
   InventoryItem,
   OrgInventoryItem,
 } from '../services/inventory.service';
-import { uexService, CatalogItem } from '../services/uex.service';
+import { catalogService, CatalogEntryDto } from '../services/catalog.service';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
@@ -141,15 +141,15 @@ const InventoryPage = () => {
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
-  const [catalogCategoryId, setCatalogCategoryId] = useState<number | ''>('');
-  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [catalogCategoryId, setCatalogCategoryId] = useState<string | ''>('');
+  const [catalogItems, setCatalogItems] = useState<CatalogEntryDto[]>([]);
   const [catalogTotal, setCatalogTotal] = useState(0);
   const [catalogPage, setCatalogPage] = useState(0);
   const [catalogRowsPerPage, setCatalogRowsPerPage] = useState(25);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [selectedCatalogItem, setSelectedCatalogItem] =
-    useState<CatalogItem | null>(null);
+    useState<CatalogEntryDto | null>(null);
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemNotes, setNewItemNotes] = useState('');
   const [addSubmitting, setAddSubmitting] = useState(false);
@@ -162,7 +162,7 @@ const InventoryPage = () => {
 
   const [filters, setFilters] = useState({
     search: '',
-    categoryId: '' as number | '',
+    categoryId: '' as string | '',
     sharedOnly: false,
     valueRange: [0, 999999.999999] as [number, number],
   });
@@ -191,16 +191,16 @@ const InventoryPage = () => {
   const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] =
     useState(false);
   const [newRowDraft, setNewRowDraft] = useState<{
-    itemId: number | '';
+    itemId: string | '';
     quantity: number | '';
   }>({
     itemId: '',
     quantity: '',
   });
   const [newRowSelectedItem, setNewRowSelectedItem] =
-    useState<CatalogItem | null>(null);
+    useState<CatalogEntryDto | null>(null);
   const [newRowItemInput, setNewRowItemInput] = useState('');
-  const [newRowItemOptions, setNewRowItemOptions] = useState<CatalogItem[]>([]);
+  const [newRowItemOptions, setNewRowItemOptions] = useState<CatalogEntryDto[]>([]);
   const [newRowItemLoading, setNewRowItemLoading] = useState(false);
   const [newRowItemError, setNewRowItemError] = useState<string | null>(null);
   const [newRowErrors, setNewRowErrors] = useState<{
@@ -283,7 +283,7 @@ const InventoryPage = () => {
   const newRowItemRef = useRef<HTMLInputElement | null>(null);
   const newRowQuantityRef = useRef<HTMLInputElement | null>(null);
   const newRowSaveRef = useRef<HTMLButtonElement | null>(null);
-  const newRowItemCache = useRef<Map<string, CatalogItem[]>>(new Map());
+  const newRowItemCache = useRef<Map<string, CatalogEntryDto[]>>(new Map());
 
   const activateInlineField = useCallback(
     (rowKey: string, field: 'quantity') => {
@@ -454,20 +454,19 @@ const InventoryPage = () => {
       setCatalogLoading(true);
       const params = {
         search: debouncedCatalogSearch || undefined,
-        categoryId:
-          typeof catalogCategoryId === 'number' ? catalogCategoryId : undefined,
+        categoryId: catalogCategoryId || undefined,
         limit: catalogRowsPerPage,
-        offset: catalogPage * catalogRowsPerPage,
+        page: catalogPage + 1,
       };
-      const data = await uexService.searchItems(params);
-      setCatalogItems(data.items);
+      const data = await catalogService.getCatalogItems(params);
+      setCatalogItems(data.data);
       setCatalogTotal(data.total);
       setSelectedCatalogItem((prev) => {
-        if (data.items.length === 0) {
+        if (data.data.length === 0) {
           return null;
         }
-        if (!prev || !data.items.some((item) => item.id === prev.id)) {
-          return data.items[0];
+        if (!prev || !data.data.some((item) => item.id === prev.id)) {
+          return data.data[0];
         }
         return prev;
       });
@@ -498,8 +497,7 @@ const InventoryPage = () => {
       } else {
         setRefreshing(true);
       }
-      const categoryId =
-        typeof filters.categoryId === 'number' ? filters.categoryId : undefined;
+      const categoryId = filters.categoryId || undefined;
       const [minQuantity, maxQuantity] = filters.valueRange;
       const apiSort = sortBy === 'date' ? 'date_modified' : sortBy;
       const limit = rowsPerPage;
@@ -638,7 +636,7 @@ const InventoryPage = () => {
       setAddSubmitting(true);
       setCatalogError(null);
       const existing = items.find(
-        (item) => item.uexItemId === selectedCatalogItem.uexId,
+        (item) => item.catalogEntryId === selectedCatalogItem.id,
       );
 
       if (existing) {
@@ -662,7 +660,7 @@ const InventoryPage = () => {
         } else if (!isOrgView) {
           await inventoryService.createItem({
             gameId: GAME_ID,
-            uexItemId: selectedCatalogItem.uexId,
+            catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
             notes: newItemNotes || undefined,
           });
@@ -674,14 +672,14 @@ const InventoryPage = () => {
         if (isOrgView && selectedOrgId !== null) {
           await inventoryService.createOrgItem(selectedOrgId, {
             gameId: GAME_ID,
-            uexItemId: selectedCatalogItem.uexId,
+            catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
             notes: newItemNotes || undefined,
           });
         } else {
           await inventoryService.createItem({
             gameId: GAME_ID,
-            uexItemId: selectedCatalogItem.uexId,
+            catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
             notes: newItemNotes || undefined,
           });
@@ -708,7 +706,7 @@ const InventoryPage = () => {
         );
       } else if (status === 409 && viewMode === 'org' && selectedOrgId) {
         let existing = items.find(
-          (item) => item.uexItemId === selectedCatalogItem?.uexId,
+          (item) => item.catalogEntryId === selectedCatalogItem?.id,
         );
         if (!existing && selectedCatalogItem) {
           try {
@@ -716,7 +714,7 @@ const InventoryPage = () => {
               selectedOrgId,
               {
                 gameId: GAME_ID,
-                uexItemId: selectedCatalogItem.uexId,
+                catalogEntryId: selectedCatalogItem.id,
                 limit: 1,
                 offset: 0,
               },
@@ -958,9 +956,7 @@ const InventoryPage = () => {
       }));
       return;
     }
-    const selectedItemId =
-      newRowSelectedItem?.uexId ??
-      (typeof newRowDraft.itemId === 'number' ? newRowDraft.itemId : null);
+    const selectedItemId = newRowSelectedItem?.id ?? null;
     const parsedQuantity = Number(newRowDraft.quantity);
     const errors: typeof newRowErrors = {};
 
@@ -989,7 +985,7 @@ const InventoryPage = () => {
       setNewRowErrors({});
       const payload = {
         gameId: GAME_ID,
-        uexItemId: selectedItemId as number,
+        catalogEntryId: selectedItemId as string,
         quantity: parsedQuantity,
       };
       if (viewMode === 'org' && selectedOrgId) {
@@ -1131,14 +1127,14 @@ const InventoryPage = () => {
       try {
         setNewRowItemError(null);
         setNewRowItemLoading(true);
-        const data = await uexService.searchItems({
+        const data = await catalogService.getCatalogItems({
           search: debouncedNewItemSearch || undefined,
           limit: 20,
-          offset: 0,
+          page: 1,
         });
         if (!isMounted) return;
-        newRowItemCache.current.set(searchKey, data.items);
-        setNewRowItemOptions(data.items);
+        newRowItemCache.current.set(searchKey, data.data);
+        setNewRowItemOptions(data.data);
       } catch (err) {
         console.error('Failed to search catalog items for new row', err);
         if (isMounted) {
@@ -1542,7 +1538,7 @@ const InventoryPage = () => {
               <Typography variant="body2">
                 Delete{' '}
                 <strong>
-                  {actionItem.itemName || `Item ${actionItem.uexItemId}`}
+                  {actionItem.itemName || `Item ${actionItem.catalogEntryId}`}
                 </strong>
                 ?
               </Typography>
@@ -1954,7 +1950,7 @@ const InventoryPage = () => {
                           setNewRowSelectedItem(value);
                           setNewRowDraft((prev) => ({
                             ...prev,
-                            itemId: value ? value.uexId : '',
+                            itemId: value ? value.id : '',
                           }));
                           setNewRowItemInput(value?.name ?? newRowItemInput);
                           setNewRowErrors((prev) => ({
@@ -2165,9 +2161,7 @@ const InventoryPage = () => {
                         label="Category"
                         value={catalogCategoryId}
                         onChange={(e) =>
-                          setCatalogCategoryId(
-                            e.target.value === '' ? '' : Number(e.target.value),
-                          )
+                          setCatalogCategoryId(e.target.value as string)
                         }
                       >
                         <MenuItem value="">
@@ -2304,7 +2298,7 @@ const InventoryPage = () => {
                           </ListItemIcon>
                           <ListItemText
                             primary={item.name}
-                            secondary={item.categoryName || 'Uncategorized'}
+                            secondary={item.categoryPath || 'Uncategorized'}
                           />
                         </ListItemButton>
                       ))}
