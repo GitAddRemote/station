@@ -36,7 +36,7 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
         "owner_id"             UUID           NOT NULL,
         "catalog_entry_id"     UUID           NOT NULL,
         "catalog_kind"         VARCHAR(20)    NOT NULL,
-        "location_id"          UUID           NOT NULL,
+        "location_id"          UUID           NOT NULL DEFAULT (SELECT "id" FROM "station_location" WHERE "slug" = 'unknown'),
         "unit_of_measure_id"   UUID           NOT NULL,
         "quantity"             NUMERIC(12,6)  NOT NULL DEFAULT 1,
         "quality"              INTEGER        NULL,
@@ -50,6 +50,8 @@ export class AddInventoryTables1780080000000 implements MigrationInterface {
           PRIMARY KEY ("id"),
         CONSTRAINT "chk_station_inventory_item_quantity_positive"
           CHECK ("quantity" > 0),
+        CONSTRAINT "chk_station_inventory_item_unit_quantity_whole"
+          CHECK ("catalog_kind" NOT IN ('item', 'vehicle') OR floor("quantity") = "quantity"),
         CONSTRAINT "chk_station_inventory_item_owner_type"
           CHECK ("owner_type" IN ('user', 'org')),
         CONSTRAINT "chk_station_inventory_item_catalog_kind"
