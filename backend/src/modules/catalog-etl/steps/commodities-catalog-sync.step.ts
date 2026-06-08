@@ -37,7 +37,7 @@ interface StationCommodityRow {
 }
 
 interface StoredCatalogEntry {
-  uex_id: number;
+  uex_id: number | null;
   name: string;
   slug: string;
   is_available_live: boolean;
@@ -66,7 +66,12 @@ export class CommoditiesCatalogSyncStep implements EtlStep {
        WHERE is_locally_managed = TRUE AND catalog_kind = 'commodity'`,
     );
     const locallyManagedByUexId = new Map<number, StoredCatalogEntry>(
-      locallyManagedRows.map((r) => [r.uex_id, r]),
+      locallyManagedRows
+        .filter((r) => r.uex_id !== null)
+        .map((r) => [r.uex_id as number, r]),
+    );
+    const locallyManagedBySlug = new Map<string, StoredCatalogEntry>(
+      locallyManagedRows.map((r) => [r.slug, r]),
     );
 
     // Load commodities joined with their category mapping
@@ -107,12 +112,15 @@ export class CommoditiesCatalogSyncStep implements EtlStep {
         continue;
       }
 
-      // Check locally managed drift
-      const stored = locallyManagedByUexId.get(record.uex_id);
+      // Check locally managed drift — primary lookup by uex_id, fallback by slug
+      const slug = record.slug ?? `commodity-${record.uex_id}`;
+      const stored =
+        locallyManagedByUexId.get(record.uex_id) ??
+        locallyManagedBySlug.get(slug);
       if (stored !== undefined) {
         const drifted: string[] = [];
+        if (stored.uex_id !== record.uex_id) drifted.push('uex_id');
         if (record.name !== stored.name) drifted.push('name');
-        const slug = record.slug ?? `commodity-${record.uex_id}`;
         if (slug !== stored.slug) drifted.push('slug');
         if (record.is_available_live !== stored.is_available_live)
           drifted.push('is_available_live');
@@ -131,8 +139,6 @@ export class CommoditiesCatalogSyncStep implements EtlStep {
         }
         continue;
       }
-
-      const slug = record.slug ?? `commodity-${record.uex_id}`;
 
       const baseProperties = {
         weight_scu: record.weight_scu ?? null,

@@ -193,5 +193,35 @@ describe('ItemsCatalogSyncStep', () => {
         }),
       );
     });
+
+    it('warns via slug fallback when locally managed row has uex_id=null but matching slug', async () => {
+      const dsQuery = buildDsQuery(
+        [makeItem()],
+        [
+          {
+            uex_id: null,
+            name: 'Helmets S1',
+            slug: 'helmets-s1',
+          },
+        ],
+      );
+      const step = buildStep(dsQuery, repoCreate, repoSave);
+
+      await step.execute(CTX);
+
+      const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_catalog_entry'),
+      );
+      expect(insert).toBeUndefined();
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          rawPayload: expect.objectContaining({
+            id: 1,
+            drifted_fields: expect.arrayContaining(['uex_id']),
+          }),
+        }),
+      );
+    });
   });
 });

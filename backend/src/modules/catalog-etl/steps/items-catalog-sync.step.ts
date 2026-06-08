@@ -20,7 +20,7 @@ interface StationItemRow {
 }
 
 interface StoredCatalogEntry {
-  uex_id: number;
+  uex_id: number | null;
   name: string;
   slug: string;
 }
@@ -47,7 +47,12 @@ export class ItemsCatalogSyncStep implements EtlStep {
        WHERE is_locally_managed = TRUE AND catalog_kind = 'item'`,
     );
     const locallyManagedByUexId = new Map<number, StoredCatalogEntry>(
-      locallyManagedRows.map((r) => [r.uex_id, r]),
+      locallyManagedRows
+        .filter((r) => r.uex_id !== null)
+        .map((r) => [r.uex_id as number, r]),
+    );
+    const locallyManagedBySlug = new Map<string, StoredCatalogEntry>(
+      locallyManagedRows.map((r) => [r.slug, r]),
     );
 
     // Load items joined with their category mapping via station_uex_category_map
@@ -86,12 +91,15 @@ export class ItemsCatalogSyncStep implements EtlStep {
         continue;
       }
 
-      // Check locally managed drift
-      const stored = locallyManagedByUexId.get(record.uex_id);
+      // Check locally managed drift — primary lookup by uex_id, fallback by slug
+      const slug = record.slug ?? `item-${record.uex_id}`;
+      const stored =
+        locallyManagedByUexId.get(record.uex_id) ??
+        locallyManagedBySlug.get(slug);
       if (stored !== undefined) {
         const drifted: string[] = [];
+        if (stored.uex_id !== record.uex_id) drifted.push('uex_id');
         if (record.name !== stored.name) drifted.push('name');
-        const slug = record.slug ?? `item-${record.uex_id}`;
         if (slug !== stored.slug) drifted.push('slug');
 
         if (drifted.length > 0) {
@@ -107,8 +115,6 @@ export class ItemsCatalogSyncStep implements EtlStep {
         }
         continue;
       }
-
-      const slug = record.slug ?? `item-${record.uex_id}`;
 
       // Parse size: varchar like '1', '2' cast to smallint; if not parseable store NULL
       let sizeVal: number | null = null;

@@ -64,7 +64,7 @@ interface StationVehicleRow {
 }
 
 interface StoredCatalogEntry {
-  uex_id: number;
+  uex_id: number | null;
   category_id: string;
   name: string;
   slug: string;
@@ -114,7 +114,12 @@ export class VehiclesCatalogSyncStep implements EtlStep {
        WHERE is_locally_managed = TRUE AND catalog_kind = 'vehicle'`,
     );
     const locallyManagedByUexId = new Map<number, StoredCatalogEntry>(
-      locallyManagedRows.map((r) => [r.uex_id, r]),
+      locallyManagedRows
+        .filter((r) => r.uex_id !== null)
+        .map((r) => [r.uex_id as number, r]),
+    );
+    const locallyManagedBySlug = new Map<string, StoredCatalogEntry>(
+      locallyManagedRows.map((r) => [r.slug, r]),
     );
 
     // Load all vehicles from station_vehicle
@@ -168,13 +173,16 @@ export class VehiclesCatalogSyncStep implements EtlStep {
         continue;
       }
 
-      // Check locally managed drift
-      const stored = locallyManagedByUexId.get(record.uex_id);
+      // Check locally managed drift — primary lookup by uex_id, fallback by slug
+      const slug = record.slug ?? `vehicle-${record.uex_id}`;
+      const stored =
+        locallyManagedByUexId.get(record.uex_id) ??
+        locallyManagedBySlug.get(slug);
       if (stored !== undefined) {
         const drifted: string[] = [];
+        if (stored.uex_id !== record.uex_id) drifted.push('uex_id');
         if (categoryId !== stored.category_id) drifted.push('category_id');
         if (record.name !== stored.name) drifted.push('name');
-        const slug = record.slug ?? `vehicle-${record.uex_id}`;
         if (slug !== stored.slug) drifted.push('slug');
         if ((record.scu ?? null) !== stored.scu) drifted.push('scu');
         if ((record.crew_min ?? null) !== stored.crew_min)
@@ -201,7 +209,6 @@ export class VehiclesCatalogSyncStep implements EtlStep {
         continue;
       }
 
-      const slug = record.slug ?? `vehicle-${record.uex_id}`;
       const isAvailableLive = !record.is_concept;
       const isConcept = record.is_concept;
 
