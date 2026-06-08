@@ -8,9 +8,6 @@ import { UserOrganizationRole } from './modules/user-organization-roles/user-org
 import { PasswordReset } from './modules/auth/password-reset.entity';
 import { AuditLog } from './modules/audit-logs/audit-log.entity';
 import { Game } from './modules/games/game.entity';
-import { UserInventoryItem } from './modules/user-inventory/entities/user-inventory-item.entity';
-import { InventoryAuditLog } from './modules/user-inventory/entities/inventory-audit-log.entity';
-import { OrgInventoryItem } from './modules/org-inventory/entities/org-inventory-item.entity';
 import { UexCommodity } from './modules/uex/entities/uex-commodity.entity';
 import { UexItem } from './modules/uex/entities/uex-item.entity';
 import { UexCategory } from './modules/uex/entities/uex-category.entity';
@@ -66,9 +63,6 @@ export const AppDataSource = new DataSource({
     PasswordReset,
     AuditLog,
     Game,
-    UserInventoryItem,
-    InventoryAuditLog,
-    OrgInventoryItem,
     UexCommodity,
     UexItem,
     UexCategory,
