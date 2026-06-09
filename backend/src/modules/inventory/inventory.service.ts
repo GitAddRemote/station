@@ -116,8 +116,18 @@ export class InventoryService {
     const queryBuilder = this.createInventoryBaseQueryBuilder();
     this.applyListFilters(queryBuilder, context, query);
 
+    const sortColumnMap: Record<string, string> = {
+      name: 'catalogEntry.name',
+      quantity: 'item.quantity',
+      created_at: 'item.createdAt',
+      date_modified: 'item.updatedAt',
+    };
+    const sortColumn =
+      sortColumnMap[query.sort ?? 'date_modified'] ?? 'item.updatedAt';
+    const sortDir = (query.order ?? 'desc').toUpperCase() as 'ASC' | 'DESC';
+
     queryBuilder
-      .orderBy('item.updated_at', 'DESC')
+      .orderBy(sortColumn, sortDir)
       .skip((normalizedPage - 1) * normalizedLimit)
       .take(normalizedLimit);
 
@@ -493,6 +503,24 @@ export class InventoryService {
     if (query.categoryId) {
       queryBuilder.andWhere('catalogEntry.category_id = :categoryId', {
         categoryId: query.categoryId,
+      });
+    }
+
+    if (query.search) {
+      queryBuilder.andWhere('catalogEntry.name ILIKE :search', {
+        search: `%${query.search}%`,
+      });
+    }
+
+    if (query.minQuantity !== undefined) {
+      queryBuilder.andWhere('item.quantity >= :minQuantity', {
+        minQuantity: query.minQuantity,
+      });
+    }
+
+    if (query.maxQuantity !== undefined) {
+      queryBuilder.andWhere('item.quantity <= :maxQuantity', {
+        maxQuantity: query.maxQuantity,
       });
     }
   }

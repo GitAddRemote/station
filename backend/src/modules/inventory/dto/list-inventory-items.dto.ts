@@ -4,7 +4,9 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
+  IsString,
   IsUUID,
   Max,
   Min,
@@ -75,4 +77,35 @@ export class ListInventoryItemsDto {
   @Transform(({ value }) => parseBoolean(value))
   @IsBoolean()
   includeSummary?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minQuantity?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxQuantity?: number;
+
+  @ApiPropertyOptional({
+    enum: ['name', 'quantity', 'created_at', 'date_modified'],
+  })
+  @IsOptional()
+  @IsIn(['name', 'quantity', 'created_at', 'date_modified'])
+  sort?: 'name' | 'quantity' | 'created_at' | 'date_modified';
+
+  @ApiPropertyOptional({ enum: ['asc', 'desc'] })
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  order?: 'asc' | 'desc';
 }

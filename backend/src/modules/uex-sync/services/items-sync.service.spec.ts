@@ -516,7 +516,7 @@ describe('ItemsSyncService', () => {
           kind: 'commodity',
         },
         { id: 101, id_category: 1, name: 'Regular Item', kind: 'item' },
-        { id: 102, id_category: 1, name: 'Delta Item' }, // kind absent — must not default to false
+        { id: 102, id_category: 1, name: 'Delta Item' }, // kind and is_commodity absent — defaults to false
       ];
 
       mockSyncService.shouldUseDeltaSync.mockResolvedValue({
@@ -544,10 +544,10 @@ describe('ItemsSyncService', () => {
       const rows = capturedValues as Array<Record<string, unknown>>;
       expect(rows[0].isCommodity).toBe(true);
       expect(rows[1].isCommodity).toBe(false);
-      // kind absent → null (not undefined/DEFAULT) so COALESCE preserves the stored DB value
-      expect(rows[2].isCommodity).toBeNull();
-      expect(rows[2].isBuyable).toBeNull();
-      expect(rows[2].isSellable).toBeNull();
+      // kind and is_commodity absent → false (NOT NULL default; avoids constraint violation on fresh insert)
+      expect(rows[2].isCommodity).toBe(false);
+      expect(rows[2].isBuyable).toBe(false);
+      expect(rows[2].isSellable).toBe(false);
     });
 
     it('should not pause between category chunks when no rate limit is hit', async () => {

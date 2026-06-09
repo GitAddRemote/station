@@ -5,18 +5,15 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 
-interface StationItemRow {
+interface UexItemRow {
   uex_id: number;
   name: string;
-  slug: string | null;
+  slug?: string | null;
   size: string | null;
-  weight_scu: string | null;
-  is_buyable: boolean;
-  is_sellable: boolean;
   company_name: string | null;
-  category_name: string | null;
   uuid: string | null;
   catalog_category_id: string | null;
+  star_citizen_uuid: string | null;
 }
 
 interface StoredCatalogEntry {
@@ -55,22 +52,22 @@ export class ItemsCatalogSyncStep implements EtlStep {
       locallyManagedRows.map((r) => [r.slug, r]),
     );
 
-    // Load items joined with their category mapping via station_uex_category_map
-    const items = await this.dataSource.query<StationItemRow[]>(
-      `SELECT si.uex_id, si.name, si.slug, si.size, si.weight_scu,
-              si.is_buyable, si.is_sellable,
-              sc.name AS company_name,
-              NULL::text AS category_name,
-              si.uuid,
+    // Source from uex_item (populated by the uex-sync pipeline) joined with
+    // station_uex_category_map to resolve catalog_category_id.
+    const items = await this.dataSource.query<UexItemRow[]>(
+      `SELECT ui.uex_id, ui.name, ui.size,
+              ui.company_name,
+              ui.star_citizen_uuid AS uuid,
+              ui.star_citizen_uuid,
               ucm.catalog_category_id
-       FROM station_item si
-       LEFT JOIN station_uex_category_map ucm ON ucm.uex_category_id = si.category_uex_id
-       LEFT JOIN station_company sc ON sc.uex_id = si.company_uex_id`,
+       FROM uex_item ui
+       LEFT JOIN station_uex_category_map ucm ON ucm.uex_category_id = ui.id_category
+       WHERE ui.deleted = FALSE AND ui.active = TRUE`,
     );
 
     this.logger.info(
       { runId: ctx.runId, count: items.length },
-      'Loaded items from station_item',
+      'Loaded items from uex_item',
     );
 
     let upserted = 0;
@@ -127,15 +124,12 @@ export class ItemsCatalogSyncStep implements EtlStep {
 
       const baseProperties = {
         size: record.size ?? null,
-        weight_scu: record.weight_scu ?? null,
-        is_buyable: record.is_buyable,
-        is_sellable: record.is_sellable,
       };
 
       const attributes = {
         company_name: record.company_name ?? null,
-        category_name: record.category_name ?? null,
         uuid: record.uuid ?? null,
+        star_citizen_uuid: record.star_citizen_uuid ?? null,
       };
 
       await this.dataSource.query(
@@ -172,7 +166,7 @@ export class ItemsCatalogSyncStep implements EtlStep {
           record.name, // $3  name
           slug, // $4  slug
           sizeVal, // $5  size
-          record.weight_scu ?? null, // $6  scu
+          null, // $6  scu (not available from station_item)
           JSON.stringify(baseProperties), // $7  base_properties
           JSON.stringify(attributes), // $8  attributes
         ],
