@@ -21,10 +21,11 @@ export interface UEXItemResponse {
   uuid?: string;
   weight_scu?: string | number;
   kind?: string;
-  is_buyable?: boolean;
-  is_sellable?: boolean;
-  date_added?: string;
-  date_modified?: string;
+  is_commodity?: number | boolean;
+  is_buyable?: boolean | null;
+  is_sellable?: boolean | null;
+  date_added?: string | number;
+  date_modified?: string | number;
 }
 
 export interface UEXItemFilters {
