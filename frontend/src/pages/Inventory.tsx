@@ -215,6 +215,8 @@ const InventoryPage = () => {
   const [uomOptions, setUomOptions] = useState<UnitOfMeasureDto[]>([]);
   const [newRowSelectedUom, setNewRowSelectedUom] =
     useState<UnitOfMeasureDto | null>(null);
+  const newRowSelectedUomRef = useRef<UnitOfMeasureDto | null>(null);
+  newRowSelectedUomRef.current = newRowSelectedUom;
   const [dialogSelectedUom, setDialogSelectedUom] =
     useState<UnitOfMeasureDto | null>(null);
   const debouncedSearch = useDebounce(filters.search, 350);
@@ -583,7 +585,6 @@ const InventoryPage = () => {
     orgPermissionsLoading,
     canViewOrgInventory,
     filters.categoryId,
-    filters.sharedOnly,
     filters.valueRange,
     debouncedSearch,
     sortBy,
@@ -1139,7 +1140,7 @@ const InventoryPage = () => {
       return code === 'unit';
     });
     if (allowed.length === 0) return;
-    const current = newRowSelectedUom;
+    const current = newRowSelectedUomRef.current;
     const alreadyValid = current && allowed.some((u) => u.id === current.id);
     if (!alreadyValid) {
       setNewRowSelectedUom(allowed[0]);
@@ -1493,7 +1494,7 @@ const InventoryPage = () => {
                   onClick={() =>
                     handleUpdateItem({
                       quantity: actionQuantity,
-                      notes: actionItem.notes,
+                      notes: actionItem.notes ?? undefined,
                     })
                   }
                   disabled={actionWorking}

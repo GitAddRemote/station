@@ -53,7 +53,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
+const InventoryPortlet = ({ onExpand }: InventoryPortletProps) => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -100,7 +100,7 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
     } finally {
       setLoading(false);
     }
-  }, [gameId, debouncedSearch, sharedOnly, page, rowsPerPage, categoryId]);
+  }, [debouncedSearch, page, rowsPerPage, categoryId]);
 
   useEffect(() => {
     fetchInventory();
