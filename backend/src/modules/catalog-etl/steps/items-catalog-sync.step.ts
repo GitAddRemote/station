@@ -8,6 +8,7 @@ import { EtlWarning } from '../entities/etl-warning.entity';
 interface UexItemRow {
   uex_id: number;
   name: string;
+  slug?: string | null;
   size: string | null;
   company_name: string | null;
   uuid: string | null;
@@ -88,7 +89,7 @@ export class ItemsCatalogSyncStep implements EtlStep {
       }
 
       // Check locally managed drift — primary lookup by uex_id, fallback by slug
-      const slug = `item-${record.uex_id}`;
+      const slug = record.slug ?? `item-${record.uex_id}`;
       const stored =
         locallyManagedByUexId.get(record.uex_id) ??
         locallyManagedBySlug.get(slug);
