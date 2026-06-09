@@ -18,7 +18,8 @@
     "transpileOnly": true,
     "files": true,
     "compilerOptions": {
-      "module": "commonjs"
+      "module": "commonjs",
+      "types": ["node", "jest"]
     }
   }
 }

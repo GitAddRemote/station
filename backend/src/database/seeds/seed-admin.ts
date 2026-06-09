@@ -4,7 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseSeederAdminModule } from './database-seeder-admin.module';
 import { DatabaseSeederAdminService } from './database-seeder-admin.service';
-import { User } from '../../modules/users/user.entity';
+import { AppDataSource } from '../../data-source';
 
 // Minimal module: only DB + config + the seeder. No Redis, no auth stack.
 @Module({
@@ -19,7 +19,7 @@ import { User } from '../../modules/users/user.entity';
         username: configService.get<string>('DATABASE_USER'),
         password: configService.get<string>('DATABASE_PASSWORD'),
         database: configService.get<string>('DATABASE_NAME'),
-        entities: [User],
+        entities: AppDataSource.options.entities,
         synchronize: false,
         extra: { parseInt8: true },
       }),
