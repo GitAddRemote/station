@@ -2,7 +2,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cache } from 'cache-manager';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { StationUnitOfMeasure } from '../inventory/entities/station-unit-of-measure.entity';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
 import {
@@ -10,7 +10,17 @@ import {
   PaginatedCatalogEntriesDto,
 } from './dto/catalog-entry.dto';
 import { CatalogCategoryTreeDto } from './dto/catalog-category-tree.dto';
+import { LocationDto } from './dto/location.dto';
 import { UnitOfMeasureDto } from './dto/unit-of-measure.dto';
+
+interface RawLocationRow {
+  id: string;
+  name: string;
+  slug: string;
+  sourceType: string;
+  starSystemUexId: number | null;
+  starSystemName: string | null;
+}
 import { StationCatalogCategory } from './entities/station-catalog-category.entity';
 import { StationCatalogEntry } from './entities/station-catalog-entry.entity';
 
@@ -27,6 +37,7 @@ export class CatalogService {
     private readonly unitOfMeasureRepository: Repository<StationUnitOfMeasure>,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
+    private readonly dataSource: DataSource,
   ) {}
 
   async searchCatalog(
@@ -230,5 +241,35 @@ export class CatalogService {
       scaleFactor: Number(unit.scaleFactor),
       sortOrder: unit.sortOrder,
     };
+  }
+
+  async searchLocations(search?: string): Promise<LocationDto[]> {
+    const rows = await this.dataSource.query<RawLocationRow[]>(
+      `SELECT
+         sl.id,
+         sl.name,
+         sl.slug,
+         sl.source_type AS "sourceType",
+         sl.star_system_uex_id AS "starSystemUexId",
+         ss.name AS "starSystemName"
+       FROM station_location sl
+       LEFT JOIN uex_star_system ss
+         ON ss.uex_id = sl.star_system_uex_id
+         AND ss.deleted = FALSE
+       WHERE sl.is_available_live = TRUE
+         AND ($1::text IS NULL OR sl.name ILIKE '%' || $1 || '%')
+       ORDER BY sl.name ASC
+       LIMIT 100`,
+      [search ?? null],
+    );
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      sourceType: r.sourceType,
+      starSystemUexId: r.starSystemUexId,
+      starSystemName: r.starSystemName ?? null,
+    }));
   }
 }
