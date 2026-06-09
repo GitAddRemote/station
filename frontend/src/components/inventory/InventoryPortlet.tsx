@@ -29,7 +29,6 @@ import {
   inventoryService,
   InventoryItem,
   InventoryCategory,
-  InventorySearchParams,
 } from '../../services/inventory.service';
 
 interface InventoryPortletProps {
@@ -54,7 +53,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
+const InventoryPortlet = ({ onExpand }: InventoryPortletProps) => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -83,27 +82,24 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
   const fetchInventory = useCallback(async () => {
     try {
       setLoading(true);
-      const params: InventorySearchParams = {
-        gameId,
+      const result = await inventoryService.getInventory({
         limit: rowsPerPage,
-        offset: page * rowsPerPage,
+        page: page + 1,
         search: debouncedSearch || undefined,
-        sharedOnly,
+        orgAvailable: sharedOnly || undefined,
         categoryId: categoryId || undefined,
-      };
+      });
 
-      const { items: fetchedItems, total } =
-        await inventoryService.getInventory(params);
-
+      const fetchedItems = result.data;
       setItems(fetchedItems);
-      setTotalCount(total ?? fetchedItems.length);
+      setTotalCount(result.total ?? fetchedItems.length);
     } catch (error) {
       console.error('Error fetching inventory:', error);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [gameId, debouncedSearch, sharedOnly, page, rowsPerPage, categoryId]);
+  }, [debouncedSearch, sharedOnly, page, rowsPerPage, categoryId]);
 
   useEffect(() => {
     fetchInventory();
@@ -248,15 +244,13 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">
-                          {item.locationType && item.locationUexId
-                            ? `${item.locationType} #${item.locationUexId}`
-                            : '—'}
+                          {item.locationName ?? '—'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        {item.sharedOrgId ? (
+                        {item.isOrgAvailable ? (
                           <Chip
-                            label={item.sharedOrgName || 'Shared'}
+                            label="Shared"
                             size="small"
                             color="primary"
                             variant="outlined"
