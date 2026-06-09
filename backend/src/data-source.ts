@@ -50,6 +50,7 @@ import { AddCatalogCategoryMaps1780060000000 } from './migrations/1780060000000-
 import { AddStationCatalogEntry1780070000000 } from './migrations/1780070000000-AddStationCatalogEntry';
 import { AddInventoryTables1780080000000 } from './migrations/1780080000000-AddInventoryTables';
 import { AddInventoryListTables1780090000000 } from './migrations/1780090000000-AddInventoryListTables';
+import { UpgradeStationUnitOfMeasureReferenceData1780100000000 } from './migrations/1780100000000-UpgradeStationUnitOfMeasureReferenceData';
 import { AddUuidV7IdentityToUsersAndOrganizations1780110000000 } from './migrations/1780110000000-AddUuidV7IdentityToUsersAndOrganizations';
 
 export const AppDataSource = new DataSource({
@@ -110,6 +111,7 @@ export const AppDataSource = new DataSource({
     AddStationCatalogEntry1780070000000,
     AddInventoryTables1780080000000,
     AddInventoryListTables1780090000000,
+    UpgradeStationUnitOfMeasureReferenceData1780100000000,
     AddUuidV7IdentityToUsersAndOrganizations1780110000000,
   ],
   synchronize: false,

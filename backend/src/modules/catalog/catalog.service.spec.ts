@@ -5,6 +5,7 @@ import { NotFoundException } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { StationCatalogEntry } from './entities/station-catalog-entry.entity';
 import { StationCatalogCategory } from './entities/station-catalog-category.entity';
+import { StationUnitOfMeasure } from '../inventory/entities/station-unit-of-measure.entity';
 
 describe('CatalogService', () => {
   let service: CatalogService;
@@ -16,6 +17,10 @@ describe('CatalogService', () => {
 
   const mockCategoryRepository = {
     findOne: jest.fn(),
+    find: jest.fn(),
+  };
+
+  const mockUnitOfMeasureRepository = {
     find: jest.fn(),
   };
 
@@ -81,6 +86,10 @@ describe('CatalogService', () => {
         {
           provide: getRepositoryToken(StationCatalogCategory),
           useValue: mockCategoryRepository,
+        },
+        {
+          provide: getRepositoryToken(StationUnitOfMeasure),
+          useValue: mockUnitOfMeasureRepository,
         },
         {
           provide: CACHE_MANAGER,
@@ -222,6 +231,110 @@ describe('CatalogService', () => {
 
     expect(result).toBe(cachedEntry);
     expect(mockEntryRepository.findOne).not.toHaveBeenCalled();
+  });
+
+  it('returns cached units of measure when available', async () => {
+    const cachedUnits = [
+      {
+        id: 'uom-1',
+        name: 'Unit',
+        abbreviation: 'unit',
+        catalogKind: null,
+        scaleFactor: 1,
+        sortOrder: 1,
+      },
+    ];
+    mockCacheManager.get.mockResolvedValueOnce(cachedUnits);
+
+    const result = await service.getUnitsOfMeasure();
+
+    expect(result).toBe(cachedUnits);
+    expect(mockUnitOfMeasureRepository.find).not.toHaveBeenCalled();
+  });
+
+  it('loads active units of measure ordered by sort order and caches them', async () => {
+    mockCacheManager.get.mockResolvedValueOnce(null);
+    mockUnitOfMeasureRepository.find.mockResolvedValueOnce([
+      {
+        id: 'uom-1',
+        name: 'Unit',
+        abbreviation: 'unit',
+        catalogKind: null,
+        scaleFactor: '1.000000',
+        sortOrder: 1,
+        isActive: true,
+      },
+      {
+        id: 'uom-2',
+        name: 'Standard Cargo Unit',
+        abbreviation: 'SCU',
+        catalogKind: 'commodity',
+        scaleFactor: '1.000000',
+        sortOrder: 2,
+        isActive: true,
+      },
+    ]);
+
+    const result = await service.getUnitsOfMeasure();
+
+    expect(mockUnitOfMeasureRepository.find).toHaveBeenCalledWith({
+      where: { isActive: true },
+      order: { sortOrder: 'ASC' },
+    });
+    expect(result).toEqual([
+      {
+        id: 'uom-1',
+        name: 'Unit',
+        abbreviation: 'unit',
+        catalogKind: null,
+        scaleFactor: 1,
+        sortOrder: 1,
+      },
+      {
+        id: 'uom-2',
+        name: 'Standard Cargo Unit',
+        abbreviation: 'SCU',
+        catalogKind: 'commodity',
+        scaleFactor: 1,
+        sortOrder: 2,
+      },
+    ]);
+    expect(mockCacheManager.set).toHaveBeenCalledWith(
+      'catalog:units-of-measure:active',
+      result,
+      300000,
+    );
+  });
+
+  it('preserves micro-precision scale factors through the DTO mapper', async () => {
+    mockCacheManager.get.mockResolvedValueOnce(null);
+    mockUnitOfMeasureRepository.find.mockResolvedValueOnce([
+      {
+        id: 'uom-3',
+        name: 'Centi-SCU',
+        abbreviation: 'cSCU',
+        catalogKind: 'commodity',
+        scaleFactor: '0.010000',
+        sortOrder: 3,
+        isActive: true,
+      },
+      {
+        id: 'uom-4',
+        name: 'Micro-SCU',
+        abbreviation: 'μSCU',
+        catalogKind: 'commodity',
+        scaleFactor: '0.000001',
+        sortOrder: 4,
+        isActive: true,
+      },
+    ]);
+
+    const result = await service.getUnitsOfMeasure();
+
+    expect(result).toEqual([
+      expect.objectContaining({ abbreviation: 'cSCU', scaleFactor: 0.01 }),
+      expect.objectContaining({ abbreviation: 'μSCU', scaleFactor: 0.000001 }),
+    ]);
   });
 
   it('loads and caches entry detail on cache miss', async () => {

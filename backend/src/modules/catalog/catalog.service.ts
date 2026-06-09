@@ -3,12 +3,14 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cache } from 'cache-manager';
 import { Repository } from 'typeorm';
+import { StationUnitOfMeasure } from '../inventory/entities/station-unit-of-measure.entity';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
 import {
   CatalogEntryDto,
   PaginatedCatalogEntriesDto,
 } from './dto/catalog-entry.dto';
 import { CatalogCategoryTreeDto } from './dto/catalog-category-tree.dto';
+import { UnitOfMeasureDto } from './dto/unit-of-measure.dto';
 import { StationCatalogCategory } from './entities/station-catalog-category.entity';
 import { StationCatalogEntry } from './entities/station-catalog-entry.entity';
 
@@ -21,6 +23,8 @@ export class CatalogService {
     private readonly entryRepository: Repository<StationCatalogEntry>,
     @InjectRepository(StationCatalogCategory)
     private readonly categoryRepository: Repository<StationCatalogCategory>,
+    @InjectRepository(StationUnitOfMeasure)
+    private readonly unitOfMeasureRepository: Repository<StationUnitOfMeasure>,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
   ) {}
@@ -136,6 +140,24 @@ export class CatalogService {
     return roots;
   }
 
+  async getUnitsOfMeasure(): Promise<UnitOfMeasureDto[]> {
+    const cacheKey = 'catalog:units-of-measure:active';
+    const cached = await this.cacheManager.get<UnitOfMeasureDto[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    const units = await this.unitOfMeasureRepository.find({
+      where: { isActive: true },
+      order: { sortOrder: 'ASC' },
+    });
+
+    const result = units.map((unit) => this.toUnitOfMeasureDto(unit));
+    await this.cacheManager.set(cacheKey, result, this.CACHE_TTL_MS);
+    return result;
+  }
+
   async getCatalogEntryById(id: string): Promise<CatalogEntryDto> {
     const cacheKey = `catalog:entry:${id}`;
     const cached = await this.cacheManager.get<CatalogEntryDto>(cacheKey);
@@ -196,6 +218,17 @@ export class CatalogService {
       crewMax: entry.crewMax,
       baseProperties: entry.baseProperties,
       attributes: entry.attributes,
+    };
+  }
+
+  private toUnitOfMeasureDto(unit: StationUnitOfMeasure): UnitOfMeasureDto {
+    return {
+      id: unit.id,
+      name: unit.name,
+      abbreviation: unit.abbreviation,
+      catalogKind: unit.catalogKind,
+      scaleFactor: Number(unit.scaleFactor),
+      sortOrder: unit.sortOrder,
     };
   }
 }
