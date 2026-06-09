@@ -58,7 +58,8 @@ import {
   InventoryItem,
   OrgInventoryItem,
 } from '../services/inventory.service';
-import { catalogService, CatalogEntryDto } from '../services/catalog.service';
+import { catalogService, CatalogEntryDto, LocationDto } from '../services/catalog.service';
+import LocationPicker from '../components/inventory/LocationPicker';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
@@ -136,6 +137,7 @@ const InventoryPage = () => {
   const [actionItem, setActionItem] = useState<InventoryRecord | null>(null);
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionWorking, setActionWorking] = useState(false);
+  const [editLocation, setEditLocation] = useState<LocationDto | null>(null);
   const [shareOrgId, setShareOrgId] = useState<number | ''>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -151,6 +153,7 @@ const InventoryPage = () => {
     useState<CatalogEntryDto | null>(null);
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemNotes, setNewItemNotes] = useState('');
+  const [newItemLocation, setNewItemLocation] = useState<LocationDto | null>(null);
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [orgPermissions, setOrgPermissions] = useState<OrgPermission[]>([]);
   const [orgPermissionsLoading, setOrgPermissionsLoading] = useState(false);
@@ -198,6 +201,8 @@ const InventoryPage = () => {
   });
   const [newRowSelectedItem, setNewRowSelectedItem] =
     useState<CatalogEntryDto | null>(null);
+  const [newRowSelectedLocation, setNewRowSelectedLocation] =
+    useState<LocationDto | null>(null);
   const [newRowItemInput, setNewRowItemInput] = useState('');
   const [newRowItemOptions, setNewRowItemOptions] = useState<CatalogEntryDto[]>([]);
   const [newRowItemLoading, setNewRowItemLoading] = useState(false);
@@ -573,12 +578,14 @@ const InventoryPage = () => {
     setCatalogPage(0);
     setNewItemQuantity(1);
     setNewItemNotes('');
+    setNewItemLocation(null);
     setCatalogError(null);
     setAddSubmitting(false);
   };
 
   const closeAddDialog = () => {
     setAddDialogOpen(false);
+    setNewItemLocation(null);
   };
 
   const handleCreateInventoryItem = async (options?: {
@@ -637,6 +644,7 @@ const InventoryPage = () => {
             quantity: newItemQuantity,
             unitOfMeasureId: defaultUom.id,
             notes: newItemNotes || null,
+            locationId: newItemLocation?.id ?? null,
           });
         } else {
           setCatalogError('This item already exists in the org inventory.');
@@ -651,6 +659,7 @@ const InventoryPage = () => {
             quantity: newItemQuantity,
             unitOfMeasureId: defaultUom.id,
             notes: newItemNotes || null,
+            locationId: newItemLocation?.id ?? null,
           });
         } else {
           await inventoryService.createItem({
@@ -658,6 +667,7 @@ const InventoryPage = () => {
             quantity: newItemQuantity,
             unitOfMeasureId: defaultUom.id,
             notes: newItemNotes || null,
+            locationId: newItemLocation?.id ?? null,
           });
         }
       }
@@ -666,6 +676,7 @@ const InventoryPage = () => {
       if (options?.stayOpen) {
         setNewItemQuantity(1);
         setNewItemNotes('');
+        setNewItemLocation(null);
         setCatalogError(null);
       } else {
         closeAddDialog();
@@ -830,6 +841,18 @@ const InventoryPage = () => {
   useEffect(() => {
     if (actionMode && actionItem) {
       setActionQuantity(Number(actionItem.quantity) || 0);
+      if (actionMode === 'edit' && actionItem.locationId && actionItem.locationName) {
+        setEditLocation({
+          id: actionItem.locationId,
+          name: actionItem.locationName,
+          slug: '',
+          sourceType: '',
+          starSystemUexId: null,
+          starSystemName: null,
+        });
+      } else {
+        setEditLocation(null);
+      }
     }
   }, [actionMode, actionItem]);
 
@@ -960,6 +983,7 @@ const InventoryPage = () => {
         catalogEntryId: selectedItemId!,
         quantity: parsedQuantity,
         unitOfMeasureId: defaultUom.id,
+        locationId: newRowSelectedLocation?.id ?? null,
       };
       if (viewMode === 'org' && selectedOrgId) {
         await inventoryService.createOrgItem(selectedOrgId, payload);
@@ -967,6 +991,7 @@ const InventoryPage = () => {
         await inventoryService.createItem(payload);
       }
       await fetchInventory();
+      setNewRowSelectedLocation(null);
       resetNewRowDraft();
       newRowFocusController.focus('new-row', 'item');
     } catch (err) {
@@ -1260,6 +1285,7 @@ const InventoryPage = () => {
   const handleUpdateItem = async (payload: {
     quantity?: number;
     notes?: string;
+    locationId?: string | null;
   }) => {
     if (!actionItem) return;
     try {
@@ -1371,6 +1397,10 @@ const InventoryPage = () => {
                 inputProps={{ min: 0, step: 0.000001 }}
                 onChange={(e) => setActionQuantity(Number(e.target.value))}
               />
+              <LocationPicker
+                value={editLocation}
+                onChange={setEditLocation}
+              />
               <TextField
                 label="Notes"
                 fullWidth
@@ -1393,6 +1423,7 @@ const InventoryPage = () => {
                     handleUpdateItem({
                       quantity: actionQuantity,
                       notes: actionItem.notes ?? undefined,
+                      locationId: editLocation?.id ?? null,
                     })
                   }
                   disabled={actionWorking}
@@ -1891,6 +1922,8 @@ const InventoryPage = () => {
                             api: null,
                           }));
                         }}
+                        selectedLocation={newRowSelectedLocation}
+                        onLocationChange={setNewRowSelectedLocation}
                         onItemSelect={(value) => {
                           setNewRowSelectedItem(value);
                           setNewRowDraft((prev) => ({
@@ -2156,6 +2189,10 @@ const InventoryPage = () => {
                           </Button>
                         </Stack>
                       </Stack>
+                      <LocationPicker
+                        value={newItemLocation}
+                        onChange={setNewItemLocation}
+                      />
                       <TextField
                         fullWidth
                         label="Notes"

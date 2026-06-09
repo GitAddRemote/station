@@ -321,6 +321,13 @@ export class TerminalsSyncStep implements EtlStep {
         await this.warningsRepo.save(secondaryWarnings);
       }
 
+      // If UEX has reassigned a code to a different uex_id, evict the stale row
+      // before upserting so the code unique constraint doesn't block the insert.
+      await this.dataSource.query(
+        `DELETE FROM station_terminal WHERE code = $1 AND uex_id != $2`,
+        [record.code, record.id],
+      );
+
       await this.dataSource.query(
         `INSERT INTO station_terminal
            (uex_id, name, fullname, nickname, displayname, code, type, contact_url, screenshot,

@@ -10,6 +10,7 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -21,6 +22,7 @@ import {
 } from './dto/catalog-entry.dto';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { CatalogCategoryTreeDto } from './dto/catalog-category-tree.dto';
+import { LocationDto } from './dto/location.dto';
 
 @ApiTags('catalog')
 @ApiBearerAuth()
@@ -44,6 +46,21 @@ export class CatalogController {
   @Get('categories')
   async listCategories(): Promise<CatalogCategoryTreeDto[]> {
     return this.catalogService.getCategoryTree();
+  }
+
+  @ApiOperation({ summary: 'Search locations for inventory assignment' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Name filter (min 2 chars)',
+  })
+  @ApiResponse({ status: 200, type: [LocationDto] })
+  @Get('locations')
+  async listLocations(
+    @Query('search') search?: string,
+  ): Promise<LocationDto[]> {
+    const term = search && search.length >= 2 ? search : undefined;
+    return this.catalogService.searchLocations(term);
   }
 
   @ApiOperation({ summary: 'Get catalog entry detail' })

@@ -189,6 +189,8 @@ export const inventoryService = {
       catalogEntryId: string;
       quantity: number;
       unitOfMeasureId: string;
+      locationId?: string | null;
+      quality?: number | null;
       notes?: string | null;
     },
   ): Promise<InventoryItem> {

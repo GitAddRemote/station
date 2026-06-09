@@ -49,6 +49,15 @@ export interface PaginatedCatalogResponse {
   limit: number;
 }
 
+export interface LocationDto {
+  id: string;
+  name: string;
+  slug: string;
+  sourceType: string;
+  starSystemUexId: number | null;
+  starSystemName: string | null;
+}
+
 export const catalogService = {
   async getCatalogItems(
     params: CatalogQueryParams,
@@ -62,6 +71,14 @@ export const catalogService = {
 
   async getCatalogCategories(): Promise<CatalogCategory[]> {
     const response = await axios.get(`${API_URL}/api/catalog/categories`, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  async getLocations(search?: string): Promise<LocationDto[]> {
+    const response = await axios.get(`${API_URL}/api/catalog/locations`, {
+      params: search && search.length >= 2 ? { search } : undefined,
       withCredentials: true,
     });
     return response.data;

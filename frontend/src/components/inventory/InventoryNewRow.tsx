@@ -9,7 +9,8 @@ import {
   Typography,
 } from '@mui/material';
 import type { RefObject } from 'react';
-import type { CatalogEntryDto } from '../../services/catalog.service';
+import type { CatalogEntryDto, LocationDto } from '../../services/catalog.service';
+import LocationPicker from './LocationPicker';
 
 interface InventoryNewRowProps {
   isEditorMode: boolean;
@@ -32,8 +33,10 @@ interface InventoryNewRowProps {
   saving: boolean;
   orgBlocked: boolean;
   showQuantityWarning: boolean;
+  selectedLocation: LocationDto | null;
   onItemInputChange: (value: string, reason: string) => void;
   onItemSelect: (item: CatalogEntryDto | null) => void;
+  onLocationChange: (location: LocationDto | null) => void;
   onQuantityChange: (value: string) => void;
   onQuantityEnter: () => void;
   onSave: () => void;
@@ -56,8 +59,10 @@ export const InventoryNewRow = ({
   saving,
   orgBlocked,
   showQuantityWarning,
+  selectedLocation,
   onItemInputChange,
   onItemSelect,
+  onLocationChange,
   onQuantityChange,
   onQuantityEnter,
   onSave,
@@ -74,7 +79,7 @@ export const InventoryNewRow = ({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md: '2fr 1fr 1fr 1fr auto',
+          md: '2fr 1fr 1.5fr 1fr 1fr auto',
         },
         gap: 0.75,
         alignItems: 'flex-start',
@@ -160,6 +165,13 @@ export const InventoryNewRow = ({
             Large quantity entered - verify value.
           </Typography>
         )}
+      </Stack>
+      <Stack spacing={0.5}>
+        <LocationPicker
+          value={selectedLocation}
+          onChange={onLocationChange}
+          size="small"
+        />
       </Stack>
       <Stack spacing={0.5}>
         <Typography variant="body2" color="text.secondary">

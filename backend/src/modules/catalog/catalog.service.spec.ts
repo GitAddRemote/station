@@ -2,6 +2,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { CatalogService } from './catalog.service';
 import { StationCatalogEntry } from './entities/station-catalog-entry.entity';
 import { StationCatalogCategory } from './entities/station-catalog-category.entity';
@@ -94,6 +95,10 @@ describe('CatalogService', () => {
         {
           provide: CACHE_MANAGER,
           useValue: mockCacheManager,
+        },
+        {
+          provide: DataSource,
+          useValue: { query: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();
