@@ -146,6 +146,12 @@ export const InventoryFiltersPanel = ({
                   valueRange: value as [number, number],
                 }))
               }
+              onChangeCommitted={(_, value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  valueRange: value as [number, number],
+                }))
+              }
               valueLabelDisplay="auto"
               getAriaValueText={valueText}
             />

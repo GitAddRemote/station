@@ -520,6 +520,8 @@ const InventoryPage = () => {
           categoryId,
           limit,
           page: page + 1,
+          minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
+          maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
         });
         setItems(data.data);
         setTotalCount(data.total);
@@ -534,6 +536,8 @@ const InventoryPage = () => {
           search: debouncedSearch || undefined,
           categoryId,
           orgAvailable: filters.sharedOnly || undefined,
+          minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
+          maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
         });
         setItems(data.data);
         setTotalCount(data.total);
@@ -561,6 +565,7 @@ const InventoryPage = () => {
     canViewOrgInventory,
     filters.categoryId,
     filters.sharedOnly,
+    filters.valueRange,
     debouncedSearch,
     page,
     rowsPerPage,
