@@ -91,5 +91,4 @@ export const UomPicker = ({
   );
 };
 
-export { isAllowedForKind };
 export default UomPicker;
