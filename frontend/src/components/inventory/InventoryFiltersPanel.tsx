@@ -25,7 +25,7 @@ import type { InventoryCategory } from '../../services/inventory.service';
 interface FiltersPanelProps {
   filters: {
     search: string;
-    categoryId: number | '';
+    categoryId: string | '';
     sharedOnly: boolean;
     valueRange: [number, number];
   };
@@ -115,8 +115,7 @@ export const InventoryFiltersPanel = ({
               onChange={(e) =>
                 setFilters((prev) => ({
                   ...prev,
-                  categoryId:
-                    e.target.value === '' ? '' : Number(e.target.value),
+                  categoryId: e.target.value as string,
                 }))
               }
             >

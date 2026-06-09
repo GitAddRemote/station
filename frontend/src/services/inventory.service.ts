@@ -5,7 +5,7 @@ export interface InventoryItem {
   id: string;
   userId: number;
   gameId: number;
-  uexItemId: number;
+  catalogEntryId: string;
   quantity: number;
   unitOfMeasure: 'unit' | 'scu' | 'uscu';
   quality?: number | null;
@@ -47,8 +47,8 @@ export interface UserOrganizationMembership {
 
 export interface InventorySearchParams {
   gameId: number;
-  categoryId?: number;
-  uexItemId?: number;
+  categoryId?: string;
+  catalogEntryId?: string;
   sharedOnly?: boolean;
   sharedOrgId?: number;
   search?: string;
@@ -71,10 +71,10 @@ export interface InventoryListResponse {
 }
 
 export interface InventoryCategory {
-  id: number;
+  id: string;
   name: string;
-  section?: string;
-  type?: string;
+  path?: string;
+  depth?: number;
 }
 
 const buildInventoryQuery = (params: InventorySearchParams) => {
@@ -83,7 +83,7 @@ const buildInventoryQuery = (params: InventorySearchParams) => {
   };
 
   if (params.categoryId !== undefined) query.category_id = params.categoryId;
-  if (params.uexItemId !== undefined) query.uex_item_id = params.uexItemId;
+  if (params.catalogEntryId !== undefined) query.catalog_entry_id = params.catalogEntryId;
   if (params.sharedOnly !== undefined) query.shared_only = params.sharedOnly;
   if (params.sharedOrgId !== undefined)
     query.shared_org_id = params.sharedOrgId;
@@ -103,8 +103,8 @@ const buildInventoryQuery = (params: InventorySearchParams) => {
 
 const buildOrgInventoryQuery = (params: {
   gameId: number;
-  uexItemId?: number;
-  categoryId?: number;
+  catalogEntryId?: string;
+  categoryId?: string;
   activeOnly?: boolean;
   search?: string;
   minQuantity?: number;
@@ -121,7 +121,7 @@ const buildOrgInventoryQuery = (params: {
     gameId: params.gameId,
   };
 
-  if (params.uexItemId !== undefined) query.uexItemId = params.uexItemId;
+  if (params.catalogEntryId !== undefined) query.catalogEntryId = params.catalogEntryId;
   if (params.categoryId !== undefined) query.categoryId = params.categoryId;
   if (params.activeOnly !== undefined) query.activeOnly = params.activeOnly;
   if (params.search) query.search = params.search;
@@ -152,14 +152,16 @@ export const inventoryService = {
     return response.data;
   },
 
-  /**
-   * Get active UEX categories for filtering
-   */
   async getCategories(): Promise<InventoryCategory[]> {
-    const response = await axios.get(`${API_URL}/api/uex/categories`, {
+    const response = await axios.get(`${API_URL}/api/catalog/categories`, {
       withCredentials: true,
     });
-    return response.data;
+    const flatten = (nodes: Array<{ id: string; name: string; path: string; depth: number; children: unknown[] }>): InventoryCategory[] =>
+      nodes.flatMap((node) => [
+        { id: node.id, name: node.name, path: node.path, depth: node.depth },
+        ...flatten(node.children as typeof nodes),
+      ]);
+    return flatten(response.data);
   },
 
   /**
@@ -259,8 +261,8 @@ export const inventoryService = {
     orgId: number,
     params: {
       gameId: number;
-      uexItemId?: number;
-      categoryId?: number;
+      catalogEntryId?: string;
+      categoryId?: string;
       activeOnly?: boolean;
       search?: string;
       minQuantity?: number;
