@@ -19,6 +19,7 @@ import {
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
+import BusinessIcon from '@mui/icons-material/Business';
 import InventoryPortlet from '../components/inventory/InventoryPortlet';
 import { API_URL } from '../config/api';
 
@@ -278,6 +279,15 @@ const Dashboard = () => {
                 }
               >
                 Create Organization
+              </Button>
+            </Grid>
+            <Grid item>
+              <Button
+                variant="outlined"
+                startIcon={<BusinessIcon />}
+                onClick={() => navigate('/org-inventory')}
+              >
+                Org Inventory
               </Button>
             </Grid>
             <Grid item>
