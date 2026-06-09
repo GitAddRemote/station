@@ -89,8 +89,8 @@ const InventoryInlineRow = ({
           xs: '1fr',
           md:
             density === 'compact'
-              ? '2fr 1fr 1fr 1fr auto'
-              : '2fr 1fr 1fr 1fr auto',
+              ? '2fr 1fr 1.5fr 1fr 1fr auto'
+              : '2fr 1fr 1.5fr 1fr 1fr auto',
         },
         gap: density === 'compact' ? 0.75 : 2,
         alignItems: 'center',
@@ -145,13 +145,25 @@ const InventoryInlineRow = ({
               Location
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              &mdash;
+              {item.locationName ?? <>&mdash;</>}
             </Typography>
+            {item.catalogKind === 'commodity' && item.quality != null && (
+              <Typography variant="caption" color="text.secondary">
+                Quality: {item.quality}
+              </Typography>
+            )}
           </>
         ) : (
-          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-            &mdash;
-          </Typography>
+          <>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {item.locationName ?? <>&mdash;</>}
+            </Typography>
+            {item.catalogKind === 'commodity' && item.quality != null && (
+              <Typography variant="caption" color="text.secondary">
+                Q: {item.quality}
+              </Typography>
+            )}
+          </>
         )}
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>

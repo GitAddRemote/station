@@ -138,6 +138,7 @@ const InventoryPage = () => {
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionWorking, setActionWorking] = useState(false);
   const [editLocation, setEditLocation] = useState<LocationDto | null>(null);
+  const [editQuality, setEditQuality] = useState<number | ''>('');
   const [shareOrgId, setShareOrgId] = useState<number | ''>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -154,6 +155,7 @@ const InventoryPage = () => {
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemNotes, setNewItemNotes] = useState('');
   const [newItemLocation, setNewItemLocation] = useState<LocationDto | null>(null);
+  const [newItemQuality, setNewItemQuality] = useState<number | ''>('');
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [orgPermissions, setOrgPermissions] = useState<OrgPermission[]>([]);
   const [orgPermissionsLoading, setOrgPermissionsLoading] = useState(false);
@@ -203,6 +205,7 @@ const InventoryPage = () => {
     useState<CatalogEntryDto | null>(null);
   const [newRowSelectedLocation, setNewRowSelectedLocation] =
     useState<LocationDto | null>(null);
+  const [newRowQuality, setNewRowQuality] = useState<number | ''>('');
   const [newRowItemInput, setNewRowItemInput] = useState('');
   const [newRowItemOptions, setNewRowItemOptions] = useState<CatalogEntryDto[]>([]);
   const [newRowItemLoading, setNewRowItemLoading] = useState(false);
@@ -579,6 +582,7 @@ const InventoryPage = () => {
     setNewItemQuantity(1);
     setNewItemNotes('');
     setNewItemLocation(null);
+    setNewItemQuality('');
     setCatalogError(null);
     setAddSubmitting(false);
   };
@@ -586,6 +590,7 @@ const InventoryPage = () => {
   const closeAddDialog = () => {
     setAddDialogOpen(false);
     setNewItemLocation(null);
+    setNewItemQuality('');
   };
 
   const handleCreateInventoryItem = async (options?: {
@@ -645,6 +650,7 @@ const InventoryPage = () => {
             unitOfMeasureId: defaultUom.id,
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
+            quality: newItemQuality !== '' ? newItemQuality : null,
           });
         } else {
           setCatalogError('This item already exists in the org inventory.');
@@ -660,6 +666,7 @@ const InventoryPage = () => {
             unitOfMeasureId: defaultUom.id,
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
+            quality: newItemQuality !== '' ? newItemQuality : null,
           });
         } else {
           await inventoryService.createItem({
@@ -668,6 +675,7 @@ const InventoryPage = () => {
             unitOfMeasureId: defaultUom.id,
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
+            quality: newItemQuality !== '' ? newItemQuality : null,
           });
         }
       }
@@ -677,6 +685,7 @@ const InventoryPage = () => {
         setNewItemQuantity(1);
         setNewItemNotes('');
         setNewItemLocation(null);
+        setNewItemQuality('');
         setCatalogError(null);
       } else {
         closeAddDialog();
@@ -841,17 +850,20 @@ const InventoryPage = () => {
   useEffect(() => {
     if (actionMode && actionItem) {
       setActionQuantity(Number(actionItem.quantity) || 0);
-      if (actionMode === 'edit' && actionItem.locationId && actionItem.locationName) {
-        setEditLocation({
-          id: actionItem.locationId,
-          name: actionItem.locationName,
-          slug: '',
-          sourceType: '',
-          starSystemUexId: null,
-          starSystemName: null,
-        });
-      } else {
-        setEditLocation(null);
+      if (actionMode === 'edit') {
+        if (actionItem.locationId && actionItem.locationName) {
+          setEditLocation({
+            id: actionItem.locationId,
+            name: actionItem.locationName,
+            slug: '',
+            sourceType: '',
+            starSystemUexId: null,
+            starSystemName: null,
+          });
+        } else {
+          setEditLocation(null);
+        }
+        setEditQuality(actionItem.quality != null ? actionItem.quality : '');
       }
     }
   }, [actionMode, actionItem]);
@@ -938,6 +950,8 @@ const InventoryPage = () => {
       quantity: '',
     });
     setNewRowSelectedItem(null);
+    setNewRowSelectedLocation(null);
+    setNewRowQuality('');
     setNewRowItemInput('');
     setNewRowErrors({});
   };
@@ -984,6 +998,7 @@ const InventoryPage = () => {
         quantity: parsedQuantity,
         unitOfMeasureId: defaultUom.id,
         locationId: newRowSelectedLocation?.id ?? null,
+        quality: newRowQuality !== '' ? newRowQuality : null,
       };
       if (viewMode === 'org' && selectedOrgId) {
         await inventoryService.createOrgItem(selectedOrgId, payload);
@@ -992,6 +1007,7 @@ const InventoryPage = () => {
       }
       await fetchInventory();
       setNewRowSelectedLocation(null);
+      setNewRowQuality('');
       resetNewRowDraft();
       newRowFocusController.focus('new-row', 'item');
     } catch (err) {
@@ -1286,6 +1302,7 @@ const InventoryPage = () => {
     quantity?: number;
     notes?: string;
     locationId?: string | null;
+    quality?: number | null;
   }) => {
     if (!actionItem) return;
     try {
@@ -1401,6 +1418,26 @@ const InventoryPage = () => {
                 value={editLocation}
                 onChange={setEditLocation}
               />
+              {actionItem.catalogKind === 'commodity' && (
+                <TextField
+                  label="Quality"
+                  type="number"
+                  fullWidth
+                  inputProps={{ min: 0, max: 10, step: 0.1 }}
+                  value={editQuality}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') {
+                      setEditQuality('');
+                      return;
+                    }
+                    const num = parseFloat(raw);
+                    if (!Number.isNaN(num)) {
+                      setEditQuality(Math.min(10, Math.max(0, num)));
+                    }
+                  }}
+                />
+              )}
               <TextField
                 label="Notes"
                 fullWidth
@@ -1424,6 +1461,7 @@ const InventoryPage = () => {
                       quantity: actionQuantity,
                       notes: actionItem.notes ?? undefined,
                       locationId: editLocation?.id ?? null,
+                      quality: editQuality !== '' ? editQuality : null,
                     })
                   }
                   disabled={actionWorking}
@@ -1873,10 +1911,7 @@ const InventoryPage = () => {
                             display: 'grid',
                             gridTemplateColumns: {
                               xs: '1fr',
-                              md:
-                                density === 'compact'
-                                  ? '2fr 1fr 1fr 1fr auto'
-                                  : '2fr 1fr 1fr 1fr auto',
+                              md: '2fr 1fr 1.5fr 1fr 1fr auto',
                             },
                             alignItems: 'center',
                             color: 'text.secondary',
@@ -1924,6 +1959,8 @@ const InventoryPage = () => {
                         }}
                         selectedLocation={newRowSelectedLocation}
                         onLocationChange={setNewRowSelectedLocation}
+                        quality={newRowQuality}
+                        onQualityChange={setNewRowQuality}
                         onItemSelect={(value) => {
                           setNewRowSelectedItem(value);
                           setNewRowDraft((prev) => ({
@@ -2193,6 +2230,26 @@ const InventoryPage = () => {
                         value={newItemLocation}
                         onChange={setNewItemLocation}
                       />
+                      {selectedCatalogItem?.catalogKind === 'commodity' && (
+                        <TextField
+                          fullWidth
+                          label="Quality"
+                          type="number"
+                          inputProps={{ min: 0, max: 10, step: 0.1 }}
+                          value={newItemQuality}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw === '') {
+                              setNewItemQuality('');
+                              return;
+                            }
+                            const num = parseFloat(raw);
+                            if (!Number.isNaN(num)) {
+                              setNewItemQuality(Math.min(10, Math.max(0, num)));
+                            }
+                          }}
+                        />
+                      )}
                       <TextField
                         fullWidth
                         label="Notes"

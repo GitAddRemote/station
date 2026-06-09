@@ -34,9 +34,11 @@ interface InventoryNewRowProps {
   orgBlocked: boolean;
   showQuantityWarning: boolean;
   selectedLocation: LocationDto | null;
+  quality: number | '';
   onItemInputChange: (value: string, reason: string) => void;
   onItemSelect: (item: CatalogEntryDto | null) => void;
   onLocationChange: (location: LocationDto | null) => void;
+  onQualityChange: (value: number | '') => void;
   onQuantityChange: (value: string) => void;
   onQuantityEnter: () => void;
   onSave: () => void;
@@ -60,9 +62,11 @@ export const InventoryNewRow = ({
   orgBlocked,
   showQuantityWarning,
   selectedLocation,
+  quality,
   onItemInputChange,
   onItemSelect,
   onLocationChange,
+  onQualityChange,
   onQuantityChange,
   onQuantityEnter,
   onSave,
@@ -71,6 +75,7 @@ export const InventoryNewRow = ({
   quantityRef,
   saveRef,
 }: InventoryNewRowProps) => {
+  const isCommodity = selectedItem?.catalogKind === 'commodity';
   if (!isEditorMode) return null;
 
   return (
@@ -79,7 +84,7 @@ export const InventoryNewRow = ({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md: '2fr 1fr 1.5fr 1fr 1fr auto',
+          md: isCommodity ? '2fr 1fr 1.5fr 0.8fr 1fr 1fr auto' : '2fr 1fr 1.5fr 1fr 1fr auto',
         },
         gap: 0.75,
         alignItems: 'flex-start',
@@ -173,6 +178,28 @@ export const InventoryNewRow = ({
           size="small"
         />
       </Stack>
+      {isCommodity && (
+        <Stack spacing={0.5}>
+          <TextField
+            type="number"
+            size="small"
+            label="Quality"
+            value={quality}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === '') {
+                onQualityChange('');
+                return;
+              }
+              const num = parseFloat(raw);
+              if (!Number.isNaN(num)) {
+                onQualityChange(Math.min(10, Math.max(0, num)));
+              }
+            }}
+            inputProps={{ min: 0, max: 10, step: 0.1 }}
+          />
+        </Stack>
+      )}
       <Stack spacing={0.5}>
         <Typography variant="body2" color="text.secondary">
           New entry
