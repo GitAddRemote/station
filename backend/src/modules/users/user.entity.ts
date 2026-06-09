@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import {
   Entity,
   Column,
@@ -11,6 +12,15 @@ import { UserOrganizationRole } from '../user-organization-roles/user-organizati
 export class User {
   @PrimaryGeneratedColumn()
   id!: number;
+
+  @Exclude()
+  @Column({
+    name: 'id_uuid',
+    type: 'uuid',
+    unique: true,
+    default: () => 'uuid_generate_v7()',
+  })
+  idUuid!: string;
 
   @Column({ unique: true })
   username!: string;

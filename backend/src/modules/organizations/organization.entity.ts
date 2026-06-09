@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import {
   Entity,
   Column,
@@ -16,6 +17,15 @@ import { Game } from '../games/game.entity';
 export class Organization {
   @PrimaryGeneratedColumn()
   id!: number;
+
+  @Exclude()
+  @Column({
+    name: 'id_uuid',
+    type: 'uuid',
+    unique: true,
+    default: () => 'uuid_generate_v7()',
+  })
+  idUuid!: string;
 
   @Column()
   name!: string;
