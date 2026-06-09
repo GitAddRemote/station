@@ -69,7 +69,7 @@ import {
   OrgPermission,
   permissionsService,
 } from '../services/permissions.service';
-import { API_URL } from '../config/api';
+import { api } from '../services/api.service';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
@@ -361,10 +361,7 @@ const InventoryPage = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await api.post('/auth/logout', {});
     } finally {
       navigate('/login');
     }
@@ -411,19 +408,10 @@ const InventoryPage = () => {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/users/profile`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        navigate('/login');
-        return;
-      }
-
-      const data = await response.json();
+      const response = await api.get('/users/profile');
+      const data = response.data;
       setUser({ userId: data.userId, username: data.username });
-    } catch (err) {
-      console.error('Error fetching profile:', err);
+    } catch {
       navigate('/login');
     }
   }, [navigate]);

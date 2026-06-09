@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_URL } from '../config/api';
+import { api } from './api.service';
 
 export interface InventoryItem {
   id: string;
@@ -142,8 +141,7 @@ export interface OrgInventoryQueryParams {
 
 export const inventoryService = {
   async getUnitsOfMeasure(): Promise<UnitOfMeasure[]> {
-    const response = await axios.get(`${API_URL}/api/units-of-measure`, {
-      withCredentials: true,
+    const response = await api.get(`/api/units-of-measure`, {
     });
     return response.data;
   },
@@ -160,17 +158,15 @@ export const inventoryService = {
     if (params.page !== undefined) query.page = params.page;
     if (params.limit !== undefined) query.limit = params.limit;
 
-    const response = await axios.get(`${API_URL}/api/inventory`, {
+    const response = await api.get(`/api/inventory`, {
       params: query,
-      withCredentials: true,
     });
     // Provide both .data and .items so callers using either shape work
     return { ...response.data, items: response.data.data };
   },
 
   async getCategories(): Promise<InventoryCategory[]> {
-    const response = await axios.get(`${API_URL}/api/catalog/categories`, {
-      withCredentials: true,
+    const response = await api.get(`/api/catalog/categories`, {
     });
     const flatten = (nodes: Array<{ id: string; name: string; path: string; depth: number; children: unknown[] }>): InventoryCategory[] =>
       nodes.flatMap((node) => [
@@ -189,8 +185,7 @@ export const inventoryService = {
     notes?: string | null;
     isOrgAvailable?: boolean;
   }): Promise<InventoryItem> {
-    const response = await axios.post(`${API_URL}/api/inventory`, item, {
-      withCredentials: true,
+    const response = await api.post(`/api/inventory`, item, {
     });
     return response.data;
   },
@@ -203,22 +198,19 @@ export const inventoryService = {
     notes?: string | null;
     isOrgAvailable?: boolean;
   }): Promise<InventoryItem> {
-    const response = await axios.patch(`${API_URL}/api/inventory/${id}`, updates, {
-      withCredentials: true,
+    const response = await api.patch(`/api/inventory/${id}`, updates, {
     });
     return response.data;
   },
 
   async deleteItem(id: string): Promise<void> {
-    await axios.delete(`${API_URL}/api/inventory/${id}`, {
-      withCredentials: true,
+    await api.delete(`/api/inventory/${id}`, {
     });
   },
 
   async getUserOrganizations(userId: number): Promise<UserOrganizationMembership[]> {
-    const response = await axios.get(
-      `${API_URL}/user-organization-roles/user/${userId}/organizations`,
-      { withCredentials: true },
+    const response = await api.get(
+      `/user-organization-roles/user/${userId}/organizations`,
     );
     return response.data;
   },
@@ -259,10 +251,9 @@ export const inventoryService = {
       notes?: string | null;
     },
   ): Promise<InventoryItem> {
-    const response = await axios.post(
-      `${API_URL}/api/inventory`,
+    const response = await api.post(
+      `/api/inventory`,
       { ...item, ownerType: 'org', ownerId: String(orgId) },
-      { withCredentials: true },
     );
     return response.data;
   },
@@ -282,7 +273,7 @@ export const inventoryService = {
   async listOrgInventory(
     params: OrgInventoryQueryParams,
   ): Promise<PaginatedOrgInventoryResponse> {
-    const response = await axios.get(`${API_URL}/api/inventory`, {
+    const response = await api.get(`/api/inventory`, {
       params: {
         ...(params.ownerType && { ownerType: params.ownerType }),
         ...(params.ownerId && { ownerId: params.ownerId }),
@@ -295,7 +286,6 @@ export const inventoryService = {
         ...(params.limit !== undefined && { limit: params.limit }),
         ...(params.includeSummary !== undefined && { includeSummary: params.includeSummary }),
       },
-      withCredentials: true,
     });
     return response.data;
   },

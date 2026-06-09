@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_URL } from '../config/api';
+import { api } from './api.service';
 
 export interface CatalogItem {
   id: number;
@@ -35,17 +34,12 @@ export const uexService = {
   async searchItems(
     params: CatalogSearchParams,
   ): Promise<CatalogSearchResponse> {
-    const response = await axios.get(`${API_URL}/api/uex/items`, {
-      params,
-      withCredentials: true,
-    });
+    const response = await api.get('/api/uex/items', { params });
     return response.data;
   },
 
   async getStarSystems(): Promise<StarSystem[]> {
-    const response = await axios.get(`${API_URL}/api/uex/star-systems`, {
-      withCredentials: true,
-    });
+    const response = await api.get('/api/uex/star-systems');
     return response.data;
   },
 };
