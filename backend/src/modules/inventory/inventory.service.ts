@@ -117,7 +117,7 @@ export class InventoryService {
     this.applyListFilters(queryBuilder, context, query);
 
     queryBuilder
-      .orderBy('item.updated_at', 'DESC')
+      .orderBy('item.updatedAt', 'DESC')
       .skip((normalizedPage - 1) * normalizedLimit)
       .take(normalizedLimit);
 
