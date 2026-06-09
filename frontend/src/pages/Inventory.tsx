@@ -1299,7 +1299,7 @@ const InventoryPage = () => {
     }
   };
 
-  const handleShare = async (_orgId: number, _quantity: number) => {
+  const handleShare = async () => {
     setError('Sharing is not yet supported in this version.');
   };
 
@@ -1470,7 +1470,7 @@ const InventoryPage = () => {
                   disabled={actionWorking || shareOrgId === ''}
                   onClick={() =>
                     typeof shareOrgId === 'number' &&
-                    handleShare(shareOrgId, actionQuantity)
+                    handleShare()
                   }
                 >
                   Share
