@@ -12,16 +12,13 @@ import {
 import CheckIcon from '@mui/icons-material/Check';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
-import type {
-  InventoryItem,
-  OrgInventoryItem,
-} from '../../services/inventory.service';
+import type { InventoryItem } from '../../services/inventory.service';
 import type { FocusController } from '../../utils/focusController';
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
 
-export type InventoryRecord = InventoryItem | OrgInventoryItem;
+export type InventoryRecord = InventoryItem;
 
 interface InventoryInlineRowProps {
   item: InventoryRecord;
@@ -81,16 +78,22 @@ const InventoryInlineRow = ({
     ? draftQuantityNumber
     : Number(item.quantity);
 
+  const isDiscrete =
+    item.catalogKind === 'item' || item.catalogKind === 'vehicle';
+
+  const quantityFractionDigits = isDiscrete ? 0 : 6;
+
+  const quantityLabel = `${displayQuantity.toLocaleString(undefined, {
+    maximumFractionDigits: quantityFractionDigits,
+  })} ${item.unitOfMeasureCode}`;
+
   return (
     <Box
       sx={{
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md:
-            density === 'compact'
-              ? '2fr 1fr 1fr 1fr auto'
-              : '2fr 1fr 1fr 1fr auto',
+          md: '2fr 1fr 1fr 1fr auto',
         },
         gap: density === 'compact' ? 0.75 : 2,
         alignItems: 'center',
@@ -128,14 +131,6 @@ const InventoryInlineRow = ({
             size={density === 'compact' ? 'small' : 'medium'}
             variant="outlined"
           />
-          {item.sharedOrgId && (
-            <Chip
-              size={density === 'compact' ? 'small' : 'medium'}
-              color="primary"
-              variant="outlined"
-              label={item.sharedOrgName || 'Shared'}
-            />
-          )}
         </Stack>
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
@@ -145,12 +140,12 @@ const InventoryInlineRow = ({
               Location
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              &mdash;
+              {item.locationName || <span>&mdash;</span>}
             </Typography>
           </>
         ) : (
           <Typography variant="body2" sx={{ fontWeight: 500 }}>
-            &mdash;
+            {item.locationName || <span>&mdash;</span>}
           </Typography>
         )}
       </Stack>
@@ -164,7 +159,12 @@ const InventoryInlineRow = ({
               variant="body2"
               sx={{ fontWeight: 700, letterSpacing: 0.1 }}
             >
-              {Number(item.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+              {Number(item.quantity).toLocaleString(undefined, {
+                maximumFractionDigits: quantityFractionDigits,
+              })}{' '}
+              <Typography component="span" variant="caption" color="text.secondary">
+                {item.unitOfMeasureCode}
+              </Typography>
             </Typography>
           </>
         ) : (
@@ -195,14 +195,16 @@ const InventoryInlineRow = ({
                     numeric < MIN_INVENTORY_QUANTITY
                   ) {
                     onErrorChange(item.id, 'Quantity must be at least 0.000001');
+                  } else if (isDiscrete && !Number.isInteger(numeric)) {
+                    onErrorChange(item.id, 'Quantity must be a whole number');
                   } else {
                     onErrorChange(item.id, null);
                   }
                 }}
                 onBlur={() => onQuantityBlur(rowKey)}
                 inputProps={{
-                  inputMode: 'decimal',
-                  pattern: '[0-9]*\\.?[0-9]*',
+                  inputMode: isDiscrete ? 'numeric' : 'decimal',
+                  pattern: isDiscrete ? '[0-9]*' : '[0-9]*\\.?[0-9]*',
                 }}
                 inputRef={(el) => {
                   setQuantityRef(el, rowKey);
@@ -268,7 +270,7 @@ const InventoryInlineRow = ({
                   variant="body2"
                   sx={{ fontWeight: 700, letterSpacing: 0.1 }}
                 >
-                  {displayQuantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                  {quantityLabel}
                 </Typography>
                 <EditIcon
                   className="inline-edit-icon"
@@ -287,9 +289,7 @@ const InventoryInlineRow = ({
           </Typography>
         )}
         <Typography variant="body2">
-          {new Date(
-            item.dateModified || item.dateAdded || '',
-          ).toLocaleDateString()}
+          {new Date(item.updatedAt || item.createdAt || '').toLocaleDateString()}
         </Typography>
         {Number.isFinite(draftQuantityNumber) &&
           draftQuantityNumber >= EDITOR_MODE_QUANTITY_MAX && (

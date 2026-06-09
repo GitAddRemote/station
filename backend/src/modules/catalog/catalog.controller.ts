@@ -21,6 +21,7 @@ import {
 } from './dto/catalog-entry.dto';
 import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { CatalogCategoryTreeDto } from './dto/catalog-category-tree.dto';
+import { UnitOfMeasureDto } from './dto/unit-of-measure.dto';
 
 @ApiTags('catalog')
 @ApiBearerAuth()
@@ -44,6 +45,13 @@ export class CatalogController {
   @Get('categories')
   async listCategories(): Promise<CatalogCategoryTreeDto[]> {
     return this.catalogService.getCategoryTree();
+  }
+
+  @ApiOperation({ summary: 'List active units of measure' })
+  @ApiResponse({ status: 200, type: [UnitOfMeasureDto] })
+  @Get('units-of-measure')
+  async listUnitsOfMeasure(): Promise<UnitOfMeasureDto[]> {
+    return this.catalogService.getUnitsOfMeasure();
   }
 
   @ApiOperation({ summary: 'Get catalog entry detail' })

@@ -10,6 +10,8 @@ import {
 } from '@mui/material';
 import type { RefObject } from 'react';
 import type { CatalogEntryDto } from '../../services/catalog.service';
+import type { UnitOfMeasureDto } from '../../services/catalog.service';
+import { UomPicker } from './UomPicker';
 
 interface InventoryNewRowProps {
   isEditorMode: boolean;
@@ -25,6 +27,7 @@ interface InventoryNewRowProps {
   errors: {
     item?: string | null;
     quantity?: string | null;
+    uom?: string | null;
     org?: string | null;
     api?: string | null;
   };
@@ -32,6 +35,9 @@ interface InventoryNewRowProps {
   saving: boolean;
   orgBlocked: boolean;
   showQuantityWarning: boolean;
+  uomOptions: UnitOfMeasureDto[];
+  selectedUom: UnitOfMeasureDto | null;
+  onUomChange: (uom: UnitOfMeasureDto | null) => void;
   onItemInputChange: (value: string, reason: string) => void;
   onItemSelect: (item: CatalogEntryDto | null) => void;
   onQuantityChange: (value: string) => void;
@@ -56,6 +62,9 @@ export const InventoryNewRow = ({
   saving,
   orgBlocked,
   showQuantityWarning,
+  uomOptions,
+  selectedUom,
+  onUomChange,
   onItemInputChange,
   onItemSelect,
   onQuantityChange,
@@ -67,6 +76,8 @@ export const InventoryNewRow = ({
   saveRef,
 }: InventoryNewRowProps) => {
   if (!isEditorMode) return null;
+
+  const catalogKind = selectedItem?.catalogKind ?? null;
 
   return (
     <Box
@@ -142,8 +153,12 @@ export const InventoryNewRow = ({
           value={draft.quantity}
           onChange={(e) => onQuantityChange(e.target.value)}
           inputProps={{
-            inputMode: 'decimal',
-            pattern: '[0-9]*\\.?[0-9]*',
+            inputMode:
+              catalogKind === 'commodity' ? 'decimal' : 'numeric',
+            pattern:
+              catalogKind === 'commodity'
+                ? '[0-9]*\\.?[0-9]*'
+                : '[0-9]*',
           }}
           inputRef={quantityRef as RefObject<HTMLInputElement>}
           onKeyDown={(event) => {
@@ -162,9 +177,22 @@ export const InventoryNewRow = ({
         )}
       </Stack>
       <Stack spacing={0.5}>
-        <Typography variant="body2" color="text.secondary">
-          New entry
-        </Typography>
+        <UomPicker
+          options={uomOptions}
+          value={selectedUom}
+          onChange={onUomChange}
+          catalogKind={catalogKind}
+          error={errors.uom}
+        />
+      </Stack>
+      <Box sx={{ display: { xs: 'none', md: 'block' } }} />
+      <Stack
+        direction="row"
+        spacing={1}
+        justifyContent="flex-end"
+        alignItems="center"
+        sx={{ minWidth: 140 }}
+      >
         {errors.org && (
           <Typography variant="caption" color="error">
             {errors.org}
@@ -186,15 +214,6 @@ export const InventoryNewRow = ({
             </Button>
           </Stack>
         )}
-      </Stack>
-      <Box sx={{ display: { xs: 'none', md: 'block' } }} />
-      <Stack
-        direction="row"
-        spacing={1}
-        justifyContent="flex-end"
-        alignItems="center"
-        sx={{ minWidth: 140 }}
-      >
         {dirty && (
           <Chip
             label={saving ? 'Saving...' : 'Unsaved'}

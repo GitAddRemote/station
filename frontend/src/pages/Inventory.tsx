@@ -56,9 +56,12 @@ import {
   inventoryService,
   InventoryCategory,
   InventoryItem,
-  OrgInventoryItem,
 } from '../services/inventory.service';
-import { catalogService, CatalogEntryDto } from '../services/catalog.service';
+import {
+  catalogService,
+  CatalogEntryDto,
+  UnitOfMeasureDto,
+} from '../services/catalog.service';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
@@ -70,11 +73,9 @@ import {
 } from '../services/permissions.service';
 import { API_URL } from '../config/api';
 
-type InventoryRecord = InventoryItem | OrgInventoryItem;
+type InventoryRecord = InventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
 type InlineDraft = { quantity: number | '' };
-
-const GAME_ID = 1;
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
 const ORG_ACCENT = '#f2a255';
@@ -206,10 +207,16 @@ const InventoryPage = () => {
   const [newRowErrors, setNewRowErrors] = useState<{
     item?: string | null;
     quantity?: string | null;
+    uom?: string | null;
     org?: string | null;
     api?: string | null;
   }>({});
   const [newRowSaving, setNewRowSaving] = useState(false);
+  const [uomOptions, setUomOptions] = useState<UnitOfMeasureDto[]>([]);
+  const [newRowSelectedUom, setNewRowSelectedUom] =
+    useState<UnitOfMeasureDto | null>(null);
+  const [dialogSelectedUom, setDialogSelectedUom] =
+    useState<UnitOfMeasureDto | null>(null);
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
   const isOrgMode = viewMode === 'org';
@@ -512,17 +519,18 @@ const InventoryPage = () => {
           return;
         }
         const data = await inventoryService.getOrgInventory(selectedOrgId, {
-          gameId: GAME_ID,
+          ownerType: 'org',
+          ownerId: String(selectedOrgId),
           search: debouncedSearch || undefined,
           categoryId,
           minQuantity,
           maxQuantity,
-          sort: apiSort,
+          sort: apiSort as 'name' | 'quantity' | 'created_at' | 'updated_at' | undefined,
           order: sortDir,
+          page: Math.floor(offset / limit) + 1,
           limit,
-          offset,
         });
-        setItems(data.items);
+        setItems(data.data);
         setTotalCount(data.total);
         if (page > 0) {
           const lastPage = Math.max(
@@ -534,20 +542,18 @@ const InventoryPage = () => {
           }
         }
       } else {
-        const params = {
-          gameId: GAME_ID,
+        const data = await inventoryService.getInventory({
+          ownerType: 'user',
+          page: Math.floor(offset / limit) + 1,
           limit,
-          offset,
           search: debouncedSearch || undefined,
           categoryId,
           minQuantity,
           maxQuantity,
-          sharedOnly: filters.sharedOnly || undefined,
-          sort: apiSort,
+          sort: apiSort as 'name' | 'quantity' | 'created_at' | 'updated_at' | undefined,
           order: sortDir,
-        } as const;
-        const data = await inventoryService.getInventory(params);
-        setItems(data.items);
+        });
+        setItems(data.data);
         setTotalCount(data.total);
         if (page > 0) {
           const lastPage = Math.max(
@@ -601,6 +607,7 @@ const InventoryPage = () => {
     setCatalogPage(0);
     setNewItemQuantity(1);
     setNewItemNotes('');
+    setDialogSelectedUom(null);
     setCatalogError(null);
     setAddSubmitting(false);
   };
@@ -632,6 +639,19 @@ const InventoryPage = () => {
       return;
     }
 
+    const dialogKind = selectedCatalogItem.catalogKind;
+    const effectiveUom = dialogSelectedUom ?? uomOptions.find((u) => {
+      const code = u.abbreviation.toLowerCase();
+      return dialogKind === 'commodity'
+        ? ['scu', 'cscu', 'uscu'].includes(code)
+        : code === 'unit';
+    });
+
+    if (!effectiveUom) {
+      setCatalogError('Unable to determine unit of measure for this item.');
+      return;
+    }
+
     try {
       setAddSubmitting(true);
       setCatalogError(null);
@@ -659,9 +679,9 @@ const InventoryPage = () => {
           }
         } else if (!isOrgView) {
           await inventoryService.createItem({
-            gameId: GAME_ID,
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
+            unitOfMeasureId: effectiveUom.id,
             notes: newItemNotes || undefined,
           });
         } else {
@@ -671,16 +691,16 @@ const InventoryPage = () => {
       } else {
         if (isOrgView && selectedOrgId !== null) {
           await inventoryService.createOrgItem(selectedOrgId, {
-            gameId: GAME_ID,
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
+            unitOfMeasureId: effectiveUom.id,
             notes: newItemNotes || undefined,
           });
         } else {
           await inventoryService.createItem({
-            gameId: GAME_ID,
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
+            unitOfMeasureId: effectiveUom.id,
             notes: newItemNotes || undefined,
           });
         }
@@ -713,14 +733,13 @@ const InventoryPage = () => {
             const lookupResult = await inventoryService.getOrgInventory(
               selectedOrgId,
               {
-                gameId: GAME_ID,
                 catalogEntryId: selectedCatalogItem.id,
                 limit: 1,
-                offset: 0,
+                page: 1,
               },
             );
-            if (lookupResult.items.length > 0) {
-              existing = lookupResult.items[0];
+            if (lookupResult.data.length > 0) {
+              existing = lookupResult.data[0];
             }
           } catch (lookupErr) {
             console.error(
@@ -763,6 +782,9 @@ const InventoryPage = () => {
   useEffect(() => {
     fetchProfile();
     fetchCategories();
+    catalogService.getUnitsOfMeasure().then(setUomOptions).catch((err) => {
+      console.error('Failed to load units of measure', err);
+    });
   }, [fetchProfile, fetchCategories]);
 
   useEffect(() => {
@@ -910,7 +932,7 @@ const InventoryPage = () => {
       if (groupBy === 'category') {
         key = item.categoryName || 'Uncategorized';
       } else if (groupBy === 'share') {
-        key = item.sharedOrgId ? 'Shared' : 'Private';
+        key = item.isOrgAvailable ? 'Shared' : 'Private';
       }
 
       const current = groups.get(key) || [];
@@ -945,6 +967,7 @@ const InventoryPage = () => {
     });
     setNewRowSelectedItem(null);
     setNewRowItemInput('');
+    setNewRowSelectedUom(null);
     setNewRowErrors({});
   };
 
@@ -958,6 +981,8 @@ const InventoryPage = () => {
     }
     const selectedItemId = newRowSelectedItem?.id ?? null;
     const parsedQuantity = Number(newRowDraft.quantity);
+    const catalogKind = newRowSelectedItem?.catalogKind ?? null;
+    const isDiscrete = catalogKind === 'item' || catalogKind === 'vehicle';
     const errors: typeof newRowErrors = {};
 
     if (!selectedItemId) {
@@ -968,9 +993,14 @@ const InventoryPage = () => {
       parsedQuantity < MIN_INVENTORY_QUANTITY
     ) {
       errors.quantity = 'Quantity must be at least 0.000001';
+    } else if (isDiscrete && !Number.isInteger(parsedQuantity)) {
+      errors.quantity = 'Quantity must be a whole number for this item type';
+    }
+    if (!newRowSelectedUom) {
+      errors.uom = 'Select a unit';
     }
 
-    if (errors.item || errors.quantity) {
+    if (errors.item || errors.quantity || errors.uom) {
       setNewRowErrors((prev) => ({ ...prev, ...errors, api: null }));
       if (errors.item) {
         newRowFocusController.focus('new-row', 'item');
@@ -984,9 +1014,9 @@ const InventoryPage = () => {
       setNewRowSaving(true);
       setNewRowErrors({});
       const payload = {
-        gameId: GAME_ID,
         catalogEntryId: selectedItemId!,
         quantity: parsedQuantity,
+        unitOfMeasureId: newRowSelectedUom!.id,
       };
       if (viewMode === 'org' && selectedOrgId) {
         await inventoryService.createOrgItem(selectedOrgId, payload);
@@ -1099,6 +1129,22 @@ const InventoryPage = () => {
         : null,
     }));
   }, [newRowOrgBlocked]);
+
+  useEffect(() => {
+    if (!newRowSelectedItem || uomOptions.length === 0) return;
+    const kind = newRowSelectedItem.catalogKind;
+    const allowed = uomOptions.filter((u) => {
+      const code = u.abbreviation.toLowerCase();
+      if (kind === 'commodity') return ['scu', 'cscu', 'uscu'].includes(code);
+      return code === 'unit';
+    });
+    if (allowed.length === 0) return;
+    const current = newRowSelectedUom;
+    const alreadyValid = current && allowed.some((u) => u.id === current.id);
+    if (!alreadyValid) {
+      setNewRowSelectedUom(allowed[0]);
+    }
+  }, [newRowSelectedItem, uomOptions]);
 
   useEffect(() => {
     if (pendingFocusAfterPageChange && items.length > 0) {
@@ -1984,6 +2030,9 @@ const InventoryPage = () => {
                             ...prev,
                             quantity: nextQuantity,
                           }));
+                          const isDiscreteKind =
+                            newRowSelectedItem?.catalogKind === 'item' ||
+                            newRowSelectedItem?.catalogKind === 'vehicle';
                           if (
                             !Number.isFinite(numeric) ||
                             numeric < MIN_INVENTORY_QUANTITY
@@ -1993,6 +2042,12 @@ const InventoryPage = () => {
                               quantity: 'Quantity must be at least 0.000001',
                               api: null,
                             }));
+                          } else if (isDiscreteKind && !Number.isInteger(numeric)) {
+                            setNewRowErrors((prev) => ({
+                              ...prev,
+                              quantity: 'Quantity must be a whole number for this item type',
+                              api: null,
+                            }));
                           } else {
                             setNewRowErrors((prev) => ({
                               ...prev,
@@ -2000,6 +2055,16 @@ const InventoryPage = () => {
                               api: null,
                             }));
                           }
+                        }}
+                        uomOptions={uomOptions}
+                        selectedUom={newRowSelectedUom}
+                        onUomChange={(uom) => {
+                          setNewRowSelectedUom(uom);
+                          setNewRowErrors((prev) => ({
+                            ...prev,
+                            uom: null,
+                            api: null,
+                          }));
                         }}
                         onQuantityEnter={() =>
                           newRowFocusController.focus('new-row', 'save')
@@ -2368,7 +2433,7 @@ const InventoryPage = () => {
             <ListItemText>Share</ListItemText>
           </MenuItem>
         )}
-        {viewMode === 'personal' && actionItem?.sharedOrgId && (
+        {viewMode === 'personal' && actionItem?.isOrgAvailable && (
           <MenuItem onClick={handleUnshare}>
             <ListItemIcon>
               <UnpublishedIcon fontSize="small" />

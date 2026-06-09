@@ -29,7 +29,6 @@ import {
   inventoryService,
   InventoryItem,
   InventoryCategory,
-  InventorySearchParams,
 } from '../../services/inventory.service';
 
 interface InventoryPortletProps {
@@ -83,20 +82,18 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
   const fetchInventory = useCallback(async () => {
     try {
       setLoading(true);
-      const params: InventorySearchParams = {
-        gameId,
+      const params = {
+        ownerType: 'user' as const,
+        page: page + 1,
         limit: rowsPerPage,
-        offset: page * rowsPerPage,
         search: debouncedSearch || undefined,
-        sharedOnly,
         categoryId: categoryId || undefined,
       };
 
-      const { items: fetchedItems, total } =
-        await inventoryService.getInventory(params);
+      const result = await inventoryService.getInventory(params);
 
-      setItems(fetchedItems);
-      setTotalCount(total ?? fetchedItems.length);
+      setItems(result.data);
+      setTotalCount(result.total);
     } catch (error) {
       console.error('Error fetching inventory:', error);
       setItems([]);
@@ -248,15 +245,13 @@ const InventoryPortlet = ({ gameId = 1, onExpand }: InventoryPortletProps) => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">
-                          {item.locationType && item.locationUexId
-                            ? `${item.locationType} #${item.locationUexId}`
-                            : '—'}
+                          {item.locationName || '—'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        {item.sharedOrgId ? (
+                        {item.isOrgAvailable ? (
                           <Chip
-                            label={item.sharedOrgName || 'Shared'}
+                            label="Shared"
                             size="small"
                             color="primary"
                             variant="outlined"

@@ -49,6 +49,15 @@ export interface PaginatedCatalogResponse {
   limit: number;
 }
 
+export interface UnitOfMeasureDto {
+  id: string;
+  name: string;
+  abbreviation: string;
+  catalogKind: 'item' | 'commodity' | 'vehicle' | null;
+  scaleFactor: number;
+  sortOrder: number;
+}
+
 export const catalogService = {
   async getCatalogItems(
     params: CatalogQueryParams,
@@ -62,6 +71,13 @@ export const catalogService = {
 
   async getCatalogCategories(): Promise<CatalogCategory[]> {
     const response = await axios.get(`${API_URL}/api/catalog/categories`, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
+
+  async getUnitsOfMeasure(): Promise<UnitOfMeasureDto[]> {
+    const response = await axios.get(`${API_URL}/api/catalog/units-of-measure`, {
       withCredentials: true,
     });
     return response.data;
