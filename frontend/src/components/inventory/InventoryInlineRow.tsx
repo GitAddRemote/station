@@ -128,12 +128,12 @@ const InventoryInlineRow = ({
             size={density === 'compact' ? 'small' : 'medium'}
             variant="outlined"
           />
-          {item.sharedOrgId && (
+          {item.isOrgAvailable && (
             <Chip
               size={density === 'compact' ? 'small' : 'medium'}
               color="primary"
               variant="outlined"
-              label={item.sharedOrgName || 'Shared'}
+              label="Shared"
             />
           )}
         </Stack>
@@ -287,9 +287,7 @@ const InventoryInlineRow = ({
           </Typography>
         )}
         <Typography variant="body2">
-          {new Date(
-            item.dateModified || item.dateAdded || '',
-          ).toLocaleDateString()}
+          {new Date(item.updatedAt || item.createdAt || '').toLocaleDateString()}
         </Typography>
         {Number.isFinite(draftQuantityNumber) &&
           draftQuantityNumber >= EDITOR_MODE_QUANTITY_MAX && (

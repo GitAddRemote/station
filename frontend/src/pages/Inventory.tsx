@@ -74,7 +74,6 @@ type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
 type InlineDraft = { quantity: number | '' };
 
-const GAME_ID = 1;
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
 const ORG_ACCENT = '#f2a255';
@@ -498,10 +497,7 @@ const InventoryPage = () => {
         setRefreshing(true);
       }
       const categoryId = filters.categoryId || undefined;
-      const [minQuantity, maxQuantity] = filters.valueRange;
-      const apiSort = sortBy === 'date' ? 'date_modified' : sortBy;
       const limit = rowsPerPage;
-      const offset = page * rowsPerPage;
 
       if (isOrgMode && selectedOrgId) {
         if (orgPermissionsLoading || permissionsFetchedForOrgId.current !== selectedOrgId || !canViewOrgInventory) {
@@ -512,51 +508,30 @@ const InventoryPage = () => {
           return;
         }
         const data = await inventoryService.getOrgInventory(selectedOrgId, {
-          gameId: GAME_ID,
           search: debouncedSearch || undefined,
           categoryId,
-          minQuantity,
-          maxQuantity,
-          sort: apiSort,
-          order: sortDir,
           limit,
-          offset,
+          page: page + 1,
         });
-        setItems(data.items);
+        setItems(data.data);
         setTotalCount(data.total);
         if (page > 0) {
-          const lastPage = Math.max(
-            0,
-            Math.floor((data.total - 1) / rowsPerPage),
-          );
-          if (page > lastPage) {
-            setPage(lastPage);
-          }
+          const lastPage = Math.max(0, Math.floor((data.total - 1) / rowsPerPage));
+          if (page > lastPage) setPage(lastPage);
         }
       } else {
-        const params = {
-          gameId: GAME_ID,
+        const data = await inventoryService.getInventory({
           limit,
-          offset,
+          page: page + 1,
           search: debouncedSearch || undefined,
           categoryId,
-          minQuantity,
-          maxQuantity,
-          sharedOnly: filters.sharedOnly || undefined,
-          sort: apiSort,
-          order: sortDir,
-        } as const;
-        const data = await inventoryService.getInventory(params);
-        setItems(data.items);
+          orgAvailable: filters.sharedOnly || undefined,
+        });
+        setItems(data.data);
         setTotalCount(data.total);
         if (page > 0) {
-          const lastPage = Math.max(
-            0,
-            Math.floor((data.total - 1) / rowsPerPage),
-          );
-          if (page > lastPage) {
-            setPage(lastPage);
-          }
+          const lastPage = Math.max(0, Math.floor((data.total - 1) / rowsPerPage));
+          if (page > lastPage) setPage(lastPage);
         }
       }
     } catch (err) {
@@ -578,10 +553,7 @@ const InventoryPage = () => {
     canViewOrgInventory,
     filters.categoryId,
     filters.sharedOnly,
-    filters.valueRange,
     debouncedSearch,
-    sortBy,
-    sortDir,
     page,
     rowsPerPage,
     initialLoading,
@@ -658,30 +630,34 @@ const InventoryPage = () => {
             });
           }
         } else if (!isOrgView) {
+          const uoms = await inventoryService.getUnitsOfMeasure();
+          const defaultUom = uoms.find((u) => u.code === 'unit') ?? uoms[0];
           await inventoryService.createItem({
-            gameId: GAME_ID,
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
-            notes: newItemNotes || undefined,
+            unitOfMeasureId: defaultUom.id,
+            notes: newItemNotes || null,
           });
         } else {
           setCatalogError('This item already exists in the org inventory.');
           return;
         }
       } else {
+        const uoms = await inventoryService.getUnitsOfMeasure();
+        const defaultUom = uoms.find((u) => u.code === 'unit') ?? uoms[0];
         if (isOrgView && selectedOrgId !== null) {
           await inventoryService.createOrgItem(selectedOrgId, {
-            gameId: GAME_ID,
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
-            notes: newItemNotes || undefined,
+            unitOfMeasureId: defaultUom.id,
+            notes: newItemNotes || null,
           });
         } else {
           await inventoryService.createItem({
-            gameId: GAME_ID,
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
-            notes: newItemNotes || undefined,
+            unitOfMeasureId: defaultUom.id,
+            notes: newItemNotes || null,
           });
         }
       }
@@ -712,15 +688,10 @@ const InventoryPage = () => {
           try {
             const lookupResult = await inventoryService.getOrgInventory(
               selectedOrgId,
-              {
-                gameId: GAME_ID,
-                catalogEntryId: selectedCatalogItem.id,
-                limit: 1,
-                offset: 0,
-              },
+              { limit: 1, page: 1 },
             );
-            if (lookupResult.items.length > 0) {
-              existing = lookupResult.items[0];
+            if (lookupResult.data.length > 0) {
+              existing = lookupResult.data[0];
             }
           } catch (lookupErr) {
             console.error(
@@ -910,7 +881,7 @@ const InventoryPage = () => {
       if (groupBy === 'category') {
         key = item.categoryName || 'Uncategorized';
       } else if (groupBy === 'share') {
-        key = item.sharedOrgId ? 'Shared' : 'Private';
+        key = item.isOrgAvailable ? 'Shared' : 'Private';
       }
 
       const current = groups.get(key) || [];
@@ -983,10 +954,12 @@ const InventoryPage = () => {
     try {
       setNewRowSaving(true);
       setNewRowErrors({});
+      const uoms = await inventoryService.getUnitsOfMeasure();
+      const defaultUom = uoms.find((u) => u.code === 'unit') ?? uoms[0];
       const payload = {
-        gameId: GAME_ID,
         catalogEntryId: selectedItemId!,
         quantity: parsedQuantity,
+        unitOfMeasureId: defaultUom.id,
       };
       if (viewMode === 'org' && selectedOrgId) {
         await inventoryService.createOrgItem(selectedOrgId, payload);
@@ -1318,48 +1291,20 @@ const InventoryPage = () => {
         throw new Error('Split quantity must be less than the current quantity');
       }
 
-      if (viewMode === 'org' && selectedOrgId) {
-        await inventoryService.splitOrgItem(selectedOrgId, actionItem.id, quantity);
-      } else {
-        await inventoryService.splitItem(actionItem.id, quantity);
-      }
-      closeActionMenu();
-      await fetchInventory();
+      setError('Split is not yet supported in this version.');
+      setActionWorking(false);
+      return;
     } finally {
       setActionWorking(false);
     }
   };
 
-  const handleShare = async (orgId: number, quantity: number) => {
-    if (!actionItem) return;
-    try {
-      setActionWorking(true);
-      setError(null);
-      const available = Number(actionItem.quantity) || 0;
-      if (quantity <= 0 || quantity > available) {
-        setError('Share quantity must be between 0 and the available amount.');
-        setActionWorking(false);
-        return;
-      }
-      await inventoryService.shareItem(actionItem.id, orgId, quantity);
-      setShareOrgId('');
-      closeActionMenu();
-      await fetchInventory();
-    } finally {
-      setActionWorking(false);
-    }
+  const handleShare = async () => {
+    setError('Sharing is not yet supported in this version.');
   };
 
   const handleUnshare = async () => {
-    if (!actionItem) return;
-    try {
-      setActionWorking(true);
-      await inventoryService.unshareItem(actionItem.id);
-      closeActionMenu();
-      await fetchInventory();
-    } finally {
-      setActionWorking(false);
-    }
+    setError('Unshare is not yet supported in this version.');
   };
 
   const handleDelete = async () => {
@@ -1447,7 +1392,7 @@ const InventoryPage = () => {
                   onClick={() =>
                     handleUpdateItem({
                       quantity: actionQuantity,
-                      notes: actionItem.notes,
+                      notes: actionItem.notes ?? undefined,
                     })
                   }
                   disabled={actionWorking}
@@ -1525,7 +1470,7 @@ const InventoryPage = () => {
                   disabled={actionWorking || shareOrgId === ''}
                   onClick={() =>
                     typeof shareOrgId === 'number' &&
-                    handleShare(shareOrgId, actionQuantity)
+                    handleShare()
                   }
                 >
                   Share
@@ -2368,7 +2313,7 @@ const InventoryPage = () => {
             <ListItemText>Share</ListItemText>
           </MenuItem>
         )}
-        {viewMode === 'personal' && actionItem?.sharedOrgId && (
+        {viewMode === 'personal' && actionItem?.isOrgAvailable && (
           <MenuItem onClick={handleUnshare}>
             <ListItemIcon>
               <UnpublishedIcon fontSize="small" />
