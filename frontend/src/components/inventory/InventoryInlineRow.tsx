@@ -16,7 +16,9 @@ import type {
   InventoryItem,
   OrgInventoryItem,
 } from '../../services/inventory.service';
+import type { LocationDto } from '../../services/catalog.service';
 import type { FocusController } from '../../utils/focusController';
+import LocationPicker from './LocationPicker';
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
@@ -28,6 +30,8 @@ interface InventoryInlineRowProps {
   density: 'standard' | 'compact';
   inlineDraft: { quantity: number | '' };
   quantityEditing: boolean;
+  locationEditing: boolean;
+  inlineLocation: LocationDto | null;
   inlineSaving: boolean;
   inlineSaved?: boolean;
   inlineError?: string | null;
@@ -43,9 +47,11 @@ interface InventoryInlineRowProps {
   onQuantityBlur: (rowKey: string) => void;
   onActivateField: (
     rowKey: string,
-    field: 'quantity',
+    field: 'quantity' | 'location',
     initialInput?: string,
   ) => void;
+  onLocationChange: (itemId: string, location: LocationDto | null) => void;
+  onLocationBlur: (rowKey: string) => void;
   onSave: (item: InventoryRecord) => void;
   onOpenActions?: (
     event: MouseEvent<HTMLElement>,
@@ -60,6 +66,8 @@ const InventoryInlineRow = ({
   density,
   inlineDraft,
   quantityEditing,
+  locationEditing,
+  inlineLocation,
   inlineSaving,
   inlineSaved,
   inlineError,
@@ -71,6 +79,8 @@ const InventoryInlineRow = ({
   onErrorChange,
   onQuantityBlur,
   onActivateField,
+  onLocationChange,
+  onLocationBlur,
   onSave,
   onOpenActions,
   setQuantityRef,
@@ -153,17 +163,57 @@ const InventoryInlineRow = ({
               </Typography>
             )}
           </>
+        ) : locationEditing ? (
+          <LocationPicker
+            value={inlineLocation}
+            onChange={(loc) => onLocationChange(item.id, loc)}
+            size="small"
+            onBlur={() => onLocationBlur(rowKey)}
+          />
         ) : (
-          <>
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              {item.locationName ?? <>&mdash;</>}
+          <Box
+            role="button"
+            tabIndex={0}
+            onClick={() => onActivateField(rowKey, 'location')}
+            onFocus={() => onActivateField(rowKey, 'location')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onActivateField(rowKey, 'location');
+              }
+            }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              cursor: 'text',
+              color: 'text.primary',
+              textDecoration: 'underline dotted',
+              textUnderlineOffset: '4px',
+              textDecorationColor: 'rgba(255,255,255,0.35)',
+              '&:hover .inline-edit-icon': { opacity: 0.75 },
+              '&:focus-visible': {
+                outline: '1px solid rgba(74, 158, 255, 0.6)',
+                borderRadius: 1,
+                outlineOffset: 2,
+              },
+            }}
+            aria-label={`Edit location for ${item.itemName ?? `Item ${item.catalogEntryId}`}`}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+              {inlineLocation?.name ?? item.locationName ?? '—'}
             </Typography>
-            {item.catalogKind === 'commodity' && item.quality != null && (
-              <Typography variant="caption" color="text.secondary">
-                Q: {item.quality}
-              </Typography>
-            )}
-          </>
+            <EditIcon
+              className="inline-edit-icon"
+              fontSize="inherit"
+              sx={{ opacity: 0, transition: 'opacity 0.2s ease', flexShrink: 0 }}
+            />
+          </Box>
+        )}
+        {density === 'compact' && item.catalogKind === 'commodity' && item.quality != null && (
+          <Typography variant="caption" color="text.secondary">
+            Q: {item.quality}
+          </Typography>
         )}
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
@@ -382,6 +432,8 @@ const areEqual = (
   prev.density === next.density &&
   prev.inlineDraft === next.inlineDraft &&
   prev.quantityEditing === next.quantityEditing &&
+  prev.locationEditing === next.locationEditing &&
+  prev.inlineLocation === next.inlineLocation &&
   prev.inlineSaving === next.inlineSaving &&
   prev.inlineSaved === next.inlineSaved &&
   prev.inlineError === next.inlineError &&
@@ -393,6 +445,8 @@ const areEqual = (
   prev.onErrorChange === next.onErrorChange &&
   prev.onQuantityBlur === next.onQuantityBlur &&
   prev.onActivateField === next.onActivateField &&
+  prev.onLocationChange === next.onLocationChange &&
+  prev.onLocationBlur === next.onLocationBlur &&
   prev.onSave === next.onSave &&
   prev.onOpenActions === next.onOpenActions &&
   prev.setQuantityRef === next.setQuantityRef &&
