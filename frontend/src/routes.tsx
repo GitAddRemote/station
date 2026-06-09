@@ -9,6 +9,7 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Inventory from './pages/Inventory';
+import OrgInventory from './pages/OrgInventory';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const AppRoutes = () => (
@@ -25,6 +26,7 @@ const AppRoutes = () => (
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/inventory" element={<Inventory />} />
+        <Route path="/org-inventory" element={<OrgInventory />} />
       </Route>
     </Routes>
   </Router>

@@ -81,6 +81,65 @@ export interface InventoryCategory {
   depth?: number;
 }
 
+export interface OrgInventoryItemV2 {
+  id: string;
+  ownerType: 'user' | 'org';
+  ownerId: string;
+  catalogEntryId: string;
+  catalogKind: 'item' | 'commodity' | 'vehicle';
+  itemName: string;
+  categoryId: string;
+  categoryName: string;
+  categoryPath: string;
+  locationId: string | null;
+  locationName: string | null;
+  unitOfMeasureId: string;
+  unitOfMeasureCode: string;
+  unitOfMeasureLabel: string;
+  unitOfMeasureDescription: string | null;
+  quantity: number;
+  quality: number | null;
+  isOrgAvailable: boolean;
+  alias: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrgInventorySummaryCategory {
+  categoryId: string;
+  categoryName: string;
+  categoryPath: string;
+  totalQuantity: number;
+}
+
+export interface OrgInventorySummary {
+  totalItems: number;
+  totalQuantity: number;
+  byCategory: OrgInventorySummaryCategory[];
+}
+
+export interface PaginatedOrgInventoryResponse {
+  data: OrgInventoryItemV2[];
+  total: number;
+  page: number;
+  limit: number;
+  summary?: OrgInventorySummary;
+}
+
+export interface OrgInventoryQueryParams {
+  ownerType?: 'org' | 'user';
+  ownerId?: string;
+  orgId?: string;
+  orgAvailable?: boolean;
+  catalogKind?: 'item' | 'commodity' | 'vehicle';
+  categoryId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  includeSummary?: boolean;
+}
+
 export const inventoryService = {
   async getUnitsOfMeasure(): Promise<UnitOfMeasure[]> {
     const response = await axios.get(`${API_URL}/api/units-of-measure`, {
@@ -218,5 +277,26 @@ export const inventoryService = {
 
   async deleteOrgItem(_orgId: number, id: string): Promise<void> {
     return inventoryService.deleteItem(id);
+  },
+
+  async listOrgInventory(
+    params: OrgInventoryQueryParams,
+  ): Promise<PaginatedOrgInventoryResponse> {
+    const response = await axios.get(`${API_URL}/api/inventory`, {
+      params: {
+        ...(params.ownerType && { ownerType: params.ownerType }),
+        ...(params.ownerId && { ownerId: params.ownerId }),
+        ...(params.orgId && { orgId: params.orgId }),
+        ...(params.orgAvailable !== undefined && { orgAvailable: params.orgAvailable }),
+        ...(params.catalogKind && { catalogKind: params.catalogKind }),
+        ...(params.categoryId && { categoryId: params.categoryId }),
+        ...(params.search && { search: params.search }),
+        ...(params.page !== undefined && { page: params.page }),
+        ...(params.limit !== undefined && { limit: params.limit }),
+        ...(params.includeSummary !== undefined && { includeSummary: params.includeSummary }),
+      },
+      withCredentials: true,
+    });
+    return response.data;
   },
 };
