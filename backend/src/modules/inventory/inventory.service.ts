@@ -82,7 +82,7 @@ export class InventoryService {
     this.validateQuantityAndUomPolicy({
       catalogKind: catalogEntry.catalogKind,
       quantity: dto.quantity,
-      unitCode: unitOfMeasure.code,
+      unitCode: unitOfMeasure.abbreviation,
     });
 
     const item = this.inventoryItemRepository.create({
@@ -196,7 +196,7 @@ export class InventoryService {
     this.validateQuantityAndUomPolicy({
       catalogKind: item.catalogKind,
       quantity: nextQuantity,
-      unitCode: nextUnitOfMeasure.code,
+      unitCode: nextUnitOfMeasure.abbreviation,
     });
 
     item.quantity = nextQuantity.toFixed(6);
@@ -737,9 +737,9 @@ export class InventoryService {
       locationId: item.locationId ?? null,
       locationName: item.location?.name ?? null,
       unitOfMeasureId: item.unitOfMeasureId,
-      unitOfMeasureCode: item.unitOfMeasure.code,
-      unitOfMeasureLabel: item.unitOfMeasure.label,
-      unitOfMeasureDescription: item.unitOfMeasure.description,
+      unitOfMeasureCode: item.unitOfMeasure.abbreviation,
+      unitOfMeasureLabel: item.unitOfMeasure.name,
+      unitOfMeasureDescription: null,
       quantity: Number(item.quantity),
       quality: item.quality,
       isOrgAvailable: item.isOrgAvailable,

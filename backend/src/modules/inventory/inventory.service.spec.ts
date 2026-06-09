@@ -63,16 +63,14 @@ describe('InventoryService', () => {
 
   const unit = {
     id: '00000000-0000-0000-0000-000000000201',
-    code: 'unit',
-    label: 'Unit',
-    description: 'Discrete item',
+    abbreviation: 'unit',
+    name: 'Unit',
   } as StationUnitOfMeasure;
 
   const scu = {
     id: '00000000-0000-0000-0000-000000000202',
-    code: 'scu',
-    label: 'SCU',
-    description: 'Cargo unit',
+    abbreviation: 'scu',
+    name: 'SCU',
   } as StationUnitOfMeasure;
 
   const organization = {
