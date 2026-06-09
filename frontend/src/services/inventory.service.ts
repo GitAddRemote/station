@@ -62,6 +62,8 @@ export interface InventorySearchParams {
   includeSummary?: boolean;
   page?: number;
   limit?: number;
+  minQuantity?: number;
+  maxQuantity?: number;
 }
 
 export interface InventoryListResponse {
@@ -171,6 +173,8 @@ export const inventoryService = {
       limit?: number;
       page?: number;
       catalogEntryId?: string;
+      minQuantity?: number;
+      maxQuantity?: number;
     },
   ): Promise<InventoryListResponse> {
     return inventoryService.getInventory({
@@ -180,6 +184,8 @@ export const inventoryService = {
       search: params.search,
       limit: params.limit,
       page: params.page !== undefined ? params.page : 1,
+      minQuantity: params.minQuantity,
+      maxQuantity: params.maxQuantity,
     });
   },
 

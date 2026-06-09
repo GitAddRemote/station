@@ -146,6 +146,14 @@ export class CatalogService {
       }
     }
 
+    const sortChildren = (nodes: CatalogCategoryTreeDto[]): void => {
+      nodes.sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+      );
+      nodes.forEach((n) => sortChildren(n.children));
+    };
+    sortChildren(roots);
+
     await this.cacheManager.set(cacheKey, roots, this.CACHE_TTL_MS);
 
     return roots;
