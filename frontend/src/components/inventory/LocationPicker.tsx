@@ -8,6 +8,7 @@ interface LocationPickerProps {
   error?: string | null;
   disabled?: boolean;
   size?: 'small' | 'medium';
+  onBlur?: () => void;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -24,6 +25,7 @@ const LocationPicker = ({
   error,
   disabled,
   size = 'small',
+  onBlur,
 }: LocationPickerProps) => {
   const [inputValue, setInputValue] = useState('');
   const [options, setOptions] = useState<LocationDto[]>([]);
@@ -99,6 +101,7 @@ const LocationPicker = ({
           error={Boolean(error)}
           helperText={error ?? undefined}
           placeholder="Search locations..."
+          onBlur={onBlur}
         />
       )}
     />

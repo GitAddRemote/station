@@ -73,7 +73,7 @@ import { API_URL } from '../config/api';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
-type InlineDraft = { quantity: number | '' };
+type InlineDraft = { quantity: number | ''; locationId?: string | null; locationName?: string | null };
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
@@ -190,8 +190,9 @@ const InventoryPage = () => {
   );
   const [inlineActiveField, setInlineActiveField] = useState<{
     rowKey: string;
-    field: 'quantity';
+    field: 'quantity' | 'location';
   } | null>(null);
+  const [inlineLocations, setInlineLocations] = useState<Record<string, LocationDto | null>>({});
   const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] =
     useState(false);
   const [newRowDraft, setNewRowDraft] = useState<{
@@ -293,7 +294,7 @@ const InventoryPage = () => {
   const newRowItemCache = useRef<Map<string, CatalogEntryDto[]>>(new Map());
 
   const activateInlineField = useCallback(
-    (rowKey: string, field: 'quantity') => {
+    (rowKey: string, field: 'quantity' | 'location') => {
       setInlineActiveField({ rowKey, field });
       setInlineError((prev) => ({ ...prev, [rowKey]: null }));
     },
@@ -327,6 +328,21 @@ const InventoryPage = () => {
     setInlineActiveField((prev) => {
       if (!prev || prev.rowKey !== rowKey) return prev;
       if (prev.field !== 'quantity') return prev;
+      return null;
+    });
+  }, []);
+
+  const handleInlineLocationChange = useCallback(
+    (itemId: string, location: LocationDto | null) => {
+      setInlineLocations((prev) => ({ ...prev, [itemId]: location }));
+    },
+    [],
+  );
+
+  const handleInlineLocationBlur = useCallback((rowKey: string) => {
+    setInlineActiveField((prev) => {
+      if (!prev || prev.rowKey !== rowKey) return prev;
+      if (prev.field !== 'location') return prev;
       return null;
     });
   }, []);
@@ -893,6 +909,7 @@ const InventoryPage = () => {
   useEffect(() => {
     if (!items.length) {
       setInlineDrafts({});
+      setInlineLocations({});
       return;
     }
     setInlineDrafts(
@@ -900,6 +917,14 @@ const InventoryPage = () => {
         acc[item.id] = {
           quantity: Number(item.quantity) || 0,
         };
+        return acc;
+      }, {}),
+    );
+    setInlineLocations(
+      items.reduce<Record<string, LocationDto | null>>((acc, item) => {
+        acc[item.id] = item.locationId && item.locationName
+          ? { id: item.locationId, name: item.locationName, slug: '', sourceType: '', starSystemUexId: null, starSystemName: null }
+          : null;
         return acc;
       }, {}),
     );
@@ -1218,6 +1243,8 @@ const InventoryPage = () => {
       const nextSaving = new Set(inlineSaving);
       nextSaving.add(item.id);
       setInlineSaving(nextSaving);
+      const locationDraft = inlineLocations[item.id];
+      const locationId = locationDraft !== undefined ? (locationDraft?.id ?? null) : (item.locationId ?? null);
       const prevItem =
         items.find((entry) => entry.id === item.id) ??
         ({
@@ -1226,6 +1253,8 @@ const InventoryPage = () => {
       const updatedItem: InventoryRecord = {
         ...item,
         quantity: parsedQuantity,
+        locationId,
+        locationName: locationDraft !== undefined ? (locationDraft?.name ?? null) : (item.locationName ?? null),
       };
       setItems((prev) =>
         prev.map((entry) => (entry.id === item.id ? updatedItem : entry)),
@@ -1235,10 +1264,12 @@ const InventoryPage = () => {
         if (viewMode === 'org' && selectedOrgId) {
           await inventoryService.updateOrgItem(selectedOrgId, item.id, {
             quantity: parsedQuantity,
+            locationId,
           });
         } else {
           await inventoryService.updateItem(item.id, {
             quantity: parsedQuantity,
+            locationId,
           });
         }
         setInlineSaved((prev) => {
@@ -1271,7 +1302,7 @@ const InventoryPage = () => {
         setInlineSaving(updated);
       }
     },
-    [focusController, getInlineDraft, inlineSaving, items, selectedOrgId, viewMode],
+    [focusController, getInlineDraft, inlineLocations, inlineSaving, items, selectedOrgId, viewMode],
   );
 
   const handleInlineSaveAndAdvance = useCallback(
@@ -1655,10 +1686,15 @@ const InventoryPage = () => {
     const draft = getInlineDraft(item);
     const originalQuantity = Number(item.quantity) || 0;
     const draftQuantityNumber = Number(draft.quantity);
-    const isDirty = draftQuantityNumber !== originalQuantity;
+    const inlineLocation = inlineLocations[item.id] !== undefined ? inlineLocations[item.id] : (item.locationId && item.locationName ? { id: item.locationId, name: item.locationName, slug: '', sourceType: '', starSystemUexId: null, starSystemName: null } : null);
+    const originalLocationId = item.locationId ?? null;
+    const draftLocationId = inlineLocations[item.id] !== undefined ? (inlineLocations[item.id]?.id ?? null) : originalLocationId;
+    const isDirty = draftQuantityNumber !== originalQuantity || draftLocationId !== originalLocationId;
     const isRowActive = inlineActiveField?.rowKey === rowKey;
     const isQuantityActive =
       isRowActive && inlineActiveField?.field === 'quantity';
+    const isLocationActive =
+      isRowActive && inlineActiveField?.field === 'location';
     const saving = inlineSaving.has(item.id);
     const errorText = inlineError[item.id];
     const saved = inlineSaved.has(item.id.toString());
@@ -1670,6 +1706,8 @@ const InventoryPage = () => {
         density={density}
         inlineDraft={draft}
         quantityEditing={isQuantityActive}
+        locationEditing={isLocationActive}
+        inlineLocation={inlineLocation}
         inlineSaving={saving}
         inlineSaved={saved}
         inlineError={errorText}
@@ -1681,6 +1719,8 @@ const InventoryPage = () => {
         onErrorChange={handleInlineErrorChange}
         onQuantityBlur={handleInlineQuantityBlur}
         onActivateField={activateInlineField}
+        onLocationChange={handleInlineLocationChange}
+        onLocationBlur={handleInlineLocationBlur}
         onSave={handleInlineSaveAndAdvance}
         onOpenActions={handleActionOpen}
         setQuantityRef={handleQuantityRef}
