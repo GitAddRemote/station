@@ -1993,7 +1993,7 @@ const InventoryPage = () => {
                     disabled={inventoryBusy}
                     onClearAll={() => {
                       setSortBy('date');
-                      setSortDir(_prev => 'desc');
+                      setSortDir(() => 'desc');
                       setGroupBy('none');
                       setSliderMax(SLIDER_QUANTITY_MAX);
                       setFilters(prev => ({ ...prev, valueRange: [0, SLIDER_QUANTITY_MAX], qualityRange: [0, 1000] }));
