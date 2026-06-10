@@ -62,6 +62,23 @@ const LoginCredentials = () => {
 
       if (response.ok) {
         navigate('/dashboard');
+      } else if (response.status === 403) {
+        const errorData = await response.json();
+        const code =
+          typeof errorData.message === 'object'
+            ? errorData.message?.code
+            : null;
+        if (
+          code === 'PASSWORD_CHANGE_REQUIRED' ||
+          code === 'PASSWORD_EXPIRED'
+        ) {
+          const preAuthToken = response.headers.get('X-Pre-Auth-Token');
+          navigate(
+            `/forced-password-change${preAuthToken ? `?token=${encodeURIComponent(preAuthToken)}` : ''}`,
+          );
+        } else {
+          setError(errorData.message || 'Access denied');
+        }
       } else {
         const errorData = await response.json();
         setError(
