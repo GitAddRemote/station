@@ -22,7 +22,7 @@ interface UexVehicle {
   scu: number | null;
   fuel_quantum: number | null;
   fuel_hydrogen: number | null;
-  container_sizes: number[] | null;
+  container_sizes: number[] | string | null;
   pad_type: string | null;
   is_addon: number;
   is_boarding: number;
@@ -90,6 +90,23 @@ function parseCrew(raw: string | null): {
 }
 
 const VALID_PAD_TYPES = new Set(['XS', 'S', 'M', 'L', 'XL']);
+
+function normalizeContainerSizes(
+  value: number[] | string | null,
+): number[] | null {
+  if (value === null || value === undefined) return null;
+
+  const rawValues =
+    typeof value === 'string'
+      ? value.split(',')
+      : value.map((entry) => entry.toString());
+
+  const normalized = rawValues
+    .map((entry) => Number.parseInt(entry.trim(), 10))
+    .filter((entry) => Number.isInteger(entry) && entry > 0);
+
+  return normalized.length > 0 ? normalized : null;
+}
 
 function normalizeLoanerIds(record: UexVehicle): number[] {
   const embedded = record.loaners ?? [];
@@ -307,7 +324,7 @@ export class VehiclesSyncStep implements EtlStep {
           record.scu ?? null, // $14 scu
           record.fuel_quantum ?? null, // $15 fuel_quantum
           record.fuel_hydrogen ?? null, // $16 fuel_hydrogen
-          record.container_sizes ?? null, // $17 container_sizes
+          normalizeContainerSizes(record.container_sizes), // $17 container_sizes
           padType, // $18 pad_type
           Boolean(record.is_addon), // $19
           Boolean(record.is_boarding), // $20

@@ -183,6 +183,32 @@ describe('CommoditiesSyncStep', () => {
       expect(insert[1][20]).toBe(true); // is_illegal
     });
 
+    it('stores fractional weight_scu values without coercing them to integers', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
+      uexGet.mockResolvedValueOnce([makeCommodity({ weight_scu: 1.2 })]);
+
+      await step.execute(CTX);
+
+      const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_commodity'),
+      );
+      expect(insert[1][4]).toBe(1.2); // $5 weight_scu
+    });
+
+    it('parses string weight_scu values into decimals', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);
+      uexGet.mockResolvedValueOnce([makeCommodity({ weight_scu: '2.5' })]);
+
+      await step.execute(CTX);
+
+      const insert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_commodity'),
+      );
+      expect(insert[1][4]).toBe(2.5); // $5 weight_scu
+    });
+
     it('skips commodity with no name and emits warn', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave, mapFind);

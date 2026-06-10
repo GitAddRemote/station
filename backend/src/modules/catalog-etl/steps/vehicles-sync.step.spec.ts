@@ -290,6 +290,51 @@ describe('VehiclesSyncStep', () => {
     });
   });
 
+  describe('container_sizes normalization', () => {
+    it('passes through numeric container_sizes arrays unchanged', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([makeVehicle({ container_sizes: [1, 2] })]);
+
+      await step.execute(CTX);
+
+      const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle'),
+      );
+      expect(vehicleInsert[1][16]).toEqual([1, 2]); // $17 container_sizes
+    });
+
+    it('parses comma-delimited string container_sizes into integer arrays', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ container_sizes: '1,2, 4' }),
+      ]);
+
+      await step.execute(CTX);
+
+      const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle'),
+      );
+      expect(vehicleInsert[1][16]).toEqual([1, 2, 4]); // $17 container_sizes
+    });
+
+    it('stores null when string container_sizes cannot be parsed into positive integers', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValueOnce([
+        makeVehicle({ container_sizes: 'abc,0,-1' }),
+      ]);
+
+      await step.execute(CTX);
+
+      const vehicleInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('INSERT INTO station_vehicle'),
+      );
+      expect(vehicleInsert[1][16]).toBeNull(); // $17 container_sizes
+    });
+  });
+
   describe('parent_uex_id two-pass', () => {
     it('pass 1a inserts with NULL parent_uex_id; pass 1b issues UPDATE to set it', async () => {
       const dsQuery = buildDsQuery();
