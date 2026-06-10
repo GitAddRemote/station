@@ -52,7 +52,10 @@ describe('InventoryController', () => {
 
     await controller.createItem(request, dto);
 
-    expect(service.createItem).toHaveBeenCalledWith(7, dto);
+    expect(service.createItem).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000007',
+      dto,
+    );
   });
 
   it('delegates inventory listing to the service', async () => {
@@ -66,7 +69,10 @@ describe('InventoryController', () => {
 
     await controller.listItems(request, query);
 
-    expect(service.listItems).toHaveBeenCalledWith(7, query);
+    expect(service.listItems).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000007',
+      query,
+    );
   });
 
   it('delegates inventory updates to the service', async () => {
@@ -102,7 +108,10 @@ describe('InventoryController', () => {
     mockInventoryService.createList.mockResolvedValue(result);
 
     await expect(controller.createList(request, dto)).resolves.toEqual(result);
-    expect(service.createList).toHaveBeenCalledWith(7, dto);
+    expect(service.createList).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000007',
+      dto,
+    );
   });
 
   it('delegates list retrieval to the service', async () => {
@@ -118,7 +127,10 @@ describe('InventoryController', () => {
 
     await controller.deleteList(request, listId);
 
-    expect(service.deleteList).toHaveBeenCalledWith(7, listId);
+    expect(service.deleteList).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000007',
+      listId,
+    );
   });
 
   it('delegates adding an item to a list to the service', async () => {
@@ -127,7 +139,11 @@ describe('InventoryController', () => {
 
     await controller.addItemToList(request, listId, dto);
 
-    expect(service.addItemToList).toHaveBeenCalledWith(7, listId, dto);
+    expect(service.addItemToList).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000007',
+      listId,
+      dto,
+    );
   });
 
   it('delegates removing an item from a list to the service', async () => {
