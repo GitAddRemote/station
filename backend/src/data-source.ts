@@ -52,6 +52,8 @@ import { AddInventoryTables1780080000000 } from './migrations/1780080000000-AddI
 import { AddInventoryListTables1780090000000 } from './migrations/1780090000000-AddInventoryListTables';
 import { UpgradeStationUnitOfMeasureReferenceData1780100000000 } from './migrations/1780100000000-UpgradeStationUnitOfMeasureReferenceData';
 import { AddUuidV7IdentityToUsersAndOrganizations1780110000000 } from './migrations/1780110000000-AddUuidV7IdentityToUsersAndOrganizations';
+import { FixCatalogEtlCommodityWeightScuType1780120000000 } from './migrations/1780120000000-FixCatalogEtlCommodityWeightScuType';
+import { MigrateRemainingEntitiesToUuidV7_1780130000000 } from './migrations/1780130000000-MigrateRemainingEntitiesToUuidV7';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -113,6 +115,8 @@ export const AppDataSource = new DataSource({
     AddInventoryListTables1780090000000,
     UpgradeStationUnitOfMeasureReferenceData1780100000000,
     AddUuidV7IdentityToUsersAndOrganizations1780110000000,
+    FixCatalogEtlCommodityWeightScuType1780120000000,
+    MigrateRemainingEntitiesToUuidV7_1780130000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },
