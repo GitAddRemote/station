@@ -25,8 +25,7 @@ describe('InventoryService', () => {
   let savedInventoryItem: StationInventoryItem | null;
 
   const user = {
-    id: 7,
-    idUuid: '00000000-0000-0000-0000-000000000007',
+    id: '00000000-0000-0000-0000-000000000007',
     username: 'pilot',
     isSystemUser: false,
   } satisfies Partial<User>;
@@ -74,8 +73,7 @@ describe('InventoryService', () => {
   } as StationUnitOfMeasure;
 
   const organization = {
-    id: 99,
-    idUuid: '00000000-0000-0000-0000-000000000099',
+    id: '00000000-0000-0000-0000-000000000099',
     isActive: true,
     name: 'Station Logistics',
   } as Organization;
@@ -261,7 +259,7 @@ describe('InventoryService', () => {
   });
 
   it('creates a personal inventory item using the authenticated user UUID owner', async () => {
-    const result = await service.createItem(7, {
+    const result = await service.createItem(user.id, {
       catalogEntryId: itemCatalogEntry.id,
       quantity: 2,
       unitOfMeasureId: unit.id,
@@ -270,19 +268,19 @@ describe('InventoryService', () => {
     expect(mockInventoryItemRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         ownerType: 'user',
-        ownerId: user.idUuid,
+        ownerId: user.id,
         catalogEntryId: itemCatalogEntry.id,
         unitOfMeasureId: unit.id,
         quantity: '2.000000',
       }),
     );
-    expect(result.ownerId).toBe(user.idUuid);
+    expect(result.ownerId).toBe(user.id);
     expect(result.itemName).toBe('Laser Rifle');
   });
 
   it('rejects fractional quantities for discrete items', async () => {
     await expect(
-      service.createItem(7, {
+      service.createItem(user.id, {
         catalogEntryId: itemCatalogEntry.id,
         quantity: 1.5,
         unitOfMeasureId: unit.id,
@@ -294,7 +292,7 @@ describe('InventoryService', () => {
     mockCatalogEntryRepository.findOne.mockResolvedValue(commodityCatalogEntry);
 
     await expect(
-      service.createItem(7, {
+      service.createItem(user.id, {
         catalogEntryId: commodityCatalogEntry.id,
         quantity: 1,
         unitOfMeasureId: unit.id,
@@ -311,16 +309,16 @@ describe('InventoryService', () => {
     mockCatalogEntryRepository.findOne.mockResolvedValue(commodityCatalogEntry);
     mockUnitOfMeasureRepository.findOne.mockResolvedValue(scu);
 
-    const result = await service.createItem(7, {
+    const result = await service.createItem(user.id, {
       ownerType: 'org',
-      ownerId: organization.idUuid,
+      ownerId: organization.id,
       catalogEntryId: commodityCatalogEntry.id,
       quantity: 3.25,
       unitOfMeasureId: scu.id,
     });
 
     expect(result.ownerType).toBe('org');
-    expect(result.ownerId).toBe(organization.idUuid);
+    expect(result.ownerId).toBe(organization.id);
   });
 
   it('rejects organization inventory creation without permission', async () => {
@@ -331,9 +329,9 @@ describe('InventoryService', () => {
     ]);
 
     await expect(
-      service.createItem(7, {
+      service.createItem(user.id, {
         ownerType: 'org',
-        ownerId: organization.idUuid,
+        ownerId: organization.id,
         catalogEntryId: itemCatalogEntry.id,
         quantity: 1,
         unitOfMeasureId: unit.id,
@@ -348,7 +346,7 @@ describe('InventoryService', () => {
         {
           id: '00000000-0000-0000-0000-000000000501',
           ownerType: 'user',
-          ownerId: user.idUuid,
+          ownerId: user.id,
           catalogEntryId: itemCatalogEntry.id,
           catalogKind: itemCatalogEntry.catalogKind,
           catalogEntry: itemCatalogEntry,
@@ -368,18 +366,17 @@ describe('InventoryService', () => {
       1,
     ]);
 
-    const result = await service.listItems(7, {});
+    const result = await service.listItems(user.id, {});
 
     expect(builder.where).toHaveBeenCalled();
     expect(builder.skip).toHaveBeenCalledWith(0);
     expect(result.total).toBe(1);
-    expect(result.data[0].ownerId).toBe(user.idUuid);
+    expect(result.data[0].ownerId).toBe(user.id);
   });
 
   it('lists org inventory including member-contributed shared items and returns a summary', async () => {
     const member = {
-      id: 8,
-      idUuid: '00000000-0000-0000-0000-000000000008',
+      id: '00000000-0000-0000-0000-000000000008',
       isSystemUser: false,
     } as User;
     mockOrganizationRepository.findOne.mockResolvedValue(organization);
@@ -396,7 +393,7 @@ describe('InventoryService', () => {
     const orgItem = {
       id: '00000000-0000-0000-0000-000000000601',
       ownerType: 'org',
-      ownerId: organization.idUuid,
+      ownerId: organization.id,
       catalogEntryId: commodityCatalogEntry.id,
       catalogKind: commodityCatalogEntry.catalogKind,
       catalogEntry: commodityCatalogEntry,
@@ -416,16 +413,16 @@ describe('InventoryService', () => {
       ...orgItem,
       id: '00000000-0000-0000-0000-000000000602',
       ownerType: 'user',
-      ownerId: member.idUuid,
+      ownerId: member.id,
       isOrgAvailable: true,
       quantity: '2.500000',
     } as StationInventoryItem;
     builder.getManyAndCount.mockResolvedValue([[orgItem, sharedUserItem], 2]);
     builder.getMany.mockResolvedValue([orgItem, sharedUserItem]);
 
-    const result = await service.listItems(7, {
+    const result = await service.listItems(user.id, {
       ownerType: 'org',
-      ownerId: organization.idUuid,
+      ownerId: organization.id,
       includeSummary: true,
     });
 
@@ -438,7 +435,7 @@ describe('InventoryService', () => {
     savedInventoryItem = {
       id: '00000000-0000-0000-0000-000000000501',
       ownerType: 'user',
-      ownerId: user.idUuid,
+      ownerId: user.id,
       catalogEntryId: itemCatalogEntry.id,
       catalogKind: itemCatalogEntry.catalogKind,
       catalogEntry: itemCatalogEntry,
@@ -456,7 +453,7 @@ describe('InventoryService', () => {
     } as StationInventoryItem;
 
     const result = await service.updateItem(
-      7,
+      user.id,
       '00000000-0000-0000-0000-000000000501',
       {
         quantity: 4,
@@ -490,7 +487,7 @@ describe('InventoryService', () => {
     } as StationInventoryItem);
 
     await expect(
-      service.updateItem(7, '00000000-0000-0000-0000-000000000501', {
+      service.updateItem(user.id, '00000000-0000-0000-0000-000000000501', {
         quantity: 4,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -500,7 +497,7 @@ describe('InventoryService', () => {
     savedInventoryItem = {
       id: '00000000-0000-0000-0000-000000000501',
       ownerType: 'user',
-      ownerId: user.idUuid,
+      ownerId: user.id,
       catalogEntryId: itemCatalogEntry.id,
       catalogKind: itemCatalogEntry.catalogKind,
       catalogEntry: itemCatalogEntry,
@@ -521,7 +518,7 @@ describe('InventoryService', () => {
       affected: 1,
     } satisfies DeleteResult);
 
-    await service.deleteItem(7, '00000000-0000-0000-0000-000000000501');
+    await service.deleteItem(user.id, '00000000-0000-0000-0000-000000000501');
 
     expect(mockInventoryItemRepository.delete).toHaveBeenCalledWith({
       id: '00000000-0000-0000-0000-000000000501',
@@ -544,7 +541,7 @@ describe('InventoryService', () => {
       }),
     );
 
-    const result = await service.createList(7, { name: '  To Sell  ' });
+    const result = await service.createList(user.id, { name: '  To Sell  ' });
 
     expect(mockDataSource.transaction).toHaveBeenCalledWith(
       'REPEATABLE READ',
@@ -572,7 +569,7 @@ describe('InventoryService', () => {
     mockTransactionManager.count.mockResolvedValue(5);
 
     await expect(
-      service.createList(7, { name: 'Loadout' }),
+      service.createList(user.id, { name: 'Loadout' }),
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
@@ -589,7 +586,7 @@ describe('InventoryService', () => {
       },
     ]);
 
-    const result = await service.listLists(7);
+    const result = await service.listLists(user.id);
 
     expect(mockInventoryListRepository.find).toHaveBeenCalledWith({
       where: {
@@ -616,7 +613,7 @@ describe('InventoryService', () => {
       ownerId: '00000000-0000-0000-0000-000000000007',
     } satisfies Partial<StationInventoryList>);
 
-    await service.deleteList(7, '00000000-0000-0000-0000-000000000101');
+    await service.deleteList(user.id, '00000000-0000-0000-0000-000000000101');
 
     expect(mockInventoryListRepository.delete).toHaveBeenCalledWith({
       id: '00000000-0000-0000-0000-000000000101',
@@ -642,7 +639,7 @@ describe('InventoryService', () => {
     }));
 
     const result = await service.addItemToList(
-      7,
+      user.id,
       '00000000-0000-0000-0000-000000000101',
       {
         inventoryItemId: '00000000-0000-0000-0000-000000000202',
@@ -679,7 +676,7 @@ describe('InventoryService', () => {
     mockInventoryListItemRepository.findOne.mockResolvedValue(existingItem);
 
     const result = await service.addItemToList(
-      7,
+      user.id,
       '00000000-0000-0000-0000-000000000101',
       { inventoryItemId: '00000000-0000-0000-0000-000000000202' },
     );
@@ -704,9 +701,13 @@ describe('InventoryService', () => {
       ...value,
     }));
 
-    await service.addItemToList(7, '00000000-0000-0000-0000-000000000102', {
-      inventoryItemId: '00000000-0000-0000-0000-000000000202',
-    });
+    await service.addItemToList(
+      user.id,
+      '00000000-0000-0000-0000-000000000102',
+      {
+        inventoryItemId: '00000000-0000-0000-0000-000000000202',
+      },
+    );
 
     expect(mockInventoryListItemRepository.save).toHaveBeenCalledWith({
       listId: '00000000-0000-0000-0000-000000000102',
@@ -718,7 +719,7 @@ describe('InventoryService', () => {
     mockInventoryListRepository.findOne.mockResolvedValue({
       id: '00000000-0000-0000-0000-000000000101',
       ownerType: 'user',
-      ownerId: user.idUuid,
+      ownerId: user.id,
     } satisfies Partial<StationInventoryList>);
     mockInventoryListItemRepository.delete.mockResolvedValue({
       raw: [],
@@ -726,7 +727,7 @@ describe('InventoryService', () => {
     } satisfies DeleteResult);
 
     await service.removeItemFromList(
-      7,
+      user.id,
       '00000000-0000-0000-0000-000000000101',
       '00000000-0000-0000-0000-000000000202',
     );
@@ -741,12 +742,12 @@ describe('InventoryService', () => {
     mockInventoryListRepository.findOne.mockResolvedValue({
       id: '00000000-0000-0000-0000-000000000101',
       ownerType: 'user',
-      ownerId: user.idUuid,
+      ownerId: user.id,
     } satisfies Partial<StationInventoryList>);
     mockInventoryItemRepository.findOne.mockResolvedValueOnce(null);
 
     await expect(
-      service.addItemToList(7, '00000000-0000-0000-0000-000000000101', {
+      service.addItemToList(user.id, '00000000-0000-0000-0000-000000000101', {
         inventoryItemId: '00000000-0000-0000-0000-000000000202',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -755,8 +756,8 @@ describe('InventoryService', () => {
   it('throws NotFoundException when the user is not found', async () => {
     mockUserRepository.findOne.mockResolvedValue(null);
 
-    await expect(service.listLists(999)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.listLists('00000000-0000-0000-0000-000000000999'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

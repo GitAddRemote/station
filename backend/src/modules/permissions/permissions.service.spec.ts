@@ -51,12 +51,12 @@ describe('PermissionsService', () => {
     it('should aggregate permissions from multiple roles', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Admin',
             permissions: {
               canEditUsers: true,
@@ -65,12 +65,12 @@ describe('PermissionsService', () => {
           },
         },
         {
-          id: 2,
-          userId: 1,
-          organizationId: 1,
-          roleId: 2,
+          id: '00000000-0000-0000-0000-000000000002',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000022',
           role: {
-            id: 2,
+            id: '00000000-0000-0000-0000-000000000002',
             name: 'Developer',
             permissions: {
               canDeployCode: true,
@@ -83,7 +83,10 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.getUserPermissions(1, 1);
+      const result = await service.getUserPermissions(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+      );
 
       expect(result).toBeInstanceOf(Set);
       expect(result.has('canEditUsers')).toBe(true);
@@ -97,7 +100,10 @@ describe('PermissionsService', () => {
       const cachedPermissions = ['canEditUsers', 'canDeleteUsers'];
       mockCacheManager.get.mockResolvedValue(cachedPermissions);
 
-      const result = await service.getUserPermissions(1, 1);
+      const result = await service.getUserPermissions(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+      );
 
       expect(result).toBeInstanceOf(Set);
       expect(result.has('canEditUsers')).toBe(true);
@@ -110,7 +116,10 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue([]);
 
-      const result = await service.getUserPermissions(1, 1);
+      const result = await service.getUserPermissions(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+      );
 
       expect(result).toBeInstanceOf(Set);
       expect(result.size).toBe(0);
@@ -119,12 +128,12 @@ describe('PermissionsService', () => {
     it('should handle roles without permissions', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Viewer',
             permissions: null,
           },
@@ -134,7 +143,10 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.getUserPermissions(1, 1);
+      const result = await service.getUserPermissions(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+      );
 
       expect(result).toBeInstanceOf(Set);
       expect(result.size).toBe(0);
@@ -145,12 +157,12 @@ describe('PermissionsService', () => {
     it('should return true if user has the permission', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Admin',
             permissions: {
               canEditUsers: true,
@@ -162,7 +174,11 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasPermission(1, 1, 'canEditUsers');
+      const result = await service.hasPermission(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+        'canEditUsers',
+      );
 
       expect(result).toBe(true);
     });
@@ -170,12 +186,12 @@ describe('PermissionsService', () => {
     it('should return false if user does not have the permission', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Viewer',
             permissions: {
               canViewUsers: true,
@@ -187,7 +203,11 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasPermission(1, 1, 'canEditUsers');
+      const result = await service.hasPermission(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+        'canEditUsers',
+      );
 
       expect(result).toBe(false);
     });
@@ -197,12 +217,12 @@ describe('PermissionsService', () => {
     it('should return true if user has any of the permissions', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Developer',
             permissions: {
               canDeployCode: true,
@@ -214,10 +234,11 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasAnyPermission(1, 1, [
-        'canEditUsers',
-        'canDeployCode',
-      ]);
+      const result = await service.hasAnyPermission(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+        ['canEditUsers', 'canDeployCode'],
+      );
 
       expect(result).toBe(true);
     });
@@ -225,12 +246,12 @@ describe('PermissionsService', () => {
     it('should return false if user has none of the permissions', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Viewer',
             permissions: {
               canViewUsers: true,
@@ -242,10 +263,11 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasAnyPermission(1, 1, [
-        'canEditUsers',
-        'canDeleteUsers',
-      ]);
+      const result = await service.hasAnyPermission(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+        ['canEditUsers', 'canDeleteUsers'],
+      );
 
       expect(result).toBe(false);
     });
@@ -255,12 +277,12 @@ describe('PermissionsService', () => {
     it('should return true if user has all permissions', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Admin',
             permissions: {
               canEditUsers: true,
@@ -274,10 +296,11 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasAllPermissions(1, 1, [
-        'canEditUsers',
-        'canDeleteUsers',
-      ]);
+      const result = await service.hasAllPermissions(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+        ['canEditUsers', 'canDeleteUsers'],
+      );
 
       expect(result).toBe(true);
     });
@@ -285,12 +308,12 @@ describe('PermissionsService', () => {
     it('should return false if user is missing any permission', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Developer',
             permissions: {
               canEditUsers: true,
@@ -302,10 +325,11 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.hasAllPermissions(1, 1, [
-        'canEditUsers',
-        'canDeleteUsers',
-      ]);
+      const result = await service.hasAllPermissions(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+        ['canEditUsers', 'canDeleteUsers'],
+      );
 
       expect(result).toBe(false);
     });
@@ -315,12 +339,12 @@ describe('PermissionsService', () => {
     it('should return permissions as an array', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Admin',
             permissions: {
               canEditUsers: true,
@@ -333,7 +357,10 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.getUserPermissionsArray(1, 1);
+      const result = await service.getUserPermissionsArray(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+      );
 
       expect(Array.isArray(result)).toBe(true);
       expect(result).toContain('canEditUsers');
@@ -364,12 +391,12 @@ describe('PermissionsService', () => {
     it('user with Owner role has canManageInventory permission', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Owner',
             permissions: DEFAULT_ROLE_PERMISSIONS['Owner'],
           },
@@ -379,7 +406,10 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.getUserPermissions(1, 1);
+      const result = await service.getUserPermissions(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+      );
 
       expect(result.has(OrgPermission.CAN_MANAGE_INVENTORY)).toBe(true);
     });
@@ -387,12 +417,12 @@ describe('PermissionsService', () => {
     it('user with Member role does not have canManageInventory permission', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 2,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000022',
           role: {
-            id: 2,
+            id: '00000000-0000-0000-0000-000000000002',
             name: 'Member',
             permissions: DEFAULT_ROLE_PERMISSIONS['Member'],
           },
@@ -402,7 +432,10 @@ describe('PermissionsService', () => {
       mockCacheManager.get.mockResolvedValue(null);
       mockRepository.find.mockResolvedValue(userRoles);
 
-      const result = await service.getUserPermissions(1, 1);
+      const result = await service.getUserPermissions(
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
+      );
 
       expect(result.has(OrgPermission.CAN_MANAGE_INVENTORY)).toBe(false);
     });
@@ -410,12 +443,12 @@ describe('PermissionsService', () => {
     it('hasPermission returns true for Owner with canManageInventory', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 1,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000021',
           role: {
-            id: 1,
+            id: '00000000-0000-0000-0000-000000000001',
             name: 'Owner',
             permissions: DEFAULT_ROLE_PERMISSIONS['Owner'],
           },
@@ -426,8 +459,8 @@ describe('PermissionsService', () => {
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasPermission(
-        1,
-        1,
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
         OrgPermission.CAN_MANAGE_INVENTORY,
       );
 
@@ -437,12 +470,12 @@ describe('PermissionsService', () => {
     it('hasPermission returns false for Member with canManageInventory', async () => {
       const userRoles = [
         {
-          id: 1,
-          userId: 1,
-          organizationId: 1,
-          roleId: 2,
+          id: '00000000-0000-0000-0000-000000000001',
+          userId: '00000000-0000-0000-0000-000000000001',
+          organizationId: '00000000-0000-0000-0000-000000000011',
+          roleId: '00000000-0000-0000-0000-000000000022',
           role: {
-            id: 2,
+            id: '00000000-0000-0000-0000-000000000002',
             name: 'Member',
             permissions: DEFAULT_ROLE_PERMISSIONS['Member'],
           },
@@ -453,8 +486,8 @@ describe('PermissionsService', () => {
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasPermission(
-        1,
-        1,
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
         OrgPermission.CAN_MANAGE_INVENTORY,
       );
 

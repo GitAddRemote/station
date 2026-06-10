@@ -156,11 +156,14 @@ describe('BaseUexRepository', () => {
         .spyOn(repository, 'update')
         .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
-      await repository.markAsDeleted('1', 999);
+      await repository.markAsDeleted(
+        '1',
+        '00000000-0000-0000-0000-000000000099',
+      );
 
       expect(updateSpy).toHaveBeenCalledWith('1', {
         deleted: true,
-        modifiedById: 999,
+        modifiedById: '00000000-0000-0000-0000-000000000099',
       });
     });
   });
@@ -171,13 +174,16 @@ describe('BaseUexRepository', () => {
         .spyOn(repository, 'update')
         .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
-      await repository.markAsDeletedByUexId(100, 999);
+      await repository.markAsDeletedByUexId(
+        100,
+        '00000000-0000-0000-0000-000000000099',
+      );
 
       expect(updateSpy).toHaveBeenCalledWith(
         { uexId: 100 },
         {
           deleted: true,
-          modifiedById: 999,
+          modifiedById: '00000000-0000-0000-0000-000000000099',
         },
       );
     });
@@ -189,11 +195,11 @@ describe('BaseUexRepository', () => {
         .spyOn(repository, 'update')
         .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
-      await repository.deactivate('1', 999);
+      await repository.deactivate('1', '00000000-0000-0000-0000-000000000099');
 
       expect(updateSpy).toHaveBeenCalledWith('1', {
         active: false,
-        modifiedById: 999,
+        modifiedById: '00000000-0000-0000-0000-000000000099',
       });
     });
   });
@@ -204,11 +210,11 @@ describe('BaseUexRepository', () => {
         .spyOn(repository, 'update')
         .mockResolvedValue({ affected: 1 } as unknown as UpdateResult);
 
-      await repository.activate('1', 999);
+      await repository.activate('1', '00000000-0000-0000-0000-000000000099');
 
       expect(updateSpy).toHaveBeenCalledWith('1', {
         active: true,
-        modifiedById: 999,
+        modifiedById: '00000000-0000-0000-0000-000000000099',
       });
     });
   });

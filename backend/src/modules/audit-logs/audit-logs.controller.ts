@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-  Param,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Param } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AuditLogsService } from './audit-logs.service';
 import { AuditAction, AuditEntityType } from './audit-log.entity';
@@ -27,9 +20,9 @@ export class AuditLogsController {
     @Query('offset') offset?: string,
   ) {
     const filters = {
-      userId: userId ? parseInt(userId, 10) : undefined,
+      userId: userId || undefined,
       entityType,
-      entityId: entityId ? parseInt(entityId, 10) : undefined,
+      entityId: entityId || undefined,
       action,
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
@@ -42,7 +35,7 @@ export class AuditLogsController {
 
   @Get('user/:userId')
   async findByUser(
-    @Param('userId', ParseIntPipe) userId: number,
+    @Param('userId') userId: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
@@ -56,7 +49,7 @@ export class AuditLogsController {
   @Get('entity/:entityType/:entityId')
   async findByEntity(
     @Param('entityType') entityType: AuditEntityType,
-    @Param('entityId', ParseIntPipe) entityId: number,
+    @Param('entityId') entityId: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {

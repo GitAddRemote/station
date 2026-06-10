@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsUUID } from 'class-validator';
 
 export class CreateOrganizationDto {
   @IsString()
@@ -13,6 +13,6 @@ export class CreateOrganizationDto {
   isActive?: boolean;
 
   @IsOptional()
-  @IsNumber()
-  gameId?: number;
+  @IsUUID()
+  gameId?: string;
 }

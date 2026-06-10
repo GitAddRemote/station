@@ -24,8 +24,7 @@ describe('AuthService', () => {
   let service: AuthService;
 
   const mockUser = {
-    id: 1,
-    idUuid: '00000000-0000-0000-0000-000000000001',
+    id: '00000000-0000-0000-0000-000000000001',
     username: 'testuser',
     email: 'test@example.com',
     password: '$2b$10$hashedpassword',
@@ -123,7 +122,7 @@ describe('AuthService', () => {
 
       // Refresh token format: "{jti}.{64-char-hex}"
       const signCall = mockJwtService.sign.mock.calls[0][0] as {
-        sub: number;
+        sub: string;
         username: string;
         jti: string;
         sid: string;
@@ -157,7 +156,11 @@ describe('AuthService', () => {
       const jti = 'test-jti-uuid';
       const sid = 'test-sid-uuid';
 
-      const raw = await service.generateRefreshToken(1, jti, sid);
+      const raw = await service.generateRefreshToken(
+        '00000000-0000-0000-0000-000000000001',
+        jti,
+        sid,
+      );
 
       // Token starts with the JTI
       expect(raw.startsWith(`${jti}.`)).toBe(true);
@@ -167,7 +170,7 @@ describe('AuthService', () => {
         .calls[0] as [string, string, number];
       expect(refreshKey).toBe(`refresh:${jti}`);
       const [userId, storedHash, storedSid] = storedValue.split(':');
-      expect(userId).toBe('1');
+      expect(userId).toBe('00000000-0000-0000-0000-000000000001');
       expect(storedHash).toBe(sha256(raw));
       expect(storedHash).not.toBe(raw);
       expect(storedSid).toBe(sid);
@@ -205,7 +208,7 @@ describe('AuthService', () => {
     it('should return new tokens when jti and hash match and session is alive', async () => {
       const jti = 'valid-jti';
       const rawToken = `${jti}.` + 'a'.repeat(64);
-      const stored = `1:${sha256(rawToken)}:${sid}`;
+      const stored = `${mockUser.id}:${sha256(rawToken)}:${sid}`;
 
       // get calls: (1) refresh:{jti} via consumeRefreshEntry,
       //            (2) session:{sid} for liveness check
@@ -242,7 +245,7 @@ describe('AuthService', () => {
     it('should throw 401 when the hash does not match the stored value', async () => {
       const jti = 'valid-jti';
       mockCacheManager.get.mockResolvedValue(
-        `1:${sha256('correct-token')}:${sid}`,
+        `${mockUser.id}:${sha256('correct-token')}:${sid}`,
       );
       mockCacheManager.set.mockResolvedValue(undefined); // restore call
 
@@ -255,7 +258,7 @@ describe('AuthService', () => {
       // Prevents an attacker from DoS-ing a valid session by sending a bad token
       const jti = 'valid-jti';
       const correctRaw = `${jti}.correct`;
-      const stored = `1:${sha256(correctRaw)}:${sid}`;
+      const stored = `${mockUser.id}:${sha256(correctRaw)}:${sid}`;
       mockCacheManager.get.mockResolvedValue(stored);
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -274,7 +277,7 @@ describe('AuthService', () => {
     it('should throw 401 when session has been revoked', async () => {
       const jti = 'valid-jti';
       const rawToken = `${jti}.` + 'a'.repeat(64);
-      const stored = `1:${sha256(rawToken)}:${sid}`;
+      const stored = `${mockUser.id}:${sha256(rawToken)}:${sid}`;
 
       mockCacheManager.get
         .mockResolvedValueOnce(stored) // refresh:{jti}
@@ -293,7 +296,9 @@ describe('AuthService', () => {
     it('should delete the session and the refresh entry when hash matches', async () => {
       const jti = 'test-jti';
       const raw = `${jti}.somerandombytes`;
-      mockCacheManager.get.mockResolvedValue(`1:${sha256(raw)}:${sid}`);
+      mockCacheManager.get.mockResolvedValue(
+        `${mockUser.id}:${sha256(raw)}:${sid}`,
+      );
       mockCacheManager.del.mockResolvedValue(undefined);
 
       await service.revokeRefreshToken(raw, jti);
@@ -313,7 +318,7 @@ describe('AuthService', () => {
     it('should do nothing when the hash does not match', async () => {
       const jti = 'valid-jti';
       mockCacheManager.get.mockResolvedValue(
-        `1:${sha256('correct-token')}:${sid}`,
+        `${mockUser.id}:${sha256('correct-token')}:${sid}`,
       );
 
       await service.revokeRefreshToken(`${jti}.wrong-token`, jti);
@@ -406,7 +411,7 @@ describe('AuthService', () => {
       // logout reads jti:{jti} first, then revokeRefreshToken reads refresh:{jti}
       mockCacheManager.get
         .mockResolvedValueOnce(sid) // jti:{jti} reverse-index (read first)
-        .mockResolvedValueOnce(`1:${sha256(rawRefresh)}:${sid}`); // refresh:{jti}
+        .mockResolvedValueOnce(`${mockUser.id}:${sha256(rawRefresh)}:${sid}`); // refresh:{jti}
       mockCacheManager.del.mockResolvedValue(undefined);
       mockCacheManager.set.mockResolvedValue(undefined);
 
@@ -571,9 +576,13 @@ describe('AuthService', () => {
     it('should throw if user not found', async () => {
       mockUsersService.findById.mockResolvedValue(null);
 
-      await expect(service.changePassword(999, 'old', 'new')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.changePassword(
+          '00000000-0000-0000-0000-000000000999',
+          'old',
+          'new',
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw with incorrect current password', async () => {

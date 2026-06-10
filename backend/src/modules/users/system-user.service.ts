@@ -7,8 +7,8 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class SystemUserService implements OnModuleInit {
-  private systemUserId: number | null = null;
-  private readonly SYSTEM_USER_ID = 1; // Reserved ID for system user
+  private systemUserId: string | null = null;
+  private readonly SYSTEM_USERNAME = 'station-system';
 
   constructor(
     @InjectPinoLogger(SystemUserService.name)
@@ -18,15 +18,13 @@ export class SystemUserService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Cache system user ID at startup
     this.logger.info('Initializing system user service...');
 
     let systemUser = await this.usersRepository.findOne({
-      where: { id: this.SYSTEM_USER_ID, isSystemUser: true },
+      where: { username: this.SYSTEM_USERNAME, isSystemUser: true },
       select: ['id'],
     });
 
-    // In test environment, auto-create system user if missing
     if (!systemUser && process.env.NODE_ENV === 'test') {
       this.logger.warn(
         'System user not found in test environment - creating automatically',
@@ -51,8 +49,7 @@ export class SystemUserService implements OnModuleInit {
     );
 
     const systemUser = this.usersRepository.create({
-      id: this.SYSTEM_USER_ID,
-      username: 'station-system',
+      username: this.SYSTEM_USERNAME,
       email: 'system@station.internal',
       password: unusablePassword,
       isActive: true,
@@ -62,7 +59,7 @@ export class SystemUserService implements OnModuleInit {
     return await this.usersRepository.save(systemUser);
   }
 
-  getSystemUserId(): number {
+  getSystemUserId(): string {
     if (!this.systemUserId) {
       throw new Error(
         'System user not initialized. Ensure SystemUserService.onModuleInit() has been called.',
@@ -71,7 +68,7 @@ export class SystemUserService implements OnModuleInit {
     return this.systemUserId;
   }
 
-  isSystemUser(userId: number): boolean {
-    return userId === this.SYSTEM_USER_ID;
+  isSystemUser(userId: string): boolean {
+    return userId === this.systemUserId;
   }
 }

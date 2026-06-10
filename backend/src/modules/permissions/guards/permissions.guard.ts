@@ -48,11 +48,7 @@ export class PermissionsGuard implements CanActivate {
       );
     }
 
-    const organizationId = Number(orgId);
-
-    if (isNaN(organizationId)) {
-      throw new BadRequestException('Invalid organization ID');
-    }
+    const organizationId = String(orgId);
 
     // Check if user has all required permissions
     const hasPermissions = await this.permissionsService.hasAllPermissions(

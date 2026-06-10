@@ -24,7 +24,7 @@ export class UsersService {
     return user || undefined;
   }
 
-  async findById(id: number): Promise<User | undefined> {
+  async findById(id: string): Promise<User | undefined> {
     const user = await this.usersRepository.findOne({
       where: { id, isSystemUser: false },
     });
@@ -83,7 +83,7 @@ export class UsersService {
     }
   }
 
-  async update(id: number, userDto: Partial<UserDto>): Promise<User> {
+  async update(id: string, userDto: Partial<UserDto>): Promise<User> {
     await this.usersRepository.update(id, userDto);
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) {
@@ -92,12 +92,12 @@ export class UsersService {
     return user;
   }
 
-  async delete(id: number): Promise<void> {
+  async delete(id: string): Promise<void> {
     await this.usersRepository.delete(id);
   }
 
   async updateProfile(
-    userId: number,
+    userId: string,
     updateProfileDto: UpdateProfileDto,
   ): Promise<User> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
@@ -122,12 +122,12 @@ export class UsersService {
     return this.usersRepository.save(user);
   }
 
-  async updatePassword(userId: number, hashedPassword: string): Promise<void> {
+  async updatePassword(userId: string, hashedPassword: string): Promise<void> {
     await this.usersRepository.update(userId, { password: hashedPassword });
   }
 
   async updatePasswordWithExpiry(
-    userId: number,
+    userId: string,
     hashedPassword: string,
     passwordExpiresAt: Date,
   ): Promise<void> {
@@ -146,7 +146,7 @@ export class UsersService {
   }
 
   async linkDiscord(
-    userId: number,
+    userId: string,
     discordId: string,
     discordAvatarUrl: string | null,
   ): Promise<void> {
@@ -154,7 +154,7 @@ export class UsersService {
   }
 
   async updateDiscordAvatar(
-    userId: number,
+    userId: string,
     discordAvatarUrl: string | null,
   ): Promise<void> {
     await this.usersRepository.update(userId, { discordAvatarUrl });

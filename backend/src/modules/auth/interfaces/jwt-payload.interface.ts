@@ -3,7 +3,7 @@
  */
 export interface JwtPayload {
   /** User ID (subject) */
-  sub: number;
+  sub: string;
   /** Username */
   username: string;
   /** JWT ID — unique identifier used for per-token blacklisting on logout */

@@ -20,7 +20,7 @@ interface AuditLogResponse {
 
 interface AuditLogRequest {
   user?: {
-    userId?: number;
+    userId?: string;
     username?: string;
   };
   params?: Record<string, string>;
@@ -63,25 +63,14 @@ export class AuditLogInterceptor implements NestInterceptor {
           : undefined;
 
         // Extract entity ID from response or params
-        let entityId: number | undefined;
         const rawEntityId =
           typedResponse?.id ||
           request.params?.id ||
           request.params?.organizationId ||
           request.params?.roleId;
 
-        if (rawEntityId !== undefined) {
-          if (typeof rawEntityId === 'number') {
-            entityId = Number.isNaN(rawEntityId) ? undefined : rawEntityId;
-          } else if (
-            typeof rawEntityId === 'string' &&
-            /^\d+$/.test(rawEntityId)
-          ) {
-            entityId = parseInt(rawEntityId, 10);
-          }
-          // Non-numeric IDs (e.g. UUIDs) are intentionally left as undefined
-          // to avoid silent truncation like parseInt('1e3...') → 1.
-        }
+        const entityId: string | undefined =
+          rawEntityId !== undefined ? String(rawEntityId) : undefined;
 
         this.auditLogsService
           .log({

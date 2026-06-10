@@ -55,8 +55,7 @@ import { permissionsService } from '../services/permissions.service';
 import { useDebounce } from '../hooks/useDebounce';
 
 interface OrgOption {
-  id: number;
-  idUuid: string;
+  id: string;
   name: string;
 }
 
@@ -66,10 +65,9 @@ const ROWS_PER_PAGE = 50;
 
 const OrgInventoryPage = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<{ userId: number; username: string } | null>(null);
+  const [user, setUser] = useState<{ userId: string; username: string } | null>(null);
   const [orgs, setOrgs] = useState<OrgOption[]>([]);
-  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
-  const [selectedOrgUuid, setSelectedOrgUuid] = useState<string | null>(null);
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
 
   const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all');
   const [categoryId, setCategoryId] = useState<string>('');
@@ -88,7 +86,7 @@ const OrgInventoryPage = () => {
 
   const [canManage, setCanManage] = useState(false);
   const [permissionsLoading, setPermissionsLoading] = useState(false);
-  const permFetchedForOrg = useRef<number | null>(null);
+  const permFetchedForOrg = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -99,21 +97,19 @@ const OrgInventoryPage = () => {
     }
   }, [navigate]);
 
-  const fetchOrgs = useCallback(async (userId: number) => {
+  const fetchOrgs = useCallback(async (userId: string) => {
     try {
       const memberships = await inventoryService.getUserOrganizations(userId);
       const mapped: OrgOption[] = memberships
         .filter((m) => m.organization)
         .map((m) => ({
           id: m.organization!.id,
-          idUuid: (m.organization as unknown as { idUuid?: string }).idUuid ?? '',
           name: m.organization!.name,
         }))
         .filter((o, i, arr) => arr.findIndex((x) => x.id === o.id) === i);
       setOrgs(mapped);
       if (mapped.length > 0 && selectedOrgId === null) {
         setSelectedOrgId(mapped[0].id);
-        setSelectedOrgUuid(mapped[0].idUuid);
       }
     } catch (err) {
       console.error('Failed to load organizations', err);
@@ -130,7 +126,7 @@ const OrgInventoryPage = () => {
   }, []);
 
   const fetchInventory = useCallback(async () => {
-    if (!selectedOrgUuid) {
+    if (!selectedOrgId) {
       setItems([]);
       setTotal(0);
       setSummary(null);
@@ -146,9 +142,9 @@ const OrgInventoryPage = () => {
       }
 
       const baseParams = {
-        orgId: selectedOrgUuid,
+        orgId: selectedOrgId,
         ownerType: 'org' as const,
-        ownerId: selectedOrgUuid,
+        ownerId: selectedOrgId,
         categoryId: categoryId || undefined,
         search: debouncedSearch || undefined,
         page: page + 1,
@@ -160,7 +156,7 @@ const OrgInventoryPage = () => {
         const result = await inventoryService.listOrgInventory({
           ...baseParams,
           ownerType: 'org',
-          ownerId: selectedOrgUuid,
+          ownerId: selectedOrgId,
         });
         setItems(result.data);
         setTotal(result.total);
@@ -168,7 +164,7 @@ const OrgInventoryPage = () => {
       } else if (ownershipFilter === 'member-contributed') {
         const result = await inventoryService.listOrgInventory({
           ownerType: 'user',
-          orgId: selectedOrgUuid,
+          orgId: selectedOrgId,
           orgAvailable: true,
           categoryId: categoryId || undefined,
           search: debouncedSearch || undefined,
@@ -183,7 +179,7 @@ const OrgInventoryPage = () => {
         const [orgResult, memberResult] = await Promise.all([
           inventoryService.listOrgInventory({
             ownerType: 'org',
-            ownerId: selectedOrgUuid,
+            ownerId: selectedOrgId,
             categoryId: categoryId || undefined,
             search: debouncedSearch || undefined,
             page: page + 1,
@@ -192,7 +188,7 @@ const OrgInventoryPage = () => {
           }),
           inventoryService.listOrgInventory({
             ownerType: 'user',
-            orgId: selectedOrgUuid,
+            orgId: selectedOrgId,
             orgAvailable: true,
             categoryId: categoryId || undefined,
             search: debouncedSearch || undefined,
@@ -214,7 +210,7 @@ const OrgInventoryPage = () => {
       setLoading(false);
     }
   }, [
-    selectedOrgUuid,
+    selectedOrgId,
     ownershipFilter,
     categoryId,
     debouncedSearch,
@@ -260,10 +256,10 @@ const OrgInventoryPage = () => {
   }, [selectedOrgId, user?.userId]);
 
   useEffect(() => {
-    if (selectedOrgUuid) {
+    if (selectedOrgId) {
       fetchInventory();
     }
-  }, [selectedOrgUuid, fetchInventory]);
+  }, [selectedOrgId, fetchInventory]);
 
   useEffect(() => {
     setPage(0);
@@ -279,11 +275,10 @@ const OrgInventoryPage = () => {
     [items],
   );
 
-  const handleOrgChange = (orgId: number) => {
+  const handleOrgChange = (orgId: string) => {
     const org = orgs.find((o) => o.id === orgId);
     if (!org) return;
     setSelectedOrgId(org.id);
-    setSelectedOrgUuid(org.idUuid);
     permFetchedForOrg.current = null;
     setPage(0);
   };
@@ -404,7 +399,7 @@ const OrgInventoryPage = () => {
             <Select
               label="Organization"
               value={selectedOrgId ?? ''}
-              onChange={(e) => handleOrgChange(Number(e.target.value))}
+              onChange={(e) => handleOrgChange(String(e.target.value))}
               data-testid="org-select"
             >
               {orgs.map((org) => (

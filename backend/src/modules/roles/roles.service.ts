@@ -17,7 +17,6 @@ export class RolesService {
   ) {}
 
   async create(createRoleDto: CreateRoleDto): Promise<Role> {
-    // Check if role with same name already exists
     const existingRole = await this.rolesRepository.findOne({
       where: { name: createRoleDto.name },
     });
@@ -38,7 +37,7 @@ export class RolesService {
     });
   }
 
-  async findOne(id: number): Promise<Role> {
+  async findOne(id: string): Promise<Role> {
     const role = await this.rolesRepository.findOne({ where: { id } });
 
     if (!role) {
@@ -52,10 +51,9 @@ export class RolesService {
     return this.rolesRepository.findOne({ where: { name } });
   }
 
-  async update(id: number, updateRoleDto: UpdateRoleDto): Promise<Role> {
+  async update(id: string, updateRoleDto: UpdateRoleDto): Promise<Role> {
     const role = await this.findOne(id);
 
-    // If updating name, check for conflicts
     if (updateRoleDto.name && updateRoleDto.name !== role.name) {
       const existingRole = await this.rolesRepository.findOne({
         where: { name: updateRoleDto.name },
@@ -72,7 +70,7 @@ export class RolesService {
     return this.rolesRepository.save(role);
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     const role = await this.findOne(id);
     await this.rolesRepository.remove(role);
   }

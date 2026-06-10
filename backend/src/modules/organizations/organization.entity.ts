@@ -1,8 +1,7 @@
-import { Exclude } from 'class-transformer';
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   OneToMany,
   ManyToOne,
   JoinColumn,
@@ -15,17 +14,8 @@ import { Game } from '../games/game.entity';
 
 @Entity()
 export class Organization {
-  @PrimaryGeneratedColumn()
-  id!: number;
-
-  @Exclude()
-  @Column({
-    name: 'id_uuid',
-    type: 'uuid',
-    unique: true,
-    default: () => 'uuid_generate_v7()',
-  })
-  idUuid!: string;
+  @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
+  id!: string;
 
   @Column()
   name!: string;
@@ -36,9 +26,9 @@ export class Organization {
   @Column({ default: true })
   isActive!: boolean;
 
-  @Column({ name: 'game_id' })
+  @Column({ name: 'game_id', type: 'uuid' })
   @Index()
-  gameId!: number;
+  gameId!: string;
 
   @ManyToOne(() => Game)
   @JoinColumn({ name: 'game_id' })

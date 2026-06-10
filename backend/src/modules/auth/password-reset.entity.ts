@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   ManyToOne,
@@ -10,11 +10,11 @@ import { User } from '../users/user.entity';
 
 @Entity('password_reset')
 export class PasswordReset {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
+  id!: string;
 
-  @Column()
-  userId!: number;
+  @Column({ type: 'uuid' })
+  userId!: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })

@@ -19,8 +19,8 @@ export class PermissionsService {
    * Combines permissions from all roles the user has in that organization
    */
   async getUserPermissions(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
   ): Promise<Set<string>> {
     const cacheKey = `permissions:user:${userId}:org:${organizationId}`;
 
@@ -59,8 +59,8 @@ export class PermissionsService {
    * Call this whenever user roles change
    */
   async invalidateUserPermissions(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
   ): Promise<void> {
     const cacheKey = `permissions:user:${userId}:org:${organizationId}`;
     await this.cacheManager.del(cacheKey);
@@ -70,8 +70,8 @@ export class PermissionsService {
    * Check if user has a specific permission in an organization
    */
   async hasPermission(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
     permission: string,
   ): Promise<boolean> {
     const permissions = await this.getUserPermissions(userId, organizationId);
@@ -82,8 +82,8 @@ export class PermissionsService {
    * Check if user has any of the specified permissions
    */
   async hasAnyPermission(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
     permissionsToCheck: string[],
   ): Promise<boolean> {
     const userPermissions = await this.getUserPermissions(
@@ -99,8 +99,8 @@ export class PermissionsService {
    * Check if user has all of the specified permissions
    */
   async hasAllPermissions(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
     permissionsToCheck: string[],
   ): Promise<boolean> {
     const userPermissions = await this.getUserPermissions(
@@ -116,8 +116,8 @@ export class PermissionsService {
    * Get all permissions as an array (useful for API responses)
    */
   async getUserPermissionsArray(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
   ): Promise<string[]> {
     const permissions = await this.getUserPermissions(userId, organizationId);
     return Array.from(permissions);

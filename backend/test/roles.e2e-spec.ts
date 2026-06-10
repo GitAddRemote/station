@@ -9,7 +9,7 @@ import { seedSystemUser } from './helpers/seed-system-user';
 describe('Roles (e2e)', () => {
   let app: INestApplication;
   let authCookie: string;
-  let createdRoleId: number;
+  let createdRoleId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -129,7 +129,7 @@ describe('Roles (e2e)', () => {
 
     it('should return 404 for non-existent role', () => {
       return request(app.getHttpServer())
-        .get('/roles/99999')
+        .get('/roles/ffffffff-ffff-4fff-bfff-ffffffffffff')
         .set('Cookie', authCookie)
         .expect(404);
     });
@@ -166,7 +166,7 @@ describe('Roles (e2e)', () => {
 
     it('should return 404 when deleting non-existent role', () => {
       return request(app.getHttpServer())
-        .delete('/roles/99999')
+        .delete('/roles/ffffffff-ffff-4fff-bfff-ffffffffffff')
         .set('Cookie', authCookie)
         .expect(404);
     });

@@ -38,16 +38,16 @@ export interface UnitOfMeasure {
 }
 
 export interface UserOrganizationMembership {
-  id: number;
-  userId: number;
-  organizationId: number;
-  roleId: number;
+  id: string;
+  userId: string;
+  organizationId: string;
+  roleId: string;
   organization?: {
-    id: number;
+    id: string;
     name: string;
   };
   role?: {
-    id: number;
+    id: string;
     name: string;
   };
 }
@@ -209,7 +209,7 @@ export const inventoryService = {
     });
   },
 
-  async getUserOrganizations(userId: number): Promise<UserOrganizationMembership[]> {
+  async getUserOrganizations(userId: string): Promise<UserOrganizationMembership[]> {
     const response = await api.get(
       `/user-organization-roles/user/${userId}/organizations`,
     );
@@ -218,7 +218,7 @@ export const inventoryService = {
 
   // Org inventory — uses the same /api/inventory endpoint filtered by ownerType/ownerId
   async getOrgInventory(
-    orgId: number,
+    orgId: string,
     params: {
       categoryId?: string;
       search?: string;
@@ -231,7 +231,7 @@ export const inventoryService = {
   ): Promise<InventoryListResponse> {
     return inventoryService.getInventory({
       ownerType: 'org',
-      ownerId: String(orgId),
+      ownerId: orgId,
       categoryId: params.categoryId,
       search: params.search,
       limit: params.limit,
@@ -242,7 +242,7 @@ export const inventoryService = {
   },
 
   async createOrgItem(
-    orgId: number,
+    orgId: string,
     item: {
       catalogEntryId: string;
       quantity: number;
@@ -254,20 +254,20 @@ export const inventoryService = {
   ): Promise<InventoryItem> {
     const response = await api.post(
       `/api/inventory`,
-      { ...item, ownerType: 'org', ownerId: String(orgId) },
+      { ...item, ownerType: 'org', ownerId: orgId },
     );
     return response.data;
   },
 
   async updateOrgItem(
-    _orgId: number,
+    _orgId: string,
     id: string,
     updates: { quantity?: number; unitOfMeasureId?: string; notes?: string | null; locationId?: string | null },
   ): Promise<InventoryItem> {
     return inventoryService.updateItem(id, updates);
   },
 
-  async deleteOrgItem(_orgId: number, id: string): Promise<void> {
+  async deleteOrgItem(_orgId: string, id: string): Promise<void> {
     return inventoryService.deleteItem(id);
   },
 

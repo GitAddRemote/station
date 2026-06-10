@@ -9,12 +9,12 @@ describe('AuditLogsService', () => {
   let repository: Repository<AuditLog>;
 
   const mockAuditLog: AuditLog = {
-    id: 1,
-    userId: 1,
+    id: '00000000-0000-0000-0000-000000000001',
+    userId: '00000000-0000-0000-0000-000000000002',
     username: 'testuser',
     action: AuditAction.CREATE,
     entityType: AuditEntityType.USER,
-    entityId: 1,
+    entityId: '00000000-0000-0000-0000-000000000003',
     metadata: { test: 'data' },
     oldValues: undefined,
     newValues: { name: 'test' },
@@ -64,11 +64,11 @@ describe('AuditLogsService', () => {
   describe('log', () => {
     it('should create and save an audit log', async () => {
       const dto = {
-        userId: 1,
+        userId: '00000000-0000-0000-0000-000000000002',
         username: 'testuser',
         action: AuditAction.CREATE,
         entityType: AuditEntityType.USER,
-        entityId: 1,
+        entityId: '00000000-0000-0000-0000-000000000003',
         metadata: { test: 'data' },
       };
 
@@ -97,9 +97,9 @@ describe('AuditLogsService', () => {
 
     it('should apply filters correctly', async () => {
       const filters = {
-        userId: 1,
+        userId: '00000000-0000-0000-0000-000000000002',
         entityType: AuditEntityType.USER,
-        entityId: 1,
+        entityId: '00000000-0000-0000-0000-000000000003',
         action: AuditAction.CREATE,
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-12-31'),
@@ -117,13 +117,17 @@ describe('AuditLogsService', () => {
 
   describe('findByUser', () => {
     it('should find audit logs by user', async () => {
-      const result = await service.findByUser(1, 50, 0);
+      const result = await service.findByUser(
+        '00000000-0000-0000-0000-000000000002',
+        50,
+        0,
+      );
 
       expect(result).toEqual({ logs: [mockAuditLog], total: 1 });
     });
 
     it('should use default limit and offset', async () => {
-      await service.findByUser(1);
+      await service.findByUser('00000000-0000-0000-0000-000000000002');
 
       expect(repository.createQueryBuilder).toHaveBeenCalled();
     });
@@ -131,7 +135,12 @@ describe('AuditLogsService', () => {
 
   describe('findByEntity', () => {
     it('should find audit logs by entity', async () => {
-      const result = await service.findByEntity(AuditEntityType.USER, 1, 50, 0);
+      const result = await service.findByEntity(
+        AuditEntityType.USER,
+        '00000000-0000-0000-0000-000000000003',
+        50,
+        0,
+      );
 
       expect(result).toEqual({ logs: [mockAuditLog], total: 1 });
     });

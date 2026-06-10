@@ -38,12 +38,12 @@ describe('UexCategory Entity', () => {
 
     category.dateAdded = now;
     category.dateModified = now;
-    category.addedById = 1;
-    category.modifiedById = 1;
+    category.addedById = '00000000-0000-0000-0000-000000000001';
+    category.modifiedById = '00000000-0000-0000-0000-000000000001';
 
     expect(category.dateAdded).toBe(now);
     expect(category.dateModified).toBe(now);
-    expect(category.addedById).toBe(1);
-    expect(category.modifiedById).toBe(1);
+    expect(category.addedById).toBe('00000000-0000-0000-0000-000000000001');
+    expect(category.modifiedById).toBe('00000000-0000-0000-0000-000000000001');
   });
 });
