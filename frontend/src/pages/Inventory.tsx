@@ -76,10 +76,11 @@ import { api } from '../services/api.service';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
-type InlineDraft = { quantity: number | ''; locationId?: string | null; locationName?: string | null };
+type InlineDraft = { quantity: number | ''; quality: number | ''; locationId?: string | null; locationName?: string | null };
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
+const SLIDER_QUANTITY_MAX = 10000;
 const ORG_ACCENT = '#f2a255';
 const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
 const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
@@ -109,6 +110,10 @@ const valueText = (value: number) =>
 const InventoryPage = () => {
   const navigate = useNavigate();
   const addSearchRef = useRef<HTMLInputElement | null>(null);
+  const addQuantityRef = useRef<HTMLInputElement | null>(null);
+  const addLocationRef = useRef<HTMLInputElement | null>(null);
+  const addQualityRef = useRef<HTMLInputElement | null>(null);
+  const addNotesRef = useRef<HTMLInputElement | null>(null);
   const firstCatalogItemRef = useRef<HTMLDivElement | null>(null);
   const catalogItemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [user, setUser] = useState<{ userId: string; username: string } | null>(
@@ -171,7 +176,8 @@ const InventoryPage = () => {
     search: '',
     categoryId: '' as string | '',
     sharedOnly: false,
-    valueRange: [0, 999999.999999] as [number, number],
+    valueRange: [0, SLIDER_QUANTITY_MAX] as [number, number],
+    qualityRange: [0, 1000] as [number, number],
   });
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'date'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -193,7 +199,7 @@ const InventoryPage = () => {
   );
   const [inlineActiveField, setInlineActiveField] = useState<{
     rowKey: string;
-    field: 'quantity' | 'location';
+    field: 'quantity' | 'quality' | 'location';
   } | null>(null);
   const [inlineLocations, setInlineLocations] = useState<Record<string, LocationDto | null>>({});
   const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] =
@@ -311,8 +317,8 @@ const InventoryPage = () => {
     }
     return null;
   }, [page, rowsPerPage, totalCount]);
-  const focusController = useFocusController<string, 'quantity' | 'save'>({
-    fieldOrder: useMemo(() => ['quantity', 'save'] as const, []),
+  const focusController = useFocusController<string, 'quantity' | 'quality' | 'save'>({
+    fieldOrder: useMemo(() => ['quantity', 'quality', 'save'] as const, []),
     getRowOrder,
     onBoundary: handleFocusBoundary,
   });
@@ -324,6 +330,7 @@ const InventoryPage = () => {
     getRowOrder: getNewRowOrder,
   });
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const qualityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const saveRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const newRowItemRef = useRef<HTMLInputElement | null>(null);
   const newRowQuantityRef = useRef<HTMLInputElement | null>(null);
@@ -331,14 +338,14 @@ const InventoryPage = () => {
   const newRowItemCache = useRef<Map<string, CatalogEntryDto[]>>(new Map());
 
   const activateInlineField = useCallback(
-    (rowKey: string, field: 'quantity' | 'location') => {
+    (rowKey: string, field: 'quantity' | 'quality' | 'location') => {
       setInlineActiveField({ rowKey, field });
       setInlineError((prev) => ({ ...prev, [rowKey]: null }));
     },
     [],
   );
   const handleInlineDraftChange = useCallback(
-    (itemId: string, changes: Partial<{ quantity: number | '' }>) => {
+    (itemId: string, changes: Partial<{ quantity: number | ''; quality: number | '' }>) => {
       setInlineDrafts((prev) => ({
         ...prev,
         [itemId]: {
@@ -346,6 +353,10 @@ const InventoryPage = () => {
             changes.quantity === undefined
               ? (prev[itemId]?.quantity ?? 0)
               : (changes.quantity as number | ''),
+          quality:
+            changes.quality === undefined
+              ? (prev[itemId]?.quality ?? '')
+              : (changes.quality as number | ''),
         },
       }));
       setInlineError((prev) => ({ ...prev, [itemId]: null }));
@@ -369,6 +380,14 @@ const InventoryPage = () => {
     });
   }, []);
 
+  const handleInlineQualityBlur = useCallback((rowKey: string) => {
+    setInlineActiveField((prev) => {
+      if (!prev || prev.rowKey !== rowKey) return prev;
+      if (prev.field !== 'quality') return prev;
+      return null;
+    });
+  }, []);
+
   const handleInlineLocationChange = useCallback(
     (itemId: string, location: LocationDto | null) => {
       setInlineLocations((prev) => ({ ...prev, [itemId]: location }));
@@ -386,6 +405,12 @@ const InventoryPage = () => {
   const handleQuantityRef = useCallback(
     (ref: HTMLInputElement | null, key: string) => {
       quantityRefs.current[key] = ref;
+    },
+    [],
+  );
+  const handleQualityRef = useCallback(
+    (ref: HTMLInputElement | null, key: string) => {
+      qualityRefs.current[key] = ref;
     },
     [],
   );
@@ -548,6 +573,9 @@ const InventoryPage = () => {
       const categoryId = filters.categoryId || undefined;
       const limit = rowsPerPage;
 
+      const sortParam: 'name' | 'quantity' | 'date_modified' =
+        sortBy === 'name' ? 'name' : sortBy === 'quantity' ? 'quantity' : 'date_modified';
+
       if (isOrgMode && selectedOrgId) {
         if (orgPermissionsLoading || permissionsFetchedForOrgId.current !== selectedOrgId || !canViewOrgInventory) {
           setItems([]);
@@ -562,7 +590,11 @@ const InventoryPage = () => {
           limit,
           page: page + 1,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
-          maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
+          maxQuantity: filters.valueRange[1] < SLIDER_QUANTITY_MAX ? filters.valueRange[1] : undefined,
+          minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
+          maxQuality: filters.qualityRange[1] < 1000 ? filters.qualityRange[1] : undefined,
+          sort: sortParam,
+          order: sortDir,
         });
         setItems(data.data);
         setTotalCount(data.total);
@@ -578,7 +610,11 @@ const InventoryPage = () => {
           categoryId,
           orgAvailable: filters.sharedOnly || undefined,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
-          maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
+          maxQuantity: filters.valueRange[1] < SLIDER_QUANTITY_MAX ? filters.valueRange[1] : undefined,
+          minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
+          maxQuality: filters.qualityRange[1] < 1000 ? filters.qualityRange[1] : undefined,
+          sort: sortParam,
+          order: sortDir,
         });
         setItems(data.data);
         setTotalCount(data.total);
@@ -607,10 +643,13 @@ const InventoryPage = () => {
     filters.categoryId,
     filters.sharedOnly,
     filters.valueRange,
+    filters.qualityRange,
     debouncedSearch,
     page,
     rowsPerPage,
     initialLoading,
+    sortBy,
+    sortDir,
   ]);
 
   const openAddDialog = () => {
@@ -854,8 +893,11 @@ const InventoryPage = () => {
     filters.categoryId,
     filters.sharedOnly,
     filters.valueRange,
+    filters.qualityRange,
     viewMode,
     selectedOrgId,
+    sortBy,
+    sortDir,
   ]);
 
   useEffect(() => {
@@ -921,16 +963,15 @@ const InventoryPage = () => {
     [items],
   );
 
-  const currentMaxValue = filters.valueRange[1];
+  // Track the slider's "natural" max separately so the auto-expand effect
+  // only grows the ceiling — never resets a filter the user has actively set.
+  const [sliderMax, setSliderMax] = useState(SLIDER_QUANTITY_MAX);
 
   useEffect(() => {
-    if (maxQuantity > currentMaxValue) {
-      setFilters((prev) => ({
-        ...prev,
-        valueRange: [0, Math.ceil(maxQuantity)],
-      }));
+    if (maxQuantity > sliderMax) {
+      setSliderMax(Math.ceil(maxQuantity));
     }
-  }, [maxQuantity, currentMaxValue]);
+  }, [maxQuantity, sliderMax]);
 
   const filteredItems = useMemo(() => items, [items]);
 
@@ -941,9 +982,10 @@ const InventoryPage = () => {
       return;
     }
     setInlineDrafts(
-      items.reduce<Record<string, { quantity: number }>>((acc, item) => {
+      items.reduce<Record<string, { quantity: number; quality: number | '' }>>((acc, item) => {
         acc[item.id] = {
           quantity: Number(item.quantity) || 0,
+          quality: item.quality ?? '',
         };
         return acc;
       }, {}),
@@ -1081,6 +1123,11 @@ const InventoryPage = () => {
           activateInlineField(key, 'quantity');
         }),
       );
+      unregisters.push(
+        focusController.register(key, 'quality', () => {
+          activateInlineField(key, 'quality');
+        }),
+      );
       const saveRef = saveRefs.current[key];
       if (saveRef) {
         unregisters.push(
@@ -1097,8 +1144,8 @@ const InventoryPage = () => {
 
   useEffect(() => {
     if (!inlineActiveField) return;
-    const { rowKey } = inlineActiveField;
-    const ref = quantityRefs.current[rowKey];
+    const { rowKey, field } = inlineActiveField;
+    const ref = field === 'quality' ? qualityRefs.current[rowKey] : quantityRefs.current[rowKey];
     if (!ref) return;
     const handle = window.requestAnimationFrame(() => {
       ref.focus();
@@ -1230,6 +1277,7 @@ const InventoryPage = () => {
       const rowKey = item.id.toString();
       const nextFallback: InlineDraft = {
         quantity: Number(item.quantity) || 0,
+        quality: item.quality ?? '',
       };
       const cachedFallback = inlineDraftFallbacks.current.get(rowKey);
 
@@ -1287,16 +1335,21 @@ const InventoryPage = () => {
         prev.map((entry) => (entry.id === item.id ? updatedItem : entry)),
       );
 
+      const draftQuality = draft.quality;
+      const parsedQuality = draftQuality !== '' ? Number(draftQuality) : null;
+
       try {
         if (viewMode === 'org' && selectedOrgId) {
           await inventoryService.updateOrgItem(selectedOrgId, item.id, {
             quantity: parsedQuantity,
             locationId,
+            quality: parsedQuality,
           });
         } else {
           await inventoryService.updateItem(item.id, {
             quantity: parsedQuantity,
             locationId,
+            quality: parsedQuality,
           });
         }
         setInlineSaved((prev) => {
@@ -1503,26 +1556,24 @@ const InventoryPage = () => {
                 value={editLocation}
                 onChange={setEditLocation}
               />
-              {actionItem.catalogKind === 'commodity' && (
-                <TextField
-                  label="Quality"
-                  type="number"
-                  fullWidth
-                  inputProps={{ min: 0, max: 10, step: 0.1 }}
-                  value={editQuality}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    if (raw === '') {
-                      setEditQuality('');
-                      return;
-                    }
-                    const num = parseFloat(raw);
-                    if (!Number.isNaN(num)) {
-                      setEditQuality(Math.min(10, Math.max(0, num)));
-                    }
-                  }}
-                />
-              )}
+              <TextField
+                label="Quality (0–1000)"
+                type="number"
+                fullWidth
+                inputProps={{ min: 0, max: 1000, step: 1 }}
+                value={editQuality}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setEditQuality('');
+                    return;
+                  }
+                  const num = parseFloat(raw);
+                  if (!Number.isNaN(num)) {
+                    setEditQuality(Math.min(1000, Math.max(0, num)));
+                  }
+                }}
+              />
               <TextField
                 label="Notes"
                 fullWidth
@@ -1674,12 +1725,10 @@ const InventoryPage = () => {
   };
 
   const handleCatalogSearchKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Tab' && !event.shiftKey) {
-      if (firstCatalogItemRef.current) {
-        event.preventDefault();
-        event.stopPropagation();
-        firstCatalogItemRef.current.focus();
-      }
+    if (event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey)) {
+      event.preventDefault();
+      event.stopPropagation();
+      addQuantityRef.current?.focus();
     }
   };
 
@@ -1746,6 +1795,8 @@ const InventoryPage = () => {
     const isRowActive = inlineActiveField?.rowKey === rowKey;
     const isQuantityActive =
       isRowActive && inlineActiveField?.field === 'quantity';
+    const isQualityActive =
+      isRowActive && inlineActiveField?.field === 'quality';
     const isLocationActive =
       isRowActive && inlineActiveField?.field === 'location';
     const saving = inlineSaving.has(item.id);
@@ -1759,6 +1810,7 @@ const InventoryPage = () => {
         density={density}
         inlineDraft={draft}
         quantityEditing={isQuantityActive}
+        qualityEditing={isQualityActive}
         locationEditing={isLocationActive}
         inlineLocation={inlineLocation}
         inlineSaving={saving}
@@ -1771,12 +1823,14 @@ const InventoryPage = () => {
         onDraftChange={handleInlineDraftChange}
         onErrorChange={handleInlineErrorChange}
         onQuantityBlur={handleInlineQuantityBlur}
+        onQualityBlur={handleInlineQualityBlur}
         onActivateField={activateInlineField}
         onLocationChange={handleInlineLocationChange}
         onLocationBlur={handleInlineLocationBlur}
         onSave={handleInlineSaveAndAdvance}
         onOpenActions={handleActionOpen}
         setQuantityRef={handleQuantityRef}
+        setQualityRef={handleQualityRef}
         setSaveRef={handleSaveRef}
       />
     );
@@ -1915,7 +1969,7 @@ const InventoryPage = () => {
                     setFilters={setFilters}
                     categories={categories}
                     valueText={valueText}
-                    maxQuantity={maxQuantity}
+                    maxQuantity={sliderMax}
                     sortBy={sortBy}
                     sortDir={sortDir}
                     setSortBy={(value) => setSortBy(value)}
@@ -1937,6 +1991,13 @@ const InventoryPage = () => {
                     itemCount={items.length}
                     autoFocusSearch
                     disabled={inventoryBusy}
+                    onClearAll={() => {
+                      setSortBy('date');
+                      setSortDir(() => 'desc');
+                      setGroupBy('none');
+                      setSliderMax(SLIDER_QUANTITY_MAX);
+                      setFilters(prev => ({ ...prev, valueRange: [0, SLIDER_QUANTITY_MAX], qualityRange: [0, 1000] }));
+                    }}
                   />
                   {orgPermissionsError && (
                     <Alert severity="warning" sx={{ mt: 2 }}>
@@ -2004,7 +2065,7 @@ const InventoryPage = () => {
                             display: 'grid',
                             gridTemplateColumns: {
                               xs: '1fr',
-                              md: '2fr 1fr 1.5fr 1fr 1fr auto',
+                              md: '2fr 1fr 1.5fr 0.8fr 1fr 1fr 1fr auto',
                             },
                             alignItems: 'center',
                             color: 'text.secondary',
@@ -2015,8 +2076,10 @@ const InventoryPage = () => {
                         >
                           <Typography variant="caption">Item</Typography>
                           <Typography variant="caption">Location</Typography>
+                          <Typography variant="caption">Quality</Typography>
                           <Typography variant="caption">Quantity</Typography>
                           <Typography variant="caption">Updated</Typography>
+                          <Typography variant="caption">Category</Typography>
                           <Typography variant="caption" textAlign="right">
                             Actions
                           </Typography>
@@ -2212,8 +2275,8 @@ const InventoryPage = () => {
                           setPage(0);
                         }}
                         rowsPerPageOptions={[10, 25, 50, 100, 250]}
-                        backIconButtonProps={{ disabled: inventoryBusy }}
-                        nextIconButtonProps={{ disabled: inventoryBusy }}
+                        backIconButtonProps={{ disabled: inventoryBusy || page === 0 }}
+                        nextIconButtonProps={{ disabled: inventoryBusy || (page + 1) * rowsPerPage >= totalCount }}
                         SelectProps={{ disabled: inventoryBusy }}
                         sx={{ mt: 2 }}
                       />
@@ -2228,7 +2291,10 @@ const InventoryPage = () => {
 
       <Dialog
         open={addDialogOpen}
-        onClose={closeAddDialog}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick') return;
+          closeAddDialog();
+        }}
         fullWidth
         maxWidth="lg"
       >
@@ -2274,11 +2340,14 @@ const InventoryPage = () => {
                         onChange={(e) =>
                           setCatalogCategoryId(e.target.value as string)
                         }
+                        onClose={() => {
+                          setTimeout(() => addQuantityRef.current?.focus(), 0);
+                        }}
                       >
                         <MenuItem value="">
                           <em>All</em>
                         </MenuItem>
-                        {categories.map((category) => (
+                        {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
                           <MenuItem key={category.id} value={category.id}>
                             {category.name}
                           </MenuItem>
@@ -2292,10 +2361,17 @@ const InventoryPage = () => {
                           label="Quantity"
                           type="number"
                           inputProps={{ min: 0.000001, step: 0.000001 }}
+                          inputRef={addQuantityRef}
                           value={newItemQuantity}
                           onChange={(e) =>
                             setNewItemQuantity(Number(e.target.value))
                           }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'Tab') {
+                              e.preventDefault();
+                              addLocationRef.current?.focus();
+                            }
+                          }}
                         />
                         <Stack direction="row" spacing={1}>
                           <Button
@@ -2303,22 +2379,22 @@ const InventoryPage = () => {
                             variant="outlined"
                             onClick={() =>
                               setNewItemQuantity((qty) =>
-                                Number(Math.max(0.000001, qty - 1).toFixed(6)),
+                                Number(Math.max(0.000001, qty - 10).toFixed(6)),
                               )
                             }
                           >
-                            -1
+                            -10
                           </Button>
                           <Button
                             size="small"
                             variant="outlined"
                             onClick={() =>
                               setNewItemQuantity((qty) =>
-                                Number(Math.max(0.000001, qty + 1).toFixed(6)),
+                                Number(Math.max(0.000001, qty + 10).toFixed(6)),
                               )
                             }
                           >
-                            +1
+                            +10
                           </Button>
                         </Stack>
                       </Stack>
@@ -2356,33 +2432,51 @@ const InventoryPage = () => {
                       )}
                       <LocationPicker
                         value={newItemLocation}
-                        onChange={setNewItemLocation}
+                        onChange={(loc) => {
+                          setNewItemLocation(loc);
+                          if (loc) {
+                            setTimeout(() => addQualityRef.current?.focus(), 0);
+                          }
+                        }}
+                        inputRef={addLocationRef}
                       />
-                      {selectedCatalogItem?.catalogKind === 'commodity' && (
-                        <TextField
-                          fullWidth
-                          label="Quality"
-                          type="number"
-                          inputProps={{ min: 0, max: 10, step: 0.1 }}
-                          value={newItemQuality}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            if (raw === '') {
-                              setNewItemQuality('');
-                              return;
-                            }
-                            const num = parseFloat(raw);
-                            if (!Number.isNaN(num)) {
-                              setNewItemQuality(Math.min(10, Math.max(0, num)));
-                            }
-                          }}
-                        />
-                      )}
+                      <TextField
+                        fullWidth
+                        label="Quality (0–1000)"
+                        type="number"
+                        inputProps={{ min: 0, max: 1000, step: 1 }}
+                        inputRef={addQualityRef}
+                        value={newItemQuality}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === '') {
+                            setNewItemQuality('');
+                            return;
+                          }
+                          const num = parseFloat(raw);
+                          if (!Number.isNaN(num)) {
+                            setNewItemQuality(Math.min(1000, Math.max(0, num)));
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === 'Tab') {
+                            e.preventDefault();
+                            addNotesRef.current?.focus();
+                          }
+                        }}
+                      />
                       <TextField
                         fullWidth
                         label="Notes"
                         value={newItemNotes}
+                        inputRef={addNotesRef}
                         onChange={(e) => setNewItemNotes(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey && addReady) {
+                            e.preventDefault();
+                            handleCreateInventoryItem({ stayOpen: true });
+                          }
+                        }}
                       />
                       <Typography variant="caption" color="text.secondary">
                         Tip: Ctrl/Cmd + Enter to add and keep this dialog open

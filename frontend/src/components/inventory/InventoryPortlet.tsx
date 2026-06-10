@@ -175,7 +175,7 @@ const InventoryPortlet = ({ onExpand }: InventoryPortletProps) => {
               <MenuItem value="">
                 <em>All categories</em>
               </MenuItem>
-              {categories.map((category) => (
+              {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
                 <MenuItem key={category.id} value={category.id}>
                   {category.name}
                 </MenuItem>
@@ -216,6 +216,7 @@ const InventoryPortlet = ({ onExpand }: InventoryPortletProps) => {
                     <TableCell>Item</TableCell>
                     <TableCell>Category</TableCell>
                     <TableCell align="right">Quantity</TableCell>
+                    <TableCell align="right">Quality</TableCell>
                     <TableCell>Location</TableCell>
                     <TableCell>Status</TableCell>
                   </TableRow>
@@ -240,6 +241,11 @@ const InventoryPortlet = ({ onExpand }: InventoryPortletProps) => {
                       <TableCell align="right">
                         <Typography variant="body2">
                           {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" color="text.secondary">
+                          {item.quality != null ? item.quality : '—'}
                         </Typography>
                       </TableCell>
                       <TableCell>

@@ -97,6 +97,20 @@ export class ListInventoryItemsDto {
   @Min(0)
   maxQuantity?: number;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minQuality?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxQuality?: number;
+
   @ApiPropertyOptional({
     enum: ['name', 'quantity', 'created_at', 'date_modified'],
   })

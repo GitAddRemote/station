@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Avatar,
   Box,
@@ -28,6 +29,7 @@ interface FiltersPanelProps {
     categoryId: string | '';
     sharedOnly: boolean;
     valueRange: [number, number];
+    qualityRange: [number, number];
   };
   setFilters: (
     updater:
@@ -58,6 +60,7 @@ interface FiltersPanelProps {
   itemCount: number;
   autoFocusSearch?: boolean;
   disabled?: boolean;
+  onClearAll?: () => void;
 }
 
 export const InventoryFiltersPanel = ({
@@ -87,7 +90,20 @@ export const InventoryFiltersPanel = ({
   itemCount,
   autoFocusSearch = false,
   disabled = false,
+  onClearAll,
 }: FiltersPanelProps) => {
+  const sliderMax = maxQuantity || 1000;
+  const [localRange, setLocalRange] = useState<[number, number]>(filters.valueRange);
+  const [localQualityRange, setLocalQualityRange] = useState<[number, number]>(filters.qualityRange);
+
+  useEffect(() => {
+    setLocalRange(filters.valueRange);
+  }, [filters.valueRange]);
+
+  useEffect(() => {
+    setLocalQualityRange(filters.qualityRange);
+  }, [filters.qualityRange]);
+
   return (
     <>
       <Grid container spacing={2} alignItems="center">
@@ -122,7 +138,7 @@ export const InventoryFiltersPanel = ({
               <MenuItem value="">
                 <em>All</em>
               </MenuItem>
-              {categories.map((category) => (
+              {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
                 <MenuItem key={category.id} value={category.id}>
                   {category.name}
                 </MenuItem>
@@ -130,22 +146,17 @@ export const InventoryFiltersPanel = ({
             </Select>
           </FormControl>
         </Grid>
-        <Grid item xs={12} md={4} lg={3}>
+        <Grid item xs={12} md={3} lg={2}>
           <Box sx={{ px: 1 }}>
             <Typography variant="caption" color="text.secondary">
-              Value (quantity) range
+              Quantity range
             </Typography>
             <Slider
-              value={filters.valueRange}
+              value={localRange}
               min={0}
-              max={Math.max(filters.valueRange[1], maxQuantity || 1000)}
+              max={sliderMax}
               disabled={disabled}
-              onChange={(_, value) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  valueRange: value as [number, number],
-                }))
-              }
+              onChange={(_, value) => setLocalRange(value as [number, number])}
               onChangeCommitted={(_, value) =>
                 setFilters((prev) => ({
                   ...prev,
@@ -154,6 +165,27 @@ export const InventoryFiltersPanel = ({
               }
               valueLabelDisplay="auto"
               getAriaValueText={valueText}
+            />
+          </Box>
+        </Grid>
+        <Grid item xs={12} md={3} lg={2}>
+          <Box sx={{ px: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Quality range (0–1000)
+            </Typography>
+            <Slider
+              value={localQualityRange}
+              min={0}
+              max={1000}
+              disabled={disabled}
+              onChange={(_, value) => setLocalQualityRange(value as [number, number])}
+              onChangeCommitted={(_, value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  qualityRange: value as [number, number],
+                }))
+              }
+              valueLabelDisplay="auto"
             />
           </Box>
         </Grid>
@@ -288,14 +320,19 @@ export const InventoryFiltersPanel = ({
             color="inherit"
             startIcon={<FilterAltIcon />}
             disabled={disabled}
-            onClick={() =>
+            onClick={() => {
+              const reset = [0, maxQuantity || 999999.999999] as [number, number];
+              setLocalRange(reset);
+              setLocalQualityRange([0, 1000]);
               setFilters({
                 search: '',
                 categoryId: '',
                 sharedOnly: false,
-                valueRange: [0, maxQuantity || 999999.999999],
-              })
-            }
+                valueRange: reset,
+                qualityRange: [0, 1000],
+              });
+              onClearAll?.();
+            }}
           >
             Clear filters
           </Button>

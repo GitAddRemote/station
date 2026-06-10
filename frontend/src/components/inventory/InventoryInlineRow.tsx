@@ -28,8 +28,9 @@ export type InventoryRecord = InventoryItem | OrgInventoryItem;
 interface InventoryInlineRowProps {
   item: InventoryRecord;
   density: 'standard' | 'compact';
-  inlineDraft: { quantity: number | '' };
+  inlineDraft: { quantity: number | ''; quality: number | '' };
   quantityEditing: boolean;
+  qualityEditing: boolean;
   locationEditing: boolean;
   inlineLocation: LocationDto | null;
   inlineSaving: boolean;
@@ -37,17 +38,18 @@ interface InventoryInlineRowProps {
   inlineError?: string | null;
   isDirty: boolean;
   isRowActive: boolean;
-  focusController: FocusController<string, 'quantity' | 'save'>;
+  focusController: FocusController<string, 'quantity' | 'quality' | 'save'>;
   rowKey: string;
   onDraftChange: (
     itemId: string,
-    changes: Partial<{ quantity: number | '' }>,
+    changes: Partial<{ quantity: number | ''; quality: number | '' }>,
   ) => void;
   onErrorChange: (itemId: string, message: string | null) => void;
   onQuantityBlur: (rowKey: string) => void;
+  onQualityBlur: (rowKey: string) => void;
   onActivateField: (
     rowKey: string,
-    field: 'quantity' | 'location',
+    field: 'quantity' | 'quality' | 'location',
     initialInput?: string,
   ) => void;
   onLocationChange: (itemId: string, location: LocationDto | null) => void;
@@ -58,6 +60,7 @@ interface InventoryInlineRowProps {
     item: InventoryRecord,
   ) => void;
   setQuantityRef: (ref: HTMLInputElement | null, key: string) => void;
+  setQualityRef: (ref: HTMLInputElement | null, key: string) => void;
   setSaveRef: (ref: HTMLButtonElement | null, key: string) => void;
 }
 
@@ -66,6 +69,7 @@ const InventoryInlineRow = ({
   density,
   inlineDraft,
   quantityEditing,
+  qualityEditing,
   locationEditing,
   inlineLocation,
   inlineSaving,
@@ -78,12 +82,14 @@ const InventoryInlineRow = ({
   onDraftChange,
   onErrorChange,
   onQuantityBlur,
+  onQualityBlur,
   onActivateField,
   onLocationChange,
   onLocationBlur,
   onSave,
   onOpenActions,
   setQuantityRef,
+  setQualityRef,
   setSaveRef,
 }: InventoryInlineRowProps) => {
   const draftQuantityNumber = Number(inlineDraft.quantity);
@@ -97,10 +103,9 @@ const InventoryInlineRow = ({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md:
-            density === 'compact'
-              ? '2fr 1fr 1.5fr 1fr 1fr auto'
-              : '2fr 1fr 1.5fr 1fr 1fr auto',
+          md: density === 'compact'
+            ? '2fr 1fr 1.5fr 0.8fr 1fr 1fr 1fr auto'
+            : '2fr 1fr 1.5fr 0.8fr 1fr 1fr 1fr auto',
         },
         gap: density === 'compact' ? 0.75 : 2,
         alignItems: 'center',
@@ -133,11 +138,6 @@ const InventoryInlineRow = ({
           >
             {item.itemName || `Item #${item.catalogEntryId}`}
           </Typography>
-          <Chip
-            label={item.categoryName || 'General'}
-            size={density === 'compact' ? 'small' : 'medium'}
-            variant="outlined"
-          />
           {item.isOrgAvailable && (
             <Chip
               size={density === 'compact' ? 'small' : 'medium'}
@@ -157,11 +157,6 @@ const InventoryInlineRow = ({
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
               {item.locationName ?? <>&mdash;</>}
             </Typography>
-            {item.catalogKind === 'commodity' && item.quality != null && (
-              <Typography variant="caption" color="text.secondary">
-                Quality: {item.quality}
-              </Typography>
-            )}
           </>
         ) : locationEditing ? (
           <LocationPicker
@@ -210,10 +205,89 @@ const InventoryInlineRow = ({
             />
           </Box>
         )}
-        {density === 'compact' && item.catalogKind === 'commodity' && item.quality != null && (
-          <Typography variant="caption" color="text.secondary">
-            Q: {item.quality}
-          </Typography>
+      </Stack>
+      {/* Quality column */}
+      <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
+        {density !== 'compact' ? (
+          <>
+            <Typography variant="body2" color="text.secondary">
+              Quality
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {item.quality != null ? item.quality : <>&mdash;</>}
+            </Typography>
+          </>
+        ) : qualityEditing ? (
+          <TextField
+            type="text"
+            size="small"
+            label="Quality"
+            value={inlineDraft.quality}
+            onChange={(e) => {
+              const raw = e.target.value.trim();
+              if (raw === '') {
+                onDraftChange(item.id, { quality: '' });
+                return;
+              }
+              const num = Number(raw);
+              if (!Number.isNaN(num)) {
+                onDraftChange(item.id, { quality: Math.min(1000, Math.max(0, num)) });
+              }
+            }}
+            onBlur={() => onQualityBlur(rowKey)}
+            inputProps={{ inputMode: 'numeric' }}
+            inputRef={(el) => setQualityRef(el, rowKey)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                focusController.focus(rowKey, 'save');
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                onDraftChange(item.id, { quality: item.quality ?? '' });
+                onQualityBlur(rowKey);
+              }
+            }}
+            sx={{ maxWidth: 90 }}
+          />
+        ) : (
+          <Box
+            role="button"
+            tabIndex={0}
+            onClick={() => onActivateField(rowKey, 'quality')}
+            onFocus={() => onActivateField(rowKey, 'quality')}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onActivateField(rowKey, 'quality');
+              }
+            }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              cursor: 'text',
+              color: 'text.primary',
+              textDecoration: 'underline dotted',
+              textUnderlineOffset: '4px',
+              textDecorationColor: 'rgba(255,255,255,0.35)',
+              '&:hover .inline-edit-icon': { opacity: 0.75 },
+              '&:focus-visible': {
+                outline: '1px solid rgba(74, 158, 255, 0.6)',
+                borderRadius: 1,
+                outlineOffset: 2,
+              },
+            }}
+            aria-label={`Edit quality for ${item.itemName ?? `Item ${item.catalogEntryId}`}`}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {inlineDraft.quality !== '' ? inlineDraft.quality : (item.quality != null ? item.quality : '—')}
+            </Typography>
+            <EditIcon
+              className="inline-edit-icon"
+              fontSize="inherit"
+              sx={{ opacity: 0, transition: 'opacity 0.2s ease', flexShrink: 0 }}
+            />
+          </Box>
         )}
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
@@ -358,6 +432,15 @@ const InventoryInlineRow = ({
             </Typography>
           )}
       </Stack>
+      {/* Category column */}
+      <Stack spacing={density === 'compact' ? 0.25 : 0.5} justifyContent="center">
+        <Chip
+          label={item.categoryName || 'General'}
+          size="small"
+          variant="outlined"
+          sx={{ maxWidth: '100%' }}
+        />
+      </Stack>
       <Stack
         direction="row"
         spacing={density === 'compact' ? 0.5 : 1}
@@ -394,24 +477,31 @@ const InventoryInlineRow = ({
           />
         )}
         {density === 'compact' ? (
-          <IconButton
-            color="primary"
-            size="small"
-            onClick={() => onSave(item)}
-            disabled={inlineSaving}
-            data-testid={`inline-save-${item.id}`}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onSave(item);
-              }
-            }}
-            ref={(el: HTMLButtonElement | null) => {
-              setSaveRef(el, rowKey);
-            }}
-          >
-            <CheckIcon fontSize="small" />
-          </IconButton>
+          <>
+            <IconButton
+              color="primary"
+              size="small"
+              onClick={() => onSave(item)}
+              disabled={inlineSaving}
+              data-testid={`inline-save-${item.id}`}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  onSave(item);
+                }
+              }}
+              ref={(el: HTMLButtonElement | null) => {
+                setSaveRef(el, rowKey);
+              }}
+            >
+              <CheckIcon fontSize="small" />
+            </IconButton>
+            <Tooltip title="Actions">
+              <IconButton size="small" onClick={(event) => onOpenActions?.(event, item)}>
+                <MoreVertIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </>
         ) : (
           <Tooltip title="Actions">
             <IconButton onClick={(event) => onOpenActions?.(event, item)}>
@@ -432,6 +522,7 @@ const areEqual = (
   prev.density === next.density &&
   prev.inlineDraft === next.inlineDraft &&
   prev.quantityEditing === next.quantityEditing &&
+  prev.qualityEditing === next.qualityEditing &&
   prev.locationEditing === next.locationEditing &&
   prev.inlineLocation === next.inlineLocation &&
   prev.inlineSaving === next.inlineSaving &&
@@ -444,12 +535,14 @@ const areEqual = (
   prev.onDraftChange === next.onDraftChange &&
   prev.onErrorChange === next.onErrorChange &&
   prev.onQuantityBlur === next.onQuantityBlur &&
+  prev.onQualityBlur === next.onQualityBlur &&
   prev.onActivateField === next.onActivateField &&
   prev.onLocationChange === next.onLocationChange &&
   prev.onLocationBlur === next.onLocationBlur &&
   prev.onSave === next.onSave &&
   prev.onOpenActions === next.onOpenActions &&
   prev.setQuantityRef === next.setQuantityRef &&
+  prev.setQualityRef === next.setQualityRef &&
   prev.setSaveRef === next.setSaveRef;
 
 export { InventoryInlineRow };

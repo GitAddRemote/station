@@ -64,6 +64,10 @@ export interface InventorySearchParams {
   limit?: number;
   minQuantity?: number;
   maxQuantity?: number;
+  minQuality?: number;
+  maxQuality?: number;
+  sort?: 'name' | 'quantity' | 'date_modified';
+  order?: 'asc' | 'desc';
 }
 
 export interface InventoryListResponse {
@@ -158,6 +162,12 @@ export const inventoryService = {
     if (params.includeSummary !== undefined) query.includeSummary = params.includeSummary;
     if (params.page !== undefined) query.page = params.page;
     if (params.limit !== undefined) query.limit = params.limit;
+    if (params.minQuantity !== undefined) query.minQuantity = params.minQuantity;
+    if (params.maxQuantity !== undefined) query.maxQuantity = params.maxQuantity;
+    if (params.minQuality !== undefined) query.minQuality = params.minQuality;
+    if (params.maxQuality !== undefined) query.maxQuality = params.maxQuality;
+    if (params.sort !== undefined) query.sort = params.sort;
+    if (params.order !== undefined) query.order = params.order;
 
     const response = await api.get(`/api/inventory`, {
       params: query,
@@ -227,6 +237,10 @@ export const inventoryService = {
       catalogEntryId?: string;
       minQuantity?: number;
       maxQuantity?: number;
+      minQuality?: number;
+      maxQuality?: number;
+      sort?: 'name' | 'quantity' | 'date_modified';
+      order?: 'asc' | 'desc';
     },
   ): Promise<InventoryListResponse> {
     return inventoryService.getInventory({
@@ -238,6 +252,10 @@ export const inventoryService = {
       page: params.page !== undefined ? params.page : 1,
       minQuantity: params.minQuantity,
       maxQuantity: params.maxQuantity,
+      minQuality: params.minQuality,
+      maxQuality: params.maxQuality,
+      sort: params.sort,
+      order: params.order,
     });
   },
 
@@ -262,7 +280,7 @@ export const inventoryService = {
   async updateOrgItem(
     _orgId: string,
     id: string,
-    updates: { quantity?: number; unitOfMeasureId?: string; notes?: string | null; locationId?: string | null },
+    updates: { quantity?: number; unitOfMeasureId?: string; notes?: string | null; locationId?: string | null; quality?: number | null },
   ): Promise<InventoryItem> {
     return inventoryService.updateItem(id, updates);
   },
