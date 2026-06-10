@@ -7,8 +7,10 @@ import { User } from './user.entity';
 describe('SystemUserService', () => {
   let service: SystemUserService;
 
+  const SYSTEM_USER_UUID = '00000000-0000-0000-0000-000000000001';
+
   const mockSystemUser = {
-    id: 1,
+    id: SYSTEM_USER_UUID,
     username: 'station-system',
     email: 'system@station.internal',
     isSystemUser: true,
@@ -56,10 +58,10 @@ describe('SystemUserService', () => {
       await service.onModuleInit();
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 1, isSystemUser: true },
+        where: { username: 'station-system', isSystemUser: true },
         select: ['id'],
       });
-      expect(service.getSystemUserId()).toBe(1);
+      expect(service.getSystemUserId()).toBe(SYSTEM_USER_UUID);
     });
 
     it('should throw error if system user is missing', async () => {
@@ -94,7 +96,6 @@ describe('SystemUserService', () => {
 
       expect(mockRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 1,
           username: 'station-system',
           email: 'system@station.internal',
           isActive: true,
@@ -102,7 +103,7 @@ describe('SystemUserService', () => {
         }),
       );
       expect(mockRepository.save).toHaveBeenCalled();
-      expect(service.getSystemUserId()).toBe(1);
+      expect(service.getSystemUserId()).toBe(SYSTEM_USER_UUID);
 
       // Restore original NODE_ENV
       process.env.NODE_ENV = originalNodeEnv;
@@ -114,7 +115,7 @@ describe('SystemUserService', () => {
       mockRepository.findOne.mockResolvedValue(mockSystemUser);
       await service.onModuleInit();
 
-      expect(service.getSystemUserId()).toBe(1);
+      expect(service.getSystemUserId()).toBe(SYSTEM_USER_UUID);
     });
 
     it('should throw error if not initialized', () => {
@@ -129,15 +130,19 @@ describe('SystemUserService', () => {
       mockRepository.findOne.mockResolvedValue(mockSystemUser);
       await service.onModuleInit();
 
-      expect(service.isSystemUser(1)).toBe(true);
+      expect(service.isSystemUser(SYSTEM_USER_UUID)).toBe(true);
     });
 
     it('should return false for non-system user ID', async () => {
       mockRepository.findOne.mockResolvedValue(mockSystemUser);
       await service.onModuleInit();
 
-      expect(service.isSystemUser(2)).toBe(false);
-      expect(service.isSystemUser(100)).toBe(false);
+      expect(service.isSystemUser('00000000-0000-0000-0000-000000000002')).toBe(
+        false,
+      );
+      expect(service.isSystemUser('00000000-0000-0000-0000-000000000100')).toBe(
+        false,
+      );
     });
   });
 });

@@ -15,9 +15,9 @@ import { seedSystemUser } from './helpers/seed-system-user';
 describe('UserOrganizationRoles (e2e)', () => {
   let app: INestApplication;
   let authCookie: string;
-  let userId: number;
-  let organizationId: number;
-  let roleId: number;
+  let userId: string;
+  let organizationId: string;
+  let roleId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -259,7 +259,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     it('should return 404 when removing non-existent assignment', () => {
       return request(app.getHttpServer())
         .delete(
-          `/user-organization-roles/user/${userId}/organization/${organizationId}/role/99999`,
+          `/user-organization-roles/user/${userId}/organization/${organizationId}/role/00000000-0000-0000-0000-000000009999`,
         )
         .set('Cookie', authCookie)
         .expect(404);

@@ -119,7 +119,9 @@ describe('InventoryController', () => {
 
     await controller.listLists(request);
 
-    expect(service.listLists).toHaveBeenCalledWith(7);
+    expect(service.listLists).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000007',
+    );
   });
 
   it('delegates list deletion to the service', async () => {
