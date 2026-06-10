@@ -5,6 +5,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
+import { UEXClientException } from '../../uex-sync/exceptions/uex-exceptions';
 
 const UPSERT_BATCH_SIZE = 500;
 
@@ -28,9 +29,21 @@ export class TerminalDistancesSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    const distances = await this.uexApiClient.get<UexTerminalDistance[]>(
-      '/terminals_distances',
-    );
+    let distances: UexTerminalDistance[];
+    try {
+      distances = await this.uexApiClient.get<UexTerminalDistance[]>(
+        '/terminals_distances',
+      );
+    } catch (err) {
+      if (err instanceof UEXClientException) {
+        this.logger.warn(
+          { runId: ctx.runId },
+          'terminal-distances-sync skipped: UEX /terminals_distances now requires per-terminal query params — bulk sync unavailable',
+        );
+        return;
+      }
+      throw err;
+    }
     this.logger.info(
       { runId: ctx.runId, count: distances.length },
       'Fetched terminal distances from UEX',
