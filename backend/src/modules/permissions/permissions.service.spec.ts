@@ -3,7 +3,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PermissionsService } from './permissions.service';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
-import { OrgPermission, DEFAULT_ROLE_PERMISSIONS } from './permissions.constants';
+import {
+  OrgPermission,
+  DEFAULT_ROLE_PERMISSIONS,
+} from './permissions.constants';
 
 describe('PermissionsService', () => {
   let service: PermissionsService;
