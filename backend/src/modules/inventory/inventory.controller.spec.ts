@@ -84,7 +84,7 @@ describe('InventoryController', () => {
     );
 
     expect(service.updateItem).toHaveBeenCalledWith(
-      7,
+      '00000000-0000-0000-0000-000000000007',
       '00000000-0000-0000-0000-000000000111',
       dto,
     );
@@ -97,7 +97,7 @@ describe('InventoryController', () => {
     );
 
     expect(service.deleteItem).toHaveBeenCalledWith(
-      7,
+      '00000000-0000-0000-0000-000000000007',
       '00000000-0000-0000-0000-000000000111',
     );
   });
@@ -153,7 +153,7 @@ describe('InventoryController', () => {
     await controller.removeItemFromList(request, listId, inventoryItemId);
 
     expect(service.removeItemFromList).toHaveBeenCalledWith(
-      7,
+      '00000000-0000-0000-0000-000000000007',
       listId,
       inventoryItemId,
     );
