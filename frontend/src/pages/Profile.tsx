@@ -22,7 +22,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SaveIcon from '@mui/icons-material/Save';
 import LockIcon from '@mui/icons-material/Lock';
-import { API_URL } from '../config/api';
+import { api } from '../services/api.service';
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -52,25 +52,17 @@ const Profile = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await fetch(`${API_URL}/users/profile`, {
-          credentials: 'include',
+        const response = await api.get('/users/profile');
+        const data = response.data;
+        setProfile({
+          username: data.username || '',
+          email: data.email || '',
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          phoneNumber: data.phoneNumber || '',
+          bio: data.bio || '',
         });
-
-        if (response.ok) {
-          const data = await response.json();
-          setProfile({
-            username: data.username || '',
-            email: data.email || '',
-            firstName: data.firstName || '',
-            lastName: data.lastName || '',
-            phoneNumber: data.phoneNumber || '',
-            bio: data.bio || '',
-          });
-        } else {
-          navigate('/login');
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
+      } catch {
         navigate('/login');
       } finally {
         setLoading(false);
@@ -90,10 +82,7 @@ const Profile = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await api.post('/auth/logout', {});
     } finally {
       navigate('/login');
     }
@@ -117,35 +106,16 @@ const Profile = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`${API_URL}/users/profile`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          firstName: profile.firstName,
-          lastName: profile.lastName,
-          phoneNumber: profile.phoneNumber,
-          bio: profile.bio,
-        }),
+      await api.patch('/users/profile', {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phoneNumber: profile.phoneNumber,
+        bio: profile.bio,
       });
-
-      if (response.ok) {
-        setMessage({ type: 'success', text: 'Profile updated successfully!' });
-      } else {
-        const error = await response.json();
-        setMessage({
-          type: 'error',
-          text: error.message || 'Failed to update profile',
-        });
-      }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      setMessage({
-        type: 'error',
-        text: 'An error occurred while updating your profile',
-      });
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+    } catch (error: unknown) {
+      const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setMessage({ type: 'error', text: msg || 'An error occurred while updating your profile' });
     } finally {
       setSaving(false);
     }
@@ -173,31 +143,11 @@ const Profile = () => {
     setChangingPassword(true);
 
     try {
-      const response = await fetch(`${API_URL}/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setPasswordMessage({ type: 'success', text: data.message });
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } else {
-        setPasswordMessage({
-          type: 'error',
-          text: data.message || 'Failed to change password',
-        });
-      }
+      const response = await api.post('/auth/change-password', { currentPassword, newPassword });
+      setPasswordMessage({ type: 'success', text: response.data.message });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
       console.error('Error changing password:', error);
       setPasswordMessage({

@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_URL } from '../config/api';
+import { api } from './api.service';
 
 export interface CatalogEntryDto {
   id: string;
@@ -62,24 +61,18 @@ export const catalogService = {
   async getCatalogItems(
     params: CatalogQueryParams,
   ): Promise<PaginatedCatalogResponse> {
-    const response = await axios.get(`${API_URL}/api/catalog`, {
-      params,
-      withCredentials: true,
-    });
+    const response = await api.get('/api/catalog', { params });
     return response.data;
   },
 
   async getCatalogCategories(): Promise<CatalogCategory[]> {
-    const response = await axios.get(`${API_URL}/api/catalog/categories`, {
-      withCredentials: true,
-    });
+    const response = await api.get('/api/catalog/categories');
     return response.data;
   },
 
   async getLocations(search?: string): Promise<LocationDto[]> {
-    const response = await axios.get(`${API_URL}/api/catalog/locations`, {
+    const response = await api.get('/api/catalog/locations', {
       params: search && search.length >= 2 ? { search } : undefined,
-      withCredentials: true,
     });
     return response.data;
   },

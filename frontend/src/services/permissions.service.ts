@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_URL } from '../config/api';
+import { api } from './api.service';
 
 export const OrgPermission = {
   CAN_VIEW_ORG_INVENTORY: 'can_view_org_inventory',
@@ -15,9 +14,8 @@ export const permissionsService = {
     userId: number,
     organizationId: number,
   ): Promise<OrgPermission[]> {
-    const response = await axios.get(
-      `${API_URL}/permissions/user/${userId}/organization/${organizationId}`,
-      { withCredentials: true },
+    const response = await api.get(
+      `/permissions/user/${userId}/organization/${organizationId}`,
     );
     const permissions = response.data?.permissions;
     return Array.isArray(permissions) ? permissions : [];

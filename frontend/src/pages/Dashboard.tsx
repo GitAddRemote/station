@@ -21,7 +21,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import BusinessIcon from '@mui/icons-material/Business';
 import InventoryPortlet from '../components/inventory/InventoryPortlet';
-import { API_URL } from '../config/api';
+import { api } from '../services/api.service';
 
 interface User {
   username: string;
@@ -37,18 +37,9 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const response = await fetch(`${API_URL}/users/profile`, {
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data);
-        } else {
-          navigate('/login');
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error);
+        const response = await api.get('/users/profile');
+        setUser(response.data);
+      } catch {
         navigate('/login');
       } finally {
         setLoading(false);
@@ -68,10 +59,7 @@ const Dashboard = () => {
 
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await api.post('/auth/logout', {});
     } finally {
       navigate('/login');
     }

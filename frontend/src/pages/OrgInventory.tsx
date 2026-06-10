@@ -44,8 +44,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import BusinessIcon from '@mui/icons-material/Business';
 import SearchIcon from '@mui/icons-material/Search';
-import axios from 'axios';
-import { API_URL } from '../config/api';
+import { api } from '../services/api.service';
 import {
   inventoryService,
   InventoryCategory,
@@ -93,9 +92,7 @@ const OrgInventoryPage = () => {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_URL}/auth/profile`, {
-        withCredentials: true,
-      });
+      const response = await api.get('/auth/profile');
       setUser({ userId: response.data.userId, username: response.data.username });
     } catch {
       navigate('/login');
@@ -293,7 +290,7 @@ const OrgInventoryPage = () => {
 
   const handleLogout = async () => {
     try {
-      await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
+      await api.post('/auth/logout', {});
     } finally {
       navigate('/login');
     }
