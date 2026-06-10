@@ -118,8 +118,10 @@ describe('Games (e2e)', () => {
       });
 
       it('should throw NotFoundException for invalid ID', async () => {
-        await expect(gamesService.getGameById(99999)).rejects.toThrow(
-          'Game with ID 99999 not found',
+        await expect(
+          gamesService.getGameById('ffffffff-ffff-4fff-bfff-ffffffffffff'),
+        ).rejects.toThrow(
+          'Game with ID ffffffff-ffff-4fff-bfff-ffffffffffff not found',
         );
       });
     });
@@ -141,7 +143,9 @@ describe('Games (e2e)', () => {
       });
 
       it('should return false for invalid game ID', async () => {
-        const isValid = await gamesService.validateGameId(99999);
+        const isValid = await gamesService.validateGameId(
+          'ffffffff-ffff-4fff-bfff-ffffffffffff',
+        );
         expect(isValid).toBe(false);
       });
     });

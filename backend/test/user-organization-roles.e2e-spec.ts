@@ -141,7 +141,7 @@ describe('UserOrganizationRoles (e2e)', () => {
         .post('/user-organization-roles/assign')
         .set('Cookie', authCookie)
         .send({
-          userId: '00000000-0000-0000-0000-000000000999',
+          userId: 'ffffffff-ffff-4fff-bfff-ffffffffffff',
           organizationId,
           roleId,
         })
@@ -259,7 +259,7 @@ describe('UserOrganizationRoles (e2e)', () => {
     it('should return 404 when removing non-existent assignment', () => {
       return request(app.getHttpServer())
         .delete(
-          `/user-organization-roles/user/${userId}/organization/${organizationId}/role/00000000-0000-0000-0000-000000009999`,
+          `/user-organization-roles/user/${userId}/organization/${organizationId}/role/ffffffff-ffff-4fff-bfff-ffffffffffff`,
         )
         .set('Cookie', authCookie)
         .expect(404);

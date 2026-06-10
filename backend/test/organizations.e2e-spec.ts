@@ -10,7 +10,7 @@ import { seedSystemUser } from './helpers/seed-system-user';
 describe('Organizations (e2e)', () => {
   let app: INestApplication;
   let authCookie: string;
-  let createdOrgId: number;
+  let createdOrgId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -133,7 +133,7 @@ describe('Organizations (e2e)', () => {
 
     it('should return 404 for non-existent organization', () => {
       return request(app.getHttpServer())
-        .get('/organizations/99999')
+        .get('/organizations/ffffffff-ffff-4fff-bfff-ffffffffffff')
         .set('Cookie', authCookie)
         .expect(404);
     });
@@ -194,7 +194,7 @@ describe('Organizations (e2e)', () => {
 
     it('should return 404 when deleting non-existent organization', () => {
       return request(app.getHttpServer())
-        .delete('/organizations/99999')
+        .delete('/organizations/ffffffff-ffff-4fff-bfff-ffffffffffff')
         .set('Cookie', authCookie)
         .expect(404);
     });
