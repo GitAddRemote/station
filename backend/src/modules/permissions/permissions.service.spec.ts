@@ -459,8 +459,8 @@ describe('PermissionsService', () => {
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasPermission(
-        1,
-        1,
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
         OrgPermission.CAN_MANAGE_INVENTORY,
       );
 
@@ -486,8 +486,8 @@ describe('PermissionsService', () => {
       mockRepository.find.mockResolvedValue(userRoles);
 
       const result = await service.hasPermission(
-        1,
-        1,
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000011',
         OrgPermission.CAN_MANAGE_INVENTORY,
       );
 

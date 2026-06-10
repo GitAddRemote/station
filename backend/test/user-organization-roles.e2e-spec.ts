@@ -141,7 +141,7 @@ describe('UserOrganizationRoles (e2e)', () => {
         .post('/user-organization-roles/assign')
         .set('Cookie', authCookie)
         .send({
-          userId: 99999,
+          userId: '00000000-0000-0000-0000-000000000999',
           organizationId,
           roleId,
         })
