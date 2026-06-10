@@ -25,7 +25,9 @@ import {
   Notifications as NotificationsIcon,
   CheckCircleOutline as CheckIcon,
   UnfoldMoreDouble as ChevronUpDownIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
+import { api } from '../services/api.service';
 import './AppShell.css';
 
 // ---- navigation items ------------------------------------------------
@@ -269,6 +271,11 @@ export function AppShell({
     if (href && href !== '#') navigate(href);
   }, [navigate]);
 
+  const handleSignOut = useCallback(async () => {
+    try { await api.post('/auth/logout', {}); } catch { /* ignore */ }
+    navigate('/login');
+  }, [navigate]);
+
   const allCommands = useMemo<Command[]>(() => {
     const navCmds = NAV_PRIMARY
       .filter((n) => !n.soon)
@@ -296,9 +303,16 @@ export function AppShell({
         hint: '?',
         run: () => setHelpOpen(true),
       },
+      {
+        id: 'signout',
+        group: 'System',
+        icon: <LogoutIcon />,
+        label: 'Sign out',
+        run: handleSignOut,
+      },
     ];
     return [...commands, ...navCmds, ...sys];
-  }, [commands, theme, toggleTheme, go]);
+  }, [commands, theme, toggleTheme, go, handleSignOut]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
