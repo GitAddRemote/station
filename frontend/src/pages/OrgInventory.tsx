@@ -6,12 +6,9 @@ import {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AppShell from '../components/AppShell';
 import {
-  AppBar,
-  Toolbar,
-  IconButton,
   Typography,
-  Avatar,
   Container,
   Box,
   CircularProgress,
@@ -39,10 +36,7 @@ import {
   Paper,
   Tooltip,
 } from '@mui/material';
-import LogoutIcon from '@mui/icons-material/Logout';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import InventoryIcon from '@mui/icons-material/Inventory';
-import BusinessIcon from '@mui/icons-material/Business';
 import SearchIcon from '@mui/icons-material/Search';
 import { api } from '../services/api.service';
 import {
@@ -283,14 +277,6 @@ const OrgInventoryPage = () => {
     setPage(0);
   };
 
-  const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout', {});
-    } finally {
-      navigate('/login');
-    }
-  };
-
   const renderItemTable = (rows: OrgInventoryItemV2[], label: string, color?: string) => (
     <Box mb={3}>
       <Stack direction="row" spacing={1} alignItems="center" mb={1}>
@@ -367,31 +353,12 @@ const OrgInventoryPage = () => {
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#0a0a0f' }}>
-      <AppBar position="static" sx={{ backgroundColor: '#12121a', borderBottom: '1px solid rgba(255,255,255,0.06)' }} elevation={0}>
-        <Toolbar>
-          <IconButton edge="start" color="inherit" onClick={() => navigate('/dashboard')} sx={{ mr: 1 }}>
-            <ArrowBackIcon />
-          </IconButton>
-          <BusinessIcon sx={{ mr: 1, color: '#f2a255' }} />
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            Org Inventory
-          </Typography>
-          {user && (
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Avatar sx={{ width: 30, height: 30, fontSize: 14, bgcolor: '#4A9EFF' }}>
-                {user.username[0]?.toUpperCase()}
-              </Avatar>
-              <Typography variant="body2">{user.username}</Typography>
-              <IconButton color="inherit" size="small" onClick={handleLogout}>
-                <LogoutIcon fontSize="small" />
-              </IconButton>
-            </Stack>
-          )}
-        </Toolbar>
-      </AppBar>
-
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+    <AppShell
+      active="inventory"
+      userInitial={user?.username?.[0]?.toUpperCase() || 'U'}
+      searchPlaceholder="Search org inventory…"
+    >
+      <Container maxWidth="xl" sx={{ py: 0 }}>
         {/* Org + filter controls */}
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} mb={3} flexWrap="wrap">
           <FormControl size="small" sx={{ minWidth: 220 }}>
@@ -551,7 +518,7 @@ const OrgInventoryPage = () => {
           </>
         )}
       </Container>
-    </Box>
+    </AppShell>
   );
 };
 

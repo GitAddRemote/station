@@ -2,35 +2,28 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  Container,
-  Typography,
   Grid,
   Card,
   CardContent,
   Button,
-  AppBar,
-  Toolbar,
-  IconButton,
-  Avatar,
-  Menu,
-  MenuItem,
   CircularProgress,
+  Typography,
 } from '@mui/material';
-import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
-import LogoutIcon from '@mui/icons-material/Logout';
-import BusinessIcon from '@mui/icons-material/Business';
+import GroupsIcon from '@mui/icons-material/Groups';
 import InventoryPortlet from '../components/inventory/InventoryPortlet';
+import AppShell from '../components/AppShell';
 import { api } from '../services/api.service';
 
 interface User {
   username: string;
   email: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,27 +42,6 @@ const Dashboard = () => {
     fetchUserProfile();
   }, [navigate]);
 
-  const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout', {});
-    } finally {
-      navigate('/login');
-    }
-  };
-
-  const handleProfile = () => {
-    handleClose();
-    navigate('/profile');
-  };
-
   if (loading) {
     return (
       <Box
@@ -78,7 +50,7 @@ const Dashboard = () => {
           justifyContent: 'center',
           alignItems: 'center',
           minHeight: '100vh',
-          backgroundColor: '#1e2328',
+          backgroundColor: 'var(--surface-page)',
         }}
       >
         <CircularProgress />
@@ -86,211 +58,137 @@ const Dashboard = () => {
     );
   }
 
-  return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#1e2328' }}>
-      {/* Navigation */}
-      <AppBar position="static">
-        <Toolbar>
-          <Typography
-            variant="h6"
-            sx={{
-              flexGrow: 1,
-              fontWeight: 700,
-              background: 'linear-gradient(135deg, #4A9EFF 0%, #7ABDFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              cursor: 'pointer',
-            }}
-            onClick={() => navigate('/dashboard')}
-          >
-            STATION
-          </Typography>
-          <IconButton color="inherit" onClick={handleMenu}>
-            <Avatar sx={{ width: 36, height: 36, bgcolor: '#4A9EFF' }}>
-              {user?.username?.charAt(0).toUpperCase() || 'U'}
-            </Avatar>
-          </IconButton>
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleClose}
-          >
-            <MenuItem onClick={handleProfile}>
-              <PersonIcon sx={{ mr: 1 }} /> Profile
-            </MenuItem>
-            <MenuItem onClick={handleLogout}>
-              <LogoutIcon sx={{ mr: 1 }} /> Logout
-            </MenuItem>
-          </Menu>
-        </Toolbar>
-      </AppBar>
+  const userInitial = user?.firstName
+    ? user.firstName.charAt(0).toUpperCase()
+    : user?.username?.charAt(0).toUpperCase() || 'U';
 
-      {/* Main Content */}
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+  return (
+    <AppShell
+      active="dashboard"
+      userInitial={userInitial}
+      searchPlaceholder="Search inventory, members, orders…"
+    >
+      {/* Welcome header */}
+      <Box sx={{ mb: 4 }}>
         <Typography
           variant="h3"
           sx={{
-            mb: 1,
+            fontFamily: 'var(--font-display)',
             fontWeight: 700,
-            color: '#e8eaed',
+            letterSpacing: 'var(--tracking-tight)',
+            color: 'var(--text-strong)',
+            mb: 0.5,
           }}
         >
-          Welcome back, {user?.username}!
+          Welcome back{user?.firstName ? `, ${user.firstName}` : user?.username ? `, ${user.username}` : ''}
         </Typography>
-        <Typography
-          variant="body1"
-          sx={{
-            mb: 4,
-            color: '#9aa0a6',
-          }}
-        >
+        <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>
           {user?.email}
         </Typography>
+      </Box>
 
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <Card
-              sx={{
-                height: '100%',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                },
-              }}
-              onClick={() => navigate('/profile')}
-            >
-              <CardContent>
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    p: 2,
-                    borderRadius: '12px',
-                    background: 'rgba(74, 158, 255, 0.1)',
-                    mb: 2,
-                  }}
-                >
-                  <PersonIcon sx={{ fontSize: 32, color: '#4A9EFF' }} />
-                </Box>
-                <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                  My Profile
-                </Typography>
-                <Typography sx={{ color: '#9aa0a6' }}>
-                  View and update your profile information
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card
-              sx={{
-                height: '100%',
-              }}
-            >
-              <CardContent>
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    p: 2,
-                    borderRadius: '12px',
-                    background: 'rgba(74, 158, 255, 0.1)',
-                    mb: 2,
-                  }}
-                >
-                  <GroupsIcon sx={{ fontSize: 32, color: '#4A9EFF' }} />
-                </Box>
-                <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                  My Organizations
-                </Typography>
-                <Typography sx={{ color: '#9aa0a6', mb: 2 }}>
-                  You are not a member of any organizations yet
-                </Typography>
-                <Button variant="outlined" size="small">
-                  Create Organization
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card
-              sx={{
-                height: '100%',
-              }}
-            >
-              <CardContent>
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    p: 2,
-                    borderRadius: '12px',
-                    background: 'rgba(74, 158, 255, 0.1)',
-                    mb: 2,
-                  }}
-                >
-                  <GroupsIcon sx={{ fontSize: 32, color: '#4A9EFF' }} />
-                </Box>
-                <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                  Invitations
-                </Typography>
-                <Typography sx={{ color: '#9aa0a6' }}>
-                  No pending invitations
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Inventory Portlet - Full Width */}
-          <Grid item xs={12}>
-            <InventoryPortlet
-              gameId={1}
-              onExpand={() => navigate('/inventory')}
-            />
-          </Grid>
+      <Grid container spacing={3}>
+        {/* Profile portlet */}
+        <Grid item xs={12} md={4}>
+          <Card
+            sx={{
+              height: '100%',
+              cursor: 'pointer',
+              transition: 'border-color var(--dur-base) var(--ease-out)',
+              '&:hover': { borderColor: 'rgba(83, 174, 247, 0.3)' },
+            }}
+            onClick={() => navigate('/profile')}
+          >
+            <CardContent>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  p: 1.5,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--brand-subtle)',
+                  mb: 2,
+                }}
+              >
+                <PersonIcon sx={{ fontSize: 24, color: 'var(--brand)' }} />
+              </Box>
+              <Typography
+                variant="h6"
+                sx={{ mb: 0.5, fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-strong)' }}
+              >
+                My Profile
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>
+                View and update your profile information
+              </Typography>
+            </CardContent>
+          </Card>
         </Grid>
 
-        <Box sx={{ mt: 6 }}>
-          <Typography
-            variant="h5"
-            sx={{ mb: 3, fontWeight: 600, color: '#e8eaed' }}
-          >
-            Quick Actions
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item>
-              <Button
-                variant="contained"
-                startIcon={<GroupsIcon />}
-                onClick={() =>
-                  alert('Create Organization feature coming soon!')
-                }
+        {/* Organizations portlet */}
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  p: 1.5,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--brand-subtle)',
+                  mb: 2,
+                }}
               >
+                <GroupsIcon sx={{ fontSize: 24, color: 'var(--brand)' }} />
+              </Box>
+              <Typography
+                variant="h6"
+                sx={{ mb: 0.5, fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-strong)' }}
+              >
+                My Organizations
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'var(--text-muted)', mb: 2 }}>
+                You are not a member of any organizations yet
+              </Typography>
+              <Button variant="outlined" size="small">
                 Create Organization
               </Button>
-            </Grid>
-            <Grid item>
-              <Button
-                variant="outlined"
-                startIcon={<BusinessIcon />}
-                onClick={() => navigate('/org-inventory')}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Invitations portlet */}
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  p: 1.5,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--brand-subtle)',
+                  mb: 2,
+                }}
               >
-                Org Inventory
-              </Button>
-            </Grid>
-            <Grid item>
-              <Button
-                variant="outlined"
-                startIcon={<PersonIcon />}
-                onClick={() => navigate('/profile')}
+                <GroupsIcon sx={{ fontSize: 24, color: 'var(--brand)' }} />
+              </Box>
+              <Typography
+                variant="h6"
+                sx={{ mb: 0.5, fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-strong)' }}
               >
-                Edit Profile
-              </Button>
-            </Grid>
-          </Grid>
-        </Box>
-      </Container>
-    </Box>
+                Invitations
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>
+                No pending invitations
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Inventory Portlet — full width */}
+        <Grid item xs={12}>
+          <InventoryPortlet onExpand={() => navigate('/inventory')} />
+        </Grid>
+      </Grid>
+    </AppShell>
   );
 };
 

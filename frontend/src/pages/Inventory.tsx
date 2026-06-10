@@ -7,12 +7,9 @@ import {
 } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AppShell from '../components/AppShell';
 import {
-  AppBar,
-  Toolbar,
-  IconButton,
   Typography,
-  Avatar,
   Container,
   Box,
   CircularProgress,
@@ -45,8 +42,6 @@ import {
   ToggleButton,
   Tooltip as MuiTooltip,
 } from '@mui/material';
-import LogoutIcon from '@mui/icons-material/Logout';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import EditIcon from '@mui/icons-material/Edit';
@@ -420,14 +415,6 @@ const InventoryPage = () => {
     },
     [],
   );
-
-  const handleLogout = async () => {
-    try {
-      await api.post('/auth/logout', {});
-    } finally {
-      navigate('/login');
-    }
-  };
 
   const closeActionMenu = () => {
     setActionAnchor(null);
@@ -1837,49 +1824,11 @@ const InventoryPage = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#0b1118' }}>
-      <AppBar
-        position="sticky"
-        color="transparent"
-        sx={{
-          backdropFilter: 'blur(6px)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
-        <Toolbar>
-          <IconButton color="inherit" onClick={() => navigate('/dashboard')}>
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography
-            variant="h6"
-            sx={{
-              flexGrow: 1,
-              fontWeight: 700,
-              ml: 1,
-              background: 'linear-gradient(135deg, #4A9EFF 0%, #7ABDFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              cursor: 'pointer',
-            }}
-            onClick={() => navigate('/dashboard')}
-          >
-            Inventory Command
-          </Typography>
-          <Chip
-            icon={<InventoryIcon />}
-            label={viewMode === 'org' ? 'Org Inventory' : 'Personal'}
-            sx={{ mr: 2 }}
-            color="primary"
-            variant="outlined"
-          />
-          <IconButton color="inherit" onClick={handleLogout}>
-            <LogoutIcon />
-          </IconButton>
-          <Avatar sx={{ width: 32, height: 32, ml: 1, bgcolor: '#4A9EFF' }}>
-            {user?.username?.charAt(0).toUpperCase() || 'U'}
-          </Avatar>
-        </Toolbar>
-      </AppBar>
+    <AppShell
+      active="inventory"
+      userInitial={user?.username?.charAt(0).toUpperCase() || 'U'}
+      searchPlaceholder="Search inventory…"
+    >
 
       {isOrgMode && (
         <Box
@@ -2646,7 +2595,7 @@ const InventoryPage = () => {
       </Menu>
 
       {renderActionDialog()}
-    </Box>
+    </AppShell>
   );
 };
 
