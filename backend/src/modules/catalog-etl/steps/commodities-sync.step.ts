@@ -13,7 +13,7 @@ interface UexCommodity {
   code: string;
   kind: string | null;
   id_parent: number | null;
-  weight_scu: number | null;
+  weight_scu: number | string | null;
   price_buy: number | null;
   price_sell: number | null;
   is_available: number;
@@ -44,6 +44,16 @@ interface UexCommodity {
 function toDate(unixTs: number | null | undefined): Date | null {
   if (!unixTs) return null;
   return new Date(unixTs * 1000);
+}
+
+function normalizeWeightScu(value: number | string | null): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 @Injectable()
@@ -185,7 +195,7 @@ export class CommoditiesSyncStep implements EtlStep {
           record.name, // $2  name
           record.code, // $3  code
           record.kind ?? null, // $4  kind
-          record.weight_scu ?? null, // $5  weight_scu
+          normalizeWeightScu(record.weight_scu), // $5  weight_scu
           record.price_buy ?? null, // $6  price_buy
           record.price_sell ?? null, // $7  price_sell
           Boolean(record.is_available), // $8
