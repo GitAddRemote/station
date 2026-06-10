@@ -473,24 +473,31 @@ const InventoryInlineRow = ({
           />
         )}
         {density === 'compact' ? (
-          <IconButton
-            color="primary"
-            size="small"
-            onClick={() => onSave(item)}
-            disabled={inlineSaving}
-            data-testid={`inline-save-${item.id}`}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                onSave(item);
-              }
-            }}
-            ref={(el: HTMLButtonElement | null) => {
-              setSaveRef(el, rowKey);
-            }}
-          >
-            <CheckIcon fontSize="small" />
-          </IconButton>
+          <>
+            <IconButton
+              color="primary"
+              size="small"
+              onClick={() => onSave(item)}
+              disabled={inlineSaving}
+              data-testid={`inline-save-${item.id}`}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  onSave(item);
+                }
+              }}
+              ref={(el: HTMLButtonElement | null) => {
+                setSaveRef(el, rowKey);
+              }}
+            >
+              <CheckIcon fontSize="small" />
+            </IconButton>
+            <Tooltip title="Actions">
+              <IconButton size="small" onClick={(event) => onOpenActions?.(event, item)}>
+                <MoreVertIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </>
         ) : (
           <Tooltip title="Actions">
             <IconButton onClick={(event) => onOpenActions?.(event, item)}>

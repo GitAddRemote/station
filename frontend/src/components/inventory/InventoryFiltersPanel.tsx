@@ -59,6 +59,7 @@ interface FiltersPanelProps {
   itemCount: number;
   autoFocusSearch?: boolean;
   disabled?: boolean;
+  onClearAll?: () => void;
 }
 
 export const InventoryFiltersPanel = ({
@@ -88,6 +89,7 @@ export const InventoryFiltersPanel = ({
   itemCount,
   autoFocusSearch = false,
   disabled = false,
+  onClearAll,
 }: FiltersPanelProps) => {
   const sliderMax = Math.max(filters.valueRange[1], maxQuantity || 1000);
   const [localRange, setLocalRange] = useState<[number, number]>(filters.valueRange);
@@ -291,14 +293,17 @@ export const InventoryFiltersPanel = ({
             color="inherit"
             startIcon={<FilterAltIcon />}
             disabled={disabled}
-            onClick={() =>
+            onClick={() => {
+              const reset = [0, maxQuantity || 999999.999999] as [number, number];
+              setLocalRange(reset);
               setFilters({
                 search: '',
                 categoryId: '',
                 sharedOnly: false,
-                valueRange: [0, maxQuantity || 999999.999999],
-              })
-            }
+                valueRange: reset,
+              });
+              onClearAll?.();
+            }}
           >
             Clear filters
           </Button>

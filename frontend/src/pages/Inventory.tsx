@@ -109,6 +109,9 @@ const valueText = (value: number) =>
 const InventoryPage = () => {
   const navigate = useNavigate();
   const addSearchRef = useRef<HTMLInputElement | null>(null);
+  const addQuantityRef = useRef<HTMLInputElement | null>(null);
+  const addQualityRef = useRef<HTMLInputElement | null>(null);
+  const addNotesRef = useRef<HTMLInputElement | null>(null);
   const firstCatalogItemRef = useRef<HTMLDivElement | null>(null);
   const catalogItemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [user, setUser] = useState<{ userId: string; username: string } | null>(
@@ -567,6 +570,9 @@ const InventoryPage = () => {
       const categoryId = filters.categoryId || undefined;
       const limit = rowsPerPage;
 
+      const sortParam: 'name' | 'quantity' | 'date_modified' =
+        sortBy === 'name' ? 'name' : sortBy === 'quantity' ? 'quantity' : 'date_modified';
+
       if (isOrgMode && selectedOrgId) {
         if (orgPermissionsLoading || permissionsFetchedForOrgId.current !== selectedOrgId || !canViewOrgInventory) {
           setItems([]);
@@ -582,6 +588,8 @@ const InventoryPage = () => {
           page: page + 1,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
           maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
+          sort: sortParam,
+          order: sortDir,
         });
         setItems(data.data);
         setTotalCount(data.total);
@@ -598,6 +606,8 @@ const InventoryPage = () => {
           orgAvailable: filters.sharedOnly || undefined,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
           maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
+          sort: sortParam,
+          order: sortDir,
         });
         setItems(data.data);
         setTotalCount(data.total);
@@ -630,6 +640,8 @@ const InventoryPage = () => {
     page,
     rowsPerPage,
     initialLoading,
+    sortBy,
+    sortDir,
   ]);
 
   const openAddDialog = () => {
@@ -875,6 +887,8 @@ const InventoryPage = () => {
     filters.valueRange,
     viewMode,
     selectedOrgId,
+    sortBy,
+    sortDir,
   ]);
 
   useEffect(() => {
@@ -1703,12 +1717,10 @@ const InventoryPage = () => {
   };
 
   const handleCatalogSearchKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Tab' && !event.shiftKey) {
-      if (firstCatalogItemRef.current) {
-        event.preventDefault();
-        event.stopPropagation();
-        firstCatalogItemRef.current.focus();
-      }
+    if (event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey)) {
+      event.preventDefault();
+      event.stopPropagation();
+      addQuantityRef.current?.focus();
     }
   };
 
@@ -1971,6 +1983,11 @@ const InventoryPage = () => {
                     itemCount={items.length}
                     autoFocusSearch
                     disabled={inventoryBusy}
+                    onClearAll={() => {
+                      setSortBy('date');
+                      setSortDir(_prev => 'desc');
+                      setGroupBy('none');
+                    }}
                   />
                   {orgPermissionsError && (
                     <Alert severity="warning" sx={{ mt: 2 }}>
@@ -2312,10 +2329,8 @@ const InventoryPage = () => {
                         onChange={(e) =>
                           setCatalogCategoryId(e.target.value as string)
                         }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Tab' || e.key === 'Enter') {
-                            (e.currentTarget.querySelector('input') as HTMLElement | null)?.blur();
-                          }
+                        onClose={() => {
+                          setTimeout(() => addQuantityRef.current?.focus(), 0);
                         }}
                       >
                         <MenuItem value="">
@@ -2335,6 +2350,7 @@ const InventoryPage = () => {
                           label="Quantity"
                           type="number"
                           inputProps={{ min: 0.000001, step: 0.000001 }}
+                          inputRef={addQuantityRef}
                           value={newItemQuantity}
                           onChange={(e) =>
                             setNewItemQuantity(Number(e.target.value))
@@ -2342,7 +2358,7 @@ const InventoryPage = () => {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === 'Tab') {
                               e.preventDefault();
-                              (document.querySelector('[data-dialog-field="quality"]') as HTMLElement | null)?.focus();
+                              addQualityRef.current?.focus();
                             }
                           }}
                         />
@@ -2411,7 +2427,8 @@ const InventoryPage = () => {
                         fullWidth
                         label="Quality (0–1000)"
                         type="number"
-                        inputProps={{ min: 0, max: 1000, step: 1, 'data-dialog-field': 'quality' }}
+                        inputProps={{ min: 0, max: 1000, step: 1 }}
+                        inputRef={addQualityRef}
                         value={newItemQuality}
                         onChange={(e) => {
                           const raw = e.target.value;
@@ -2427,7 +2444,7 @@ const InventoryPage = () => {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === 'Tab') {
                             e.preventDefault();
-                            (document.querySelector('[data-dialog-field="notes"]') as HTMLElement | null)?.focus();
+                            addNotesRef.current?.focus();
                           }
                         }}
                       />
@@ -2435,7 +2452,7 @@ const InventoryPage = () => {
                         fullWidth
                         label="Notes"
                         value={newItemNotes}
-                        inputProps={{ 'data-dialog-field': 'notes' }}
+                        inputRef={addNotesRef}
                         onChange={(e) => setNewItemNotes(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey && addReady) {
