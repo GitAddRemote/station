@@ -11,6 +11,7 @@ export enum OrgPermission {
   CAN_EDIT_ORG_INVENTORY = 'can_edit_org_inventory',
   CAN_ADMIN_ORG_INVENTORY = 'can_admin_org_inventory',
   CAN_VIEW_MEMBER_SHARED_ITEMS = 'can_view_member_shared_items',
+  CAN_MANAGE_INVENTORY = 'can_manage_inventory',
 
   // Future permissions can be added here
   // CAN_MANAGE_MEMBERS = 'can_manage_members',
@@ -32,36 +33,42 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
+    [OrgPermission.CAN_MANAGE_INVENTORY]: true,
   },
   Admin: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
+    [OrgPermission.CAN_MANAGE_INVENTORY]: true,
   },
   Director: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
+    [OrgPermission.CAN_MANAGE_INVENTORY]: true,
   },
   'Inventory Manager': {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
+    [OrgPermission.CAN_MANAGE_INVENTORY]: true,
   },
   Member: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
+    [OrgPermission.CAN_MANAGE_INVENTORY]: false,
   },
   Viewer: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: false,
+    [OrgPermission.CAN_MANAGE_INVENTORY]: false,
   },
 } satisfies Record<string, Record<OrgPermission, boolean>>;
 
@@ -77,4 +84,6 @@ export const PERMISSION_DESCRIPTIONS: Record<OrgPermission, string> = {
     'Manage inventory settings, perform bulk operations, and export data',
   [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]:
     'View items that members have shared with the organization',
+  [OrgPermission.CAN_MANAGE_INVENTORY]:
+    'Perform all inventory management operations for the organization',
 };

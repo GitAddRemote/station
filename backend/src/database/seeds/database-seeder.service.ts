@@ -40,6 +40,7 @@ const LEGACY_PERMISSION_KEYS = new Set<string>([
   'canViewRoles',
   'canManageSettings',
   'canViewSettings',
+  'canManageInventory',
 ]);
 // Bare key pattern — no Keyv namespace prefix is configured in app.module.ts,
 // so permission keys are stored as-is in Redis. TTL is 15 min (900000ms) per

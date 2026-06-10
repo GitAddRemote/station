@@ -3,6 +3,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { PermissionsService } from './permissions.service';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
+import {
+  OrgPermission,
+  DEFAULT_ROLE_PERMISSIONS,
+} from './permissions.constants';
 
 describe('PermissionsService', () => {
   let service: PermissionsService;
@@ -335,6 +339,126 @@ describe('PermissionsService', () => {
       expect(result).toContain('canEditUsers');
       expect(result).toContain('canDeleteUsers');
       expect(result.length).toBe(2);
+    });
+  });
+
+  describe('canManageInventory permission (ISSUE-307)', () => {
+    it('Owner role has canManageInventory = true in DEFAULT_ROLE_PERMISSIONS', () => {
+      expect(
+        DEFAULT_ROLE_PERMISSIONS['Owner'][OrgPermission.CAN_MANAGE_INVENTORY],
+      ).toBe(true);
+    });
+
+    it('Admin role has canManageInventory = true in DEFAULT_ROLE_PERMISSIONS', () => {
+      expect(
+        DEFAULT_ROLE_PERMISSIONS['Admin'][OrgPermission.CAN_MANAGE_INVENTORY],
+      ).toBe(true);
+    });
+
+    it('Member role has canManageInventory = false in DEFAULT_ROLE_PERMISSIONS', () => {
+      expect(
+        DEFAULT_ROLE_PERMISSIONS['Member'][OrgPermission.CAN_MANAGE_INVENTORY],
+      ).toBe(false);
+    });
+
+    it('user with Owner role has canManageInventory permission', async () => {
+      const userRoles = [
+        {
+          id: 1,
+          userId: 1,
+          organizationId: 1,
+          roleId: 1,
+          role: {
+            id: 1,
+            name: 'Owner',
+            permissions: DEFAULT_ROLE_PERMISSIONS['Owner'],
+          },
+        },
+      ];
+
+      mockCacheManager.get.mockResolvedValue(null);
+      mockRepository.find.mockResolvedValue(userRoles);
+
+      const result = await service.getUserPermissions(1, 1);
+
+      expect(result.has(OrgPermission.CAN_MANAGE_INVENTORY)).toBe(true);
+    });
+
+    it('user with Member role does not have canManageInventory permission', async () => {
+      const userRoles = [
+        {
+          id: 1,
+          userId: 1,
+          organizationId: 1,
+          roleId: 2,
+          role: {
+            id: 2,
+            name: 'Member',
+            permissions: DEFAULT_ROLE_PERMISSIONS['Member'],
+          },
+        },
+      ];
+
+      mockCacheManager.get.mockResolvedValue(null);
+      mockRepository.find.mockResolvedValue(userRoles);
+
+      const result = await service.getUserPermissions(1, 1);
+
+      expect(result.has(OrgPermission.CAN_MANAGE_INVENTORY)).toBe(false);
+    });
+
+    it('hasPermission returns true for Owner with canManageInventory', async () => {
+      const userRoles = [
+        {
+          id: 1,
+          userId: 1,
+          organizationId: 1,
+          roleId: 1,
+          role: {
+            id: 1,
+            name: 'Owner',
+            permissions: DEFAULT_ROLE_PERMISSIONS['Owner'],
+          },
+        },
+      ];
+
+      mockCacheManager.get.mockResolvedValue(null);
+      mockRepository.find.mockResolvedValue(userRoles);
+
+      const result = await service.hasPermission(
+        1,
+        1,
+        OrgPermission.CAN_MANAGE_INVENTORY,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('hasPermission returns false for Member with canManageInventory', async () => {
+      const userRoles = [
+        {
+          id: 1,
+          userId: 1,
+          organizationId: 1,
+          roleId: 2,
+          role: {
+            id: 2,
+            name: 'Member',
+            permissions: DEFAULT_ROLE_PERMISSIONS['Member'],
+          },
+        },
+      ];
+
+      mockCacheManager.get.mockResolvedValue(null);
+      mockRepository.find.mockResolvedValue(userRoles);
+
+      const result = await service.hasPermission(
+        1,
+        1,
+        OrgPermission.CAN_MANAGE_INVENTORY,
+      );
+
+      expect(result).toBe(false);
     });
   });
 });
