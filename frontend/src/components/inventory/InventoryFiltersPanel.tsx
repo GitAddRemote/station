@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Avatar,
   Box,
@@ -88,6 +89,13 @@ export const InventoryFiltersPanel = ({
   autoFocusSearch = false,
   disabled = false,
 }: FiltersPanelProps) => {
+  const sliderMax = Math.max(filters.valueRange[1], maxQuantity || 1000);
+  const [localRange, setLocalRange] = useState<[number, number]>(filters.valueRange);
+
+  useEffect(() => {
+    setLocalRange(filters.valueRange);
+  }, [filters.valueRange]);
+
   return (
     <>
       <Grid container spacing={2} alignItems="center">
@@ -122,7 +130,7 @@ export const InventoryFiltersPanel = ({
               <MenuItem value="">
                 <em>All</em>
               </MenuItem>
-              {categories.map((category) => (
+              {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
                 <MenuItem key={category.id} value={category.id}>
                   {category.name}
                 </MenuItem>
@@ -136,16 +144,11 @@ export const InventoryFiltersPanel = ({
               Value (quantity) range
             </Typography>
             <Slider
-              value={filters.valueRange}
+              value={localRange}
               min={0}
-              max={Math.max(filters.valueRange[1], maxQuantity || 1000)}
+              max={sliderMax}
               disabled={disabled}
-              onChange={(_, value) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  valueRange: value as [number, number],
-                }))
-              }
+              onChange={(_, value) => setLocalRange(value as [number, number])}
               onChangeCommitted={(_, value) =>
                 setFilters((prev) => ({
                   ...prev,

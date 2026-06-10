@@ -76,7 +76,7 @@ import { api } from '../services/api.service';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
-type InlineDraft = { quantity: number | ''; locationId?: string | null; locationName?: string | null };
+type InlineDraft = { quantity: number | ''; quality: number | ''; locationId?: string | null; locationName?: string | null };
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
@@ -193,7 +193,7 @@ const InventoryPage = () => {
   );
   const [inlineActiveField, setInlineActiveField] = useState<{
     rowKey: string;
-    field: 'quantity' | 'location';
+    field: 'quantity' | 'quality' | 'location';
   } | null>(null);
   const [inlineLocations, setInlineLocations] = useState<Record<string, LocationDto | null>>({});
   const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] =
@@ -311,8 +311,8 @@ const InventoryPage = () => {
     }
     return null;
   }, [page, rowsPerPage, totalCount]);
-  const focusController = useFocusController<string, 'quantity' | 'save'>({
-    fieldOrder: useMemo(() => ['quantity', 'save'] as const, []),
+  const focusController = useFocusController<string, 'quantity' | 'quality' | 'save'>({
+    fieldOrder: useMemo(() => ['quantity', 'quality', 'save'] as const, []),
     getRowOrder,
     onBoundary: handleFocusBoundary,
   });
@@ -324,6 +324,7 @@ const InventoryPage = () => {
     getRowOrder: getNewRowOrder,
   });
   const quantityRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const qualityRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const saveRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const newRowItemRef = useRef<HTMLInputElement | null>(null);
   const newRowQuantityRef = useRef<HTMLInputElement | null>(null);
@@ -331,14 +332,14 @@ const InventoryPage = () => {
   const newRowItemCache = useRef<Map<string, CatalogEntryDto[]>>(new Map());
 
   const activateInlineField = useCallback(
-    (rowKey: string, field: 'quantity' | 'location') => {
+    (rowKey: string, field: 'quantity' | 'quality' | 'location') => {
       setInlineActiveField({ rowKey, field });
       setInlineError((prev) => ({ ...prev, [rowKey]: null }));
     },
     [],
   );
   const handleInlineDraftChange = useCallback(
-    (itemId: string, changes: Partial<{ quantity: number | '' }>) => {
+    (itemId: string, changes: Partial<{ quantity: number | ''; quality: number | '' }>) => {
       setInlineDrafts((prev) => ({
         ...prev,
         [itemId]: {
@@ -346,6 +347,10 @@ const InventoryPage = () => {
             changes.quantity === undefined
               ? (prev[itemId]?.quantity ?? 0)
               : (changes.quantity as number | ''),
+          quality:
+            changes.quality === undefined
+              ? (prev[itemId]?.quality ?? '')
+              : (changes.quality as number | ''),
         },
       }));
       setInlineError((prev) => ({ ...prev, [itemId]: null }));
@@ -369,6 +374,14 @@ const InventoryPage = () => {
     });
   }, []);
 
+  const handleInlineQualityBlur = useCallback((rowKey: string) => {
+    setInlineActiveField((prev) => {
+      if (!prev || prev.rowKey !== rowKey) return prev;
+      if (prev.field !== 'quality') return prev;
+      return null;
+    });
+  }, []);
+
   const handleInlineLocationChange = useCallback(
     (itemId: string, location: LocationDto | null) => {
       setInlineLocations((prev) => ({ ...prev, [itemId]: location }));
@@ -386,6 +399,12 @@ const InventoryPage = () => {
   const handleQuantityRef = useCallback(
     (ref: HTMLInputElement | null, key: string) => {
       quantityRefs.current[key] = ref;
+    },
+    [],
+  );
+  const handleQualityRef = useCallback(
+    (ref: HTMLInputElement | null, key: string) => {
+      qualityRefs.current[key] = ref;
     },
     [],
   );
@@ -941,9 +960,10 @@ const InventoryPage = () => {
       return;
     }
     setInlineDrafts(
-      items.reduce<Record<string, { quantity: number }>>((acc, item) => {
+      items.reduce<Record<string, { quantity: number; quality: number | '' }>>((acc, item) => {
         acc[item.id] = {
           quantity: Number(item.quantity) || 0,
+          quality: item.quality ?? '',
         };
         return acc;
       }, {}),
@@ -1081,6 +1101,11 @@ const InventoryPage = () => {
           activateInlineField(key, 'quantity');
         }),
       );
+      unregisters.push(
+        focusController.register(key, 'quality', () => {
+          activateInlineField(key, 'quality');
+        }),
+      );
       const saveRef = saveRefs.current[key];
       if (saveRef) {
         unregisters.push(
@@ -1097,8 +1122,8 @@ const InventoryPage = () => {
 
   useEffect(() => {
     if (!inlineActiveField) return;
-    const { rowKey } = inlineActiveField;
-    const ref = quantityRefs.current[rowKey];
+    const { rowKey, field } = inlineActiveField;
+    const ref = field === 'quality' ? qualityRefs.current[rowKey] : quantityRefs.current[rowKey];
     if (!ref) return;
     const handle = window.requestAnimationFrame(() => {
       ref.focus();
@@ -1230,6 +1255,7 @@ const InventoryPage = () => {
       const rowKey = item.id.toString();
       const nextFallback: InlineDraft = {
         quantity: Number(item.quantity) || 0,
+        quality: item.quality ?? '',
       };
       const cachedFallback = inlineDraftFallbacks.current.get(rowKey);
 
@@ -1287,16 +1313,21 @@ const InventoryPage = () => {
         prev.map((entry) => (entry.id === item.id ? updatedItem : entry)),
       );
 
+      const draftQuality = draft.quality;
+      const parsedQuality = draftQuality !== '' ? Number(draftQuality) : null;
+
       try {
         if (viewMode === 'org' && selectedOrgId) {
           await inventoryService.updateOrgItem(selectedOrgId, item.id, {
             quantity: parsedQuantity,
             locationId,
+            quality: parsedQuality,
           });
         } else {
           await inventoryService.updateItem(item.id, {
             quantity: parsedQuantity,
             locationId,
+            quality: parsedQuality,
           });
         }
         setInlineSaved((prev) => {
@@ -1503,26 +1534,24 @@ const InventoryPage = () => {
                 value={editLocation}
                 onChange={setEditLocation}
               />
-              {actionItem.catalogKind === 'commodity' && (
-                <TextField
-                  label="Quality"
-                  type="number"
-                  fullWidth
-                  inputProps={{ min: 0, max: 10, step: 0.1 }}
-                  value={editQuality}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    if (raw === '') {
-                      setEditQuality('');
-                      return;
-                    }
-                    const num = parseFloat(raw);
-                    if (!Number.isNaN(num)) {
-                      setEditQuality(Math.min(10, Math.max(0, num)));
-                    }
-                  }}
-                />
-              )}
+              <TextField
+                label="Quality (0–1000)"
+                type="number"
+                fullWidth
+                inputProps={{ min: 0, max: 1000, step: 1 }}
+                value={editQuality}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setEditQuality('');
+                    return;
+                  }
+                  const num = parseFloat(raw);
+                  if (!Number.isNaN(num)) {
+                    setEditQuality(Math.min(1000, Math.max(0, num)));
+                  }
+                }}
+              />
               <TextField
                 label="Notes"
                 fullWidth
@@ -1746,6 +1775,8 @@ const InventoryPage = () => {
     const isRowActive = inlineActiveField?.rowKey === rowKey;
     const isQuantityActive =
       isRowActive && inlineActiveField?.field === 'quantity';
+    const isQualityActive =
+      isRowActive && inlineActiveField?.field === 'quality';
     const isLocationActive =
       isRowActive && inlineActiveField?.field === 'location';
     const saving = inlineSaving.has(item.id);
@@ -1759,6 +1790,7 @@ const InventoryPage = () => {
         density={density}
         inlineDraft={draft}
         quantityEditing={isQuantityActive}
+        qualityEditing={isQualityActive}
         locationEditing={isLocationActive}
         inlineLocation={inlineLocation}
         inlineSaving={saving}
@@ -1771,12 +1803,14 @@ const InventoryPage = () => {
         onDraftChange={handleInlineDraftChange}
         onErrorChange={handleInlineErrorChange}
         onQuantityBlur={handleInlineQuantityBlur}
+        onQualityBlur={handleInlineQualityBlur}
         onActivateField={activateInlineField}
         onLocationChange={handleInlineLocationChange}
         onLocationBlur={handleInlineLocationBlur}
         onSave={handleInlineSaveAndAdvance}
         onOpenActions={handleActionOpen}
         setQuantityRef={handleQuantityRef}
+        setQualityRef={handleQualityRef}
         setSaveRef={handleSaveRef}
       />
     );
@@ -2004,7 +2038,7 @@ const InventoryPage = () => {
                             display: 'grid',
                             gridTemplateColumns: {
                               xs: '1fr',
-                              md: '2fr 1fr 1.5fr 1fr 1fr auto',
+                              md: '2fr 1fr 1.5fr 0.8fr 1fr 1fr auto',
                             },
                             alignItems: 'center',
                             color: 'text.secondary',
@@ -2015,6 +2049,7 @@ const InventoryPage = () => {
                         >
                           <Typography variant="caption">Item</Typography>
                           <Typography variant="caption">Location</Typography>
+                          <Typography variant="caption">Quality</Typography>
                           <Typography variant="caption">Quantity</Typography>
                           <Typography variant="caption">Updated</Typography>
                           <Typography variant="caption" textAlign="right">
@@ -2228,7 +2263,10 @@ const InventoryPage = () => {
 
       <Dialog
         open={addDialogOpen}
-        onClose={closeAddDialog}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick') return;
+          closeAddDialog();
+        }}
         fullWidth
         maxWidth="lg"
       >
@@ -2274,11 +2312,16 @@ const InventoryPage = () => {
                         onChange={(e) =>
                           setCatalogCategoryId(e.target.value as string)
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Tab' || e.key === 'Enter') {
+                            (e.currentTarget.querySelector('input') as HTMLElement | null)?.blur();
+                          }
+                        }}
                       >
                         <MenuItem value="">
                           <em>All</em>
                         </MenuItem>
-                        {categories.map((category) => (
+                        {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
                           <MenuItem key={category.id} value={category.id}>
                             {category.name}
                           </MenuItem>
@@ -2296,6 +2339,12 @@ const InventoryPage = () => {
                           onChange={(e) =>
                             setNewItemQuantity(Number(e.target.value))
                           }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'Tab') {
+                              e.preventDefault();
+                              (document.querySelector('[data-dialog-field="quality"]') as HTMLElement | null)?.focus();
+                            }
+                          }}
                         />
                         <Stack direction="row" spacing={1}>
                           <Button
@@ -2303,22 +2352,22 @@ const InventoryPage = () => {
                             variant="outlined"
                             onClick={() =>
                               setNewItemQuantity((qty) =>
-                                Number(Math.max(0.000001, qty - 1).toFixed(6)),
+                                Number(Math.max(0.000001, qty - 10).toFixed(6)),
                               )
                             }
                           >
-                            -1
+                            -10
                           </Button>
                           <Button
                             size="small"
                             variant="outlined"
                             onClick={() =>
                               setNewItemQuantity((qty) =>
-                                Number(Math.max(0.000001, qty + 1).toFixed(6)),
+                                Number(Math.max(0.000001, qty + 10).toFixed(6)),
                               )
                             }
                           >
-                            +1
+                            +10
                           </Button>
                         </Stack>
                       </Stack>
@@ -2358,31 +2407,42 @@ const InventoryPage = () => {
                         value={newItemLocation}
                         onChange={setNewItemLocation}
                       />
-                      {selectedCatalogItem?.catalogKind === 'commodity' && (
-                        <TextField
-                          fullWidth
-                          label="Quality"
-                          type="number"
-                          inputProps={{ min: 0, max: 10, step: 0.1 }}
-                          value={newItemQuality}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            if (raw === '') {
-                              setNewItemQuality('');
-                              return;
-                            }
-                            const num = parseFloat(raw);
-                            if (!Number.isNaN(num)) {
-                              setNewItemQuality(Math.min(10, Math.max(0, num)));
-                            }
-                          }}
-                        />
-                      )}
+                      <TextField
+                        fullWidth
+                        label="Quality (0–1000)"
+                        type="number"
+                        inputProps={{ min: 0, max: 1000, step: 1, 'data-dialog-field': 'quality' }}
+                        value={newItemQuality}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === '') {
+                            setNewItemQuality('');
+                            return;
+                          }
+                          const num = parseFloat(raw);
+                          if (!Number.isNaN(num)) {
+                            setNewItemQuality(Math.min(1000, Math.max(0, num)));
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === 'Tab') {
+                            e.preventDefault();
+                            (document.querySelector('[data-dialog-field="notes"]') as HTMLElement | null)?.focus();
+                          }
+                        }}
+                      />
                       <TextField
                         fullWidth
                         label="Notes"
                         value={newItemNotes}
+                        inputProps={{ 'data-dialog-field': 'notes' }}
                         onChange={(e) => setNewItemNotes(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey && addReady) {
+                            e.preventDefault();
+                            handleCreateInventoryItem({ stayOpen: true });
+                          }
+                        }}
                       />
                       <Typography variant="caption" color="text.secondary">
                         Tip: Ctrl/Cmd + Enter to add and keep this dialog open

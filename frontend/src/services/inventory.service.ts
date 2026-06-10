@@ -262,7 +262,7 @@ export const inventoryService = {
   async updateOrgItem(
     _orgId: string,
     id: string,
-    updates: { quantity?: number; unitOfMeasureId?: string; notes?: string | null; locationId?: string | null },
+    updates: { quantity?: number; unitOfMeasureId?: string; notes?: string | null; locationId?: string | null; quality?: number | null },
   ): Promise<InventoryItem> {
     return inventoryService.updateItem(id, updates);
   },
