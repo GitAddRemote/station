@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import LoginCredentials from './pages/LoginCredentials';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
+import ForcedPasswordChange from './pages/ForcedPasswordChange';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Inventory from './pages/Inventory';
@@ -20,6 +21,7 @@ const AppRoutes = () => (
       <Route path="/login/credentials" element={<LoginCredentials />} />
       <Route path="/register" element={<Register />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/forced-password-change" element={<ForcedPasswordChange />} />
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
