@@ -41,6 +41,9 @@ import {
   TablePagination,
   LinearProgress,
   Alert,
+  ToggleButtonGroup,
+  ToggleButton,
+  Tooltip as MuiTooltip,
 } from '@mui/material';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -139,6 +142,7 @@ const InventoryPage = () => {
   const [actionWorking, setActionWorking] = useState(false);
   const [editLocation, setEditLocation] = useState<LocationDto | null>(null);
   const [editQuality, setEditQuality] = useState<number | ''>('');
+  const [editUomId, setEditUomId] = useState<string>('');
   const [shareOrgId, setShareOrgId] = useState<number | ''>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -152,7 +156,9 @@ const InventoryPage = () => {
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [selectedCatalogItem, setSelectedCatalogItem] =
     useState<CatalogEntryDto | null>(null);
+  const [allUoms, setAllUoms] = useState<import('../services/inventory.service').UnitOfMeasure[]>([]);
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
+  const [newItemUomId, setNewItemUomId] = useState<string>('');
   const [newItemNotes, setNewItemNotes] = useState('');
   const [newItemLocation, setNewItemLocation] = useState<LocationDto | null>(null);
   const [newItemQuality, setNewItemQuality] = useState<number | ''>('');
@@ -207,6 +213,7 @@ const InventoryPage = () => {
   const [newRowSelectedLocation, setNewRowSelectedLocation] =
     useState<LocationDto | null>(null);
   const [newRowQuality, setNewRowQuality] = useState<number | ''>('');
+  const [newRowUomId, setNewRowUomId] = useState<string>('');
   const [newRowItemInput, setNewRowItemInput] = useState('');
   const [newRowItemOptions, setNewRowItemOptions] = useState<CatalogEntryDto[]>([]);
   const [newRowItemLoading, setNewRowItemLoading] = useState(false);
@@ -249,6 +256,39 @@ const InventoryPage = () => {
       }
     }
   }, [orgOptions, selectedOrgId, viewMode]);
+
+  // Load UoMs once on mount
+  useEffect(() => {
+    inventoryService.getUnitsOfMeasure().then(setAllUoms).catch(() => {});
+  }, []);
+
+  const commodityUoms = useMemo(
+    () => allUoms.filter((u) => u.catalogKind === 'commodity'),
+    [allUoms],
+  );
+  const unitUom = useMemo(
+    () => allUoms.find((u) => u.abbreviation === 'unit'),
+    [allUoms],
+  );
+
+  const defaultUomIdFor = useCallback(
+    (catalogKind: 'item' | 'commodity' | 'vehicle' | null): string => {
+      if (catalogKind === 'commodity') {
+        return commodityUoms[0]?.id ?? '';
+      }
+      return unitUom?.id ?? '';
+    },
+    [commodityUoms, unitUom],
+  );
+
+  // Reset UoMs when catalog item selection changes
+  useEffect(() => {
+    setNewItemUomId(defaultUomIdFor(selectedCatalogItem?.catalogKind ?? null));
+  }, [selectedCatalogItem, defaultUomIdFor]);
+
+  useEffect(() => {
+    setNewRowUomId(defaultUomIdFor(newRowSelectedItem?.catalogKind ?? null));
+  }, [newRowSelectedItem, defaultUomIdFor]);
 
   const inlineDraftFallbacks = useRef<Map<string, InlineDraft>>(new Map());
 
@@ -651,12 +691,10 @@ const InventoryPage = () => {
             });
           }
         } else if (!isOrgView) {
-          const uoms = await inventoryService.getUnitsOfMeasure();
-          const defaultUom = uoms.find((u) => u.code === 'unit') ?? uoms[0];
           await inventoryService.createItem({
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
-            unitOfMeasureId: defaultUom.id,
+            unitOfMeasureId: newItemUomId || defaultUomIdFor(selectedCatalogItem.catalogKind),
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
@@ -666,13 +704,12 @@ const InventoryPage = () => {
           return;
         }
       } else {
-        const uoms = await inventoryService.getUnitsOfMeasure();
-        const defaultUom = uoms.find((u) => u.code === 'unit') ?? uoms[0];
+        const resolvedUomId = newItemUomId || defaultUomIdFor(selectedCatalogItem.catalogKind);
         if (isOrgView && selectedOrgId !== null) {
           await inventoryService.createOrgItem(selectedOrgId, {
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
-            unitOfMeasureId: defaultUom.id,
+            unitOfMeasureId: resolvedUomId,
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
@@ -681,7 +718,7 @@ const InventoryPage = () => {
           await inventoryService.createItem({
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
-            unitOfMeasureId: defaultUom.id,
+            unitOfMeasureId: resolvedUomId,
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
@@ -873,6 +910,7 @@ const InventoryPage = () => {
           setEditLocation(null);
         }
         setEditQuality(actionItem.quality != null ? actionItem.quality : '');
+        setEditUomId(actionItem.unitOfMeasureId ?? '');
       }
     }
   }, [actionMode, actionItem]);
@@ -1009,12 +1047,10 @@ const InventoryPage = () => {
     try {
       setNewRowSaving(true);
       setNewRowErrors({});
-      const uoms = await inventoryService.getUnitsOfMeasure();
-      const defaultUom = uoms.find((u) => u.code === 'unit') ?? uoms[0];
       const payload = {
         catalogEntryId: selectedItemId!,
         quantity: parsedQuantity,
-        unitOfMeasureId: defaultUom.id,
+        unitOfMeasureId: newRowUomId || defaultUomIdFor(newRowSelectedItem?.catalogKind ?? null),
         locationId: newRowSelectedLocation?.id ?? null,
         quality: newRowQuality !== '' ? newRowQuality : null,
       };
@@ -1026,6 +1062,7 @@ const InventoryPage = () => {
       await fetchInventory();
       setNewRowSelectedLocation(null);
       setNewRowQuality('');
+      setNewRowUomId('');
       resetNewRowDraft();
       newRowFocusController.focus('new-row', 'item');
     } catch (err) {
@@ -1324,6 +1361,7 @@ const InventoryPage = () => {
 
   const handleUpdateItem = async (payload: {
     quantity?: number;
+    unitOfMeasureId?: string;
     notes?: string;
     locationId?: string | null;
     quality?: number | null;
@@ -1438,6 +1476,32 @@ const InventoryPage = () => {
                 inputProps={{ min: 0, step: 0.000001 }}
                 onChange={(e) => setActionQuantity(Number(e.target.value))}
               />
+              {actionItem.catalogKind === 'commodity' ? (
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                    Unit of Measure
+                  </Typography>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={editUomId}
+                    onChange={(_e, v) => { if (v) setEditUomId(v); }}
+                    sx={{ flexWrap: 'wrap' }}
+                  >
+                    {commodityUoms.map((u) => (
+                      <MuiTooltip key={u.id} title={`Scale factor: ${u.scaleFactor}`} placement="top">
+                        <ToggleButton value={u.id} sx={{ px: 2, py: 0.5 }}>
+                          {u.abbreviation}
+                        </ToggleButton>
+                      </MuiTooltip>
+                    ))}
+                  </ToggleButtonGroup>
+                </Box>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  Unit of Measure: <strong>{actionItem.unitOfMeasureLabel || actionItem.unitOfMeasureCode}</strong>
+                </Typography>
+              )}
               <LocationPicker
                 value={editLocation}
                 onChange={setEditLocation}
@@ -1483,6 +1547,7 @@ const InventoryPage = () => {
                   onClick={() =>
                     handleUpdateItem({
                       quantity: actionQuantity,
+                      unitOfMeasureId: editUomId || undefined,
                       notes: actionItem.notes ?? undefined,
                       locationId: editLocation?.id ?? null,
                       quality: editQuality !== '' ? editQuality : null,
@@ -1990,6 +2055,9 @@ const InventoryPage = () => {
                             api: null,
                           }));
                         }}
+                        uomOptions={commodityUoms}
+                        uomId={newRowUomId}
+                        onUomChange={setNewRowUomId}
                         selectedLocation={newRowSelectedLocation}
                         onLocationChange={setNewRowSelectedLocation}
                         quality={newRowQuality}
@@ -2259,6 +2327,38 @@ const InventoryPage = () => {
                           </Button>
                         </Stack>
                       </Stack>
+                      {selectedCatalogItem?.catalogKind === 'commodity' ? (
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                            Unit of Measure
+                          </Typography>
+                          <ToggleButtonGroup
+                            size="small"
+                            exclusive
+                            value={newItemUomId}
+                            onChange={(_e, v) => { if (v) setNewItemUomId(v); }}
+                            sx={{ flexWrap: 'wrap' }}
+                          >
+                            {commodityUoms.map((u) => (
+                              <MuiTooltip
+                                key={u.id}
+                                title={`Scale factor: ${u.scaleFactor}`}
+                                placement="top"
+                              >
+                                <ToggleButton value={u.id} sx={{ px: 2, py: 0.5 }}>
+                                  {u.abbreviation}
+                                </ToggleButton>
+                              </MuiTooltip>
+                            ))}
+                          </ToggleButtonGroup>
+                        </Box>
+                      ) : (
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            Unit of Measure: <strong>Unit</strong>
+                          </Typography>
+                        </Box>
+                      )}
                       <LocationPicker
                         value={newItemLocation}
                         onChange={setNewItemLocation}

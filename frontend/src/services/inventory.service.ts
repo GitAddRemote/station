@@ -30,10 +30,11 @@ export type OrgInventoryItem = InventoryItem;
 
 export interface UnitOfMeasure {
   id: string;
-  code: string;
-  label: string;
-  description: string | null;
-  catalogKind: string | null;
+  abbreviation: string;
+  name: string;
+  catalogKind: 'item' | 'commodity' | 'vehicle' | null;
+  scaleFactor: number;
+  sortOrder: number;
 }
 
 export interface UserOrganizationMembership {
@@ -261,7 +262,7 @@ export const inventoryService = {
   async updateOrgItem(
     _orgId: number,
     id: string,
-    updates: { quantity?: number; notes?: string | null; locationId?: string | null },
+    updates: { quantity?: number; unitOfMeasureId?: string; notes?: string | null; locationId?: string | null },
   ): Promise<InventoryItem> {
     return inventoryService.updateItem(id, updates);
   },
