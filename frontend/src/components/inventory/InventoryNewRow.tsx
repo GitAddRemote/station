@@ -5,11 +5,14 @@ import {
   Chip,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
 import type { RefObject } from 'react';
 import type { CatalogEntryDto, LocationDto } from '../../services/catalog.service';
+import type { UnitOfMeasure } from '../../services/inventory.service';
 import LocationPicker from './LocationPicker';
 
 interface InventoryNewRowProps {
@@ -37,6 +40,9 @@ interface InventoryNewRowProps {
   quality: number | '';
   onItemInputChange: (value: string, reason: string) => void;
   onItemSelect: (item: CatalogEntryDto | null) => void;
+  uomOptions: UnitOfMeasure[];
+  uomId: string;
+  onUomChange: (id: string) => void;
   onLocationChange: (location: LocationDto | null) => void;
   onQualityChange: (value: number | '') => void;
   onQuantityChange: (value: string) => void;
@@ -63,6 +69,9 @@ export const InventoryNewRow = ({
   showQuantityWarning,
   selectedLocation,
   quality,
+  uomOptions,
+  uomId,
+  onUomChange,
   onItemInputChange,
   onItemSelect,
   onLocationChange,
@@ -84,7 +93,7 @@ export const InventoryNewRow = ({
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
-          md: isCommodity ? '2fr 1fr 1.5fr 0.8fr 1fr 1fr auto' : '2fr 1fr 1.5fr 1fr 1fr auto',
+          md: isCommodity ? '2fr 1fr auto 1.5fr 0.8fr 1fr 1fr auto' : '2fr 1fr auto 1.5fr 1fr 1fr auto',
         },
         gap: 0.75,
         alignItems: 'flex-start',
@@ -168,6 +177,30 @@ export const InventoryNewRow = ({
         {showQuantityWarning && (
           <Typography variant="caption" sx={{ color: 'warning.main' }}>
             Large quantity entered - verify value.
+          </Typography>
+        )}
+      </Stack>
+      <Stack spacing={0.5} justifyContent="flex-start" sx={{ pt: 0.5 }}>
+        {isCommodity ? (
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={uomId}
+            onChange={(_e, v) => { if (v) onUomChange(v); }}
+            orientation="vertical"
+            sx={{ alignSelf: 'flex-start' }}
+          >
+            {uomOptions.map((u) => (
+              <Tooltip key={u.id} title={`scale ×${u.scaleFactor}`} placement="right">
+                <ToggleButton value={u.id} sx={{ px: 1.5, py: 0.25, fontSize: '0.7rem' }}>
+                  {u.abbreviation}
+                </ToggleButton>
+              </Tooltip>
+            ))}
+          </ToggleButtonGroup>
+        ) : (
+          <Typography variant="caption" color="text.secondary" sx={{ pt: 0.75 }}>
+            Unit
           </Typography>
         )}
       </Stack>
