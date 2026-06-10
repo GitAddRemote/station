@@ -30,6 +30,7 @@ import { StationInventoryItem } from './entities/station-inventory-item.entity';
 import { StationInventoryListItem } from './entities/station-inventory-list-item.entity';
 import { StationInventoryList } from './entities/station-inventory-list.entity';
 import { StationUnitOfMeasure } from './entities/station-unit-of-measure.entity';
+import { OrgPermission } from '../permissions/permissions.constants';
 
 @Injectable()
 export class InventoryService {
@@ -37,7 +38,7 @@ export class InventoryService {
   private static readonly DEFAULT_PAGE = 1;
   private static readonly DEFAULT_LIMIT = 20;
   private static readonly MANAGE_ORG_INVENTORY_PERMISSION =
-    'canManageInventory';
+    OrgPermission.CAN_MANAGE_INVENTORY;
 
   constructor(
     @InjectRepository(User)
