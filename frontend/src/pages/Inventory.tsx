@@ -80,6 +80,7 @@ type InlineDraft = { quantity: number | ''; quality: number | ''; locationId?: s
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
+const SLIDER_QUANTITY_MAX = 10000;
 const ORG_ACCENT = '#f2a255';
 const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
 const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
@@ -175,7 +176,7 @@ const InventoryPage = () => {
     search: '',
     categoryId: '' as string | '',
     sharedOnly: false,
-    valueRange: [0, 999999.999999] as [number, number],
+    valueRange: [0, SLIDER_QUANTITY_MAX] as [number, number],
     qualityRange: [0, 1000] as [number, number],
   });
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'date'>('date');
@@ -589,7 +590,7 @@ const InventoryPage = () => {
           limit,
           page: page + 1,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
-          maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
+          maxQuantity: filters.valueRange[1] < SLIDER_QUANTITY_MAX ? filters.valueRange[1] : undefined,
           minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
           maxQuality: filters.qualityRange[1] < 1000 ? filters.qualityRange[1] : undefined,
           sort: sortParam,
@@ -609,7 +610,7 @@ const InventoryPage = () => {
           categoryId,
           orgAvailable: filters.sharedOnly || undefined,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
-          maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
+          maxQuantity: filters.valueRange[1] < SLIDER_QUANTITY_MAX ? filters.valueRange[1] : undefined,
           minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
           maxQuality: filters.qualityRange[1] < 1000 ? filters.qualityRange[1] : undefined,
           sort: sortParam,
@@ -964,7 +965,7 @@ const InventoryPage = () => {
 
   // Track the slider's "natural" max separately so the auto-expand effect
   // only grows the ceiling — never resets a filter the user has actively set.
-  const [sliderMax, setSliderMax] = useState(999999.999999);
+  const [sliderMax, setSliderMax] = useState(SLIDER_QUANTITY_MAX);
 
   useEffect(() => {
     if (maxQuantity > sliderMax) {
@@ -1994,8 +1995,8 @@ const InventoryPage = () => {
                       setSortBy('date');
                       setSortDir(_prev => 'desc');
                       setGroupBy('none');
-                      setSliderMax(999999.999999);
-                      setFilters(prev => ({ ...prev, valueRange: [0, 999999.999999], qualityRange: [0, 1000] }));
+                      setSliderMax(SLIDER_QUANTITY_MAX);
+                      setFilters(prev => ({ ...prev, valueRange: [0, SLIDER_QUANTITY_MAX], qualityRange: [0, 1000] }));
                     }}
                   />
                   {orgPermissionsError && (

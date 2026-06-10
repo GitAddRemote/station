@@ -524,6 +524,18 @@ export class InventoryService {
         maxQuantity: query.maxQuantity,
       });
     }
+
+    if (query.minQuality !== undefined) {
+      queryBuilder.andWhere('item.quality >= :minQuality', {
+        minQuality: query.minQuality,
+      });
+    }
+
+    if (query.maxQuality !== undefined) {
+      queryBuilder.andWhere('item.quality <= :maxQuality', {
+        maxQuality: query.maxQuality,
+      });
+    }
   }
 
   private async getInventoryItemOrThrow(
