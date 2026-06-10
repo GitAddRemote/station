@@ -110,6 +110,7 @@ const InventoryPage = () => {
   const navigate = useNavigate();
   const addSearchRef = useRef<HTMLInputElement | null>(null);
   const addQuantityRef = useRef<HTMLInputElement | null>(null);
+  const addLocationRef = useRef<HTMLInputElement | null>(null);
   const addQualityRef = useRef<HTMLInputElement | null>(null);
   const addNotesRef = useRef<HTMLInputElement | null>(null);
   const firstCatalogItemRef = useRef<HTMLDivElement | null>(null);
@@ -175,6 +176,7 @@ const InventoryPage = () => {
     categoryId: '' as string | '',
     sharedOnly: false,
     valueRange: [0, 999999.999999] as [number, number],
+    qualityRange: [0, 1000] as [number, number],
   });
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'date'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -588,6 +590,8 @@ const InventoryPage = () => {
           page: page + 1,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
           maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
+          minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
+          maxQuality: filters.qualityRange[1] < 1000 ? filters.qualityRange[1] : undefined,
           sort: sortParam,
           order: sortDir,
         });
@@ -606,6 +610,8 @@ const InventoryPage = () => {
           orgAvailable: filters.sharedOnly || undefined,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
           maxQuantity: filters.valueRange[1] < 999999.999999 ? filters.valueRange[1] : undefined,
+          minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
+          maxQuality: filters.qualityRange[1] < 1000 ? filters.qualityRange[1] : undefined,
           sort: sortParam,
           order: sortDir,
         });
@@ -636,6 +642,7 @@ const InventoryPage = () => {
     filters.categoryId,
     filters.sharedOnly,
     filters.valueRange,
+    filters.qualityRange,
     debouncedSearch,
     page,
     rowsPerPage,
@@ -885,6 +892,7 @@ const InventoryPage = () => {
     filters.categoryId,
     filters.sharedOnly,
     filters.valueRange,
+    filters.qualityRange,
     viewMode,
     selectedOrgId,
     sortBy,
@@ -954,16 +962,15 @@ const InventoryPage = () => {
     [items],
   );
 
-  const currentMaxValue = filters.valueRange[1];
+  // Track the slider's "natural" max separately so the auto-expand effect
+  // only grows the ceiling — never resets a filter the user has actively set.
+  const [sliderMax, setSliderMax] = useState(999999.999999);
 
   useEffect(() => {
-    if (maxQuantity > currentMaxValue) {
-      setFilters((prev) => ({
-        ...prev,
-        valueRange: [0, Math.ceil(maxQuantity)],
-      }));
+    if (maxQuantity > sliderMax) {
+      setSliderMax(Math.ceil(maxQuantity));
     }
-  }, [maxQuantity, currentMaxValue]);
+  }, [maxQuantity, sliderMax]);
 
   const filteredItems = useMemo(() => items, [items]);
 
@@ -1961,7 +1968,7 @@ const InventoryPage = () => {
                     setFilters={setFilters}
                     categories={categories}
                     valueText={valueText}
-                    maxQuantity={maxQuantity}
+                    maxQuantity={sliderMax}
                     sortBy={sortBy}
                     sortDir={sortDir}
                     setSortBy={(value) => setSortBy(value)}
@@ -1987,6 +1994,8 @@ const InventoryPage = () => {
                       setSortBy('date');
                       setSortDir(_prev => 'desc');
                       setGroupBy('none');
+                      setSliderMax(999999.999999);
+                      setFilters(prev => ({ ...prev, valueRange: [0, 999999.999999], qualityRange: [0, 1000] }));
                     }}
                   />
                   {orgPermissionsError && (
@@ -2055,7 +2064,7 @@ const InventoryPage = () => {
                             display: 'grid',
                             gridTemplateColumns: {
                               xs: '1fr',
-                              md: '2fr 1fr 1.5fr 0.8fr 1fr 1fr auto',
+                              md: '2fr 1fr 1.5fr 0.8fr 1fr 1fr 1fr auto',
                             },
                             alignItems: 'center',
                             color: 'text.secondary',
@@ -2069,6 +2078,7 @@ const InventoryPage = () => {
                           <Typography variant="caption">Quality</Typography>
                           <Typography variant="caption">Quantity</Typography>
                           <Typography variant="caption">Updated</Typography>
+                          <Typography variant="caption">Category</Typography>
                           <Typography variant="caption" textAlign="right">
                             Actions
                           </Typography>
@@ -2264,8 +2274,8 @@ const InventoryPage = () => {
                           setPage(0);
                         }}
                         rowsPerPageOptions={[10, 25, 50, 100, 250]}
-                        backIconButtonProps={{ disabled: inventoryBusy }}
-                        nextIconButtonProps={{ disabled: inventoryBusy }}
+                        backIconButtonProps={{ disabled: inventoryBusy || page === 0 }}
+                        nextIconButtonProps={{ disabled: inventoryBusy || (page + 1) * rowsPerPage >= totalCount }}
                         SelectProps={{ disabled: inventoryBusy }}
                         sx={{ mt: 2 }}
                       />
@@ -2358,7 +2368,7 @@ const InventoryPage = () => {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === 'Tab') {
                               e.preventDefault();
-                              addQualityRef.current?.focus();
+                              addLocationRef.current?.focus();
                             }
                           }}
                         />
@@ -2421,7 +2431,13 @@ const InventoryPage = () => {
                       )}
                       <LocationPicker
                         value={newItemLocation}
-                        onChange={setNewItemLocation}
+                        onChange={(loc) => {
+                          setNewItemLocation(loc);
+                          if (loc) {
+                            setTimeout(() => addQualityRef.current?.focus(), 0);
+                          }
+                        }}
+                        inputRef={addLocationRef}
                       />
                       <TextField
                         fullWidth

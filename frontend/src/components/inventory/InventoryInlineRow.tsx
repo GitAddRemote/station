@@ -104,8 +104,8 @@ const InventoryInlineRow = ({
         gridTemplateColumns: {
           xs: '1fr',
           md: density === 'compact'
-            ? '2fr 1fr 1.5fr 0.8fr 1fr 1fr auto'
-            : '2fr 1fr 1.5fr 0.8fr 1fr 1fr auto',
+            ? '2fr 1fr 1.5fr 0.8fr 1fr 1fr 1fr auto'
+            : '2fr 1fr 1.5fr 0.8fr 1fr 1fr 1fr auto',
         },
         gap: density === 'compact' ? 0.75 : 2,
         alignItems: 'center',
@@ -138,11 +138,6 @@ const InventoryInlineRow = ({
           >
             {item.itemName || `Item #${item.catalogEntryId}`}
           </Typography>
-          <Chip
-            label={item.categoryName || 'General'}
-            size={density === 'compact' ? 'small' : 'medium'}
-            variant="outlined"
-          />
           {item.isOrgAvailable && (
             <Chip
               size={density === 'compact' ? 'small' : 'medium'}
@@ -436,6 +431,15 @@ const InventoryInlineRow = ({
               Large quantity entered - verify value.
             </Typography>
           )}
+      </Stack>
+      {/* Category column */}
+      <Stack spacing={density === 'compact' ? 0.25 : 0.5} justifyContent="center">
+        <Chip
+          label={item.categoryName || 'General'}
+          size="small"
+          variant="outlined"
+          sx={{ maxWidth: '100%' }}
+        />
       </Stack>
       <Stack
         direction="row"

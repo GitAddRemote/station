@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Autocomplete, Chip, Stack, TextField, Typography } from '@mui/material';
 import { catalogService, LocationDto } from '../../services/catalog.service';
 
@@ -9,6 +9,7 @@ interface LocationPickerProps {
   disabled?: boolean;
   size?: 'small' | 'medium';
   onBlur?: () => void;
+  inputRef?: React.Ref<HTMLInputElement>;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -26,6 +27,7 @@ const LocationPicker = ({
   disabled,
   size = 'small',
   onBlur,
+  inputRef,
 }: LocationPickerProps) => {
   const [inputValue, setInputValue] = useState('');
   const [options, setOptions] = useState<LocationDto[]>([]);
@@ -102,6 +104,7 @@ const LocationPicker = ({
           helperText={error ?? undefined}
           placeholder="Search locations..."
           onBlur={onBlur}
+          inputRef={inputRef}
         />
       )}
     />
