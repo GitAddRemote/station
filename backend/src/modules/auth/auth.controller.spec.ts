@@ -141,7 +141,10 @@ describe('AuthController - Password Reset', () => {
   describe('changePassword', () => {
     it('should call authService.changePassword with userId and passwords', async () => {
       const mockRequest = {
-        user: { userId: 1, username: 'testuser' },
+        user: {
+          userId: '00000000-0000-0000-0000-000000000001',
+          username: 'testuser',
+        },
       } as unknown as AuthenticatedRequest;
       const currentPassword = 'oldPassword123';
       const newPassword = 'newSecurePassword123';
@@ -155,7 +158,7 @@ describe('AuthController - Password Reset', () => {
       });
 
       expect(authService.changePassword).toHaveBeenCalledWith(
-        1,
+        '00000000-0000-0000-0000-000000000001',
         currentPassword,
         newPassword,
       );
@@ -164,8 +167,11 @@ describe('AuthController - Password Reset', () => {
 
     it('should handle incorrect current password error', async () => {
       const mockRequest = {
-        user: { userId: 1, username: 'testuser' },
-      } as AuthenticatedRequest;
+        user: {
+          userId: '00000000-0000-0000-0000-000000000001',
+          username: 'testuser',
+        },
+      } as unknown as AuthenticatedRequest;
       const currentPassword = 'wrongPassword';
       const newPassword = 'newPassword123';
 
@@ -183,7 +189,10 @@ describe('AuthController - Password Reset', () => {
 
     it('should extract userId from authenticated request', async () => {
       const mockRequest = {
-        user: { userId: 42, username: 'testuser' },
+        user: {
+          userId: '00000000-0000-0000-0000-000000000042',
+          username: 'testuser',
+        },
       } as unknown as AuthenticatedRequest;
       const currentPassword = 'oldPassword123';
       const newPassword = 'newPassword123';
@@ -198,7 +207,7 @@ describe('AuthController - Password Reset', () => {
       });
 
       expect(authService.changePassword).toHaveBeenCalledWith(
-        42,
+        '00000000-0000-0000-0000-000000000042',
         currentPassword,
         newPassword,
       );

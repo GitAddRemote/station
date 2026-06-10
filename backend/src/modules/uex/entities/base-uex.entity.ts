@@ -42,9 +42,9 @@ export abstract class BaseUexEntity {
   @JoinColumn({ name: 'modified_by' })
   modifiedBy?: User;
 
-  @Column({ name: 'added_by', type: 'integer', nullable: true })
-  addedById?: number;
+  @Column({ name: 'added_by', type: 'uuid', nullable: true })
+  addedById?: string;
 
-  @Column({ name: 'modified_by', type: 'integer', nullable: true })
-  modifiedById?: number;
+  @Column({ name: 'modified_by', type: 'uuid', nullable: true })
+  modifiedById?: string;
 }

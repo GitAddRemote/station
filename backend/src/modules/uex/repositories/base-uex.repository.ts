@@ -80,7 +80,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
   /**
    * Mark record as soft deleted
    */
-  async markAsDeleted(id: string, modifiedBy: number): Promise<void> {
+  async markAsDeleted(id: string, modifiedBy: string): Promise<void> {
     const update: BaseUexUpdate = { deleted: true, modifiedById: modifiedBy };
     await this.update(id, update as QueryDeepPartialEntity<T>);
   }
@@ -88,7 +88,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
   /**
    * Mark record as soft deleted by UEX ID
    */
-  async markAsDeletedByUexId(uexId: number, modifiedBy: number): Promise<void> {
+  async markAsDeletedByUexId(uexId: number, modifiedBy: string): Promise<void> {
     const update: BaseUexUpdate = { deleted: true, modifiedById: modifiedBy };
     await this.update(
       { uexId } as FindOptionsWhere<T>,
@@ -99,7 +99,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
   /**
    * Mark record as inactive
    */
-  async deactivate(id: string, modifiedBy: number): Promise<void> {
+  async deactivate(id: string, modifiedBy: string): Promise<void> {
     const update: BaseUexUpdate = { active: false, modifiedById: modifiedBy };
     await this.update(id, update as QueryDeepPartialEntity<T>);
   }
@@ -107,7 +107,7 @@ export class BaseUexRepository<T extends BaseUexEntity> extends Repository<T> {
   /**
    * Mark record as active
    */
-  async activate(id: string, modifiedBy: number): Promise<void> {
+  async activate(id: string, modifiedBy: string): Promise<void> {
     const update: BaseUexUpdate = { active: true, modifiedById: modifiedBy };
     await this.update(id, update as QueryDeepPartialEntity<T>);
   }

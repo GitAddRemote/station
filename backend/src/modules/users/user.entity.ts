@@ -1,26 +1,10 @@
-import { Exclude } from 'class-transformer';
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  OneToMany,
-  Index,
-} from 'typeorm';
+import { Entity, Column, PrimaryColumn, OneToMany, Index } from 'typeorm';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn()
-  id!: number;
-
-  @Exclude()
-  @Column({
-    name: 'id_uuid',
-    type: 'uuid',
-    unique: true,
-    default: () => 'uuid_generate_v7()',
-  })
-  idUuid!: string;
+  @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
+  id!: string;
 
   @Column({ unique: true })
   username!: string;

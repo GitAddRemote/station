@@ -1,6 +1,6 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   Index,
@@ -31,11 +31,11 @@ export enum AuditEntityType {
 @Index(['action'])
 @Index(['createdAt'])
 export class AuditLog {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
+  id!: string;
 
-  @Column({ nullable: true })
-  userId?: number;
+  @Column({ nullable: true, type: 'text' })
+  userId?: string;
 
   @Column({ nullable: true })
   username?: string;
@@ -52,8 +52,8 @@ export class AuditLog {
   })
   entityType!: AuditEntityType;
 
-  @Column({ nullable: true })
-  entityId?: number;
+  @Column({ nullable: true, type: 'text' })
+  entityId?: string;
 
   @Column('jsonb', { nullable: true })
   metadata?: Record<string, unknown>;

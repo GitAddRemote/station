@@ -4,7 +4,7 @@ import { Request } from 'express';
  * User object attached to request after JWT authentication
  */
 export interface AuthenticatedUser {
-  userId: number;
+  userId: string;
   username: string;
 }
 

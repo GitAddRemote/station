@@ -30,10 +30,8 @@ export class UserOrganizationRolesService {
   ): Promise<UserOrganizationRole> {
     const { userId, organizationId, roleId } = assignRoleDto;
 
-    // Verify entities exist
     await this.verifyEntitiesExist(userId, organizationId, roleId);
 
-    // Check if assignment already exists
     const existing = await this.userOrgRoleRepository.findOne({
       where: { userId, organizationId, roleId },
     });
@@ -53,29 +51,24 @@ export class UserOrganizationRolesService {
   ): Promise<UserOrganizationRole[]> {
     const { userId, organizationId, roleIds } = assignRolesDto;
 
-    // Verify user and organization exist
     await this.verifyUserAndOrganization(userId, organizationId);
 
-    // Verify all roles exist
     const roles = await this.roleRepository.findByIds(roleIds);
     if (roles.length !== roleIds.length) {
       throw new NotFoundException('One or more roles not found');
     }
 
-    // Get existing assignments
     const existing = await this.userOrgRoleRepository.find({
       where: { userId, organizationId },
     });
     const existingRoleIds = new Set(existing.map((e) => e.roleId));
 
-    // Filter out already assigned roles
     const newRoleIds = roleIds.filter((roleId) => !existingRoleIds.has(roleId));
 
     if (newRoleIds.length === 0) {
       throw new ConflictException('All specified roles are already assigned');
     }
 
-    // Create new assignments
     const newAssignments = newRoleIds.map((roleId) =>
       this.userOrgRoleRepository.create({ userId, organizationId, roleId }),
     );
@@ -84,9 +77,9 @@ export class UserOrganizationRolesService {
   }
 
   async removeRole(
-    userId: number,
-    organizationId: number,
-    roleId: number,
+    userId: string,
+    organizationId: string,
+    roleId: string,
   ): Promise<void> {
     const userOrgRole = await this.userOrgRoleRepository.findOne({
       where: { userId, organizationId, roleId },
@@ -100,8 +93,8 @@ export class UserOrganizationRolesService {
   }
 
   async getUserRolesInOrganization(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
   ): Promise<UserOrganizationRole[]> {
     return this.userOrgRoleRepository.find({
       where: { userId, organizationId },
@@ -109,7 +102,7 @@ export class UserOrganizationRolesService {
     });
   }
 
-  async getUserOrganizations(userId: number): Promise<UserOrganizationRole[]> {
+  async getUserOrganizations(userId: string): Promise<UserOrganizationRole[]> {
     return this.userOrgRoleRepository.find({
       where: { userId },
       relations: ['organization', 'role'],
@@ -117,7 +110,7 @@ export class UserOrganizationRolesService {
   }
 
   async getOrganizationMembers(
-    organizationId: number,
+    organizationId: string,
   ): Promise<UserOrganizationRole[]> {
     return this.userOrgRoleRepository.find({
       where: { organizationId },
@@ -126,8 +119,8 @@ export class UserOrganizationRolesService {
   }
 
   async getUsersWithRole(
-    organizationId: number,
-    roleId: number,
+    organizationId: string,
+    roleId: string,
   ): Promise<UserOrganizationRole[]> {
     return this.userOrgRoleRepository.find({
       where: { organizationId, roleId },
@@ -136,9 +129,9 @@ export class UserOrganizationRolesService {
   }
 
   private async verifyEntitiesExist(
-    userId: number,
-    organizationId: number,
-    roleId: number,
+    userId: string,
+    organizationId: string,
+    roleId: string,
   ): Promise<void> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -161,8 +154,8 @@ export class UserOrganizationRolesService {
   }
 
   private async verifyUserAndOrganization(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
   ): Promise<void> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {

@@ -8,12 +8,12 @@ describe('AuditLogsController', () => {
   let service: AuditLogsService;
 
   const mockAuditLog = {
-    id: 1,
-    userId: 1,
+    id: '00000000-0000-0000-0000-000000000001',
+    userId: '00000000-0000-0000-0000-000000000002',
     username: 'testuser',
     action: AuditAction.CREATE,
     entityType: AuditEntityType.USER,
-    entityId: 1,
+    entityId: '00000000-0000-0000-0000-000000000003',
     metadata: {},
     oldValues: undefined,
     newValues: {},
@@ -75,9 +75,9 @@ describe('AuditLogsController', () => {
       );
 
       expect(service.findAll).toHaveBeenCalledWith({
-        userId: 1,
+        userId: '1',
         entityType: AuditEntityType.USER,
-        entityId: 1,
+        entityId: '1',
         action: AuditAction.CREATE,
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-12-31'),
@@ -89,26 +89,12 @@ describe('AuditLogsController', () => {
 
   describe('findByUser', () => {
     it('should return audit logs for a specific user', async () => {
-      const result = await controller.findByUser(1);
+      const result = await controller.findByUser(
+        '00000000-0000-0000-0000-000000000002',
+      );
 
-      expect(service.findByUser).toHaveBeenCalledWith(1, 50, 0);
-      expect(result).toEqual({ logs: [mockAuditLog], total: 1 });
-    });
-
-    it('should parse limit and offset', async () => {
-      await controller.findByUser(1, '100', '10');
-
-      expect(service.findByUser).toHaveBeenCalledWith(1, 100, 10);
-    });
-  });
-
-  describe('findByEntity', () => {
-    it('should return audit logs for a specific entity', async () => {
-      const result = await controller.findByEntity(AuditEntityType.USER, 1);
-
-      expect(service.findByEntity).toHaveBeenCalledWith(
-        AuditEntityType.USER,
-        1,
+      expect(service.findByUser).toHaveBeenCalledWith(
+        '00000000-0000-0000-0000-000000000002',
         50,
         0,
       );
@@ -116,11 +102,47 @@ describe('AuditLogsController', () => {
     });
 
     it('should parse limit and offset', async () => {
-      await controller.findByEntity(AuditEntityType.USER, 1, '100', '10');
+      await controller.findByUser(
+        '00000000-0000-0000-0000-000000000002',
+        '100',
+        '10',
+      );
+
+      expect(service.findByUser).toHaveBeenCalledWith(
+        '00000000-0000-0000-0000-000000000002',
+        100,
+        10,
+      );
+    });
+  });
+
+  describe('findByEntity', () => {
+    it('should return audit logs for a specific entity', async () => {
+      const result = await controller.findByEntity(
+        AuditEntityType.USER,
+        '00000000-0000-0000-0000-000000000003',
+      );
 
       expect(service.findByEntity).toHaveBeenCalledWith(
         AuditEntityType.USER,
-        1,
+        '00000000-0000-0000-0000-000000000003',
+        50,
+        0,
+      );
+      expect(result).toEqual({ logs: [mockAuditLog], total: 1 });
+    });
+
+    it('should parse limit and offset', async () => {
+      await controller.findByEntity(
+        AuditEntityType.USER,
+        '00000000-0000-0000-0000-000000000003',
+        '100',
+        '10',
+      );
+
+      expect(service.findByEntity).toHaveBeenCalledWith(
+        AuditEntityType.USER,
+        '00000000-0000-0000-0000-000000000003',
         100,
         10,
       );

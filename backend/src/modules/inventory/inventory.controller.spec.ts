@@ -20,8 +20,8 @@ describe('InventoryController', () => {
   };
 
   const request = {
-    user: { userId: 7, username: 'pilot' },
-  } as AuthenticatedRequest;
+    user: { userId: '00000000-0000-0000-0000-000000000007', username: 'pilot' },
+  } as unknown as AuthenticatedRequest;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

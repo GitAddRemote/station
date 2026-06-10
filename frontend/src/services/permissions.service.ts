@@ -11,8 +11,8 @@ export type OrgPermission = (typeof OrgPermission)[keyof typeof OrgPermission];
 
 export const permissionsService = {
   async getUserPermissions(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
   ): Promise<OrgPermission[]> {
     const response = await api.get(
       `/permissions/user/${userId}/organization/${organizationId}`,

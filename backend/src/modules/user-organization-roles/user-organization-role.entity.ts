@@ -1,7 +1,7 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   ManyToOne,
   JoinColumn,
   Index,
@@ -12,22 +12,22 @@ import { Organization } from '../organizations/organization.entity';
 import { Role } from '../roles/role.entity';
 
 @Entity()
-@Index(['userId', 'organizationId']) // Critical for "get user's roles in org"
-@Index(['organizationId', 'roleId']) // For "get all users with role X in org Y"
-@Index(['userId', 'roleId']) // For "get all orgs where user has role X"
-@Index(['userId', 'organizationId', 'roleId'], { unique: true }) // Prevent duplicate role assignments
+@Index(['userId', 'organizationId'])
+@Index(['organizationId', 'roleId'])
+@Index(['userId', 'roleId'])
+@Index(['userId', 'organizationId', 'roleId'], { unique: true })
 export class UserOrganizationRole {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
+  id!: string;
 
-  @Column()
-  userId!: number;
+  @Column({ type: 'uuid' })
+  userId!: string;
 
-  @Column()
-  organizationId!: number;
+  @Column({ type: 'uuid' })
+  organizationId!: string;
 
-  @Column()
-  roleId!: number;
+  @Column({ type: 'uuid' })
+  roleId!: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })

@@ -2,7 +2,7 @@ import {
   Controller,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Post,
   Put,
   Patch,
@@ -42,7 +42,7 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get(':id')
-  async getUserById(@Param('id', ParseIntPipe) id: number) {
+  async getUserById(@Param('id', ParseUUIDPipe) id: string) {
     return await this.usersService.findById(id);
   }
 
@@ -69,7 +69,7 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'))
   @Put(':id')
   async updateUser(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() userDto: Partial<UserDto>,
   ) {
     return await this.usersService.update(id, userDto);
@@ -79,7 +79,7 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
   async partialUpdateUser(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() userDto: Partial<UserDto>,
   ) {
     return await this.usersService.update(id, userDto);
@@ -89,7 +89,7 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
   @HttpCode(204)
-  async deleteUser(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async deleteUser(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     await this.usersService.delete(id);
   }
 }

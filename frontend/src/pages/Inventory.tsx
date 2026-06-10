@@ -91,12 +91,9 @@ const readStoredViewMode = (): 'personal' | 'org' => {
   return stored === 'org' ? 'org' : 'personal';
 };
 
-const readStoredOrgId = (): number | null => {
+const readStoredOrgId = (): string | null => {
   if (typeof window === 'undefined') return null;
-  const stored = window.sessionStorage.getItem(ORG_ID_STORAGE_KEY);
-  if (!stored) return null;
-  const parsed = Number.parseInt(stored, 10);
-  return Number.isNaN(parsed) ? null : parsed;
+  return window.sessionStorage.getItem(ORG_ID_STORAGE_KEY) || null;
 };
 
 const readStoredDensity = (): 'standard' | 'compact' => {
@@ -114,17 +111,17 @@ const InventoryPage = () => {
   const addSearchRef = useRef<HTMLInputElement | null>(null);
   const firstCatalogItemRef = useRef<HTMLDivElement | null>(null);
   const catalogItemRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const [user, setUser] = useState<{ userId: number; username: string } | null>(
+  const [user, setUser] = useState<{ userId: string; username: string } | null>(
     null,
   );
-  const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>(
+  const [orgOptions, setOrgOptions] = useState<{ id: string; name: string }[]>(
     [],
   );
   const [allOrgOptions, setAllOrgOptions] = useState<
-    { id: number; name: string }[]
+    { id: string; name: string }[]
   >([]);
   const orgsLoaded = useRef(false);
-  const [selectedOrgId, setSelectedOrgId] = useState<number | null>(() =>
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(() =>
     readStoredOrgId(),
   );
   const [viewMode, setViewMode] = useState<'personal' | 'org'>(() =>
@@ -143,7 +140,7 @@ const InventoryPage = () => {
   const [editLocation, setEditLocation] = useState<LocationDto | null>(null);
   const [editQuality, setEditQuality] = useState<number | ''>('');
   const [editUomId, setEditUomId] = useState<string>('');
-  const [shareOrgId, setShareOrgId] = useState<number | ''>('');
+  const [shareOrgId, setShareOrgId] = useState<string | ''>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -168,7 +165,7 @@ const InventoryPage = () => {
   const [orgPermissionsError, setOrgPermissionsError] = useState<string | null>(
     null,
   );
-  const permissionsFetchedForOrgId = useRef<number | null>(null);
+  const permissionsFetchedForOrgId = useRef<string | null>(null);
 
   const [filters, setFilters] = useState({
     search: '',
@@ -465,7 +462,7 @@ const InventoryPage = () => {
     }
   }, []);
 
-  const fetchOrganizations = useCallback(async (userId: number) => {
+  const fetchOrganizations = useCallback(async (userId: string) => {
     try {
       const orgs = await inventoryService.getUserOrganizations(userId);
       const mapped = orgs.map((entry) => ({
@@ -491,7 +488,7 @@ const InventoryPage = () => {
             }
           }),
         )
-      ).filter((org): org is { id: number; name: string } => org !== null);
+      ).filter((org): org is { id: string; name: string } => org !== null);
       setOrgOptions(viewableOrgs);
       orgsLoaded.current = true;
     } catch (err) {
@@ -1599,9 +1596,7 @@ const InventoryPage = () => {
                   label="Organization"
                   value={shareOrgId}
                   onChange={(e) =>
-                    setShareOrgId(
-                      e.target.value === '' ? '' : Number(e.target.value),
-                    )
+                    setShareOrgId(e.target.value)
                   }
                 >
                   {allOrgOptions.map((org) => (
@@ -1627,7 +1622,7 @@ const InventoryPage = () => {
                   variant="contained"
                   disabled={actionWorking || shareOrgId === ''}
                   onClick={() =>
-                    typeof shareOrgId === 'number' &&
+                    shareOrgId !== '' &&
                     handleShare()
                   }
                 >

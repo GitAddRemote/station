@@ -21,7 +21,6 @@ export class OrganizationsService {
   async create(
     createOrganizationDto: CreateOrganizationDto,
   ): Promise<Organization> {
-    // Set default game if not provided
     if (!createOrganizationDto.gameId) {
       const defaultGame = await this.gamesService.getDefaultGame();
       createOrganizationDto.gameId = defaultGame.id;
@@ -40,7 +39,7 @@ export class OrganizationsService {
     });
   }
 
-  async findOne(id: number): Promise<Organization> {
+  async findOne(id: string): Promise<Organization> {
     const organization = await this.organizationsRepository.findOne({
       where: { id },
     });
@@ -52,16 +51,14 @@ export class OrganizationsService {
     return organization;
   }
 
-  async findWithMembers(id: number): Promise<Organization> {
+  async findWithMembers(id: string): Promise<Organization> {
     const cacheKey = `org:${id}:members`;
 
-    // Try to get from cache
     const cached = await this.cacheManager.get<Organization>(cacheKey);
     if (cached) {
       return cached;
     }
 
-    // If not in cache, fetch from database
     const organization = await this.organizationsRepository.findOne({
       where: { id },
       relations: [
@@ -75,31 +72,28 @@ export class OrganizationsService {
       throw new NotFoundException(`Organization with ID ${id} not found`);
     }
 
-    // Store in cache with 5 minute TTL
     await this.cacheManager.set(cacheKey, organization, 300000);
 
     return organization;
   }
 
   async update(
-    id: number,
+    id: string,
     updateOrganizationDto: UpdateOrganizationDto,
   ): Promise<Organization> {
     const organization = await this.findOne(id);
     Object.assign(organization, updateOrganizationDto);
     const updated = await this.organizationsRepository.save(organization);
 
-    // Invalidate cache
     await this.cacheManager.del(`org:${id}:members`);
 
     return updated;
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     const organization = await this.findOne(id);
     await this.organizationsRepository.remove(organization);
 
-    // Invalidate cache
     await this.cacheManager.del(`org:${id}:members`);
   }
 }

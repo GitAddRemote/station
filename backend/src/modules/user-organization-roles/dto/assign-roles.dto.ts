@@ -1,14 +1,14 @@
-import { IsNumber, IsArray, ArrayMinSize } from 'class-validator';
+import { IsUUID, IsArray, ArrayMinSize } from 'class-validator';
 
 export class AssignRolesDto {
-  @IsNumber()
-  userId!: number;
+  @IsUUID()
+  userId!: string;
 
-  @IsNumber()
-  organizationId!: number;
+  @IsUUID()
+  organizationId!: string;
 
   @IsArray()
   @ArrayMinSize(1)
-  @IsNumber({}, { each: true })
-  roleIds!: number[];
+  @IsUUID('all', { each: true })
+  roleIds!: string[];
 }

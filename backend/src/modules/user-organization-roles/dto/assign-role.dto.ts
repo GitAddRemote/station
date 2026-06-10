@@ -1,12 +1,12 @@
-import { IsNumber } from 'class-validator';
+import { IsUUID } from 'class-validator';
 
 export class AssignRoleDto {
-  @IsNumber()
-  userId!: number;
+  @IsUUID()
+  userId!: string;
 
-  @IsNumber()
-  organizationId!: number;
+  @IsUUID()
+  organizationId!: string;
 
-  @IsNumber()
-  roleId!: number;
+  @IsUUID()
+  roleId!: string;
 }

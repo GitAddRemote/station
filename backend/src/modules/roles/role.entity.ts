@@ -1,7 +1,7 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   OneToMany,
   Index,
   CreateDateColumn,
@@ -12,8 +12,8 @@ import { UserOrganizationRole } from '../user-organization-roles/user-organizati
 @Entity()
 @Index(['name']) // for role lookups
 export class Role {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
+  id!: string;
 
   @Column({ unique: true })
   name!: string; // 'admin', 'developer', 'viewer', etc.

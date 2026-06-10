@@ -4,11 +4,11 @@ import { Repository } from 'typeorm';
 import { AuditLog, AuditAction, AuditEntityType } from './audit-log.entity';
 
 export interface CreateAuditLogDto {
-  userId?: number;
+  userId?: string;
   username?: string;
   action: AuditAction;
   entityType: AuditEntityType;
-  entityId?: number;
+  entityId?: string;
   metadata?: Record<string, unknown>;
   oldValues?: Record<string, unknown>;
   newValues?: Record<string, unknown>;
@@ -35,9 +35,9 @@ export class AuditLogsService {
    * Get audit logs with optional filters
    */
   async findAll(filters?: {
-    userId?: number;
+    userId?: string;
     entityType?: AuditEntityType;
-    entityId?: number;
+    entityId?: string;
     action?: AuditAction;
     startDate?: Date;
     endDate?: Date;
@@ -101,7 +101,7 @@ export class AuditLogsService {
    * Get audit logs for a specific user
    */
   async findByUser(
-    userId: number,
+    userId: string,
     limit = 50,
     offset = 0,
   ): Promise<{ logs: AuditLog[]; total: number }> {
@@ -113,7 +113,7 @@ export class AuditLogsService {
    */
   async findByEntity(
     entityType: AuditEntityType,
-    entityId: number,
+    entityId: string,
     limit = 50,
     offset = 0,
   ): Promise<{ logs: AuditLog[]; total: number }> {

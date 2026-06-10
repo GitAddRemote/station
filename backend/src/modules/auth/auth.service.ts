@@ -161,7 +161,7 @@ export class AuthService implements OnModuleDestroy {
 
   /** Issues a new access+refresh token pair and maintains the user-sessions index. */
   private async issueTokenPair(
-    userId: number,
+    userId: string,
     username: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const jti = crypto.randomUUID();
@@ -195,7 +195,7 @@ export class AuthService implements OnModuleDestroy {
    * Generates a single-use pre-auth token stored in raw Redis only.
    * Returns 503 if redisClient is null — in-memory storage is forbidden for this flow.
    */
-  async generatePreAuthToken(userId: number): Promise<string> {
+  async generatePreAuthToken(userId: string): Promise<string> {
     if (!this.redisClient) {
       throw new ServiceUnavailableException(
         'Pre-auth tokens require Redis. Set USE_REDIS_CACHE=true.',
@@ -222,7 +222,7 @@ export class AuthService implements OnModuleDestroy {
    * Storage: SHA-256 hash of the full raw value, keyed by refresh:{jti}
    */
   async generateRefreshToken(
-    userId: number,
+    userId: string,
     jti: string,
     sid: string,
   ): Promise<string> {
@@ -314,7 +314,7 @@ export class AuthService implements OnModuleDestroy {
       throw new UnauthorizedException('Session has been revoked');
     }
 
-    const userId = parseInt(userIdStr, 10);
+    const userId = userIdStr;
     const user = await this.usersService.findById(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -613,7 +613,7 @@ export class AuthService implements OnModuleDestroy {
       throw new UnauthorizedException('Invalid or expired pre-auth token');
     }
 
-    const userId = parseInt(userIdStr, 10);
+    const userId = userIdStr;
     const user = await this.usersService.findById(userId);
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -641,7 +641,7 @@ export class AuthService implements OnModuleDestroy {
   }
 
   /** Revokes all active sessions for a user via the user-sessions reverse index. */
-  private async revokeAllUserSessions(userId: number): Promise<void> {
+  private async revokeAllUserSessions(userId: string): Promise<void> {
     if (!this.redisClient) return;
     const sids = await this.redisClient.sMembers(`user-sessions:${userId}`);
     for (const sid of sids) {
@@ -651,7 +651,7 @@ export class AuthService implements OnModuleDestroy {
   }
 
   async changePassword(
-    userId: number,
+    userId: string,
     currentPassword: string,
     newPassword: string,
   ): Promise<{ message: string }> {

@@ -5,7 +5,7 @@ import {
   Delete,
   Body,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -37,17 +37,17 @@ export class UserOrganizationRolesController {
   @Delete('user/:userId/organization/:organizationId/role/:roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeRole(
-    @Param('userId', ParseIntPipe) userId: number,
-    @Param('organizationId', ParseIntPipe) organizationId: number,
-    @Param('roleId', ParseIntPipe) roleId: number,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('roleId', ParseUUIDPipe) roleId: string,
   ) {
     await this.userOrgRolesService.removeRole(userId, organizationId, roleId);
   }
 
   @Get('user/:userId/organization/:organizationId')
   async getUserRolesInOrganization(
-    @Param('userId', ParseIntPipe) userId: number,
-    @Param('organizationId', ParseIntPipe) organizationId: number,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
   ) {
     return this.userOrgRolesService.getUserRolesInOrganization(
       userId,
@@ -56,21 +56,21 @@ export class UserOrganizationRolesController {
   }
 
   @Get('user/:userId/organizations')
-  async getUserOrganizations(@Param('userId', ParseIntPipe) userId: number) {
+  async getUserOrganizations(@Param('userId', ParseUUIDPipe) userId: string) {
     return this.userOrgRolesService.getUserOrganizations(userId);
   }
 
   @Get('organization/:organizationId/members')
   async getOrganizationMembers(
-    @Param('organizationId', ParseIntPipe) organizationId: number,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
   ) {
     return this.userOrgRolesService.getOrganizationMembers(organizationId);
   }
 
   @Get('organization/:organizationId/role/:roleId/users')
   async getUsersWithRole(
-    @Param('organizationId', ParseIntPipe) organizationId: number,
-    @Param('roleId', ParseIntPipe) roleId: number,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('roleId', ParseUUIDPipe) roleId: string,
   ) {
     return this.userOrgRolesService.getUsersWithRole(organizationId, roleId);
   }

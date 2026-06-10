@@ -63,7 +63,7 @@ export class InventoryService {
   ) {}
 
   async createItem(
-    userId: number,
+    userId: string,
     dto: CreateInventoryItemDto,
   ): Promise<InventoryItemDto> {
     const currentUser = await this.getUserOrThrow(userId);
@@ -106,7 +106,7 @@ export class InventoryService {
   }
 
   async listItems(
-    userId: number,
+    userId: string,
     query: ListInventoryItemsDto,
   ): Promise<PaginatedInventoryItemsDto> {
     const normalizedPage = query.page ?? InventoryService.DEFAULT_PAGE;
@@ -153,7 +153,7 @@ export class InventoryService {
   }
 
   async updateItem(
-    userId: number,
+    userId: string,
     itemId: string,
     dto: UpdateInventoryItemDto,
   ): Promise<InventoryItemDto> {
@@ -218,7 +218,7 @@ export class InventoryService {
     return this.getInventoryItemOrThrow(item.id);
   }
 
-  async deleteItem(userId: number, itemId: string): Promise<void> {
+  async deleteItem(userId: string, itemId: string): Promise<void> {
     const item = await this.inventoryItemRepository.findOne({
       where: { id: itemId },
     });
@@ -232,7 +232,7 @@ export class InventoryService {
   }
 
   async createList(
-    userId: number,
+    userId: string,
     dto: CreateInventoryListDto,
   ): Promise<InventoryListDto> {
     const ownerId = await this.getUserOwnerUuid(userId);
@@ -265,7 +265,7 @@ export class InventoryService {
     return this.toInventoryListDto(saved);
   }
 
-  async listLists(userId: number): Promise<InventoryListDto[]> {
+  async listLists(userId: string): Promise<InventoryListDto[]> {
     const ownerId = await this.getUserOwnerUuid(userId);
     const lists = await this.inventoryListRepository.find({
       where: { ownerType: 'user', ownerId },
@@ -275,13 +275,13 @@ export class InventoryService {
     return lists.map((list) => this.toInventoryListDto(list));
   }
 
-  async deleteList(userId: number, listId: string): Promise<void> {
+  async deleteList(userId: string, listId: string): Promise<void> {
     const list = await this.getOwnedUserListOrThrow(userId, listId);
     await this.inventoryListRepository.delete({ id: list.id });
   }
 
   async addItemToList(
-    userId: number,
+    userId: string,
     listId: string,
     dto: AddInventoryListItemDto,
   ): Promise<InventoryListItemDto> {
@@ -320,7 +320,7 @@ export class InventoryService {
   }
 
   async removeItemFromList(
-    userId: number,
+    userId: string,
     listId: string,
     inventoryItemId: string,
   ): Promise<void> {
@@ -336,12 +336,12 @@ export class InventoryService {
     }
   }
 
-  private async getUserOwnerUuid(userId: number): Promise<string> {
+  private async getUserOwnerUuid(userId: string): Promise<string> {
     const user = await this.getUserOrThrow(userId);
-    return user.idUuid;
+    return user.id;
   }
 
-  private async getUserOrThrow(userId: number): Promise<User> {
+  private async getUserOrThrow(userId: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: userId, isSystemUser: false },
     });
@@ -360,8 +360,8 @@ export class InventoryService {
     const ownerType = dto.ownerType ?? 'user';
 
     if (ownerType === 'user') {
-      const ownerId = dto.ownerId ?? currentUser.idUuid;
-      if (ownerId !== currentUser.idUuid) {
+      const ownerId = dto.ownerId ?? currentUser.id;
+      if (ownerId !== currentUser.id) {
         throw new ForbiddenException(
           'Users may only create inventory items for themselves',
         );
@@ -380,7 +380,7 @@ export class InventoryService {
       organization.id,
     );
 
-    return { ownerType, ownerId: organization.idUuid };
+    return { ownerType, ownerId: organization.id };
   }
 
   private async resolveListContext(
@@ -393,8 +393,8 @@ export class InventoryService {
     const ownerType = query.ownerType ?? 'user';
 
     if (ownerType === 'user') {
-      const requestedOwnerId = query.ownerId ?? currentUser.idUuid;
-      if (requestedOwnerId !== currentUser.idUuid) {
+      const requestedOwnerId = query.ownerId ?? currentUser.id;
+      if (requestedOwnerId !== currentUser.id) {
         throw new ForbiddenException('Users may only view their own inventory');
       }
 
@@ -437,8 +437,8 @@ export class InventoryService {
 
     return {
       scope: 'org',
-      ownerId: organization.idUuid,
-      memberOwnerIds: memberUsers.map((user) => user.idUuid),
+      ownerId: organization.id,
+      memberOwnerIds: memberUsers.map((user) => user.id),
     };
   }
 
@@ -550,7 +550,7 @@ export class InventoryService {
     organizationUuid: string,
   ): Promise<Organization> {
     const organization = await this.organizationRepository.findOne({
-      where: { idUuid: organizationUuid, isActive: true },
+      where: { id: organizationUuid, isActive: true },
     });
 
     if (!organization) {
@@ -659,8 +659,8 @@ export class InventoryService {
   }
 
   private async assertCanManageOrganizationInventory(
-    userId: number,
-    organizationId: number,
+    userId: string,
+    organizationId: string,
   ): Promise<void> {
     const memberships =
       await this.userOrganizationRolesService.getUserOrganizations(userId);
@@ -687,7 +687,7 @@ export class InventoryService {
   }
 
   private async assertCanManageItem(
-    userId: number,
+    userId: string,
     item: StationInventoryItem,
   ): Promise<void> {
     const currentUserOwnerUuid = await this.getUserOwnerUuid(userId);
@@ -705,7 +705,7 @@ export class InventoryService {
   }
 
   private async getOwnedUserListOrThrow(
-    userId: number,
+    userId: string,
     listId: string,
   ): Promise<StationInventoryList> {
     const ownerId = await this.getUserOwnerUuid(userId);

@@ -1,7 +1,7 @@
 import {
   Entity,
   Column,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
@@ -14,7 +14,7 @@ export type EtlWarningSeverity = 'warn' | 'error';
 @Entity('station_etl_warning')
 @Index('idx_station_etl_warning_run_id', ['runId', 'createdAt'])
 export class EtlWarning {
-  @PrimaryGeneratedColumn('increment', { type: 'bigint' })
+  @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
   id!: string;
 
   @Column({ name: 'run_id', type: 'uuid' })

@@ -2,7 +2,7 @@ import {
   Controller,
   Get,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -15,8 +15,8 @@ export class PermissionsController {
 
   @Get('user/:userId/organization/:organizationId')
   async getUserPermissions(
-    @Param('userId', ParseIntPipe) userId: number,
-    @Param('organizationId', ParseIntPipe) organizationId: number,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
   ) {
     const permissions = await this.permissionsService.getUserPermissionsArray(
       userId,

@@ -60,7 +60,7 @@ export class GamesService {
     return game;
   }
 
-  async getGameById(id: number): Promise<Game> {
+  async getGameById(id: string): Promise<Game> {
     const cacheKey = `game:id:${id}`;
     const cached = await this.cacheManager.get<Game>(cacheKey);
     if (cached) {
@@ -84,7 +84,7 @@ export class GamesService {
     return this.getGameByCode(this.DEFAULT_GAME_CODE);
   }
 
-  async validateGameId(gameId: number): Promise<boolean> {
+  async validateGameId(gameId: string): Promise<boolean> {
     try {
       await this.getGameById(gameId);
       return true;

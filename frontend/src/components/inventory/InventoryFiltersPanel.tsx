@@ -47,9 +47,9 @@ interface FiltersPanelProps {
   setDensity: (value: 'standard' | 'compact') => void;
   viewMode: 'personal' | 'org';
   setViewMode: (mode: 'personal' | 'org') => void;
-  selectedOrgId: number | null;
-  setSelectedOrgId: (value: number | null) => void;
-  orgOptions: { id: number; name: string }[];
+  selectedOrgId: string | null;
+  setSelectedOrgId: (value: string | null) => void;
+  orgOptions: { id: string; name: string }[];
   userInitial: string;
   onOpenAddDialog: () => void;
   showAddButton: boolean;
@@ -174,7 +174,7 @@ export const InventoryFiltersPanel = ({
                   setSelectedOrgId(null);
                 } else {
                   setViewMode('org');
-                  setSelectedOrgId(Number(value));
+                  setSelectedOrgId(String(value));
                 }
               }}
             >
