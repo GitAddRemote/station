@@ -4,6 +4,7 @@ import request from 'supertest';
 import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { DataSource } from 'typeorm';
+import { User } from '../src/modules/users/user.entity';
 import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('Roles (e2e)', () => {
@@ -31,6 +32,11 @@ describe('Roles (e2e)', () => {
       email: 'test@example.com',
       password: 'password123',
     });
+
+    // Local login requires isSuperAdmin; set it directly after registration.
+    await dataSource
+      .getRepository(User)
+      .update({ username: 'testuser' }, { isSuperAdmin: true });
 
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')

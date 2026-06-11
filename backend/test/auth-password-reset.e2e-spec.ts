@@ -44,6 +44,7 @@ describe('Auth - Password Reset (e2e)', () => {
       email: 'test@example.com',
       password: hashedPassword,
       isActive: true,
+      isSuperAdmin: true,
     });
 
     // Login to get access token cookie

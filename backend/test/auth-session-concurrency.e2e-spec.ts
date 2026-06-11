@@ -115,6 +115,7 @@ describeSuite('Auth - session-family concurrency (e2e, requires Redis)', () => {
       email: 'concurrencytest@example.com',
       password: hashedPassword,
       isActive: true,
+      isSuperAdmin: true,
     });
   });
 
