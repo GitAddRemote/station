@@ -44,6 +44,7 @@ export class DatabaseSeederAdminService {
       email,
       password: hashedPassword,
       isActive: true,
+      isSuperAdmin: true,
       passwordChangeRequired: true,
       passwordExpiresAt,
     });

@@ -104,6 +104,17 @@ export class AuthService implements OnModuleDestroy {
       return null;
     }
 
+    // Local login is a break-glass path — only the super admin may use it.
+    // All other users must authenticate through Discord OAuth2.
+    if (user && !user.isSuperAdmin) {
+      this.logger.warn(
+        `Non-super-admin user attempted local login: ${username}. Blocked.`,
+      );
+      throw new ForbiddenException(
+        'Local login is restricted to the station super admin break-glass account. Please sign in with Discord.',
+      );
+    }
+
     const hashToCompare = user?.password ?? this.dummyHash;
     const isMatch = await bcrypt.compare(trimmedPass, hashToCompare);
 

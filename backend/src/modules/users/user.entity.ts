@@ -22,6 +22,10 @@ export class User {
   @Index()
   isSystemUser!: boolean;
 
+  @Column({ name: 'is_super_admin', default: false })
+  @Index()
+  isSuperAdmin!: boolean;
+
   @Column({ length: 100, nullable: true })
   firstName?: string;
 
