@@ -18,6 +18,7 @@ describe('UexSyncService', () => {
       update: jest.fn(),
       save: jest.fn(),
       insert: jest.fn().mockResolvedValue({}),
+      upsert: jest.fn().mockResolvedValue({}),
       createQueryBuilder: jest.fn(),
     };
 
@@ -476,6 +477,86 @@ describe('UexSyncService', () => {
       const result = await service.getSyncStateWithConfig('nonexistent');
 
       expect(result).toEqual({ state: null, config: null });
+    });
+  });
+
+  describe('getEtlStepSyncParams', () => {
+    it('returns full sync with no params when no sync state exists', async () => {
+      mockSyncStateRepository.findOne.mockResolvedValue(null);
+      mockSyncConfigRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.getEtlStepSyncParams('catalog-etl:vehicles');
+
+      expect(result.syncMode).toBe('full');
+      expect(result.params).toBeUndefined();
+    });
+
+    it('returns full sync when delta is disabled in config', async () => {
+      mockSyncStateRepository.findOne.mockResolvedValue({
+        endpointName: 'catalog-etl:vehicles',
+        lastSuccessfulSyncAt: new Date(Date.now() - 3600000),
+        lastFullSyncAt: new Date(Date.now() - 3600000),
+        syncStatus: SyncStatus.SUCCESS,
+      });
+      mockSyncConfigRepository.findOne.mockResolvedValue({
+        endpointName: 'catalog-etl:vehicles',
+        enabled: true,
+        deltaSyncEnabled: false,
+        fullSyncIntervalDays: 7,
+      });
+
+      const result = await service.getEtlStepSyncParams('catalog-etl:vehicles');
+
+      expect(result.syncMode).toBe('full');
+      expect(result.params).toBeUndefined();
+    });
+
+    it('returns delta sync with date_modified_min param when eligible', async () => {
+      const lastSync = new Date(Date.now() - 3600000);
+      mockSyncStateRepository.findOne.mockResolvedValue({
+        endpointName: 'catalog-etl:vehicles',
+        lastSuccessfulSyncAt: lastSync,
+        lastFullSyncAt: new Date(Date.now() - 3600000),
+        syncStatus: SyncStatus.SUCCESS,
+      });
+      mockSyncConfigRepository.findOne.mockResolvedValue({
+        endpointName: 'catalog-etl:vehicles',
+        enabled: true,
+        deltaSyncEnabled: true,
+        fullSyncIntervalDays: 7,
+      });
+
+      const result = await service.getEtlStepSyncParams('catalog-etl:vehicles');
+
+      expect(result.syncMode).toBe('delta');
+      expect(result.params).toBeDefined();
+      expect(result.params!['date_modified_min']).toBe(
+        Math.floor(lastSync.getTime() / 1000).toString(),
+      );
+    });
+  });
+
+  describe('recordEtlStepSync', () => {
+    it('upserts lastSuccessfulSyncAt and lastFullSyncAt on full sync', async () => {
+      await service.recordEtlStepSync('catalog-etl:vehicles', 'full');
+
+      expect(mockSyncStateRepository.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpointName: 'catalog-etl:vehicles',
+          syncStatus: SyncStatus.SUCCESS,
+          lastSuccessfulSyncAt: expect.any(Date),
+          lastFullSyncAt: expect.any(Date),
+        }),
+        ['endpointName'],
+      );
+    });
+
+    it('upserts lastSuccessfulSyncAt only on delta sync', async () => {
+      await service.recordEtlStepSync('catalog-etl:items', 'delta');
+
+      const call = mockSyncStateRepository.upsert.mock.calls[0][0];
+      expect(call.lastSuccessfulSyncAt).toBeInstanceOf(Date);
+      expect(call.lastFullSyncAt).toBeUndefined();
     });
   });
 });

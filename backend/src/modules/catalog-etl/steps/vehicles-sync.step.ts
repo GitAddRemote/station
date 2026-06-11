@@ -5,6 +5,19 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
+import { UexSyncService } from '../../uex-sync/uex-sync.service';
+
+// UEX /vehicles supports date_modified_min delta filtering.
+//
+// Vehicle loaners: UEX embeds two overlapping fields in the /vehicles response —
+// `loaners` (array of objects or integers) and `ids_vehicles_loaners` (comma-
+// separated string or integer array). A dedicated /vehicle_loaners endpoint does
+// not exist in the UEX API. normalizeLoanerIds() merges and deduplicates both
+// fields to produce a single canonical loaner set. Stale loaner rows are deleted
+// for every upserted vehicle before re-inserting so removed relationships are
+// cleaned up without a full table scan.
+const UEX_ENDPOINT = '/vehicles';
+const SYNC_STATE_KEY = 'catalog-etl:vehicles';
 
 interface UexVehicle {
   id: number;
@@ -134,6 +147,7 @@ export class VehiclesSyncStep implements EtlStep {
 
   constructor(
     private readonly uexApiClient: UexApiClient,
+    private readonly uexSyncService: UexSyncService,
     private readonly dataSource: DataSource,
     @InjectRepository(EtlWarning)
     private readonly warningsRepo: Repository<EtlWarning>,
@@ -142,7 +156,18 @@ export class VehiclesSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    const vehicles = await this.uexApiClient.get<UexVehicle[]>('/vehicles');
+    const { syncMode, params, reason } =
+      await this.uexSyncService.getEtlStepSyncParams(SYNC_STATE_KEY);
+
+    this.logger.info(
+      { runId: ctx.runId, syncMode, reason },
+      'vehicles-sync starting',
+    );
+
+    const vehicles = await this.uexApiClient.get<UexVehicle[]>(
+      UEX_ENDPOINT,
+      params,
+    );
     const loaners = vehicles.flatMap((vehicle) =>
       normalizeLoanerIds(vehicle).map((loanerId) => ({
         id_vehicle: vehicle.id,
@@ -151,7 +176,12 @@ export class VehiclesSyncStep implements EtlStep {
     );
 
     this.logger.info(
-      { runId: ctx.runId, vehicles: vehicles.length, loaners: loaners.length },
+      {
+        runId: ctx.runId,
+        syncMode,
+        vehicles: vehicles.length,
+        loaners: loaners.length,
+      },
       'Fetched vehicles and loaners from UEX',
     );
 
@@ -477,5 +507,7 @@ export class VehiclesSyncStep implements EtlStep {
       { runId: ctx.runId, loanerUpserted, loanerSkipped },
       'vehicle loaners upserted',
     );
+
+    await this.uexSyncService.recordEtlStepSync(SYNC_STATE_KEY, syncMode);
   }
 }

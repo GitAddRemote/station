@@ -12,6 +12,13 @@ export interface SyncDecision {
   lastSyncAt?: Date;
 }
 
+export interface EtlStepSyncParams {
+  syncMode: 'delta' | 'full';
+  /** Query params to pass to UexApiClient.get() — undefined means no filtering */
+  params: Record<string, string> | undefined;
+  reason: string;
+}
+
 export interface SyncResult {
   endpointName: string;
   syncMode: 'delta' | 'full';
@@ -289,6 +296,61 @@ export class UexSyncService {
     const msPerDay = 24 * 60 * 60 * 1000;
     const timeDiff = endDate.getTime() - startDate.getTime();
     return Math.floor(timeDiff / msPerDay);
+  }
+
+  /**
+   * Returns the sync mode and UEX query params for a catalog ETL step.
+   *
+   * Delta sync passes date_modified_min=<unix-seconds> to the UEX endpoint so
+   * only records modified since the last successful sync are returned. Full
+   * refresh passes no date filter and re-fetches the entire dataset.
+   *
+   * Callers should pass the returned params directly to UexApiClient.get() and
+   * record the outcome via recordEtlStepSync() after a successful run.
+   *
+   * Endpoints that do NOT support date_modified_min (e.g. /terminals_distances,
+   * /terminals, /categories, all spatial-layer endpoints) should not call this
+   * method — they always do a full fetch and manage their own stale-delete logic.
+   */
+  async getEtlStepSyncParams(endpointName: string): Promise<EtlStepSyncParams> {
+    const decision = await this.shouldUseDeltaSync(endpointName);
+
+    if (!decision.useDelta || !decision.lastSyncAt) {
+      return { syncMode: 'full', params: undefined, reason: decision.reason };
+    }
+
+    // UEX date_modified_min accepts a Unix timestamp in seconds.
+    const dateModifiedMin = Math.floor(
+      decision.lastSyncAt.getTime() / 1000,
+    ).toString();
+
+    return {
+      syncMode: 'delta',
+      params: { date_modified_min: dateModifiedMin },
+      reason: decision.reason,
+    };
+  }
+
+  /**
+   * Records a successful catalog ETL step sync.  Updates lastSuccessfulSyncAt
+   * on every success, and lastFullSyncAt only when the step ran in full mode.
+   * This is intentionally lightweight — steps don't need full SyncResult metrics.
+   */
+  async recordEtlStepSync(
+    endpointName: string,
+    syncMode: 'delta' | 'full',
+  ): Promise<void> {
+    const now = new Date();
+    const updates: Partial<UexSyncState> = {
+      syncStatus: SyncStatus.SUCCESS,
+      lastSuccessfulSyncAt: now,
+    };
+    if (syncMode === 'full') {
+      updates.lastFullSyncAt = now;
+    }
+    await this.syncStateRepository.upsert({ endpointName, ...updates }, [
+      'endpointName',
+    ]);
   }
 
   async initializeEndpoint(

@@ -52,15 +52,26 @@ function buildDsQuery(): jest.Mock {
   return jest.fn().mockResolvedValue([]);
 }
 
+function makeSyncService(syncMode: 'full' | 'delta' = 'full'): object {
+  return {
+    getEtlStepSyncParams: jest
+      .fn()
+      .mockResolvedValue({ syncMode, params: undefined, reason: 'FIRST_SYNC' }),
+    recordEtlStepSync: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
 function buildStep(
   uexGet: jest.Mock,
   dsQuery: jest.Mock,
   repoCreate: jest.Mock,
   repoSave: jest.Mock,
   mapFind: jest.Mock,
+  syncService: object = makeSyncService(),
 ) {
   return new CommoditiesSyncStep(
     { get: uexGet } as never,
+    syncService as never,
     { query: dsQuery } as never,
     { create: repoCreate, save: repoSave } as never,
     { find: mapFind } as never,
