@@ -12,9 +12,6 @@ import {
   Box,
   CircularProgress,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
   Button,
   Stack,
@@ -119,9 +116,6 @@ const InventoryPage = () => {
   const [orgOptions, setOrgOptions] = useState<{ id: string; name: string }[]>(
     [],
   );
-  const [allOrgOptions, setAllOrgOptions] = useState<
-    { id: string; name: string }[]
-  >([]);
   const orgsLoaded = useRef(false);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(() =>
     readStoredOrgId(),
@@ -142,7 +136,6 @@ const InventoryPage = () => {
   const [editLocation, setEditLocation] = useState<LocationDto | null>(null);
   const [editQuality, setEditQuality] = useState<number | ''>('');
   const [editUomId, setEditUomId] = useState<string>('');
-  const [shareOrgId, setShareOrgId] = useState<string | ''>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -483,7 +476,6 @@ const InventoryPage = () => {
         id: entry.organization?.id ?? entry.organizationId,
         name: entry.organization?.name ?? `Org #${entry.organizationId}`,
       }));
-      setAllOrgOptions(mapped);
       const viewableOrgs = (
         await Promise.all(
           mapped.map(async (org) => {
@@ -1393,9 +1385,6 @@ const InventoryPage = () => {
   const openActionDialog = (mode: ActionMode) => {
     setActionMode(mode);
     setActionAnchor(null);
-    if (mode === 'share') {
-      setShareOrgId('');
-    }
   };
 
   const handleUpdateItem = async (payload: {

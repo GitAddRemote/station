@@ -34,7 +34,7 @@ function categoryIcon(categoryPath: string) {
   return <Inventory2OutlinedIcon />;
 }
 
-const InventoryPortlet = ({ onExpand: _onExpand }: InventoryPortletProps) => {
+const InventoryPortlet = ({}: InventoryPortletProps) => {
   const [items, setItems]         = useState<InventoryItem[]>([]);
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [loading, setLoading]     = useState(true);
