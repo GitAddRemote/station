@@ -11,8 +11,9 @@ interface UexJumpPoint {
   id: number;
   id_star_system_origin: number;
   id_star_system_destination: number;
-  id_orbit_entry: number | null;
-  id_orbit_exit: number | null;
+  // UEX uses id_orbit_origin / id_orbit_destination (not entry/exit)
+  id_orbit_origin: number | null;
+  id_orbit_destination: number | null;
   date_added: number;
   date_modified: number;
 }
@@ -96,39 +97,39 @@ export class JumpPointsSyncStep implements EtlStep {
         continue;
       }
 
-      // Orbit FKs are optional; unknown values warn and null out
-      const orbitEntryUexId = record.id_orbit_entry ?? null;
-      if (orbitEntryUexId !== null && !knownOrbits.has(orbitEntryUexId)) {
+      // Orbit FKs are optional; unknown values warn and null out — do NOT skip
+      let orbitOriginUexId = record.id_orbit_origin ?? null;
+      if (orbitOriginUexId !== null && !knownOrbits.has(orbitOriginUexId)) {
         await this.warningsRepo.save(
           this.warningsRepo.create({
             runId: ctx.runId,
             stepName: this.name,
             severity: 'warn',
-            message: `Jump point ${record.id} references unknown entry orbit ${orbitEntryUexId} — skipped`,
+            message: `Jump point ${record.id} references unknown origin orbit ${orbitOriginUexId} — stored as null`,
             rawPayload: {
               jp_id: record.id,
-              missing_orbit_entry_id: orbitEntryUexId,
+              missing_orbit_origin_id: orbitOriginUexId,
             },
           }),
         );
-        continue;
+        orbitOriginUexId = null;
       }
 
-      const orbitExitUexId = record.id_orbit_exit ?? null;
-      if (orbitExitUexId !== null && !knownOrbits.has(orbitExitUexId)) {
+      let orbitDestUexId = record.id_orbit_destination ?? null;
+      if (orbitDestUexId !== null && !knownOrbits.has(orbitDestUexId)) {
         await this.warningsRepo.save(
           this.warningsRepo.create({
             runId: ctx.runId,
             stepName: this.name,
             severity: 'warn',
-            message: `Jump point ${record.id} references unknown exit orbit ${orbitExitUexId} — skipped`,
+            message: `Jump point ${record.id} references unknown destination orbit ${orbitDestUexId} — stored as null`,
             rawPayload: {
               jp_id: record.id,
-              missing_orbit_exit_id: orbitExitUexId,
+              missing_orbit_dest_id: orbitDestUexId,
             },
           }),
         );
-        continue;
+        orbitDestUexId = null;
       }
 
       // Upsert the real row — UUIDv7 id (time-ordered, supplied by application)
@@ -152,15 +153,40 @@ export class JumpPointsSyncStep implements EtlStep {
           record.id,
           record.id_star_system_origin,
           record.id_star_system_destination,
-          orbitEntryUexId,
-          orbitExitUexId,
+          orbitOriginUexId,
+          orbitDestUexId,
           toDate(record.date_added),
           toDate(record.date_modified),
         ],
       );
 
-      // Upsert the synthetic reverse row — deterministic UUIDv5 so re-runs
-      // hit the same row via ON CONFLICT (source_uex_id)
+      // Delete any stale synthetic for this source if UEX now provides the real reverse
+      await this.dataSource.query(
+        `DELETE FROM station_jump_point
+         WHERE is_synthetic = TRUE
+           AND source_uex_id = $1
+           AND star_system_origin_uex_id = $2
+           AND star_system_dest_uex_id = $3`,
+        [
+          record.id,
+          record.id_star_system_destination,
+          record.id_star_system_origin,
+        ],
+      );
+
+      // Only create a synthetic reverse row if no real row already covers that direction
+      const [reverseCheck] = await this.dataSource.query<{ cnt: string }[]>(
+        `SELECT COUNT(*) AS cnt FROM station_jump_point
+         WHERE is_synthetic = FALSE
+           AND star_system_origin_uex_id = $1
+           AND star_system_dest_uex_id = $2`,
+        [record.id_star_system_destination, record.id_star_system_origin],
+      );
+      if (Number(reverseCheck.cnt) > 0) {
+        continue;
+      }
+
+      // Upsert synthetic reverse row — deterministic UUIDv5 so re-runs hit same row
       await this.dataSource.query(
         `INSERT INTO station_jump_point
            (id, uex_id, star_system_origin_uex_id, star_system_dest_uex_id,
@@ -181,8 +207,8 @@ export class JumpPointsSyncStep implements EtlStep {
           // Swap origin ↔ destination for reverse direction
           record.id_star_system_destination,
           record.id_star_system_origin,
-          orbitExitUexId,
-          orbitEntryUexId,
+          orbitDestUexId,
+          orbitOriginUexId,
           record.id,
           toDate(record.date_added),
           toDate(record.date_modified),

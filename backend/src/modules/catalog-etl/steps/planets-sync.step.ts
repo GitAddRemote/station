@@ -47,19 +47,30 @@ export class PlanetsSyncStep implements EtlStep {
       'Fetched planets from UEX',
     );
 
-    const starSystemRows = await this.dataSource.query<{ uex_id: number }[]>(
-      `SELECT uex_id FROM station_star_system`,
-    );
-    const knownStarSystems = new Set(starSystemRows.map((r) => r.uex_id));
+    const [starSystemRows, orbitRows, factionRows, jurisdictionRows] =
+      await Promise.all([
+        this.dataSource.query<{ uex_id: number }[]>(
+          `SELECT uex_id FROM station_star_system`,
+        ),
+        this.dataSource.query<
+          { uex_id: number; star_system_uex_id: number; name: string }[]
+        >(
+          `SELECT uex_id, star_system_uex_id, name FROM station_orbit WHERE is_planet = TRUE`,
+        ),
+        this.dataSource.query<{ uex_id: number }[]>(
+          `SELECT uex_id FROM station_faction`,
+        ),
+        this.dataSource.query<{ uex_id: number }[]>(
+          `SELECT uex_id FROM station_jurisdiction`,
+        ),
+      ]);
 
-    const factionRows = await this.dataSource.query<{ uex_id: number }[]>(
-      `SELECT uex_id FROM station_faction`,
+    const knownStarSystems = new Set(starSystemRows.map((r) => r.uex_id));
+    // Keyed by `${starSystemUexId}:${name}` for O(1) planet→orbit lookup
+    const orbitByPlanetKey = new Map(
+      orbitRows.map((r) => [`${r.star_system_uex_id}:${r.name}`, r.uex_id]),
     );
     const knownFactions = new Set(factionRows.map((r) => r.uex_id));
-
-    const jurisdictionRows = await this.dataSource.query<{ uex_id: number }[]>(
-      `SELECT uex_id FROM station_jurisdiction`,
-    );
     const knownJurisdictions = new Set(jurisdictionRows.map((r) => r.uex_id));
 
     for (const record of planets) {
@@ -93,6 +104,25 @@ export class PlanetsSyncStep implements EtlStep {
           }),
         );
         continue;
+      }
+
+      // Resolve orbit_uex_id by matching is_planet orbits with same star system + name
+      const orbitKey = `${record.id_star_system}:${record.name}`;
+      const orbitUexId = orbitByPlanetKey.get(orbitKey) ?? null;
+      if (orbitUexId === null) {
+        await this.warningsRepo.save(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Planet ${record.id} (${record.name}) has no matching orbit in star system ${record.id_star_system} — orbit_uex_id stored as null`,
+            rawPayload: {
+              planet_id: record.id,
+              planet_name: record.name,
+              id_star_system: record.id_star_system,
+            },
+          }),
+        );
       }
 
       let factionUexId = record.id_faction ?? null;
@@ -134,13 +164,14 @@ export class PlanetsSyncStep implements EtlStep {
 
       await this.dataSource.query(
         `INSERT INTO station_planet
-           (uex_id, star_system_uex_id, faction_uex_id, jurisdiction_uex_id,
+           (uex_id, star_system_uex_id, orbit_uex_id, faction_uex_id, jurisdiction_uex_id,
             name, name_origin, code,
             is_available, is_available_live, is_visible, is_default,
             uex_date_added, uex_date_modified, synced_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
          ON CONFLICT (uex_id) DO UPDATE SET
            star_system_uex_id=EXCLUDED.star_system_uex_id,
+           orbit_uex_id=EXCLUDED.orbit_uex_id,
            faction_uex_id=EXCLUDED.faction_uex_id,
            jurisdiction_uex_id=EXCLUDED.jurisdiction_uex_id,
            name=EXCLUDED.name,
@@ -156,6 +187,7 @@ export class PlanetsSyncStep implements EtlStep {
         [
           record.id,
           record.id_star_system,
+          orbitUexId,
           factionUexId,
           jurisdictionUexId,
           record.name,

@@ -33,6 +33,14 @@ import { ItemsCatalogSyncStep } from './steps/items-catalog-sync.step';
 export class CatalogEtlService {
   protected readonly ETL_STEPS: EtlStep[];
 
+  // Steps whose failure indicates a broken dependency graph; full ETL halts immediately
+  private readonly CRITICAL_STEPS = new Set([
+    'factions-sync',
+    'jurisdictions-sync',
+    'star-systems-sync',
+    'orbits-sync',
+  ]);
+
   constructor(
     @InjectRepository(EtlRun)
     private readonly etlRunRepository: Repository<EtlRun>,
@@ -66,10 +74,12 @@ export class CatalogEtlService {
     private readonly itemsCatalogSyncStep: ItemsCatalogSyncStep,
   ) {
     this.ETL_STEPS = [
+      // Foundation: factions/jurisdictions/star-systems must succeed (critical)
       factionsSyncStep,
       jurisdictionsSyncStep,
       starSystemsSyncStep,
       companiesSyncStep,
+      // Spatial layer: orbits must succeed (critical) before planets/moons/locations
       orbitsSyncStep,
       planetsSyncStep,
       moonsSyncStep,
@@ -79,9 +89,10 @@ export class CatalogEtlService {
       poisSyncStep,
       locationsSyncStep,
       jumpPointsSyncStep,
-      categoriesSyncStep,
       terminalsSyncStep,
       terminalDistancesSyncStep,
+      // Categories must precede catalog sync steps that join on category data
+      categoriesSyncStep,
       vehiclesSyncStep,
       itemsSyncStep,
       commoditiesSyncStep,
@@ -128,6 +139,16 @@ export class CatalogEtlService {
             message,
           });
           await this.etlWarningRepository.save(warning);
+
+          if (this.CRITICAL_STEPS.has(step.name)) {
+            this.logger.error(
+              { runId: runState.runId, step: step.name },
+              'Critical ETL step failed — halting run to prevent dependent data corruption',
+            );
+            runState.status = 'failed';
+            runState.completedAt = new Date();
+            return this.etlRunRepository.save(runState);
+          }
         }
       }
 

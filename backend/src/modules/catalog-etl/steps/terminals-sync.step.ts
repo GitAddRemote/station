@@ -178,7 +178,9 @@ export class TerminalsSyncStep implements EtlStep {
         continue;
       }
 
-      // Resolve primary location FK (space station → outpost → city priority)
+      // Resolve each location FK independently — a terminal may reference
+      // multiple parent types simultaneously (e.g., a city terminal inside
+      // a space station).
       let spaceStationId: number | null = null;
       let outpostId: number | null = null;
       let cityId: number | null = null;
@@ -199,7 +201,9 @@ export class TerminalsSyncStep implements EtlStep {
             }),
           );
         }
-      } else if (record.id_outpost !== null) {
+      }
+
+      if (record.id_outpost !== null) {
         outpostId = outpostByUexId.get(record.id_outpost) ?? null;
         if (outpostId === null) {
           await this.warningsRepo.save(
@@ -215,7 +219,9 @@ export class TerminalsSyncStep implements EtlStep {
             }),
           );
         }
-      } else if (record.id_city !== null) {
+      }
+
+      if (record.id_city !== null) {
         cityId = cityByUexId.get(record.id_city) ?? null;
         if (cityId === null) {
           await this.warningsRepo.save(
@@ -228,7 +234,13 @@ export class TerminalsSyncStep implements EtlStep {
             }),
           );
         }
-      } else {
+      }
+
+      if (
+        record.id_space_station === null &&
+        record.id_outpost === null &&
+        record.id_city === null
+      ) {
         await this.warningsRepo.save(
           this.warningsRepo.create({
             runId: ctx.runId,
@@ -240,11 +252,25 @@ export class TerminalsSyncStep implements EtlStep {
         );
       }
 
-      // Resolve poi_id — nullable, silently null when not found
+      // Resolve poi_id — warn when UEX provides an id that can't be resolved
       const poiId =
         record.id_poi !== null ? (poiByUexId.get(record.id_poi) ?? null) : null;
 
       const secondaryWarnings: EtlWarning[] = [];
+
+      // Warn when UEX provides a poi_id that can't be resolved
+      if (record.id_poi !== null && poiId === null) {
+        secondaryWarnings.push(
+          this.warningsRepo.create({
+            runId: ctx.runId,
+            stepName: this.name,
+            severity: 'warn',
+            message: `Terminal ${record.id} references unknown POI ${record.id_poi} — FK stored as null`,
+            rawPayload: { terminal_id: record.id, id_poi: record.id_poi },
+          }),
+        );
+      }
+
       const queueSecondaryWarning = (
         fieldName: string,
         unresolvedUexId: number,
