@@ -353,6 +353,14 @@ textarea.field-in { resize: vertical; min-height: 64px; text-align: left; line-h
   color: var(--warning-500); font-size: var(--text-sm); margin-top: var(--space-4);
 }
 
+/* ---- inline row separators (InventoryInlineRow renders divs, not <tr><td>) */
+[role="rowgroup"] > * {
+  border-bottom: 1px solid var(--border-subtle);
+}
+[role="rowgroup"] > *:last-child {
+  border-bottom: none;
+}
+
 /* ---- row column header (matches InventoryInlineRow 8-col grid) ----------- */
 .inv-row-head {
   display: grid;

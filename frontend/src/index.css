@@ -197,6 +197,11 @@
   --text-faint:         rgba(169, 179, 189, 0.42);
   --text-link:          var(--aqua-400);
 
+  /* Semantic status: brighter in dark mode so color-mix backgrounds are visible */
+  --success-500:        #3DB87F;
+  --warning-500:        #F0B429;
+  --danger-500:         #E05545;
+
   --surface-page:       #0B1D29;
   --surface-card:       #102733;
   --surface-sunken:     #08161F;

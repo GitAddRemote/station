@@ -360,19 +360,6 @@
 .cell-muted { color: var(--text-muted); }
 .cell-num { text-align: right; font-family: var(--font-mono); font-weight: var(--weight-semibold); color: var(--text-body); font-variant-numeric: tabular-nums; }
 
-/* chip-badge */
-.chip-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: var(--weight-semibold);
-  text-transform: uppercase; letter-spacing: var(--tracking-wide);
-  padding: 3px 9px; border-radius: var(--radius-pill); line-height: 1.5; white-space: nowrap;
-}
-.chip-badge svg { width: 11px; height: 11px; }
-.chip-badge.neutral { background: var(--surface-sunken); color: var(--text-muted); border: 1px solid var(--border-default); }
-.chip-badge.brand   { background: var(--brand-subtle); color: var(--brand); }
-.chip-badge.success { background: color-mix(in srgb, var(--success-500) 16%, transparent); color: var(--success-500); }
-.chip-badge.warm    { background: color-mix(in srgb, var(--coral-500) 18%, transparent); color: var(--coral-400); }
-
 /* portlet pagination */
 .pcard .p-pagination {
   display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4);
