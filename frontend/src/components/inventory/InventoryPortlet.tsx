@@ -1,83 +1,32 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  IconButton,
-  TextField,
-  FormControlLabel,
-  Switch,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
-  CircularProgress,
-  Typography,
-  Chip,
-} from '@mui/material';
-import OpenInFullIcon from '@mui/icons-material/OpenInFull';
-import InventoryIcon from '@mui/icons-material/Inventory';
+import { CircularProgress } from '@mui/material';
 import {
   inventoryService,
   InventoryItem,
-  InventoryCategory,
 } from '../../services/inventory.service';
 
 interface InventoryPortletProps {
-  gameId?: number;
   onExpand?: () => void;
 }
 
-// Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
   }, [value, delay]);
-
   return debouncedValue;
 }
 
-const InventoryPortlet = ({ onExpand }: InventoryPortletProps) => {
+const InventoryPortlet = ({ onExpand: _onExpand }: InventoryPortletProps) => {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [sharedOnly, setSharedOnly] = useState(false);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
-  const [categories, setCategories] = useState<InventoryCategory[]>([]);
-  const [categoryId, setCategoryId] = useState<string | ''>('');
+  const rowsPerPage = 8;
 
   const debouncedSearch = useDebounce(search, 300);
-
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const data = await inventoryService.getCategories();
-        setCategories(data);
-      } catch (error) {
-        console.error('Error loading categories', error);
-      }
-    };
-
-    loadCategories();
-  }, []);
 
   const fetchInventory = useCallback(async () => {
     try {
@@ -86,209 +35,95 @@ const InventoryPortlet = ({ onExpand }: InventoryPortletProps) => {
         limit: rowsPerPage,
         page: page + 1,
         search: debouncedSearch || undefined,
-        orgAvailable: sharedOnly || undefined,
-        categoryId: categoryId || undefined,
       });
-
-      const fetchedItems = result.data;
-      setItems(fetchedItems);
-      setTotalCount(result.total ?? fetchedItems.length);
-    } catch (error) {
-      console.error('Error fetching inventory:', error);
+      setItems(result.data);
+      setTotalCount(result.total ?? result.data.length);
+    } catch {
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, sharedOnly, page, rowsPerPage, categoryId]);
+  }, [debouncedSearch, page]);
 
-  useEffect(() => {
-    fetchInventory();
-  }, [fetchInventory]);
+  useEffect(() => { fetchInventory(); }, [fetchInventory]);
+  useEffect(() => { setPage(0); }, [debouncedSearch]);
 
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch, sharedOnly, categoryId]);
+  const totalPages = Math.ceil(totalCount / rowsPerPage);
 
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1, padding: 'var(--space-6)' }}>
+        <CircularProgress size={24} />
+      </div>
+    );
+  }
 
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
+  if (items.length === 0) {
+    return (
+      <div className="pstub">
+        <span className="pstub-label">
+          {debouncedSearch ? 'No items match your search' : 'No inventory items yet'}
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <Card
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <CardHeader
-        avatar={
-          <Box
-            sx={{
-              display: 'inline-flex',
-              p: 1.5,
-              borderRadius: '8px',
-              background: 'rgba(74, 158, 255, 0.1)',
-            }}
-          >
-            <InventoryIcon sx={{ fontSize: 24, color: '#4A9EFF' }} />
-          </Box>
-        }
-        title={
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            My Inventory
-          </Typography>
-        }
-        action={
-          onExpand && (
-            <IconButton onClick={onExpand} size="small">
-              <OpenInFullIcon />
-            </IconButton>
-          )
-        }
-      />
-      <CardContent sx={{ flexGrow: 1, pt: 0 }}>
-        {/* Search and Filters */}
-        <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <TextField
-            size="small"
-            placeholder="Search items..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ flexGrow: 1, minWidth: 200 }}
-          />
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id="inventory-category-label">Category</InputLabel>
-            <Select
-              labelId="inventory-category-label"
-              label="Category"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value as string)}
-            >
-              <MenuItem value="">
-                <em>All categories</em>
-              </MenuItem>
-              {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
-                <MenuItem key={category.id} value={category.id}>
-                  {category.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={sharedOnly}
-                onChange={(e) => setSharedOnly(e.target.checked)}
-                size="small"
-              />
-            }
-            label="Shared only"
-          />
-        </Box>
+    <>
+      {/* Search */}
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <input
+          type="search"
+          placeholder="Search items…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            background: 'var(--surface-sunken)', border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-md)', padding: '7px 11px',
+            color: 'var(--text-body)', fontFamily: 'var(--font-body)',
+            fontSize: 'var(--text-sm)', outline: 'none',
+          }}
+        />
+      </div>
 
-        {/* Items Table */}
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : items.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="body2" color="text.secondary">
-              {search
-                ? 'No items found matching your search'
-                : 'No inventory items yet'}
-            </Typography>
-          </Box>
-        ) : (
-          <>
-            <TableContainer sx={{ maxHeight: 400 }}>
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Item</TableCell>
-                    <TableCell>Category</TableCell>
-                    <TableCell align="right">Quantity</TableCell>
-                    <TableCell align="right">Quality</TableCell>
-                    <TableCell>Location</TableCell>
-                    <TableCell>Status</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {items.map((item) => (
-                    <TableRow
-                      key={item.id}
-                      hover
-                      sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {item.itemName || `Item #${item.catalogEntryId}`}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {item.categoryName || '—'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2">
-                          {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" color="text.secondary">
-                          {item.quality != null ? item.quality : '—'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {item.locationName ?? '—'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {item.isOrgAvailable ? (
-                          <Chip
-                            label="Shared"
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        ) : (
-                          <Chip
-                            label="Private"
-                            size="small"
-                            variant="outlined"
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+      {/* Rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
+        {items.map((item) => (
+          <div key={item.id} className="prow">
+            <span className="l" style={{ maxWidth: '55%' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {item.itemName || `Item #${item.catalogEntryId}`}
+              </span>
+            </span>
+            <span className="v">
+              {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+            </span>
+          </div>
+        ))}
+      </div>
 
-            {/* Pagination */}
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={totalCount}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </>
-        )}
-      </CardContent>
-    </Card>
+      {/* Pagination + count */}
+      {totalCount > rowsPerPage && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--text-faint)' }}>
+          <span>{page * rowsPerPage + 1}–{Math.min(totalCount, (page + 1) * rowsPerPage)} of {totalCount}</span>
+          <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+            <button
+              className="pcard-act"
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              aria-label="Previous"
+            >‹</button>
+            <button
+              className="pcard-act"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              aria-label="Next"
+            >›</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
