@@ -187,7 +187,7 @@ const Dashboard = () => {
       case 'invitations':
         return <InvitationsPortlet invitations={[]} />;
       case 'inventory':
-        return <InventoryPortlet onExpand={() => navigate('/inventory')} />;
+        return <InventoryPortlet />;
       case 'workorders':
         return <StubPortlet icon={<ConstructionIcon />} label="Work Orders" />;
       case 'fleet':
