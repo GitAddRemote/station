@@ -13,10 +13,13 @@ export enum OrgPermission {
   CAN_VIEW_MEMBER_SHARED_ITEMS = 'can_view_member_shared_items',
   CAN_MANAGE_INVENTORY = 'can_manage_inventory',
 
-  // Future permissions can be added here
-  // CAN_MANAGE_MEMBERS = 'can_manage_members',
-  // CAN_MANAGE_ROLES = 'can_manage_roles',
-  // CAN_VIEW_AUDIT_LOG = 'can_view_audit_log',
+  // Station-Bot Administration Permissions (guild-scoped)
+  CAN_VIEW_STATION_BOT_ADMIN = 'can_view_station_bot_admin',
+  CAN_MANAGE_STATION_BOT_VERIFICATION = 'can_manage_station_bot_verification',
+  CAN_MANAGE_STATION_BOT_NOMINATIONS = 'can_manage_station_bot_nominations',
+  CAN_MANAGE_STATION_BOT_MANUFACTURING = 'can_manage_station_bot_manufacturing',
+  CAN_MANAGE_STATION_BOT_AUTOMATION = 'can_manage_station_bot_automation',
+  CAN_MANAGE_STATION_BOT_GUILD_ADMINS = 'can_manage_station_bot_guild_admins',
 }
 
 /**
@@ -34,6 +37,12 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_MANUFACTURING]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_AUTOMATION]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_GUILD_ADMINS]: true,
   },
   Admin: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
@@ -41,6 +50,12 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_MANUFACTURING]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_AUTOMATION]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_GUILD_ADMINS]: false,
   },
   Director: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
@@ -48,6 +63,12 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_MANUFACTURING]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_AUTOMATION]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_GUILD_ADMINS]: false,
   },
   'Inventory Manager': {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
@@ -55,6 +76,12 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_MANUFACTURING]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_AUTOMATION]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_GUILD_ADMINS]: false,
   },
   Member: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
@@ -62,6 +89,12 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: false,
+    [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_MANUFACTURING]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_AUTOMATION]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_GUILD_ADMINS]: false,
   },
   Viewer: {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
@@ -69,6 +102,12 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: false,
     [OrgPermission.CAN_MANAGE_INVENTORY]: false,
+    [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_MANUFACTURING]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_AUTOMATION]: false,
+    [OrgPermission.CAN_MANAGE_STATION_BOT_GUILD_ADMINS]: false,
   },
 } satisfies Record<string, Record<OrgPermission, boolean>>;
 
@@ -86,4 +125,16 @@ export const PERMISSION_DESCRIPTIONS: Record<OrgPermission, string> = {
     'View items that members have shared with the organization',
   [OrgPermission.CAN_MANAGE_INVENTORY]:
     'Perform all inventory management operations for the organization',
+  [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]:
+    'View the Station-Bot administration area for this guild',
+  [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]:
+    'Manage Station-Bot verification settings for this guild',
+  [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]:
+    'Manage Station-Bot nomination digest settings for this guild',
+  [OrgPermission.CAN_MANAGE_STATION_BOT_MANUFACTURING]:
+    'Manage Station-Bot manufacturing settings for this guild',
+  [OrgPermission.CAN_MANAGE_STATION_BOT_AUTOMATION]:
+    'Manage Station-Bot automation settings for this guild',
+  [OrgPermission.CAN_MANAGE_STATION_BOT_GUILD_ADMINS]:
+    'Assign and remove guild admin access for this guild',
 };

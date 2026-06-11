@@ -56,6 +56,8 @@ import { FixCatalogEtlCommodityWeightScuType1780120000000 } from './migrations/1
 import { MigrateRemainingEntitiesToUuidV7_1780130000000 } from './migrations/1780130000000-MigrateRemainingEntitiesToUuidV7';
 import { AddManageInventoryPermissionToManagementRoles_1780140000000 } from './migrations/1780140000000-AddManageInventoryPermissionToManagementRoles';
 import { AddIsSuperAdminToUser1780150000000 } from './migrations/1780150000000-AddIsSuperAdminToUser';
+import { AddOrgGuildMappingAndStationBotPermissions1780160000000 } from './migrations/1780160000000-AddOrgGuildMappingAndStationBotPermissions';
+import { OrgGuildMapping } from './modules/station-bot-admin/entities/org-guild-mapping.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -96,6 +98,7 @@ export const AppDataSource = new DataSource({
     StationInventoryItem,
     StationInventoryList,
     StationInventoryListItem,
+    OrgGuildMapping,
   ],
   migrations: [
     BigBangBaselineMigration1748000000000,
@@ -121,6 +124,7 @@ export const AppDataSource = new DataSource({
     MigrateRemainingEntitiesToUuidV7_1780130000000,
     AddManageInventoryPermissionToManagementRoles_1780140000000,
     AddIsSuperAdminToUser1780150000000,
+    AddOrgGuildMappingAndStationBotPermissions1780160000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },
