@@ -2,7 +2,6 @@ import { memo } from 'react';
 import type { MouseEvent } from 'react';
 import {
   Box,
-  Chip,
   IconButton,
   Stack,
   TextField,
@@ -111,13 +110,10 @@ const InventoryInlineRow = ({
         alignItems: 'center',
         px: density === 'compact' ? 1 : 2,
         py: density === 'compact' ? 0.45 : 1.5,
-        backgroundColor: isRowActive
-          ? 'rgba(74, 158, 255, 0.08)'
-          : 'transparent',
+        backgroundColor: isRowActive ? 'var(--brand-subtle)' : 'transparent',
+        transition: 'background 120ms ease-out',
         '&:hover': {
-          backgroundColor: isRowActive
-            ? 'rgba(74, 158, 255, 0.12)'
-            : 'rgba(255,255,255,0.02)',
+          backgroundColor: isRowActive ? 'var(--brand-subtle)' : 'var(--surface-sunken)',
         },
       }}
     >
@@ -138,13 +134,14 @@ const InventoryInlineRow = ({
           >
             {item.itemName || `Item #${item.catalogEntryId}`}
           </Typography>
-          {item.isOrgAvailable && (
-            <Chip
-              size={density === 'compact' ? 'small' : 'medium'}
-              color="primary"
-              variant="outlined"
-              label="Shared"
-            />
+          {item.isOrgAvailable
+            ? <span className="chip-badge success">Shared</span>
+            : <span className="chip-badge neutral">Private</span>
+          }
+          {item.ownerType === 'user' && item.sharedByUsername && (
+            <span className="chip-badge brand">
+              {item.sharedByUsername}
+            </span>
           )}
         </Stack>
       </Stack>
@@ -434,12 +431,9 @@ const InventoryInlineRow = ({
       </Stack>
       {/* Category column */}
       <Stack spacing={density === 'compact' ? 0.25 : 0.5} justifyContent="center">
-        <Chip
-          label={item.categoryName || 'General'}
-          size="small"
-          variant="outlined"
-          sx={{ maxWidth: '100%' }}
-        />
+        <span className="chip-badge neutral" style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {item.categoryName || 'General'}
+        </span>
       </Stack>
       <Stack
         direction="row"
@@ -453,28 +447,14 @@ const InventoryInlineRow = ({
       >
         <Box sx={{ minHeight: 18, display: 'flex', alignItems: 'center' }}>
           {inlineError && (
-            <Typography variant="caption" color="error">
-              {inlineError}
-            </Typography>
+            <span className="chip-badge warm">{inlineError}</span>
           )}
           {!inlineError && inlineSaved && (
-            <Chip
-              label="Saved"
-              size="small"
-              color="success"
-              variant="outlined"
-              sx={{ height: 18, fontSize: 11 }}
-            />
+            <span className="chip-badge success">Saved</span>
           )}
         </Box>
-        {density === 'compact' && isDirty && (
-          <Chip
-            label="Unsaved"
-            size="small"
-            color="warning"
-            variant="outlined"
-            sx={{ height: 22, fontSize: 12, flexShrink: 0 }}
-          />
+        {density === 'compact' && isDirty && !inlineSaved && !inlineError && (
+          <span className="chip-badge neutral" style={{ flexShrink: 0 }}>Unsaved</span>
         )}
         {density === 'compact' ? (
           <>

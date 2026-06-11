@@ -1,0 +1,126 @@
+/* ============================================================
+   STATION — My Profile page
+   Hero banner, two-column layout, social connections, org cards.
+   Builds on AppShell.css tokens (.panel, .kv already in AppShell.css).
+   ============================================================ */
+
+/* ---- form field controls (from members DS) --------------- */
+.fctl { margin-bottom: var(--space-4); }
+.fctl:last-child { margin-bottom: 0; }
+.fctl .fl {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  text-transform: uppercase; letter-spacing: var(--tracking-caps);
+  color: var(--text-faint); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.fctl .fl svg { width: 12px; height: 12px; }
+.fctl .fv { font-size: var(--text-sm); color: var(--text-strong); font-weight: var(--weight-medium); }
+.fctl select, .fctl input, .fctl textarea {
+  width: 100%; box-sizing: border-box; font-family: var(--font-body); font-size: var(--text-sm);
+  background: var(--surface-sunken); border: 1px solid var(--border-default);
+  border-radius: var(--radius-md); padding: 9px 12px; color: var(--text-strong); outline: none;
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+.fctl textarea { resize: vertical; min-height: 100px; line-height: var(--leading-relaxed); }
+.fctl select:focus, .fctl input:focus, .fctl textarea:focus { border-color: var(--border-brand); }
+.fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+
+/* ---- rank pill ------------------------------------------- */
+.rank {
+  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: var(--weight-semibold);
+  text-transform: uppercase; letter-spacing: var(--tracking-wide);
+  padding: 3px 9px; border-radius: var(--radius-pill); white-space: nowrap;
+}
+.rank.member     { background: color-mix(in srgb, var(--teal-400) 16%, transparent); color: var(--teal-300); }
+.rank.senior     { background: var(--brand-subtle); color: var(--brand); }
+.rank.officer    { background: color-mix(in srgb, var(--warning-500) 18%, transparent); color: var(--warning-500); }
+.rank.leadership { background: color-mix(in srgb, var(--coral-500) 18%, transparent); color: var(--coral-400); }
+
+/* ---- hero banner ----------------------------------------- */
+.pf-hero {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+  background: var(--surface-card); margin-top: var(--space-7);
+}
+.pf-cover {
+  height: 132px;
+  background:
+    radial-gradient(620px 220px at 12% -40%, color-mix(in srgb, var(--brand) 38%, transparent), transparent 70%),
+    radial-gradient(520px 200px at 88% 140%, color-mix(in srgb, var(--teal-400) 26%, transparent), transparent 70%),
+    linear-gradient(120deg, color-mix(in srgb, var(--brand) 16%, var(--surface-sunken)), var(--surface-sunken));
+  border-bottom: 1px solid var(--border-subtle);
+}
+.pf-body { padding: 0 var(--space-7) var(--space-6); display: flex; align-items: flex-end; gap: var(--space-5); flex-wrap: wrap; }
+.pf-av {
+  width: 104px; height: 104px; flex: none; border-radius: 24px; margin-top: -52px;
+  display: grid; place-items: center; font-family: var(--font-display); font-weight: var(--weight-bold);
+  font-size: 40px; color: #fff; border: 4px solid var(--surface-card); box-shadow: var(--shadow-dark-md);
+  position: relative;
+  background: linear-gradient(140deg, var(--aqua-500), var(--aqua-700));
+}
+.pf-id { flex: 1; min-width: 0; padding-bottom: 4px; }
+.pf-name {
+  font-family: var(--font-display); font-weight: var(--weight-bold);
+  font-size: clamp(24px, 3vw, 30px); color: var(--text-strong); line-height: 1.1;
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+}
+.pf-handle {
+  font-family: var(--font-mono); font-size: var(--text-sm); color: var(--brand);
+  margin-top: 5px; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+}
+.pf-handle .dot { color: var(--text-faint); }
+.pf-handle .muted { color: var(--text-muted); }
+.pf-meta { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); flex-wrap: wrap; font-size: var(--text-xs); color: var(--text-muted); }
+.pf-meta .mi { display: inline-flex; align-items: center; gap: 6px; }
+.pf-meta .mi svg { width: 13px; height: 13px; color: var(--text-faint); }
+
+/* quick stats inside hero */
+.pf-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); padding: 0 var(--space-7) var(--space-6); }
+.pf-stat { background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-4); }
+.pf-stat .v { font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-xl); color: var(--text-strong); font-variant-numeric: tabular-nums; line-height: 1; }
+.pf-stat .k { font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); margin-top: 6px; }
+
+/* ---- two-column layout ----------------------------------- */
+.pf-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--space-5); margin-top: var(--space-5); align-items: start; }
+
+/* bio */
+.pf-bio { font-size: var(--text-sm); line-height: var(--leading-relaxed); color: var(--text-body); white-space: pre-wrap; }
+.pf-bio.empty { color: var(--text-faint); font-style: italic; }
+.charcount { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); text-align: right; margin-top: 6px; }
+
+/* ---- organizations --------------------------------------- */
+.org-card { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: var(--space-3); transition: border-color var(--dur-base) var(--ease-out); }
+.org-card:last-child { margin-bottom: 0; }
+.org-card:hover { border-color: var(--border-default); }
+.org-logo { width: 44px; height: 44px; flex: none; border-radius: var(--radius-md); display: grid; place-items: center; font-family: var(--font-display); font-weight: var(--weight-bold); font-size: 15px; color: var(--brand-contrast); background: linear-gradient(140deg, var(--aqua-400), var(--aqua-600)); box-shadow: var(--shadow-dark-sm); }
+.org-info { flex: 1; min-width: 0; }
+.org-nm { font-family: var(--font-display); font-weight: var(--weight-semibold); font-size: var(--text-sm); color: var(--text-strong); }
+.org-meta { font-size: var(--text-xs); color: var(--text-muted); margin-top: 3px; }
+
+/* ---- account / security ---------------------------------- */
+.sec-note { display: flex; align-items: flex-start; gap: 9px; font-size: var(--text-xs); color: var(--text-muted); padding: 11px 12px; border-radius: var(--radius-md); background: var(--surface-sunken); border: 1px solid var(--border-subtle); margin-top: var(--space-3); line-height: var(--leading-relaxed); }
+.sec-note svg { width: 14px; height: 14px; color: var(--text-faint); flex: none; margin-top: 1px; }
+.locked-field { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface-sunken); border: 1px solid var(--border-subtle); }
+.locked-field .lv { font-size: var(--text-sm); color: var(--text-strong); font-weight: var(--weight-medium); }
+.locked-field .lock { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); display: inline-flex; align-items: center; gap: 5px; }
+.locked-field .lock svg { width: 12px; height: 12px; }
+
+/* save bar (edit mode) */
+.pf-savebar { display: flex; align-items: center; gap: var(--space-3); }
+.pf-savebar .hint { font-size: var(--text-xs); color: var(--text-muted); margin-right: auto; display: inline-flex; align-items: center; gap: 7px; }
+.pf-savebar .hint svg { width: 14px; height: 14px; color: var(--warning-500); }
+
+/* inline password form */
+.pw-form { border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-4); background: var(--surface-sunken); }
+.pw-form .pw-actions { display: flex; gap: var(--space-3); margin-top: var(--space-3); }
+.pw-err { font-size: var(--text-xs); color: var(--coral-400); margin-top: 5px; font-family: var(--font-mono); }
+
+/* ---- responsive ------------------------------------------ */
+@media (max-width: 1080px) {
+  .pf-grid { grid-template-columns: 1fr; }
+  .pf-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .fgrid { grid-template-columns: 1fr; }
+  .pf-stats { grid-template-columns: repeat(2, 1fr); }
+}

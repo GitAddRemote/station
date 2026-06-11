@@ -12,9 +12,6 @@ import {
   Box,
   CircularProgress,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
   Button,
   Stack,
@@ -119,9 +116,6 @@ const InventoryPage = () => {
   const [orgOptions, setOrgOptions] = useState<{ id: string; name: string }[]>(
     [],
   );
-  const [allOrgOptions, setAllOrgOptions] = useState<
-    { id: string; name: string }[]
-  >([]);
   const orgsLoaded = useRef(false);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(() =>
     readStoredOrgId(),
@@ -142,7 +136,6 @@ const InventoryPage = () => {
   const [editLocation, setEditLocation] = useState<LocationDto | null>(null);
   const [editQuality, setEditQuality] = useState<number | ''>('');
   const [editUomId, setEditUomId] = useState<string>('');
-  const [shareOrgId, setShareOrgId] = useState<string | ''>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -483,7 +476,6 @@ const InventoryPage = () => {
         id: entry.organization?.id ?? entry.organizationId,
         name: entry.organization?.name ?? `Org #${entry.organizationId}`,
       }));
-      setAllOrgOptions(mapped);
       const viewableOrgs = (
         await Promise.all(
           mapped.map(async (org) => {
@@ -1393,9 +1385,6 @@ const InventoryPage = () => {
   const openActionDialog = (mode: ActionMode) => {
     setActionMode(mode);
     setActionAnchor(null);
-    if (mode === 'share') {
-      setShareOrgId('');
-    }
   };
 
   const handleUpdateItem = async (payload: {
@@ -1444,11 +1433,29 @@ const InventoryPage = () => {
   };
 
   const handleShare = async () => {
-    setError('Sharing is not yet supported in this version.');
+    if (!actionItem) return;
+    try {
+      setActionWorking(true);
+      setError(null);
+      await inventoryService.updateItem(actionItem.id, { isOrgAvailable: true });
+      closeActionMenu();
+      await fetchInventory();
+    } finally {
+      setActionWorking(false);
+    }
   };
 
   const handleUnshare = async () => {
-    setError('Unshare is not yet supported in this version.');
+    if (!actionItem) return;
+    try {
+      setActionWorking(true);
+      setError(null);
+      await inventoryService.updateItem(actionItem.id, { isOrgAvailable: false });
+      closeActionMenu();
+      await fetchInventory();
+    } finally {
+      setActionWorking(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -1627,45 +1634,16 @@ const InventoryPage = () => {
           {actionMode === 'share' && (
             <>
               <Typography variant="body2" color="text.secondary">
-                Share a quantity with an organization
+                Share <strong style={{ color: 'var(--text-strong)' }}>
+                  {actionItem.itemName || `Item ${actionItem.catalogEntryId}`}
+                </strong> with your organizations?
               </Typography>
-              <FormControl fullWidth>
-                <InputLabel id="share-org-label">Organization</InputLabel>
-                <Select
-                  labelId="share-org-label"
-                  label="Organization"
-                  value={shareOrgId}
-                  onChange={(e) =>
-                    setShareOrgId(e.target.value)
-                  }
-                >
-                  {allOrgOptions.map((org) => (
-                    <MenuItem key={org.id} value={org.id}>
-                      {org.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                label="Quantity to share"
-                type="number"
-                fullWidth
-                inputProps={{ min: 0.000001, max: quantityValue, step: 0.000001 }}
-                value={actionQuantity}
-                onChange={(e) => setActionQuantity(Number(e.target.value))}
-              />
+              <Typography variant="body2" color="text.secondary" sx={{ fontSize: 'var(--text-xs)' }}>
+                Sharing makes this item visible to all organizations you belong to. You can unshare it at any time.
+              </Typography>
               <Stack direction="row" spacing={1} justifyContent="flex-end">
-                <Button variant="text" onClick={closeActionMenu}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="contained"
-                  disabled={actionWorking || shareOrgId === ''}
-                  onClick={() =>
-                    shareOrgId !== '' &&
-                    handleShare()
-                  }
-                >
+                <Button variant="text" onClick={closeActionMenu}>Cancel</Button>
+                <Button variant="contained" disabled={actionWorking} onClick={handleShare}>
                   Share
                 </Button>
               </Stack>
@@ -2125,22 +2103,19 @@ const InventoryPage = () => {
                       </div>
                     )}
                     <div className="dtable-wrap">
-                      <table className="dtable" aria-label={'Inventory — ' + group}>
-                        <thead>
-                          <tr>
-                            <th>Item</th>
-                            <th>Category</th>
-                            <th>Location</th>
-                            <th className="num">Quantity</th>
-                            <th>Quality</th>
-                            <th>Updated</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {groupItems.map((item) => renderInlineRow(item))}
-                        </tbody>
-                      </table>
+                      <div className="inv-row-head" role="row">
+                        <span>Item</span>
+                        <span>Location</span>
+                        <span>Quality</span>
+                        <span>Qty</span>
+                        <span>Updated</span>
+                        <span>Category</span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                      <div role="rowgroup">
+                        {groupItems.map((item) => renderInlineRow(item))}
+                      </div>
                     </div>
                   </div>
                 ))}

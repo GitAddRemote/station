@@ -19,6 +19,8 @@ export interface InventoryItem {
   quantity: number;
   quality: number | null;
   isOrgAvailable: boolean;
+  sharedByUserId: string | null;
+  sharedByUsername: string | null;
   alias: string | null;
   notes: string | null;
   createdAt: Date;
@@ -104,6 +106,8 @@ export interface OrgInventoryItemV2 {
   quantity: number;
   quality: number | null;
   isOrgAvailable: boolean;
+  sharedByUserId: string | null;
+  sharedByUsername: string | null;
   alias: string | null;
   notes: string | null;
   createdAt: string;

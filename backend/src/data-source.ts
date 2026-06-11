@@ -54,6 +54,7 @@ import { UpgradeStationUnitOfMeasureReferenceData1780100000000 } from './migrati
 import { AddUuidV7IdentityToUsersAndOrganizations1780110000000 } from './migrations/1780110000000-AddUuidV7IdentityToUsersAndOrganizations';
 import { FixCatalogEtlCommodityWeightScuType1780120000000 } from './migrations/1780120000000-FixCatalogEtlCommodityWeightScuType';
 import { MigrateRemainingEntitiesToUuidV7_1780130000000 } from './migrations/1780130000000-MigrateRemainingEntitiesToUuidV7';
+import { AddManageInventoryPermissionToManagementRoles_1780140000000 } from './migrations/1780140000000-AddManageInventoryPermissionToManagementRoles';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -117,6 +118,7 @@ export const AppDataSource = new DataSource({
     AddUuidV7IdentityToUsersAndOrganizations1780110000000,
     FixCatalogEtlCommodityWeightScuType1780120000000,
     MigrateRemainingEntitiesToUuidV7_1780130000000,
+    AddManageInventoryPermissionToManagementRoles_1780140000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },
