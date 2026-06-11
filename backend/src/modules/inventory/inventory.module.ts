@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MetricsModule } from '../../metrics/metrics.module';
 import { StationCatalogEntry } from '../catalog/entities/station-catalog-entry.entity';
 import { StationLocation } from '../locations/entities/station-location.entity';
 import { Organization } from '../organizations/organization.entity';
@@ -15,6 +16,7 @@ import { InventoryService } from './inventory.service';
 
 @Module({
   imports: [
+    MetricsModule,
     PermissionsModule,
     UserOrganizationRolesModule,
     TypeOrmModule.forFeature([

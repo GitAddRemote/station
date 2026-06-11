@@ -3,8 +3,11 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { InventoryMetricsService } from '../../metrics/inventory-metrics.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, In, Repository } from 'typeorm';
 import { StationCatalogEntry } from '../catalog/entities/station-catalog-entry.entity';
@@ -60,6 +63,9 @@ export class InventoryService {
     private readonly dataSource: DataSource,
     private readonly permissionsService: PermissionsService,
     private readonly userOrganizationRolesService: UserOrganizationRolesService,
+    @InjectPinoLogger(InventoryService.name)
+    private readonly logger: PinoLogger,
+    @Optional() private readonly metricsService?: InventoryMetricsService,
   ) {}
 
   async createItem(
@@ -102,6 +108,18 @@ export class InventoryService {
     });
 
     const saved = await this.inventoryItemRepository.save(item);
+
+    this.logger.info(
+      {
+        itemId: saved.id,
+        ownerType: saved.ownerType,
+        ownerId: saved.ownerId,
+        catalogEntryId: saved.catalogEntryId,
+      },
+      'Inventory item created',
+    );
+    this.metricsService?.recordOperation('create', saved.ownerType);
+
     return this.getInventoryItemOrThrow(saved.id);
   }
 
@@ -221,6 +239,13 @@ export class InventoryService {
     item.unitOfMeasure = nextUnitOfMeasure;
 
     await this.inventoryItemRepository.save(item);
+
+    this.logger.info(
+      { itemId: item.id, ownerType: item.ownerType, ownerId: item.ownerId },
+      'Inventory item updated',
+    );
+    this.metricsService?.recordOperation('update', item.ownerType);
+
     return this.getInventoryItemOrThrow(item.id);
   }
 
@@ -235,6 +260,12 @@ export class InventoryService {
 
     await this.assertCanManageItem(userId, item);
     await this.inventoryItemRepository.delete({ id: itemId });
+
+    this.logger.info(
+      { itemId, ownerType: item.ownerType, ownerId: item.ownerId },
+      'Inventory item deleted',
+    );
+    this.metricsService?.recordOperation('delete', item.ownerType);
   }
 
   async createList(
@@ -268,6 +299,7 @@ export class InventoryService {
       },
     );
 
+    this.logger.info({ listId: saved.id, ownerId }, 'Inventory list created');
     return this.toInventoryListDto(saved);
   }
 
@@ -284,6 +316,7 @@ export class InventoryService {
   async deleteList(userId: string, listId: string): Promise<void> {
     const list = await this.getOwnedUserListOrThrow(userId, listId);
     await this.inventoryListRepository.delete({ id: list.id });
+    this.logger.info({ listId: list.id }, 'Inventory list deleted');
   }
 
   async addItemToList(

@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { HealthController } from './health.controller';
 import { DataSource } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { UexSyncService } from '../modules/uex-sync/uex-sync.service';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -18,6 +20,14 @@ describe('HealthController', () => {
         { provide: HealthCheckService, useValue: healthCheckService },
         { provide: TypeOrmHealthIndicator, useValue: { pingCheck: jest.fn() } },
         { provide: DataSource, useValue: {} },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('true') },
+        },
+        {
+          provide: UexSyncService,
+          useValue: { getAllSyncStates: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
 

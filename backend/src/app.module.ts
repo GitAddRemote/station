@@ -30,6 +30,7 @@ import { CatalogEtlModule } from './modules/catalog-etl/catalog-etl.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 const isTest =
   process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
@@ -172,6 +173,7 @@ if (!isTest) {
     UexModule,
     UexSyncModule,
     InventoryModule,
+    MetricsModule,
     HealthModule,
     OauthClientsModule,
     CatalogEtlModule,
