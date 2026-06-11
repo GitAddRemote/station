@@ -55,6 +55,12 @@ export class InventoryItemDto {
   @ApiProperty()
   isOrgAvailable!: boolean;
 
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  sharedByUserId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  sharedByUsername!: string | null;
+
   @ApiPropertyOptional({ nullable: true })
   alias!: string | null;
 

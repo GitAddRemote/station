@@ -135,7 +135,13 @@ export class InventoryService {
     const [items, total] = await queryBuilder.getManyAndCount();
 
     const response: PaginatedInventoryItemsDto = {
-      data: items.map((item) => this.toInventoryItemDto(item)),
+      data: items.map((item) => {
+        const ownerUser =
+          context.scope === 'org' && item.ownerType === 'user'
+            ? context.memberUsersById.get(item.ownerId)
+            : undefined;
+        return this.toInventoryItemDto(item, ownerUser);
+      }),
       total,
       page: normalizedPage,
       limit: normalizedLimit,
@@ -388,7 +394,12 @@ export class InventoryService {
     query: ListInventoryItemsDto,
   ): Promise<
     | { scope: 'user'; ownerId: string }
-    | { scope: 'org'; ownerId: string; memberOwnerIds: string[] }
+    | {
+        scope: 'org';
+        ownerId: string;
+        memberOwnerIds: string[];
+        memberUsersById: Map<string, User>;
+      }
   > {
     const ownerType = query.ownerType ?? 'user';
 
@@ -435,10 +446,12 @@ export class InventoryService {
             where: { id: In(memberUserIds), isSystemUser: false },
           });
 
+    const memberUsersById = new Map(memberUsers.map((u) => [u.id, u]));
     return {
       scope: 'org',
       ownerId: organization.id,
       memberOwnerIds: memberUsers.map((user) => user.id),
+      memberUsersById,
     };
   }
 
@@ -457,7 +470,12 @@ export class InventoryService {
     >,
     context:
       | { scope: 'user'; ownerId: string }
-      | { scope: 'org'; ownerId: string; memberOwnerIds: string[] },
+      | {
+          scope: 'org';
+          ownerId: string;
+          memberOwnerIds: string[];
+          memberUsersById: Map<string, User>;
+        },
     query: ListInventoryItemsDto,
   ): void {
     if (context.scope === 'user') {
@@ -764,7 +782,10 @@ export class InventoryService {
     };
   }
 
-  private toInventoryItemDto(item: StationInventoryItem): InventoryItemDto {
+  private toInventoryItemDto(
+    item: StationInventoryItem,
+    ownerUser?: User,
+  ): InventoryItemDto {
     return {
       id: item.id,
       ownerType: item.ownerType,
@@ -784,6 +805,10 @@ export class InventoryService {
       quantity: Number(item.quantity),
       quality: item.quality,
       isOrgAvailable: item.isOrgAvailable,
+      sharedByUserId:
+        item.ownerType === 'user' && ownerUser ? ownerUser.id : null,
+      sharedByUsername:
+        item.ownerType === 'user' && ownerUser ? ownerUser.username : null,
       alias: item.alias,
       notes: item.notes,
       createdAt: item.createdAt,

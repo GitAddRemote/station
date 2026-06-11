@@ -138,6 +138,11 @@ const InventoryInlineRow = ({
             ? <span className="chip-badge success">Shared</span>
             : <span className="chip-badge neutral">Private</span>
           }
+          {item.ownerType === 'user' && item.sharedByUsername && (
+            <span className="chip-badge brand">
+              {item.sharedByUsername}
+            </span>
+          )}
         </Stack>
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>

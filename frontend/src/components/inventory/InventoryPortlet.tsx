@@ -4,6 +4,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import IosShareIcon from '@mui/icons-material/IosShare';
+import PersonIcon from '@mui/icons-material/Person';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -158,15 +159,12 @@ const InventoryPortlet = ({ onExpand: _onExpand }: InventoryPortletProps) => {
                 </td>
                 <td className="cell-muted">{item.locationName ?? '—'}</td>
                 <td>
-                  {item.isOrgAvailable ? (
-                    <span className="chip-badge success">
-                      <IosShareIcon /> Shared
-                    </span>
-                  ) : (
-                    <span className="chip-badge neutral">
-                      <LockOutlinedIcon /> Private
-                    </span>
-                  )}
+                  {item.ownerType === 'user' && item.sharedByUsername
+                    ? <span className="chip-badge brand"><PersonIcon style={{ width: 11, height: 11 }} /> {item.sharedByUsername}</span>
+                    : item.isOrgAvailable
+                      ? <span className="chip-badge success"><IosShareIcon /> Shared</span>
+                      : <span className="chip-badge neutral"><LockOutlinedIcon /> Private</span>
+                  }
                 </td>
               </tr>
             ))}
