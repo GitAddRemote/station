@@ -14,10 +14,6 @@ import {
   InventoryCategory,
 } from '../../services/inventory.service';
 
-interface InventoryPortletProps {
-  onExpand?: () => void;
-}
-
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
@@ -34,7 +30,7 @@ function categoryIcon(categoryPath: string) {
   return <Inventory2OutlinedIcon />;
 }
 
-const InventoryPortlet = (_props: InventoryPortletProps) => {
+const InventoryPortlet = () => {
   const [items, setItems]         = useState<InventoryItem[]>([]);
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
   const [loading, setLoading]     = useState(true);
