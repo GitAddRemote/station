@@ -2125,22 +2125,19 @@ const InventoryPage = () => {
                       </div>
                     )}
                     <div className="dtable-wrap">
-                      <table className="dtable" aria-label={'Inventory — ' + group}>
-                        <thead>
-                          <tr>
-                            <th>Item</th>
-                            <th>Category</th>
-                            <th>Location</th>
-                            <th className="num">Quantity</th>
-                            <th>Quality</th>
-                            <th>Updated</th>
-                            <th></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {groupItems.map((item) => renderInlineRow(item))}
-                        </tbody>
-                      </table>
+                      <div className="inv-row-head" role="row">
+                        <span>Item</span>
+                        <span>Location</span>
+                        <span>Quality</span>
+                        <span>Qty</span>
+                        <span>Updated</span>
+                        <span>Category</span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                      <div role="rowgroup">
+                        {groupItems.map((item) => renderInlineRow(item))}
+                      </div>
                     </div>
                   </div>
                 ))}

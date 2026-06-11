@@ -353,6 +353,18 @@ textarea.field-in { resize: vertical; min-height: 64px; text-align: left; line-h
   color: var(--warning-500); font-size: var(--text-sm); margin-top: var(--space-4);
 }
 
+/* ---- row column header (matches InventoryInlineRow 8-col grid) ----------- */
+.inv-row-head {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 0.8fr 1fr 1fr 1fr auto;
+  align-items: center;
+  padding: 8px var(--space-4);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase;
+  letter-spacing: var(--tracking-caps); color: var(--text-faint);
+}
+
 /* ---- editor mode column header --------------------------- */
 .inv-editor-head {
   display: grid;
