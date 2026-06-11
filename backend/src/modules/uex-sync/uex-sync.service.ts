@@ -1,9 +1,10 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, Optional } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan, IsNull } from 'typeorm';
 import { UexSyncState, SyncStatus } from './uex-sync-state.entity';
 import { UexSyncConfig } from './uex-sync-config.entity';
+import { UexSyncMetricsService } from '../../metrics/uex-sync-metrics.service';
 
 export interface SyncDecision {
   useDelta: boolean;
@@ -31,6 +32,7 @@ export class UexSyncService {
     private syncStateRepository: Repository<UexSyncState>,
     @InjectRepository(UexSyncConfig)
     private syncConfigRepository: Repository<UexSyncConfig>,
+    @Optional() private readonly metricsService?: UexSyncMetricsService,
   ) {}
 
   async acquireSyncLock(endpointName: string): Promise<void> {
@@ -217,10 +219,25 @@ export class UexSyncService {
     await this.updateSyncState(endpointName, updates);
 
     this.logger.info(
-      `Sync completed successfully for ${endpointName}: ${result.syncMode} mode, ` +
-        `created: ${result.recordsCreated}, updated: ${result.recordsUpdated}, ` +
-        `deleted: ${result.recordsDeleted}, duration: ${result.durationMs}ms`,
+      {
+        endpoint: endpointName,
+        syncMode: result.syncMode,
+        recordsCreated: result.recordsCreated,
+        recordsUpdated: result.recordsUpdated,
+        recordsDeleted: result.recordsDeleted,
+        durationMs: result.durationMs,
+      },
+      `Sync completed successfully for ${endpointName}`,
     );
+
+    this.metricsService?.recordSuccess({
+      endpoint: endpointName,
+      mode: result.syncMode,
+      created: result.recordsCreated,
+      updated: result.recordsUpdated,
+      deleted: result.recordsDeleted,
+      durationMs: result.durationMs,
+    });
   }
 
   async recordSyncFailure(
@@ -240,7 +257,12 @@ export class UexSyncService {
 
     await this.updateSyncState(endpointName, updates);
 
-    this.logger.error({ err: error }, `Sync failed for ${endpointName}`);
+    this.logger.error(
+      { err: error, endpoint: endpointName, durationMs },
+      `Sync failed for ${endpointName}`,
+    );
+
+    this.metricsService?.recordFailure(endpointName);
   }
 
   async getStaleEndpoints(

@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getLoggerToken } from 'nestjs-pino';
+import { InventoryMetricsService } from '../../metrics/inventory-metrics.service';
 import { DataSource, DeleteResult } from 'typeorm';
 import { StationCatalogEntry } from '../catalog/entities/station-catalog-entry.entity';
 import { StationCatalogCategory } from '../catalog/entities/station-catalog-category.entity';
@@ -211,6 +213,14 @@ describe('InventoryService', () => {
         {
           provide: UserOrganizationRolesService,
           useValue: mockUserOrganizationRolesService,
+        },
+        {
+          provide: getLoggerToken(InventoryService.name),
+          useValue: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+        },
+        {
+          provide: InventoryMetricsService,
+          useValue: { recordOperation: jest.fn() },
         },
       ],
     }).compile();

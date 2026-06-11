@@ -29,6 +29,7 @@ import { ItemsSyncService } from './services/items-sync.service';
 import { CompaniesSyncService } from './services/companies-sync.service';
 import { UEXSyncScheduler } from './schedulers/uex-sync.scheduler';
 import { UsersModule } from '../users/users.module';
+import { MetricsModule } from '../../metrics/metrics.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { UsersModule } from '../users/users.module';
     ]),
     HttpModule,
     UsersModule,
+    MetricsModule,
   ],
   controllers: [UexSyncController],
   providers: [
