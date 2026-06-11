@@ -16,6 +16,7 @@ import {
   Group as MembersIcon,
   Inventory2 as InventoryIcon,
   AccountBalance as TreasuryIcon,
+  SmartToy as StationBotIcon,
   Search as SearchIcon,
   Keyboard as KeyboardIcon,
   Menu as MenuIcon,
@@ -236,6 +237,7 @@ export interface AppShellProps {
   userInitial?: string;
   orgName?: string;
   orgRole?: string;
+  showStationBotAdmin?: boolean;
 }
 
 export function AppShell({
@@ -248,6 +250,7 @@ export function AppShell({
   userInitial = 'U',
   orgName = 'My Organization',
   orgRole = 'Member',
+  showStationBotAdmin = false,
 }: AppShellProps) {
   const { theme, setTheme, accent } = useChrome();
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -424,6 +427,21 @@ export function AppShell({
                 }
               </Link>
             ))}
+
+            {showStationBotAdmin && (
+              <>
+                <div className="side-cap">Administration</div>
+                <Link
+                  className={'side-link' + ('station-bot-admin' === active ? ' active' : '')}
+                  to="/station-bot-admin"
+                  aria-current={'station-bot-admin' === active ? 'page' : undefined}
+                  onClick={() => setNavOpen(false)}
+                >
+                  <StationBotIcon />
+                  <span className="side-link-label">Station Bot</span>
+                </Link>
+              </>
+            )}
           </nav>
 
           <div className="side-foot">
