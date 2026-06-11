@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { DatabaseSeederService } from '../src/database/seeds/database-seeder.service';
 import { DataSource } from 'typeorm';
+import { User } from '../src/modules/users/user.entity';
 import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('Organizations (e2e)', () => {
@@ -38,6 +39,11 @@ describe('Organizations (e2e)', () => {
       email: 'org@example.com',
       password: 'password123',
     });
+
+    // Local login requires isSuperAdmin; set it directly after registration.
+    await dataSource
+      .getRepository(User)
+      .update({ username: 'orguser' }, { isSuperAdmin: true });
 
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')

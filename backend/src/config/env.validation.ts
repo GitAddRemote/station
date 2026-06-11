@@ -77,6 +77,11 @@ export const envValidationSchema = Joi.object({
   SENTRY_DSN: Joi.string().uri().optional().allow(''),
   SENTRY_RELEASE: Joi.string().optional().allow(''),
 
+  // Station-Bot admin integration — optional; service degrades gracefully when absent.
+  STATION_BOT_CLIENT_ID: Joi.string().optional().allow(''),
+  STATION_BOT_CLIENT_SECRET: Joi.string().optional().allow(''),
+  STATION_BOT_TOKEN_URL: Joi.string().uri().optional().allow(''),
+
   // OAuth M2M — internal API key for the /oauth-clients admin endpoint.
   // Required in production; optional in development/test.
   INTERNAL_API_KEY: Joi.string()

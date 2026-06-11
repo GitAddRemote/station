@@ -31,6 +31,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { StationBotAdminModule } from './modules/station-bot-admin/station-bot-admin.module';
 
 const isTest =
   process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
@@ -179,6 +180,7 @@ if (!isTest) {
     CatalogEtlModule,
     CatalogModule,
     LocationsModule,
+    StationBotAdminModule,
   ],
   controllers: [AppController],
   providers: [

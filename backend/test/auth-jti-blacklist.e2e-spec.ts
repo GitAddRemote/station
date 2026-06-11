@@ -39,6 +39,7 @@ describe('Auth - JTI blacklist (e2e)', () => {
       email: 'jtitest@example.com',
       password: hashedPassword,
       isActive: true,
+      isSuperAdmin: true,
     });
   });
 

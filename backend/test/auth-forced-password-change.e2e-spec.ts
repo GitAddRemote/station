@@ -47,6 +47,7 @@ async function createLocalUser(
     email: `user_${suffix}@example.com`,
     password: hashedPassword,
     isActive: true,
+    isSuperAdmin: true,
     passwordChangeRequired: false,
     passwordExpiresAt: null,
     ...overrides,

@@ -55,6 +55,7 @@ import { AddUuidV7IdentityToUsersAndOrganizations1780110000000 } from './migrati
 import { FixCatalogEtlCommodityWeightScuType1780120000000 } from './migrations/1780120000000-FixCatalogEtlCommodityWeightScuType';
 import { MigrateRemainingEntitiesToUuidV7_1780130000000 } from './migrations/1780130000000-MigrateRemainingEntitiesToUuidV7';
 import { AddManageInventoryPermissionToManagementRoles_1780140000000 } from './migrations/1780140000000-AddManageInventoryPermissionToManagementRoles';
+import { AddIsSuperAdminToUser1780150000000 } from './migrations/1780150000000-AddIsSuperAdminToUser';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -119,6 +120,7 @@ export const AppDataSource = new DataSource({
     FixCatalogEtlCommodityWeightScuType1780120000000,
     MigrateRemainingEntitiesToUuidV7_1780130000000,
     AddManageInventoryPermissionToManagementRoles_1780140000000,
+    AddIsSuperAdminToUser1780150000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },

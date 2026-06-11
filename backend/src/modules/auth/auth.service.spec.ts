@@ -9,6 +9,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { PasswordReset } from './password-reset.entity';
 import {
   BadRequestException,
+  ForbiddenException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -29,6 +30,7 @@ describe('AuthService', () => {
     email: 'test@example.com',
     password: '$2b$10$hashedpassword',
     isSystemUser: false,
+    isSuperAdmin: false,
     isActive: true,
     discordId: null,
     discordAvatarUrl: null,
@@ -551,6 +553,59 @@ describe('AuthService', () => {
         mockUsersService.updatePasswordWithExpiry.mock.calls[0][1];
       expect(hashedPassword).toMatch(/^\$2[aby]\$\d{1,2}\$.{53}$/);
       expect(await bcrypt.compare('newPassword123', hashedPassword)).toBe(true);
+    });
+  });
+
+  describe('validateUser', () => {
+    it('should throw ForbiddenException when a non-super-admin attempts local login', async () => {
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        isSuperAdmin: false,
+      });
+
+      await expect(
+        service.validateUser(mockUser.username, 'any-password'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should return null (not throw) when user does not exist', async () => {
+      mockUsersService.findOne.mockResolvedValue(null);
+
+      const result = await service.validateUser('nobody', 'any-password');
+      expect(result).toBeNull();
+    });
+
+    it('should return null when super-admin password is wrong', async () => {
+      const hashedPassword = await bcrypt.hash('correct-pass', 10);
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        isSuperAdmin: true,
+        password: hashedPassword,
+      });
+
+      const result = await service.validateUser(
+        mockUser.username,
+        'wrong-pass',
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should return user (without password) when super-admin credentials are correct', async () => {
+      const plainPassword = 'correct-pass';
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        isSuperAdmin: true,
+        password: hashedPassword,
+      });
+
+      const result = await service.validateUser(
+        mockUser.username,
+        plainPassword,
+      );
+      expect(result).not.toBeNull();
+      expect(result).not.toHaveProperty('password');
+      expect(result?.username).toBe(mockUser.username);
     });
   });
 

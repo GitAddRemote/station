@@ -10,6 +10,7 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { DatabaseSeederService } from '../src/database/seeds/database-seeder.service';
 import { DataSource } from 'typeorm';
+import { User } from '../src/modules/users/user.entity';
 import { seedSystemUser } from './helpers/seed-system-user';
 
 describe('UserOrganizationRoles (e2e)', () => {
@@ -54,6 +55,11 @@ describe('UserOrganizationRoles (e2e)', () => {
 
     expect(registerResponse.body.id).toBeDefined();
     userId = registerResponse.body.id;
+
+    // Local login requires isSuperAdmin; set it directly after registration.
+    await dataSource
+      .getRepository(User)
+      .update({ username: 'roleuser' }, { isSuperAdmin: true });
 
     const loginResponse = await request(app.getHttpServer())
       .post('/auth/login')
