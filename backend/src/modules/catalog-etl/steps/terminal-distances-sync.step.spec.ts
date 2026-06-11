@@ -1,4 +1,5 @@
 import { TerminalDistancesSyncStep } from './terminal-distances-sync.step';
+import { UEXClientException } from '../../uex-sync/exceptions/uex-exceptions';
 
 const CTX = { runId: 'test-run-id' };
 
@@ -22,6 +23,10 @@ function buildDsQuery(
       return Promise.resolve(
         Object.entries(terminals).map(([code, id]) => ({ code, id })),
       );
+    }
+    // DELETE ... RETURNING 1 — return an array whose length = deleted count
+    if (sql.includes('DELETE FROM station_terminal_distance')) {
+      return Promise.resolve([]);
     }
     return Promise.resolve([]);
   });
@@ -75,7 +80,7 @@ describe('TerminalDistancesSyncStep', () => {
       expect(upsertCall[1]).toEqual([100, 200, 1500.5]);
     });
 
-    it('handles empty distances list without upserting', async () => {
+    it('handles empty distances list without upserting or deleting', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([]);
@@ -86,25 +91,11 @@ describe('TerminalDistancesSyncStep', () => {
         sql.includes('INSERT INTO station_terminal_distance'),
       );
       expect(upsertCall).toBeUndefined();
-    });
 
-    it('does not write to station_etl_run_state (run tracking is handled by runStep)', async () => {
-      const dsQuery = buildDsQuery();
-      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
-      uexGet.mockResolvedValue([
-        {
-          terminal_code_origin: 'PORTOL',
-          terminal_code_destination: 'LORV',
-          distance: 100,
-        },
-      ]);
-
-      await step.execute(CTX);
-
-      const stateInsert = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('station_etl_run_state'),
+      const deleteCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('DELETE FROM station_terminal_distance'),
       );
-      expect(stateInsert).toBeUndefined();
+      expect(deleteCall).toBeUndefined();
     });
 
     it('batches multiple distances into a single INSERT', async () => {
@@ -133,14 +124,15 @@ describe('TerminalDistancesSyncStep', () => {
       const upsertCalls = dsQuery.mock.calls.filter(([sql]: [string]) =>
         sql.includes('INSERT INTO station_terminal_distance'),
       );
-      // All 3 valid rows fit in one batch (batch size 500)
       expect(upsertCalls).toHaveLength(1);
       expect(upsertCalls[0][1]).toEqual([
         100, 200, 100, 200, 300, 200, 100, 300, 300,
       ]);
     });
+  });
 
-    it('writes NOW() in INSERT and does not issue full-table synced_at UPDATE', async () => {
+  describe('stale-row deletion', () => {
+    it('issues a DELETE for rows absent from current UEX payload', async () => {
       const dsQuery = buildDsQuery();
       const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
       uexGet.mockResolvedValue([
@@ -153,20 +145,73 @@ describe('TerminalDistancesSyncStep', () => {
 
       await step.execute(CTX);
 
-      // Each batch INSERT should write synced_at=NOW() directly
-      const insertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+      const deleteCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('DELETE FROM station_terminal_distance'),
+      );
+      expect(deleteCall).toBeDefined();
+      // The DELETE uses a NOT EXISTS anti-join against the valid pair set
+      expect(deleteCall![0]).toContain('NOT EXISTS');
+      // Parameters include the valid pair (100, 200)
+      expect(deleteCall![1]).toEqual([100, 200]);
+    });
+
+    it('does not DELETE when all records had unknown codes (safety guard)', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockResolvedValue([
+        {
+          terminal_code_origin: 'UNKNOWN_A',
+          terminal_code_destination: 'UNKNOWN_B',
+          distance: 100,
+        },
+      ]);
+
+      await step.execute(CTX);
+
+      const deleteCall = dsQuery.mock.calls.find(([sql]: [string]) =>
+        sql.includes('DELETE FROM station_terminal_distance'),
+      );
+      expect(deleteCall).toBeUndefined();
+
+      // Should emit a warning about skipping stale-delete to prevent data loss
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('stale-row deletion skipped'),
+        }),
+      );
+    });
+  });
+
+  describe('UEX endpoint unavailable', () => {
+    it('writes a visible ETL warning when bulk endpoint returns 4xx', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      uexGet.mockRejectedValue(new UEXClientException('404 Not Found'));
+
+      await step.execute(CTX);
+
+      expect(repoSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warn',
+          message: expect.stringContaining('bulk endpoint unavailable'),
+        }),
+      );
+
+      // No upsert or delete should run
+      const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
         sql.includes('INSERT INTO station_terminal_distance'),
       );
-      expect(insertCall).toBeDefined();
-      expect(insertCall![0]).toContain('NOW()');
+      expect(upsertCall).toBeUndefined();
+    });
 
-      // No full-table UPDATE should be issued (skip guard uses station_etl_run)
-      const fullTableUpdate = dsQuery.mock.calls.find(
-        ([sql]: [string]) =>
-          sql.includes('UPDATE station_terminal_distance') &&
-          !sql.includes('INSERT'),
-      );
-      expect(fullTableUpdate).toBeUndefined();
+    it('rethrows non-4xx errors', async () => {
+      const dsQuery = buildDsQuery();
+      const step = buildStep(uexGet, dsQuery, repoCreate, repoSave);
+      const serverErr = new Error('network timeout');
+      uexGet.mockRejectedValue(serverErr);
+
+      await expect(step.execute(CTX)).rejects.toThrow('network timeout');
     });
   });
 
@@ -219,10 +264,6 @@ describe('TerminalDistancesSyncStep', () => {
           ),
         }),
       );
-      const upsertCall = dsQuery.mock.calls.find(([sql]: [string]) =>
-        sql.includes('INSERT INTO station_terminal_distance'),
-      );
-      expect(upsertCall).toBeUndefined();
     });
 
     it('processes valid records even when some are skipped', async () => {
@@ -243,7 +284,12 @@ describe('TerminalDistancesSyncStep', () => {
 
       await step.execute(CTX);
 
-      expect(repoSave).toHaveBeenCalledTimes(1);
+      // One warning for the unknown origin
+      const warnCalls = (repoSave as jest.Mock).mock.calls.filter(
+        ([arg]: [{ severity?: string }]) => arg.severity === 'warn',
+      );
+      expect(warnCalls).toHaveLength(1);
+
       const upsertCalls = dsQuery.mock.calls.filter(([sql]: [string]) =>
         sql.includes('INSERT INTO station_terminal_distance'),
       );
