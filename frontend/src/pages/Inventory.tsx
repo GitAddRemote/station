@@ -9,22 +9,16 @@ import type { KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import {
-  Typography,
-  Container,
   Box,
   CircularProgress,
-  Grid,
   TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Chip,
   Button,
-  Divider,
-  Card,
-  CardContent,
   Stack,
+  Typography,
   Menu,
   ListItemIcon,
   ListItemText,
@@ -32,9 +26,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  List,
-  ListItemButton,
-  Radio,
   TablePagination,
   LinearProgress,
   Alert,
@@ -49,7 +40,24 @@ import CallSplitIcon from '@mui/icons-material/CallSplit';
 import ShareIcon from '@mui/icons-material/Share';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
-import BusinessIcon from '@mui/icons-material/Business';
+import SearchIcon from '@mui/icons-material/Search';
+import PersonIcon from '@mui/icons-material/Person';
+import GroupsIcon from '@mui/icons-material/Groups';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import SortIcon from '@mui/icons-material/Sort';
+import GridViewIcon from '@mui/icons-material/GridView';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import AddIcon from '@mui/icons-material/Add';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InventoryTwoToneIcon from '@mui/icons-material/InventoryTwoTone';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import PackageIcon from '@mui/icons-material/Inventory2';
+import LayersIcon from '@mui/icons-material/Layers';
+import './Inventory.css';
 import {
   inventoryService,
   InventoryCategory,
@@ -62,7 +70,6 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
 import InventoryNewRow from '../components/inventory/InventoryNewRow';
-import InventoryFiltersPanel from '../components/inventory/InventoryFiltersPanel';
 import {
   OrgPermission,
   permissionsService,
@@ -76,7 +83,6 @@ type InlineDraft = { quantity: number | ''; quality: number | ''; locationId?: s
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
 const SLIDER_QUANTITY_MAX = 10000;
-const ORG_ACCENT = '#f2a255';
 const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
 const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
 const DENSITY_STORAGE_KEY = 'inventory:density';
@@ -98,17 +104,13 @@ const readStoredDensity = (): 'standard' | 'compact' => {
   return stored === 'compact' ? 'compact' : 'standard';
 };
 
-const valueText = (value: number) =>
-  `${value.toLocaleString(undefined, { maximumFractionDigits: 6 })} qty`;
-
-
 const InventoryPage = () => {
   const navigate = useNavigate();
   const addSearchRef = useRef<HTMLInputElement | null>(null);
   const addQuantityRef = useRef<HTMLInputElement | null>(null);
   const addLocationRef = useRef<HTMLInputElement | null>(null);
   const addQualityRef = useRef<HTMLInputElement | null>(null);
-  const addNotesRef = useRef<HTMLInputElement | null>(null);
+  const addNotesRef = useRef<HTMLTextAreaElement | null>(null);
   const firstCatalogItemRef = useRef<HTMLDivElement | null>(null);
   const catalogItemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [user, setUser] = useState<{ userId: string; username: string } | null>(
@@ -1754,15 +1756,7 @@ const InventoryPage = () => {
 
   if (!user || initialLoading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          backgroundColor: '#0b1118',
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: 'var(--surface-page)' }}>
         <CircularProgress />
       </Box>
     );
@@ -1770,6 +1764,10 @@ const InventoryPage = () => {
 
   const inventoryBusy = refreshing;
   const showEmptyState = filteredItems.length === 0 && !refreshing;
+  const totalQty = items.reduce((s, x) => s + Number(x.quantity), 0);
+  const sharedCount = items.filter((x) => x.isOrgAvailable).length;
+  const catCount = new Set(items.map((x) => x.categoryName)).size;
+
   const renderInlineRow = (item: InventoryRecord) => {
     const rowKey = item.id.toString();
     const draft = getInlineDraft(item);
@@ -1823,421 +1821,370 @@ const InventoryPage = () => {
     );
   };
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / rowsPerPage));
+
   return (
     <AppShell
       active="inventory"
       userInitial={user?.username?.charAt(0).toUpperCase() || 'U'}
       searchPlaceholder="Search inventory…"
     >
+      <div className="inv-page">
 
-      {isOrgMode && (
-        <Box
-          sx={{
-            background: 'rgba(242, 162, 85, 0.12)',
-            borderBottom: '1px solid rgba(242, 162, 85, 0.35)',
-            boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.2)',
-          }}
-        >
-          <Container maxWidth="xl" sx={{ py: 1.5 }}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <BusinessIcon sx={{ color: ORG_ACCENT }} fontSize="small" />
-              <Typography
-                variant="subtitle2"
-                sx={{ color: '#f7f1e8', fontWeight: 600 }}
+        {/* Page header */}
+        <div className="page-head">
+          <div>
+            <div className="crumb">
+              <InventoryTwoToneIcon style={{ width: 13, height: 13 }} /> Assets &rsaquo; Inventory
+            </div>
+            <h1 className="page-title">Inventory</h1>
+            <p className="page-sub">
+              Track everything you own and what your org holds — refined ore, components,
+              weapons, and trade goods. Edit quantities inline, split stacks, and share with your org.
+            </p>
+          </div>
+          <div className="page-actions">
+            {/* View toggle */}
+            <div className="inv-seg" role="group" aria-label="Inventory view">
+              <button
+                aria-selected={viewMode === 'personal'}
+                onClick={() => setViewMode('personal')}
               >
-                Organization mode
-              </Typography>
-              <Divider
-                orientation="vertical"
-                flexItem
-                sx={{ borderColor: 'rgba(242, 162, 85, 0.35)' }}
-              />
-              <Typography variant="body2" sx={{ color: '#f0d9c0' }}>
-                {selectedOrgId
-                  ? `Working in ${selectedOrgName}`
-                  : 'Select an organization to continue.'}
-              </Typography>
-            </Stack>
-          </Container>
-        </Box>
-      )}
+                <PersonIcon style={{ width: 15, height: 15 }} /> Personal
+              </button>
+              <button
+                aria-selected={viewMode === 'org'}
+                onClick={() => setViewMode('org')}
+              >
+                <GroupsIcon style={{ width: 15, height: 15 }} /> Organization
+              </button>
+            </div>
+            {/* Org selector */}
+            {isOrgMode && orgOptions.length > 0 && (
+              <div className="inv-orgsel">
+                <span className="badge">
+                  {(orgOptions.find(o => o.id === selectedOrgId)?.name ?? 'Org').slice(0, 2).toUpperCase()}
+                </span>
+                <select
+                  value={selectedOrgId ?? ''}
+                  onChange={(e) => setSelectedOrgId(e.target.value || null)}
+                  style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--text-strong)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}
+                  aria-label="Select organization"
+                >
+                  <option value="">Select org…</option>
+                  {orgOptions.map((org) => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                </select>
+                <ExpandMoreIcon style={{ width: 15, height: 15, color: 'var(--text-faint)' }} />
+              </div>
+            )}
+            {/* Add button */}
+            {showAddButton && (
+              <button className="btn btn-primary btn-sm" onClick={openAddDialog}>
+                <AddIcon style={{ width: 15, height: 15 }} /> {addButtonLabel}
+              </button>
+            )}
+          </div>
+        </div>
 
-      <Container
-        maxWidth="xl"
-        sx={{
-          py: 4,
-          mt: isOrgMode ? 2 : 0,
-          outline: isOrgMode ? '1px solid rgba(242, 162, 85, 0.35)' : 'none',
-          outlineOffset: isOrgMode ? 0 : undefined,
-          borderRadius: isOrgMode ? 3 : undefined,
-          boxShadow: isOrgMode
-            ? '0 0 0 1px rgba(242, 162, 85, 0.08), 0 0 24px rgba(242, 162, 85, 0.08)'
-            : 'none',
-          position: 'relative',
-        }}
-        aria-busy={inventoryBusy}
-      >
-        {inventoryBusy && (
-          <Box
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 5,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(11, 17, 24, 0.65)',
-              backdropFilter: 'blur(2px)',
-              borderRadius: isOrgMode ? 3 : 0,
-            }}
-          >
-            <Stack spacing={1} alignItems="center">
-              <CircularProgress color="inherit" size={28} />
-              <Typography variant="body2" color="text.secondary">
-                Loading inventory...
-              </Typography>
-            </Stack>
-          </Box>
+        {/* Permissions banner (org mode) */}
+        {isOrgMode && selectedOrgId && !orgPermissionsLoading && (
+          <div className={'perm-bar ' + (canManageOrgInventory ? 'manage' : 'view')}>
+            {canManageOrgInventory
+              ? <VerifiedUserIcon style={{ width: 15, height: 15 }} />
+              : <VisibilityIcon style={{ width: 15, height: 15 }} />}
+            {canManageOrgInventory
+              ? <span>You have <strong>manage</strong> access to {selectedOrgName} inventory — add, edit, split, and delete org stock.</span>
+              : <span>You have <strong>view-only</strong> access to {selectedOrgName} inventory. Ask an admin for edit rights.</span>}
+            <span className="grow" />
+          </div>
         )}
-        <Box sx={{ pointerEvents: inventoryBusy ? 'none' : 'auto' }}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Card
-                sx={{
-                  background:
-                    'linear-gradient(120deg, #0f1724 0%, #0f1b2c 50%, #0c1220 100%)',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                }}
+        {orgPermissionsError && (
+          <div className="inv-perms-warn">{orgPermissionsError}</div>
+        )}
+
+        {/* Stat strip */}
+        <div className="statstrip" style={{ '--n': 4 } as React.CSSProperties}>
+          <div className="statcard">
+            <div className="k"><PackageIcon style={{ width: 13, height: 13 }} /> {isOrgMode ? 'Org records' : 'My records'}</div>
+            <div className="v">{items.length.toLocaleString()}</div>
+            <div className="d">{catCount} categories</div>
+          </div>
+          <div className="statcard">
+            <div className="k"><LayersIcon style={{ width: 13, height: 13 }} /> Total quantity</div>
+            <div className="v">{totalQty > 9999 ? `${(totalQty / 1000).toFixed(1)}k` : totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</div>
+            <div className="d">units on hand</div>
+          </div>
+          <div className="statcard">
+            <div className="k"><ShareIcon style={{ width: 13, height: 13 }} /> {isOrgMode ? 'Org stock' : 'Shared items'}</div>
+            <div className="v up">{isOrgMode ? items.length.toLocaleString() : sharedCount.toLocaleString()}</div>
+            <div className="d up">{isOrgMode ? 'visible to members' : 'shared to orgs'}</div>
+          </div>
+          <div className="statcard">
+            <div className="k"><LocalOfferIcon style={{ width: 13, height: 13 }} /> Categories</div>
+            <div className="v">{catCount}</div>
+            <div className="d">item families</div>
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <div className="inv-toolbar">
+          <label className="inv-search">
+            <SearchIcon style={{ width: 16, height: 16 }} />
+            <input
+              value={filters.search}
+              placeholder="Search items, notes…"
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              aria-label="Search inventory"
+            />
+          </label>
+          <span className="inv-select">
+            <LocalOfferIcon className="lead" style={{ width: 15, height: 15 }} />
+            <select
+              value={filters.categoryId}
+              onChange={(e) => setFilters((prev) => ({ ...prev, categoryId: e.target.value }))}
+              aria-label="Category filter"
+            >
+              <option value="">All categories</option>
+              {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
+          </span>
+          {!isOrgMode && (
+            <button
+              className="fchip"
+              aria-pressed={filters.sharedOnly}
+              onClick={() => setFilters((prev) => ({ ...prev, sharedOnly: !prev.sharedOnly }))}
+            >
+              <ShareIcon style={{ width: 15, height: 15 }} /> Shared only
+            </button>
+          )}
+          <span className="inv-select">
+            <SortIcon className="lead" style={{ width: 15, height: 15 }} />
+            <select
+              value={sortBy + ':' + sortDir}
+              onChange={(e) => {
+                const [k, d] = e.target.value.split(':');
+                setSortBy(k as 'name' | 'quantity' | 'date');
+                setSortDir(() => d as 'asc' | 'desc');
+              }}
+              aria-label="Sort"
+            >
+              <option value="date:desc">Newest first</option>
+              <option value="date:asc">Oldest first</option>
+              <option value="name:asc">Name A–Z</option>
+              <option value="name:desc">Name Z–A</option>
+              <option value="quantity:desc">Quantity high–low</option>
+              <option value="quantity:asc">Quantity low–high</option>
+            </select>
+            <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
+          </span>
+          <span className="inv-select">
+            <GridViewIcon className="lead" style={{ width: 15, height: 15 }} />
+            <select
+              value={groupBy}
+              onChange={(e) => setGroupBy(e.target.value as 'none' | 'category' | 'share')}
+              aria-label="Group by"
+            >
+              <option value="none">No grouping</option>
+              <option value="category">Group by category</option>
+              <option value="share">Group by share status</option>
+            </select>
+            <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
+          </span>
+          <span className="inv-spacer" />
+          {(viewMode === 'personal' || canManageOrgInventory) && (
+            <div className="density-toggle" role="group" aria-label="Density">
+              <button
+                aria-pressed={density === 'standard'}
+                onClick={() => setDensity('standard')}
+                title="Standard view"
               >
-                <CardContent>
-                  <InventoryFiltersPanel
-                    filters={filters}
-                    setFilters={setFilters}
-                    categories={categories}
-                    valueText={valueText}
-                    maxQuantity={sliderMax}
-                    sortBy={sortBy}
-                    sortDir={sortDir}
-                    setSortBy={(value) => setSortBy(value)}
-                    setSortDir={(updater) => setSortDir(updater)}
-                    groupBy={groupBy}
-                    setGroupBy={(value) => setGroupBy(value)}
-                    density={density}
-                    setDensity={(value) => setDensity(value)}
-                    viewMode={viewMode}
-                    setViewMode={(mode) => setViewMode(mode)}
-                    selectedOrgId={selectedOrgId}
-                    setSelectedOrgId={(value) => setSelectedOrgId(value)}
-                    orgOptions={orgOptions}
-                    userInitial={user?.username?.charAt(0).toUpperCase() || 'U'}
-                    onOpenAddDialog={openAddDialog}
-                    showAddButton={showAddButton}
-                    addButtonLabel={addButtonLabel}
-                    totalCount={totalCount}
-                    itemCount={items.length}
-                    autoFocusSearch
+                <ViewListIcon style={{ width: 16, height: 16 }} />
+              </button>
+              <button
+                aria-pressed={density === 'compact'}
+                onClick={() => setDensity('compact')}
+                title="Editor mode — inline editing"
+              >
+                <EditNoteIcon style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Table content */}
+        <div style={{ marginTop: 'var(--space-6)', position: 'relative' }} aria-busy={inventoryBusy}>
+          {refreshing && <LinearProgress sx={{ mb: 1 }} color="primary" />}
+          {error && <div className="inv-error">{error}</div>}
+
+          {isEditorMode && (
+            <>
+              <div className="inv-editor-head">
+                <span>Item</span>
+                <span>Location</span>
+                <span>Quality</span>
+                <span>Quantity</span>
+                <span>Updated</span>
+                <span>Category</span>
+                <span style={{ textAlign: 'right' }}>Actions</span>
+              </div>
+              <InventoryNewRow
+                isEditorMode={isEditorMode}
+                itemOptions={newRowItemOptions}
+                itemInput={newRowItemInput}
+                selectedItem={newRowSelectedItem}
+                itemLoading={newRowItemLoading}
+                itemError={newRowItemError}
+                draft={newRowDraft}
+                errors={newRowErrors}
+                dirty={newRowDirty}
+                saving={newRowSaving}
+                orgBlocked={newRowOrgBlocked}
+                showQuantityWarning={
+                  Number.isFinite(newRowQuantityNumber) &&
+                  newRowQuantityNumber >= EDITOR_MODE_QUANTITY_MAX
+                }
+                onItemInputChange={(value, reason) => {
+                  setNewRowItemInput(value);
+                  if (reason === 'clear') {
+                    setNewRowSelectedItem(null);
+                    setNewRowDraft((prev) => ({ ...prev, itemId: '' }));
+                  }
+                  setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
+                }}
+                uomOptions={commodityUoms}
+                uomId={newRowUomId}
+                onUomChange={setNewRowUomId}
+                selectedLocation={newRowSelectedLocation}
+                onLocationChange={setNewRowSelectedLocation}
+                quality={newRowQuality}
+                onQualityChange={setNewRowQuality}
+                onItemSelect={(value) => {
+                  setNewRowSelectedItem(value);
+                  setNewRowDraft((prev) => ({ ...prev, itemId: value ? value.id : '' }));
+                  setNewRowItemInput(value?.name ?? newRowItemInput);
+                  setNewRowErrors((prev) => ({ ...prev, item: null, api: null }));
+                  if (value) newRowFocusController.focus('new-row', 'quantity');
+                }}
+                onQuantityChange={(value) => {
+                  const raw = value.trim();
+                  if (raw === '') {
+                    setNewRowDraft((prev) => ({ ...prev, quantity: '' }));
+                    setNewRowErrors((prev) => ({ ...prev, quantity: 'Quantity is required', api: null }));
+                    return;
+                  }
+                  const numeric = Number(raw);
+                  const nextQuantity = Number.isNaN(numeric) ? '' : Math.min(numeric, EDITOR_MODE_QUANTITY_MAX);
+                  setNewRowDraft((prev) => ({ ...prev, quantity: nextQuantity }));
+                  if (!Number.isFinite(numeric) || numeric < MIN_INVENTORY_QUANTITY) {
+                    setNewRowErrors((prev) => ({ ...prev, quantity: 'Quantity must be at least 0.000001', api: null }));
+                  } else {
+                    setNewRowErrors((prev) => ({ ...prev, quantity: null, api: null }));
+                  }
+                }}
+                onQuantityEnter={() => newRowFocusController.focus('new-row', 'save')}
+                onSave={handleNewRowSave}
+                onRetry={handleNewRowSave}
+                itemRef={newRowItemRef}
+                quantityRef={newRowQuantityRef}
+                saveRef={newRowSaveRef}
+              />
+            </>
+          )}
+
+          {showEmptyState ? (
+            <div className="dtable-wrap" style={{ marginTop: isEditorMode ? 'var(--space-3)' : undefined }}>
+              <div className="inv-empty">
+                <div className="e-ic"><InventoryIcon style={{ width: 26, height: 26 }} /></div>
+                <h3>No inventory matches your filters</h3>
+                <p>Adjust filters or {canManageOrgInventory || viewMode === 'personal' ? 'add a new item' : 'sync new items'} to get started.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {!showEmptyState && (
+                <div className="inv-count-bar">
+                  <ViewAgendaIcon style={{ width: 16, height: 16 }} />
+                  <span>Showing {items.length.toLocaleString()} of {totalCount.toLocaleString()} items</span>
+                </div>
+              )}
+              <div className={isEditorMode ? 'editor' : ''}>
+                {Array.from(groupedItems.entries()).map(([group, groupItems]) => (
+                  <div
+                    key={group}
+                    className={'grp-section' + (groupBy === 'none' ? ' single' : '')}
+                  >
+                    {groupBy !== 'none' && (
+                      <div className="grp-header">
+                        <span className="gchip">{group}</span>
+                        <span className="gcount">{groupItems.length} item{groupItems.length === 1 ? '' : 's'}</span>
+                      </div>
+                    )}
+                    <div className="dtable-wrap">
+                      <table className="dtable" aria-label={'Inventory — ' + group}>
+                        <thead>
+                          <tr>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th className="num">Quantity</th>
+                            <th>Quality</th>
+                            <th>Updated</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {groupItems.map((item) => renderInlineRow(item))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              <div className="inv-pager">
+                <div className="rpp">
+                  Rows per page
+                  <select
+                    value={rowsPerPage}
+                    onChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                    aria-label="Rows per page"
                     disabled={inventoryBusy}
-                    onClearAll={() => {
-                      setSortBy('date');
-                      setSortDir(() => 'desc');
-                      setGroupBy('none');
-                      setSliderMax(SLIDER_QUANTITY_MAX);
-                      setFilters(prev => ({ ...prev, valueRange: [0, SLIDER_QUANTITY_MAX], qualityRange: [0, 1000] }));
-                    }}
-                  />
-                  {orgPermissionsError && (
-                    <Alert severity="warning" sx={{ mt: 2 }}>
-                      {orgPermissionsError}
-                    </Alert>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
+                  >
+                    {[10, 25, 50, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <span>
+                  {totalCount === 0 ? 0 : page * rowsPerPage + 1}–{Math.min(totalCount, (page + 1) * rowsPerPage)} of {totalCount.toLocaleString()}
+                </span>
+                <div className="pager">
+                  <button
+                    disabled={inventoryBusy || page === 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeftIcon style={{ width: 16, height: 16 }} />
+                  </button>
+                  <button
+                    disabled={inventoryBusy || page >= totalPages - 1}
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    aria-label="Next page"
+                  >
+                    <ChevronRightIcon style={{ width: 16, height: 16 }} />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
-            <Grid item xs={12}>
-              <Card
-                sx={{
-                  backgroundColor: '#0e1520',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                }}
-              >
-                <CardContent>
-                  {refreshing && (
-                    <LinearProgress sx={{ mb: 2 }} color="primary" />
-                  )}
-                  {error && (
-                    <Box
-                      sx={{
-                        backgroundColor: 'rgba(255,99,71,0.08)',
-                        border: '1px solid rgba(255,99,71,0.2)',
-                        borderRadius: 2,
-                        p: 2,
-                        mb: 2,
-                      }}
-                    >
-                      <Typography color="error">{error}</Typography>
-                    </Box>
-                  )}
-                  {!showEmptyState && (
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      spacing={2}
-                      sx={{ mb: 2, color: '#9aa0a6' }}
-                    >
-                      <ViewAgendaIcon fontSize="small" />
-                      <Typography variant="body2">
-                        Showing {items.length.toLocaleString()} of{' '}
-                        {totalCount.toLocaleString()} items
-                      </Typography>
-                    </Stack>
-                  )}
-                  {isEditorMode && (
-                    <>
-                      <Box
-                        sx={{
-                          position: 'sticky',
-                          top: 0,
-                          zIndex: 2,
-                          backgroundColor: '#0e1520',
-                          px: 1.5,
-                          py: 0.75,
-                          borderTop: '1px solid rgba(255,255,255,0.04)',
-                          borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: 'grid',
-                            gridTemplateColumns: {
-                              xs: '1fr',
-                              md: '2fr 1fr 1.5fr 0.8fr 1fr 1fr 1fr auto',
-                            },
-                            alignItems: 'center',
-                            color: 'text.secondary',
-                            fontSize: 12,
-                            letterSpacing: 0.2,
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          <Typography variant="caption">Item</Typography>
-                          <Typography variant="caption">Location</Typography>
-                          <Typography variant="caption">Quality</Typography>
-                          <Typography variant="caption">Quantity</Typography>
-                          <Typography variant="caption">Updated</Typography>
-                          <Typography variant="caption">Category</Typography>
-                          <Typography variant="caption" textAlign="right">
-                            Actions
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <InventoryNewRow
-                        isEditorMode={isEditorMode}
-                        itemOptions={newRowItemOptions}
-                        itemInput={newRowItemInput}
-                        selectedItem={newRowSelectedItem}
-                        itemLoading={newRowItemLoading}
-                        itemError={newRowItemError}
-                        draft={newRowDraft}
-                        errors={newRowErrors}
-                        dirty={newRowDirty}
-                        saving={newRowSaving}
-                        orgBlocked={newRowOrgBlocked}
-                        showQuantityWarning={
-                          Number.isFinite(newRowQuantityNumber) &&
-                          newRowQuantityNumber >= EDITOR_MODE_QUANTITY_MAX
-                        }
-                        onItemInputChange={(value, reason) => {
-                          setNewRowItemInput(value);
-                          if (reason === 'clear') {
-                            setNewRowSelectedItem(null);
-                            setNewRowDraft((prev) => ({ ...prev, itemId: '' }));
-                          }
-                          setNewRowErrors((prev) => ({
-                            ...prev,
-                            item: null,
-                            api: null,
-                          }));
-                        }}
-                        uomOptions={commodityUoms}
-                        uomId={newRowUomId}
-                        onUomChange={setNewRowUomId}
-                        selectedLocation={newRowSelectedLocation}
-                        onLocationChange={setNewRowSelectedLocation}
-                        quality={newRowQuality}
-                        onQualityChange={setNewRowQuality}
-                        onItemSelect={(value) => {
-                          setNewRowSelectedItem(value);
-                          setNewRowDraft((prev) => ({
-                            ...prev,
-                            itemId: value ? value.id : '',
-                          }));
-                          setNewRowItemInput(value?.name ?? newRowItemInput);
-                          setNewRowErrors((prev) => ({
-                            ...prev,
-                            item: null,
-                            api: null,
-                          }));
-                          if (value) {
-                            newRowFocusController.focus('new-row', 'quantity');
-                          }
-                        }}
-                        onQuantityChange={(value) => {
-                          const raw = value.trim();
-                          if (raw === '') {
-                            setNewRowDraft((prev) => ({
-                              ...prev,
-                              quantity: '',
-                            }));
-                            setNewRowErrors((prev) => ({
-                              ...prev,
-                              quantity: 'Quantity is required',
-                              api: null,
-                            }));
-                            return;
-                          }
-                          const numeric = Number(raw);
-                          const nextQuantity = Number.isNaN(numeric)
-                            ? ''
-                            : Math.min(numeric, EDITOR_MODE_QUANTITY_MAX);
-                          setNewRowDraft((prev) => ({
-                            ...prev,
-                            quantity: nextQuantity,
-                          }));
-                          if (
-                            !Number.isFinite(numeric) ||
-                            numeric < MIN_INVENTORY_QUANTITY
-                          ) {
-                            setNewRowErrors((prev) => ({
-                              ...prev,
-                              quantity: 'Quantity must be at least 0.000001',
-                              api: null,
-                            }));
-                          } else {
-                            setNewRowErrors((prev) => ({
-                              ...prev,
-                              quantity: null,
-                              api: null,
-                            }));
-                          }
-                        }}
-                        onQuantityEnter={() =>
-                          newRowFocusController.focus('new-row', 'save')
-                        }
-                        onSave={handleNewRowSave}
-                        onRetry={handleNewRowSave}
-                        itemRef={newRowItemRef}
-                        quantityRef={newRowQuantityRef}
-                        saveRef={newRowSaveRef}
-                      />
-                    </>
-                  )}
-                  {showEmptyState ? (
-                    <Box sx={{ textAlign: 'center', py: 8 }}>
-                      <InventoryIcon sx={{ fontSize: 42, color: '#4A9EFF' }} />
-                      <Typography variant="h6" sx={{ mt: 2 }}>
-                        No inventory matches your filters
-                      </Typography>
-                      <Typography color="text.secondary">
-                        Adjust filters or sync new items to get started.
-                      </Typography>
-                    </Box>
-                  ) : (
-                    <>
-                      <Stack spacing={2}>
-                        {Array.from(groupedItems.entries()).map(
-                          ([group, groupItems]) => (
-                            <Box
-                              key={group}
-                              sx={{
-                                border: '1px solid rgba(255,255,255,0.04)',
-                                borderRadius: 2,
-                                overflow: 'hidden',
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  px: density === 'compact' ? 1.5 : 2,
-                                  py: density === 'compact' ? 1 : 1.5,
-                                  backgroundColor: 'rgba(255,255,255,0.02)',
-                                }}
-                              >
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  alignItems="center"
-                                >
-                                  <Chip
-                                    size="small"
-                                    label={group}
-                                    color="primary"
-                                    variant="outlined"
-                                  />
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                  >
-                                    {groupItems.length} item
-                                    {groupItems.length === 1 ? '' : 's'}
-                                  </Typography>
-                                </Stack>
-                              </Box>
-                              <Divider
-                                sx={{ borderColor: 'rgba(255,255,255,0.04)' }}
-                              />
-                              <Stack
-                                divider={
-                                  <Divider
-                                    flexItem
-                                    sx={{
-                                      borderColor: 'rgba(255,255,255,0.04)',
-                                    }}
-                                  />
-                                }
-                              >
-                                {groupItems.map((item) =>
-                                  renderInlineRow(item),
-                                )}
-                              </Stack>
-                            </Box>
-                          ),
-                        )}
-                      </Stack>
-                      <TablePagination
-                        component="div"
-                        count={totalCount}
-                        page={page}
-                        onPageChange={(_, newPage) => {
-                          if (inventoryBusy) return;
-                          setPage(newPage);
-                        }}
-                        rowsPerPage={rowsPerPage}
-                        onRowsPerPageChange={(event) => {
-                          if (inventoryBusy) return;
-                          setRowsPerPage(parseInt(event.target.value, 10));
-                          setPage(0);
-                        }}
-                        rowsPerPageOptions={[10, 25, 50, 100, 250]}
-                        backIconButtonProps={{ disabled: inventoryBusy || page === 0 }}
-                        nextIconButtonProps={{ disabled: inventoryBusy || (page + 1) * rowsPerPage >= totalCount }}
-                        SelectProps={{ disabled: inventoryBusy }}
-                        sx={{ mt: 2 }}
-                      />
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
-        </Box>
-      </Container>
-
+      {/* Catalog add dialog — kept as MUI Dialog for form UX, DS classes applied inside */}
       <Dialog
         open={addDialogOpen}
         onClose={(_event, reason) => {
@@ -2246,350 +2193,198 @@ const InventoryPage = () => {
         }}
         fullWidth
         maxWidth="lg"
+        PaperProps={{ sx: { background: 'var(--surface-raised)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)' } }}
       >
-        <DialogTitle>
-          {viewMode === 'org'
-            ? `Add org inventory item · ${selectedOrgName}`
-            : 'Quick add inventory item'}
+        <DialogTitle sx={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-strong)', borderBottom: '1px solid var(--border-subtle)', pb: 2 }}>
+          {viewMode === 'org' ? `Add org inventory item · ${selectedOrgName}` : 'Add inventory item'}
         </DialogTitle>
-        <DialogContent dividers onKeyDown={handleAddKeyDown}>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            {catalogError && <Alert severity="error">{catalogError}</Alert>}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={5}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    backgroundColor: 'rgba(255,255,255,0.02)',
-                  }}
-                >
-                  <Stack spacing={1.5}>
-                    <TextField
-                      fullWidth
-                      label="Search catalog"
-                      value={catalogSearch}
-                      inputRef={addSearchRef}
-                      autoFocus
-                      onChange={(e) => {
-                        setCatalogSearch(e.target.value);
-                        setCatalogPage(0);
-                      }}
-                      onKeyDown={handleCatalogSearchKeyDown}
-                    />
-                    <FormControl fullWidth>
-                      <InputLabel id="catalog-category-label">
-                        Category
-                      </InputLabel>
-                      <Select
-                        labelId="catalog-category-label"
-                        label="Category"
-                        value={catalogCategoryId}
-                        onChange={(e) =>
-                          setCatalogCategoryId(e.target.value as string)
-                        }
-                        onClose={() => {
-                          setTimeout(() => addQuantityRef.current?.focus(), 0);
-                        }}
-                      >
-                        <MenuItem value="">
-                          <em>All</em>
-                        </MenuItem>
-                        {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((category) => (
-                          <MenuItem key={category.id} value={category.id}>
-                            {category.name}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <Stack spacing={1}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <TextField
-                          fullWidth
-                          label="Quantity"
-                          type="number"
-                          inputProps={{ min: 0.000001, step: 0.000001 }}
-                          inputRef={addQuantityRef}
-                          value={newItemQuantity}
-                          onChange={(e) =>
-                            setNewItemQuantity(Number(e.target.value))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === 'Tab') {
-                              e.preventDefault();
-                              addLocationRef.current?.focus();
-                            }
-                          }}
-                        />
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() =>
-                              setNewItemQuantity((qty) =>
-                                Number(Math.max(0.000001, qty - 10).toFixed(6)),
-                              )
-                            }
-                          >
-                            -10
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() =>
-                              setNewItemQuantity((qty) =>
-                                Number(Math.max(0.000001, qty + 10).toFixed(6)),
-                              )
-                            }
-                          >
-                            +10
-                          </Button>
-                        </Stack>
-                      </Stack>
-                      {selectedCatalogItem?.catalogKind === 'commodity' ? (
-                        <Box>
-                          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                            Unit of Measure
-                          </Typography>
-                          <ToggleButtonGroup
-                            size="small"
-                            exclusive
-                            value={newItemUomId}
-                            onChange={(_e, v) => { if (v) setNewItemUomId(v); }}
-                            sx={{ flexWrap: 'wrap' }}
-                          >
-                            {commodityUoms.map((u) => (
-                              <MuiTooltip
-                                key={u.id}
-                                title={`Scale factor: ${u.scaleFactor}`}
-                                placement="top"
-                              >
-                                <ToggleButton value={u.id} sx={{ px: 2, py: 0.5 }}>
-                                  {u.abbreviation}
-                                </ToggleButton>
-                              </MuiTooltip>
-                            ))}
-                          </ToggleButtonGroup>
-                        </Box>
-                      ) : (
-                        <Box>
-                          <Typography variant="caption" color="text.secondary">
-                            Unit of Measure: <strong>Unit</strong>
-                          </Typography>
-                        </Box>
-                      )}
-                      <LocationPicker
-                        value={newItemLocation}
-                        onChange={(loc) => {
-                          setNewItemLocation(loc);
-                          if (loc) {
-                            setTimeout(() => addQualityRef.current?.focus(), 0);
-                          }
-                        }}
-                        inputRef={addLocationRef}
-                      />
-                      <TextField
-                        fullWidth
-                        label="Quality (0–1000)"
-                        type="number"
-                        inputProps={{ min: 0, max: 1000, step: 1 }}
-                        inputRef={addQualityRef}
-                        value={newItemQuality}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          if (raw === '') {
-                            setNewItemQuality('');
-                            return;
-                          }
-                          const num = parseFloat(raw);
-                          if (!Number.isNaN(num)) {
-                            setNewItemQuality(Math.min(1000, Math.max(0, num)));
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === 'Tab') {
-                            e.preventDefault();
-                            addNotesRef.current?.focus();
-                          }
-                        }}
-                      />
-                      <TextField
-                        fullWidth
-                        label="Notes"
-                        value={newItemNotes}
-                        inputRef={addNotesRef}
-                        onChange={(e) => setNewItemNotes(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey && addReady) {
-                            e.preventDefault();
-                            handleCreateInventoryItem({ stayOpen: true });
-                          }
-                        }}
-                      />
-                      <Typography variant="caption" color="text.secondary">
-                        Tip: Ctrl/Cmd + Enter to add and keep this dialog open
-                        for rapid entry.
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={7}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    backgroundColor: 'rgba(255,255,255,0.02)',
-                    minHeight: 360,
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1}
-                    sx={{ mb: 1 }}
-                  >
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      Catalog results
-                    </Typography>
-                    {catalogLoading ? (
-                      <LinearProgress
-                        sx={{ flex: 1, height: 4, borderRadius: 1 }}
-                      />
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        {catalogTotal.toLocaleString()} items
-                      </Typography>
-                    )}
-                  </Stack>
-                  {catalogLoading ? (
-                    <Box
-                      sx={{ display: 'flex', justifyContent: 'center', py: 4 }}
-                    >
-                      <CircularProgress size={24} />
-                    </Box>
-                  ) : catalogItems.length === 0 ? (
-                    <Typography color="text.secondary">
-                      No catalog items found with these filters.
-                    </Typography>
-                  ) : (
-                    <List
-                      dense
-                      disablePadding
-                      sx={{
-                        maxHeight: 320,
-                        overflow: 'auto',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: 1,
-                      }}
-                      onKeyDown={handleCatalogListKeyDown}
-                    >
-                      {catalogItems.map((item, index) => (
-                        <ListItemButton
-                          key={item.id}
-                          selected={selectedCatalogItem?.id === item.id}
-                          onClick={() => {
-                            setSelectedCatalogItem(item);
-                            setCatalogError(null);
-                          }}
-                          ref={(el) => {
-                            catalogItemRefs.current[index] = el;
-                            if (index === 0) {
-                              firstCatalogItemRef.current = el;
-                            }
-                          }}
-                        >
-                          <ListItemIcon>
-                            <Radio
-                              checked={selectedCatalogItem?.id === item.id}
-                            />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={item.name}
-                            secondary={item.categoryPath || 'Uncategorized'}
-                          />
-                        </ListItemButton>
-                      ))}
-                    </List>
-                  )}
-                  <TablePagination
-                    component="div"
-                    count={catalogTotal}
-                    page={catalogPage}
-                    onPageChange={(_, newPage) => setCatalogPage(newPage)}
-                    rowsPerPage={catalogRowsPerPage}
-                    onRowsPerPageChange={(event) => {
-                      setCatalogRowsPerPage(parseInt(event.target.value, 10));
-                      setCatalogPage(0);
-                    }}
-                    rowsPerPageOptions={[25, 50]}
+        <DialogContent dividers onKeyDown={handleAddKeyDown} sx={{ p: 0, display: 'flex', minHeight: 420 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,5fr) minmax(0,7fr)', width: '100%' }}>
+            {/* Left: form */}
+            <div style={{ padding: 'var(--space-5) var(--space-6)', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', overflowY: 'auto' }}>
+              {catalogError && <Alert severity="error">{catalogError}</Alert>}
+              <div>
+                <label className="field-lbl">Search catalog</label>
+                <div className="inv-search" style={{ maxWidth: 'none' }}>
+                  <SearchIcon style={{ width: 16, height: 16 }} />
+                  <input
+                    ref={addSearchRef}
+                    value={catalogSearch}
+                    autoFocus
+                    placeholder="Search items…"
+                    onChange={(e) => { setCatalogSearch(e.target.value); setCatalogPage(0); }}
+                    onKeyDown={handleCatalogSearchKeyDown}
+                    aria-label="Search catalog"
                   />
-                </Box>
-              </Grid>
-            </Grid>
-          </Stack>
+                </div>
+              </div>
+              <div>
+                <label className="field-lbl">Category</label>
+                <div className="inv-select" style={{ width: '100%', boxSizing: 'border-box' }}>
+                  <LocalOfferIcon className="lead" style={{ width: 15, height: 15 }} />
+                  <select
+                    value={catalogCategoryId}
+                    onChange={(e) => setCatalogCategoryId(e.target.value)}
+                    style={{ flex: 1 }}
+                    aria-label="Catalog category"
+                  >
+                    <option value="">All categories</option>
+                    {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
+                </div>
+              </div>
+              <div>
+                <label className="field-lbl">Quantity</label>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                  <input
+                    className="field-in mono"
+                    type="number"
+                    min="0.000001"
+                    step="0.000001"
+                    ref={addQuantityRef}
+                    value={newItemQuantity}
+                    onChange={(e) => setNewItemQuantity(Number(e.target.value))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); addLocationRef.current?.focus(); }
+                    }}
+                    style={{ flex: 1 }}
+                  />
+                  <button className="btn btn-ghost btn-sm" onClick={() => setNewItemQuantity((q) => Number(Math.max(0.000001, q - 10).toFixed(6)))}>−10</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setNewItemQuantity((q) => Number((q + 10).toFixed(6)))}>+10</button>
+                </div>
+              </div>
+              {selectedCatalogItem?.catalogKind === 'commodity' && commodityUoms.length > 0 && (
+                <div>
+                  <label className="field-lbl">Unit of measure</label>
+                  <ToggleButtonGroup size="small" exclusive value={newItemUomId} onChange={(_e, v) => { if (v) setNewItemUomId(v); }} sx={{ flexWrap: 'wrap' }}>
+                    {commodityUoms.map((u) => (
+                      <MuiTooltip key={u.id} title={`Scale factor: ${u.scaleFactor}`} placement="top">
+                        <ToggleButton value={u.id} sx={{ px: 2, py: 0.5 }}>{u.abbreviation}</ToggleButton>
+                      </MuiTooltip>
+                    ))}
+                  </ToggleButtonGroup>
+                </div>
+              )}
+              <LocationPicker value={newItemLocation} onChange={(loc) => { setNewItemLocation(loc); if (loc) setTimeout(() => addQualityRef.current?.focus(), 0); }} inputRef={addLocationRef} />
+              <div>
+                <label className="field-lbl">Quality (0–1000)</label>
+                <input
+                  className="field-in mono"
+                  type="number"
+                  min="0" max="1000" step="1"
+                  ref={addQualityRef}
+                  value={newItemQuality}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') { setNewItemQuality(''); return; }
+                    const num = parseFloat(raw);
+                    if (!Number.isNaN(num)) setNewItemQuality(Math.min(1000, Math.max(0, num)));
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); addNotesRef.current?.focus(); } }}
+                />
+              </div>
+              <div>
+                <label className="field-lbl">Notes</label>
+                <textarea
+                  className="field-in"
+                  ref={addNotesRef}
+                  value={newItemNotes}
+                  onChange={(e) => setNewItemNotes(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && addReady) { e.preventDefault(); handleCreateInventoryItem({ stayOpen: true }); } }}
+                  placeholder="Optional note…"
+                />
+              </div>
+              <p className="act-note">Tip: Ctrl/Cmd + Enter to add and keep open for rapid entry.</p>
+            </div>
+            {/* Right: catalog list */}
+            <div style={{ padding: 'var(--space-5) var(--space-6)', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <div className="catalog-right" style={{ padding: 0 }}>
+                <div className="cr-head">
+                  <span className="lbl">Catalog items</span>
+                  {catalogLoading
+                    ? <LinearProgress sx={{ flex: 1, height: 3, borderRadius: 1 }} />
+                    : <span className="cnt">{catalogTotal.toLocaleString()} items</span>}
+                </div>
+                {catalogLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
+                ) : catalogItems.length === 0 ? (
+                  <p className="act-note">No catalog items found with these filters.</p>
+                ) : (
+                  <div className="cat-list" onKeyDown={handleCatalogListKeyDown}>
+                    {catalogItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className={'cat-opt' + (selectedCatalogItem?.id === item.id ? ' sel' : '')}
+                        role="option"
+                        aria-selected={selectedCatalogItem?.id === item.id}
+                        tabIndex={0}
+                        onClick={() => { setSelectedCatalogItem(item); setCatalogError(null); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedCatalogItem(item); setCatalogError(null); } }}
+                        ref={(el) => { catalogItemRefs.current[index] = el; if (index === 0) firstCatalogItemRef.current = el; }}
+                      >
+                        <span className="radio" />
+                        <div>
+                          <div className="nm">{item.name}</div>
+                          <div className="ct">{item.categoryPath || 'Uncategorized'}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <TablePagination
+                  component="div"
+                  count={catalogTotal}
+                  page={catalogPage}
+                  onPageChange={(_, newPage) => setCatalogPage(newPage)}
+                  rowsPerPage={catalogRowsPerPage}
+                  onRowsPerPageChange={(event) => { setCatalogRowsPerPage(parseInt(event.target.value, 10)); setCatalogPage(0); }}
+                  rowsPerPageOptions={[25, 50]}
+                  sx={{ mt: 'auto' }}
+                />
+              </div>
+            </div>
+          </div>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={closeAddDialog} disabled={addSubmitting}>
-            Cancel
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => handleCreateInventoryItem({ stayOpen: true })}
-            disabled={addSubmitting || !addReady}
-          >
-            Add & stay
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => handleCreateInventoryItem()}
-            disabled={addSubmitting || !addReady}
-          >
-            Add & close
-          </Button>
+        <DialogActions sx={{ borderTop: '1px solid var(--border-subtle)', gap: 1, p: 2 }}>
+          <button className="btn btn-ghost btn-sm" onClick={closeAddDialog} disabled={addSubmitting}>Cancel</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => handleCreateInventoryItem({ stayOpen: true })} disabled={addSubmitting || !addReady}>Add &amp; stay</button>
+          <button className="btn btn-primary btn-sm" onClick={() => handleCreateInventoryItem()} disabled={addSubmitting || !addReady}>Add &amp; close</button>
         </DialogActions>
       </Dialog>
 
+      {/* Row action menu */}
       <Menu
         anchorEl={actionAnchor}
         open={Boolean(actionAnchor)}
         onClose={closeActionMenu}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        PaperProps={{ sx: { background: 'var(--surface-raised)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)' } }}
       >
         <MenuItem onClick={() => openActionDialog('edit')}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
+          <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Edit</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => openActionDialog('split')}>
-          <ListItemIcon>
-            <CallSplitIcon fontSize="small" />
-          </ListItemIcon>
+          <ListItemIcon><CallSplitIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Split</ListItemText>
         </MenuItem>
         {viewMode === 'personal' && (
           <MenuItem onClick={() => openActionDialog('share')}>
-            <ListItemIcon>
-              <ShareIcon fontSize="small" />
-            </ListItemIcon>
+            <ListItemIcon><ShareIcon fontSize="small" /></ListItemIcon>
             <ListItemText>Share</ListItemText>
           </MenuItem>
         )}
         {viewMode === 'personal' && actionItem?.isOrgAvailable && (
           <MenuItem onClick={handleUnshare}>
-            <ListItemIcon>
-              <UnpublishedIcon fontSize="small" />
-            </ListItemIcon>
+            <ListItemIcon><UnpublishedIcon fontSize="small" /></ListItemIcon>
             <ListItemText>Unshare</ListItemText>
           </MenuItem>
         )}
         <MenuItem onClick={() => openActionDialog('delete')}>
-          <ListItemIcon>
-            <DeleteForeverIcon fontSize="small" color="error" />
-          </ListItemIcon>
+          <ListItemIcon><DeleteForeverIcon fontSize="small" color="error" /></ListItemIcon>
           <ListItemText>Delete</ListItemText>
         </MenuItem>
       </Menu>

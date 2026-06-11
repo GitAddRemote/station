@@ -317,3 +317,48 @@
   .shell-search-btn { max-width: none; }
   .shell-khelp-grid { grid-template-columns: 1fr; }
 }
+
+/* ---- shared button system -------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: 9px 18px; border-radius: var(--radius-md); border: 1px solid transparent;
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: var(--weight-medium);
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+  transition: all var(--dur-base) var(--ease-out); background: none;
+  color: var(--text-body);
+}
+.btn svg { width: 15px; height: 15px; }
+.btn-sm { padding: 7px 14px; font-size: var(--text-xs); }
+.btn-primary {
+  background: var(--brand); border-color: var(--brand); color: var(--brand-contrast);
+  box-shadow: var(--glow-brand-sm);
+}
+.btn-primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+.btn-ghost {
+  border-color: var(--border-default); color: var(--text-muted);
+}
+.btn-ghost:hover { color: var(--text-strong); border-color: var(--border-strong); }
+.btn-ghost.is-on { background: var(--brand-subtle); color: var(--brand); border-color: var(--border-brand); }
+.btn-danger {
+  background: color-mix(in srgb, var(--coral-500) 18%, transparent);
+  border-color: color-mix(in srgb, var(--coral-500) 35%, transparent);
+  color: var(--coral-400);
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--coral-500) 28%, transparent); }
+.btn-link {
+  background: none; border: none; padding: 0; color: var(--text-muted);
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: var(--weight-medium);
+  cursor: pointer; text-decoration: none;
+  transition: color var(--dur-base) var(--ease-out);
+}
+.btn-link:hover { color: var(--text-strong); }
+.btn-link svg { width: 15px; height: 15px; }
+
+/* ---- shared scrim overlay -------------------------------- */
+.scrim {
+  position: fixed; inset: 0; z-index: 150;
+  background: color-mix(in srgb, var(--ink-900) 55%, transparent);
+  backdrop-filter: blur(2px);
+  display: flex; align-items: flex-start; justify-content: center;
+}
