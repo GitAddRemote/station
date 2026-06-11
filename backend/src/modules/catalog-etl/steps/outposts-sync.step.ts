@@ -83,8 +83,9 @@ function toDate(unixTs: number | null | undefined): Date | null {
 
 function parsePadTypes(raw: string | null | undefined): string[] {
   if (!raw) return [];
+  const delimiter = raw.includes('|') ? '|' : ',';
   return raw
-    .split(',')
+    .split(delimiter)
     .map((s) => s.trim())
     .filter(Boolean);
 }
