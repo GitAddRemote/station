@@ -25,6 +25,7 @@ import { ContractRow } from '../components/contracts/ContractRow';
 import { ContractDetail } from '../components/contracts/ContractDetail';
 import { CONTRACT_TYPE_META, fmtAbbr } from '../components/contracts/contractMeta';
 import NewContractDialog, { type NewContractDialogPrefill } from '../components/contracts/NewContractDialog';
+import AssignCrewDialog from '../components/contracts/AssignCrewDialog';
 import type { Contract, ContractType } from '../services/contracts.service';
 import { contractsService } from '../services/contracts.service';
 import { api } from '../services/api.service';
@@ -165,6 +166,8 @@ function ContractsPage() {
   const [confirmReason, setConfirmReason] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogPrefill, setDialogPrefill] = useState<NewContractDialogPrefill | undefined>(undefined);
+  const [assignCrewOpen, setAssignCrewOpen] = useState(false);
+  const [assignCrewContractId, setAssignCrewContractId] = useState<string | null>(null);
   const [orgId, setOrgId] = useState('');
 
   // Load user's org on mount
@@ -293,6 +296,11 @@ function ContractsPage() {
     if (action === 'dispute' || action === 'cancel') {
       setConfirmAction({ action: action as 'dispute' | 'cancel', contractId });
       setConfirmReason('');
+      return;
+    }
+    if (action === 'assign') {
+      setAssignCrewContractId(contractId);
+      setAssignCrewOpen(true);
       return;
     }
     try {
@@ -591,6 +599,22 @@ function ContractsPage() {
           fetchContracts(orgId);
         }}
       />
+
+      {assignCrewOpen && assignCrewContractId && (() => {
+        const assignContract = contracts.find(c => c.id === assignCrewContractId);
+        if (!assignContract) return null;
+        return (
+          <AssignCrewDialog
+            open={assignCrewOpen}
+            contract={assignContract}
+            orgId={orgId}
+            onClose={() => { setAssignCrewOpen(false); setAssignCrewContractId(null); }}
+            onUpdated={(updated) => {
+              setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
+            }}
+          />
+        );
+      })()}
     </>
   );
 }
