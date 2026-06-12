@@ -1,0 +1,23 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Cornflower Blue — primary" subtitle="RSI Galactapedia instrument blue; the system signature accent" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; font-family: var(--font-mono); background: var(--white); }
+  .scale { display: flex; }
+  .sw { flex: 1; }
+  .chip { height: 76px; }
+  .meta { padding: 8px 6px; }
+  .meta .n { font-size: 10px; color: #142A37; font-weight: 600; }
+  .meta .h { font-size: 10px; color: #7E909C; text-transform: uppercase; }
+  .star { box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 4px #142A37; }
+</style></head>
+<body>
+  <div class="scale" id="s"></div>
+  <script>
+    const steps = [['50','#EAF4FE'],['100','#CFE6FD'],['200','#A6D2FB'],['300','#7CBEF9'],['400','#53AEF7'],['500','#2E96EE'],['600','#1E7FD6'],['700','#1865AB'],['800','#154F84'],['900','#133E66']];
+    document.getElementById('s').innerHTML = steps.map(([n,h]) =>
+      `<div class="sw"><div class="chip ${n==='400'?'star':''}" style="background:${h}"></div><div class="meta"><div class="n">${n}</div><div class="h">${h}</div></div></div>`
+    ).join('');
+  </script>
+</body></html>

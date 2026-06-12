@@ -1,0 +1,19 @@
+<!-- @dsCard group="Type" viewport="700x220" name="Type scale" subtitle="2xs → 7xl ramp in Space Grotesk" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; padding: 18px 24px; background: var(--white); font-family: var(--font-display); }
+  .line { display: flex; align-items: baseline; gap: 16px; padding: 3px 0; border-bottom: 1px solid var(--ink-50); }
+  .line .t { color: var(--ink-900); font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; }
+  .line .m { font-family: var(--font-mono); font-size: 10px; color: var(--ink-400); margin-left: auto; }
+</style></head>
+<body>
+  <div id="s"></div>
+  <script>
+    const steps = [['7xl','76'],['5xl','48'],['4xl','38'],['3xl','30'],['2xl','24'],['xl','20'],['base','16'],['sm','14'],['xs','12']];
+    document.getElementById('s').innerHTML = steps.map(([n,px]) =>
+      `<div class="line"><div class="t" style="font-size:${Math.min(px,40)}px">Station ${n}</div><div class="m">--text-${n} · ${px}px</div></div>`
+    ).join('');
+  </script>
+</body></html>

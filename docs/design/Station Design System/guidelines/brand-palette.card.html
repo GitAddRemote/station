@@ -1,0 +1,18 @@
+<!-- @dsCard group="Brand" viewport="700x150" name="Palette at a glance" subtitle="Cornflower Blue (primary) · Coral (warm) · Firefly · White" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; font-family: var(--font-mono); display: flex; }
+  .col { flex: 1; height: 150px; display: flex; flex-direction: column; justify-content: flex-end; padding: 14px; }
+  .col .n { font-size: 12px; font-weight: 600; }
+  .col .h { font-size: 10px; text-transform: uppercase; opacity: .7; }
+  .on-dark .n, .on-dark .h { color: #fff; }
+  .on-light .n, .on-light .h { color: #142A37; }
+</style></head>
+<body>
+  <div class="col on-dark" style="background:#53AEF7"><div class="n">Cornflower Blue</div><div class="h">#53AEF7 · primary</div></div>
+  <div class="col on-dark" style="background:#F05A45"><div class="n">Coral</div><div class="h">#F05A45 · warm</div></div>
+  <div class="col on-dark" style="background:#0B1D29"><div class="n">Firefly</div><div class="h">#0B1D29 · ink</div></div>
+  <div class="col on-light" style="background:#fff;box-shadow:inset 1px 0 0 #E2E7EB"><div class="n">White</div><div class="h">#FFFFFF</div></div>
+</body></html>

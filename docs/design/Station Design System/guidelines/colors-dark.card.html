@@ -1,0 +1,22 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Dark surfaces — Firefly navy" subtitle="Dark-dominant — Firefly #0B1D29 page, card, raised, sunken" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; font-family: var(--font-mono); background: #060F16; padding: 18px; }
+  .row { display: flex; gap: 14px; }
+  .item { flex: 1; }
+  .chip { height: 60px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); }
+  .meta { margin-top: 8px; }
+  .meta .n { font-size: 11px; color: #F4F6F7; font-weight: 600; }
+  .meta .h { font-size: 10px; color: rgba(244,246,247,.5); text-transform: uppercase; }
+</style></head>
+<body>
+  <div class="row" id="r"></div>
+  <script>
+    const items = [['page','#0B1D29'],['sunken','#08161F'],['card','#102733'],['raised','#163240'],['accent','#53AEF7']];
+    document.getElementById('r').innerHTML = items.map(([n,h]) =>
+      `<div class="item"><div class="chip" style="background:${h}"></div><div class="meta"><div class="n">${n}</div><div class="h">${h}</div></div></div>`
+    ).join('');
+  </script>
+</body></html>

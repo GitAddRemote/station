@@ -1,0 +1,23 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Steel & coral — secondaries" subtitle="Muted steel-blue support + coral, the single warm accent" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; font-family: var(--font-mono); background: var(--white); }
+  .scale { display: flex; }
+  .sw { flex: 1; }
+  .chip { height: 76px; }
+  .meta { padding: 8px 6px; }
+  .meta .n { font-size: 10px; color: #142A37; font-weight: 600; }
+  .meta .h { font-size: 10px; color: #7E909C; text-transform: uppercase; }
+  .gap { width: 14px; }
+</style></head>
+<body>
+  <div class="scale" id="s"></div>
+  <script>
+    const teal = [['s-300','#8FA8BC'],['s-400','#6789A3'],['s-500','#4A6E89'],['s-600','#3A5970'],['s-700','#2E475A']];
+    const amber = [['c-300','#FB9E8C'],['c-400','#F57962'],['c-500','#F05A45'],['c-600','#DC4329'],['c-700','#B7331C']];
+    const cell = ([n,h]) => `<div class="sw"><div class="chip" style="background:${h}"></div><div class="meta"><div class="n">${n}</div><div class="h">${h}</div></div></div>`;
+    document.getElementById('s').innerHTML = teal.map(cell).join('') + '<div class="gap"></div>' + amber.map(cell).join('');
+  </script>
+</body></html>

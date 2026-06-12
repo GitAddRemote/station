@@ -1,0 +1,68 @@
+/* ============================================================
+   PRESSTRONIC — TYPOGRAPHY TOKENS
+   ============================================================ */
+
+:root {
+  /* --- Families ------------------------------------------------ */
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-body:    'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* --- Weights ------------------------------------------------- */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+  --weight-black:    800;
+
+  /* --- Type scale (1.250 major-third-ish, tuned) -------------- */
+  --text-2xs:  11px;
+  --text-xs:   12px;
+  --text-sm:   14px;
+  --text-base: 16px;
+  --text-lg:   18px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-4xl:  38px;
+  --text-5xl:  48px;
+  --text-6xl:  60px;
+  --text-7xl:  76px;
+  --text-8xl:  96px;
+
+  /* --- Line heights ------------------------------------------- */
+  --leading-none:    1;
+  --leading-tight:   1.1;
+  --leading-snug:    1.25;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.7;
+
+  /* --- Letter spacing ----------------------------------------- */
+  --tracking-tighter: -0.03em;
+  --tracking-tight:   -0.015em;
+  --tracking-normal:  0em;
+  --tracking-wide:    0.02em;
+  --tracking-wider:   0.06em;
+  --tracking-caps:    0.12em; /* for uppercase eyebrows / labels */
+
+  /* ============================================================
+     SEMANTIC TYPE ALIASES
+     ============================================================ */
+  --type-display-family: var(--font-display);
+  --type-display-weight: var(--weight-bold);
+  --type-display-tracking: var(--tracking-tight);
+
+  --type-heading-family: var(--font-display);
+  --type-heading-weight: var(--weight-semibold);
+
+  --type-body-family: var(--font-body);
+  --type-body-weight: var(--weight-regular);
+  --type-body-leading: var(--leading-relaxed);
+
+  --type-eyebrow-family: var(--font-mono);
+  --type-eyebrow-weight: var(--weight-medium);
+  --type-eyebrow-size: var(--text-xs);
+  --type-eyebrow-tracking: var(--tracking-caps);
+
+  --type-mono-family: var(--font-mono);
+}

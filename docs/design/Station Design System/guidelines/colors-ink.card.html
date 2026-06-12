@@ -1,0 +1,22 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Ink — neutral ramp" subtitle="Cool navy / blue-gray, from Firefly #0B1D29 to Hit Gray" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; font-family: var(--font-mono); background: var(--white); }
+  .scale { display: flex; }
+  .sw { flex: 1; }
+  .chip { height: 76px; }
+  .meta { padding: 8px 5px; }
+  .meta .n { font-size: 10px; color: #142A37; font-weight: 600; }
+  .meta .h { font-size: 9px; color: #7E909C; text-transform: uppercase; }
+</style></head>
+<body>
+  <div class="scale" id="s"></div>
+  <script>
+    const steps = [['950','#0B1D29'],['900','#142A37'],['800','#1C3340'],['700','#2C414E'],['600','#415562'],['500','#5C6F7C'],['400','#7E909C'],['300','#A9B3BD'],['200','#C9D0D7'],['100','#E2E7EB'],['50','#F1F4F6']];
+    document.getElementById('s').innerHTML = steps.map(([n,h]) =>
+      `<div class="sw"><div class="chip" style="background:${h}"></div><div class="meta"><div class="n">${n}</div><div class="h">${h}</div></div></div>`
+    ).join('');
+  </script>
+</body></html>

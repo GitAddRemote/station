@@ -1,0 +1,110 @@
+/* ============================================================
+   STATION — Treasury
+   Multiple accounts (main org, division, funds), each with its
+   own ledger and currency (aUEC or merits). Account switcher +
+   ledger table + add account / add transaction.
+   Builds on app-shell.css. Tokens only.
+   ============================================================ */
+
+/* account switcher strip */
+.acct-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: var(--space-4); margin-top: var(--space-7); }
+.acct-card {
+  text-align: left; cursor: pointer; position: relative; overflow: hidden;
+  background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  padding: var(--space-5); transition: border-color var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+  display: flex; flex-direction: column; gap: var(--space-3); min-height: 132px;
+}
+.acct-card:hover { transform: translateY(-2px); border-color: var(--border-default); box-shadow: var(--shadow-dark-md); }
+.acct-card.active { border-color: var(--border-brand); box-shadow: 0 0 0 1px var(--border-brand); }
+.acct-card.active::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); }
+.acct-card .top { display: flex; align-items: center; gap: var(--space-3); }
+.acct-card .top > div { min-width: 0; }
+.acct-card .ic { width: 38px; height: 38px; flex: none; border-radius: var(--radius-md); display: grid; place-items: center; }
+.acct-card .ic svg { width: 19px; height: 19px; }
+.acct-card .nm { font-family: var(--font-display); font-weight: var(--weight-semibold); font-size: var(--text-sm); color: var(--text-strong); line-height: 1.2; text-wrap: balance; }
+.acct-card .ty { font-size: var(--text-2xs); color: var(--text-faint); margin-top: 2px; text-transform: uppercase; letter-spacing: var(--tracking-caps); font-family: var(--font-mono); }
+.acct-card .bal { font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-2xl); color: var(--text-strong); font-variant-numeric: tabular-nums; line-height: 1; margin-top: auto; }
+.acct-card .bal .cur { font-size: var(--text-xs); color: var(--text-muted); font-weight: var(--weight-semibold); margin-left: 5px; }
+.acct-card .spark { display: flex; align-items: flex-end; gap: 2px; height: 22px; }
+.acct-card .spark i { flex: 1; background: var(--brand-subtle); border-radius: 1px; min-height: 2px; }
+
+/* account icon tints by type */
+.acct-main    { background: var(--brand-subtle); color: var(--brand); }
+.acct-division{ background: color-mix(in srgb, var(--teal-400) 16%, transparent); color: var(--teal-300); }
+.acct-fund    { background: color-mix(in srgb, var(--warning-500) 18%, transparent); color: var(--warning-500); }
+.acct-merits  { background: color-mix(in srgb, #C879D8 20%, transparent); color: #D9A6E6; }
+
+/* add account card */
+.acct-add { display: grid; place-items: center; gap: var(--space-2); border: 1px dashed var(--border-default); background: transparent; color: var(--text-muted); cursor: pointer; border-radius: var(--radius-lg); min-height: 132px; transition: all var(--dur-base) var(--ease-out); }
+.acct-add:hover { border-color: var(--border-brand); color: var(--brand); background: var(--brand-subtle); }
+.acct-add .pl { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; border: 1px solid currentColor; }
+.acct-add .pl svg { width: 18px; height: 18px; }
+.acct-add .lbl { font-size: var(--text-sm); font-weight: var(--weight-medium); }
+
+/* currency badge */
+.cur-badge { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: var(--tracking-wide); padding: 3px 9px; border-radius: var(--radius-pill); }
+.cur-badge svg { width: 12px; height: 12px; }
+.cur-badge.auec { background: var(--brand-subtle); color: var(--brand); }
+.cur-badge.merits { background: color-mix(in srgb, #C879D8 18%, transparent); color: #D9A6E6; }
+
+/* selected account header */
+.acct-head { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-9); padding-bottom: var(--space-5); border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; }
+.acct-head .big-ic { width: 50px; height: 50px; flex: none; border-radius: var(--radius-md); display: grid; place-items: center; }
+.acct-head .big-ic svg { width: 24px; height: 24px; }
+.acct-head .h { flex: 1; min-width: 0; }
+.acct-head .h .t { font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-2xl); color: var(--text-strong); display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.acct-head .h .s { font-size: var(--text-sm); color: var(--text-muted); margin-top: 4px; }
+.acct-head .bal-big { text-align: right; }
+.acct-head .bal-big .k { font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); }
+.acct-head .bal-big .v { font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-3xl); color: var(--text-strong); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.acct-head .bal-big .v .cur { font-size: var(--text-base); color: var(--text-muted); font-weight: var(--weight-semibold); margin-left: 6px; }
+
+/* ledger toolbar */
+.ledger-toolbar { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-6); flex-wrap: wrap; }
+.ledger-toolbar .grow { flex: 1; }
+
+/* ledger table specifics */
+.led-table .amt { text-align: right; font-family: var(--font-mono); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.led-table .amt.pos { color: var(--success-500); }
+.led-table .amt.neg { color: var(--coral-400); }
+.led-table .run { text-align: right; font-family: var(--font-mono); color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.led-cat { display: inline-flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--text-muted); }
+.led-cat .cdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.led-desc .d { font-weight: var(--weight-medium); color: var(--text-strong); }
+.led-desc .m { font-size: var(--text-2xs); color: var(--text-faint); margin-top: 1px; }
+.led-ic { width: 32px; height: 32px; flex: none; border-radius: 8px; display: grid; place-items: center; border: 1px solid var(--border-subtle); }
+.led-ic svg { width: 15px; height: 15px; }
+.led-ic.in { background: color-mix(in srgb, var(--success-500) 14%, transparent); color: var(--success-500); border-color: transparent; }
+.led-ic.out { background: color-mix(in srgb, var(--coral-500) 14%, transparent); color: var(--coral-400); border-color: transparent; }
+.led-ic.xfer { background: color-mix(in srgb, var(--teal-400) 14%, transparent); color: var(--teal-300); border-color: transparent; }
+
+/* dialogs reuse inventory .act-pop / fields; provide treasury extras */
+.seg-pills { display: flex; gap: var(--space-2); }
+.seg-pill { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px; border-radius: var(--radius-md); border: 1px solid var(--border-default); background: var(--surface-sunken); color: var(--text-muted); font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer; transition: all var(--dur-base) var(--ease-out); }
+.seg-pill svg { width: 15px; height: 15px; }
+.seg-pill:hover { color: var(--text-strong); border-color: var(--border-strong); }
+.seg-pill[aria-pressed="true"] { color: var(--brand); background: var(--brand-subtle); border-color: var(--border-brand); }
+
+/* currency choice in add-account dialog */
+.cur-choice { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.cur-opt { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--border-default); background: var(--surface-sunken); cursor: pointer; transition: all var(--dur-base) var(--ease-out); }
+.cur-opt:hover { border-color: var(--border-strong); }
+.cur-opt[aria-pressed="true"] { border-color: var(--border-brand); background: var(--brand-subtle); }
+.cur-opt .ci { width: 34px; height: 34px; flex: none; border-radius: var(--radius-sm); display: grid; place-items: center; }
+.cur-opt .ci svg { width: 17px; height: 17px; }
+.cur-opt .nm { font-weight: var(--weight-semibold); color: var(--text-strong); font-size: var(--text-sm); }
+.cur-opt .sub { font-size: var(--text-2xs); color: var(--text-faint); margin-top: 1px; }
+
+.type-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-2); }
+.type-opt { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--space-3); border-radius: var(--radius-md); border: 1px solid var(--border-default); background: var(--surface-sunken); cursor: pointer; transition: all var(--dur-base) var(--ease-out); }
+.type-opt svg { width: 18px; height: 18px; color: var(--text-muted); }
+.type-opt .l { font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--text-body); }
+.type-opt:hover { border-color: var(--border-strong); }
+.type-opt[aria-pressed="true"] { border-color: var(--border-brand); background: var(--brand-subtle); }
+.type-opt[aria-pressed="true"] svg, .type-opt[aria-pressed="true"] .l { color: var(--brand); }
+
+.ledger-empty { text-align: center; padding: var(--space-16) var(--space-6); }
+.ledger-empty .e-ic { width: 56px; height: 56px; margin: 0 auto var(--space-4); display: grid; place-items: center; border-radius: var(--radius-lg); background: var(--surface-sunken); color: var(--brand); }
+.ledger-empty .e-ic svg { width: 26px; height: 26px; }
+.ledger-empty h3 { font-family: var(--font-display); font-weight: var(--weight-semibold); font-size: var(--text-lg); color: var(--text-strong); margin: 0 0 var(--space-2); }
+.ledger-empty p { color: var(--text-muted); font-size: var(--text-sm); margin: 0; }

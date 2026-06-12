@@ -1,0 +1,13 @@
+/* ============================================================
+   PRESSTRONIC — WEBFONTS
+   The legacy theme shipped with no custom fonts (system-ui stack).
+   For the modern system we adopt a deliberate trio:
+     Space Grotesk  — display / headings (techy, space-adjacent)
+     Hanken Grotesk — body / UI text (clean, neutral SaaS)
+     JetBrains Mono — data, labels, code (fleet & inventory readouts)
+   ⚠ SUBSTITUTION: these are loaded from Google Fonts as the brand
+   has no licensed binaries on hand. Swap in self-hosted files when
+   available — just replace the @import below with @font-face rules.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');

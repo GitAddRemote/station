@@ -1,0 +1,23 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Semantic status" subtitle="Success, warning, danger, info — harmonised to the palette" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; font-family: var(--font-mono); background: var(--white); padding: 18px; }
+  .row { display: flex; gap: 14px; }
+  .item { flex: 1; }
+  .chip { height: 56px; border-radius: 10px; display: flex; align-items: flex-end; padding: 8px; }
+  .chip .soft { width: 22px; height: 22px; border-radius: 6px; }
+  .meta { margin-top: 8px; }
+  .meta .n { font-size: 11px; color: #1F2328; font-weight: 600; text-transform: capitalize; }
+  .meta .h { font-size: 10px; color: #8D939A; text-transform: uppercase; }
+</style></head>
+<body>
+  <div class="row" id="r"></div>
+  <script>
+    const items = [['success','#1F8A5B','#DCF3E8'],['warning','#E0961A','#FBEBCF'],['danger','#C5341F','#FADAD3'],['info','#1E7FD6','#EAF4FE']];
+    document.getElementById('r').innerHTML = items.map(([n,c,s]) =>
+      `<div class="item"><div class="chip" style="background:${c}"><div class="soft" style="background:${s}"></div></div><div class="meta"><div class="n">${n}</div><div class="h">${c}</div></div></div>`
+    ).join('');
+  </script>
+</body></html>
