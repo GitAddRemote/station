@@ -163,8 +163,9 @@ describeSuite('Auth - session-family concurrency (e2e, requires Redis)', () => {
     expect(logoutRes.status).toBe(200);
 
     if (refreshRes.status === 200) {
-      // Refresh won the race and issued new tokens. The new access token must
-      // be rejected immediately because logout deleted session:{sid}.
+      // Refresh won the race and issued new tokens. Logout writes a tombstone
+      // after deleting session:{sid} so concurrent refresh SETs cannot
+      // resurrect the session — the new access token must be rejected.
       const newCookies = refreshRes.headers[
         'set-cookie'
       ] as unknown as string[];

@@ -50,6 +50,10 @@ export interface RedisClientLike {
 const REFRESH_TTL_SECONDS = 7 * 24 * 3600; // 7 days
 const REFRESH_TTL_MS = REFRESH_TTL_SECONDS * 1000;
 const PRE_AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// Tombstone written by logout so the session stays dead even if a concurrent
+// refresh SET races in after the DEL. Must outlive the access token TTL (15 min).
+const SESSION_REVOKED_TOMBSTONE = 'revoked';
+const SESSION_REVOKED_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 @Injectable()
 export class AuthService implements OnModuleDestroy {
@@ -405,6 +409,13 @@ export class AuthService implements OnModuleDestroy {
       } else {
         await this.authDel(`session:${sid}`);
       }
+      // Write a tombstone so a concurrent refresh that SET session:{sid} after
+      // the DEL above doesn't silently resurrect the session.
+      await this.authSet(
+        `session:${sid}`,
+        SESSION_REVOKED_TOMBSTONE,
+        SESSION_REVOKED_TTL_MS,
+      );
     }
 
     if (rawAccessToken) {
@@ -457,7 +468,9 @@ export class AuthService implements OnModuleDestroy {
 
   async isSessionAlive(sid: string): Promise<boolean> {
     const hit = await this.authGet(`session:${sid}`);
-    return hit !== null && hit !== undefined;
+    return (
+      hit !== null && hit !== undefined && hit !== SESSION_REVOKED_TOMBSTONE
+    );
   }
 
   private hashToken(raw: string): string {
