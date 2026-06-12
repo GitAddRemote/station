@@ -11,6 +11,7 @@ import {
 import { StationCatalogEntry } from '../../catalog/entities/station-catalog-entry.entity';
 import { StationLocation } from '../../locations/entities/station-location.entity';
 import { StationUnitOfMeasure } from './station-unit-of-measure.entity';
+import { StationInventoryBatch } from './station-inventory-batch.entity';
 
 @Entity({ name: 'station_inventory_item' })
 @Index('idx_station_inventory_item_owner', ['ownerType', 'ownerId'])
@@ -21,6 +22,7 @@ import { StationUnitOfMeasure } from './station-unit-of-measure.entity';
   'ownerId',
   'catalogEntryId',
 ])
+@Index('idx_station_inventory_item_batch_id', ['batchId'])
 export class StationInventoryItem {
   @PrimaryColumn({ type: 'uuid', default: () => 'uuid_generate_v7()' })
   id!: string;
@@ -75,6 +77,16 @@ export class StationInventoryItem {
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;
+
+  @Column({ name: 'batch_id', type: 'uuid', nullable: true })
+  batchId!: string | null;
+
+  @ManyToOne(() => StationInventoryBatch, (batch) => batch.items, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'batch_id' })
+  batch!: StationInventoryBatch | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
