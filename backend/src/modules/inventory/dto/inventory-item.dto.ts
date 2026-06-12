@@ -34,6 +34,9 @@ export class InventoryItemDto {
   @ApiPropertyOptional({ nullable: true })
   locationName!: string | null;
 
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  batchId!: string | null;
+
   @ApiProperty({ format: 'uuid' })
   unitOfMeasureId!: string;
 
