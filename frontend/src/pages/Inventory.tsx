@@ -67,6 +67,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
 import InventoryNewRow from '../components/inventory/InventoryNewRow';
+import InventoryGroupRow from '../components/inventory/InventoryGroupRow';
 import {
   OrgPermission,
   permissionsService,
@@ -222,6 +223,7 @@ const InventoryPage = () => {
     api?: string | null;
   }>({});
   const [newRowSaving, setNewRowSaving] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
   const isOrgMode = viewMode === 'org';
@@ -1012,27 +1014,41 @@ const InventoryPage = () => {
     );
   }, [items, setInlineDrafts]);
 
-  const groupedItems = useMemo(() => {
-    if (groupBy === 'none') {
-      return new Map<string, InventoryRecord[]>([['All items', filteredItems]]);
-    }
 
-    const groups = new Map<string, InventoryRecord[]>();
+  // Accordion grouping: always group by catalogEntryId, filters apply first
+  const accordionGroups = useMemo(() => {
+    const map = new Map<string, { items: InventoryRecord[]; itemName: string; subtypeBadge: string; totalQuantity: number }>();
     filteredItems.forEach((item) => {
-      let key = 'Other';
-      if (groupBy === 'category') {
-        key = item.categoryName || 'Uncategorized';
-      } else if (groupBy === 'share') {
-        key = item.isOrgAvailable ? 'Shared' : 'Private';
+      const existing = map.get(item.catalogEntryId);
+      if (existing) {
+        existing.items.push(item);
+        existing.totalQuantity += Number(item.quantity) || 0;
+      } else {
+        const badge = item.catalogKind === 'vehicle' ? 'Vehicle'
+          : item.catalogKind === 'commodity' ? 'Commodity'
+          : 'Item';
+        map.set(item.catalogEntryId, {
+          items: [item],
+          itemName: item.itemName || `Item #${item.catalogEntryId}`,
+          subtypeBadge: badge,
+          totalQuantity: Number(item.quantity) || 0,
+        });
       }
-
-      const current = groups.get(key) || [];
-      current.push(item);
-      groups.set(key, current);
     });
+    return map;
+  }, [filteredItems]);
 
-    return groups;
-  }, [groupBy, filteredItems]);
+  const toggleGroup = useCallback((catalogEntryId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(catalogEntryId)) {
+        next.delete(catalogEntryId);
+      } else {
+        next.add(catalogEntryId);
+      }
+      return next;
+    });
+  }, []);
 
   const newRowQuantityNumber = useMemo(
     () => (newRowDraft.quantity === '' ? NaN : Number(newRowDraft.quantity)),
@@ -2159,34 +2175,50 @@ const InventoryPage = () => {
                 </div>
               )}
               <div className={isEditorMode ? 'editor' : ''}>
-                {Array.from(groupedItems.entries()).map(([group, groupItems]) => (
-                  <div
-                    key={group}
-                    className={'grp-section' + (groupBy === 'none' ? ' single' : '')}
-                  >
-                    {groupBy !== 'none' && (
-                      <div className="grp-header">
-                        <span className="gchip">{group}</span>
-                        <span className="gcount">{groupItems.length} item{groupItems.length === 1 ? '' : 's'}</span>
-                      </div>
-                    )}
-                    <div className="dtable-wrap">
-                      <div className="inv-row-head" role="row">
-                        <span>Item</span>
-                        <span>Location</span>
-                        <span>Quality</span>
-                        <span>Qty</span>
-                        <span>Updated</span>
-                        <span>Category</span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                      <div role="rowgroup">
-                        {groupItems.map((item) => renderInlineRow(item))}
-                      </div>
+                <div className="grp-section single">
+                  <div className="dtable-wrap">
+                    <div className="inv-row-head" role="row" style={{ paddingLeft: isEditorMode ? 'calc(24px + var(--space-2) + 8px)' : undefined }}>
+                      <span>Item</span>
+                      <span>Location</span>
+                      <span>Quality</span>
+                      <span>Qty</span>
+                      <span>Updated</span>
+                      <span>Category</span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                    <div role="rowgroup">
+                      {Array.from(accordionGroups.entries()).map(([catalogEntryId, group]) => {
+                        const isExpanded = expandedGroups.has(catalogEntryId);
+                        const isFiltered = debouncedSearch !== '' || filters.categoryId !== '';
+                        const filteredQty = group.items.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+                        const activeContracts = 0; // populated by #381/#382
+                        return (
+                          <div key={catalogEntryId}>
+                            <InventoryGroupRow
+                              catalogEntryId={catalogEntryId}
+                              itemName={group.itemName}
+                              subtypeBadge={group.subtypeBadge}
+                              totalQuantity={group.totalQuantity}
+                              filteredQuantity={filteredQty}
+                              isFiltered={isFiltered}
+                              childCount={group.items.length}
+                              activeContractCount={activeContracts}
+                              isExpanded={isExpanded}
+                              density={density}
+                              onToggle={toggleGroup}
+                            />
+                            {isExpanded && group.items.map((item) => (
+                              <div key={item.id} className="acc-child-row">
+                                {renderInlineRow(item)}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
 
               {/* Pagination */}

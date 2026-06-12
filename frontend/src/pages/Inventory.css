@@ -147,6 +147,22 @@
 .grp-section .dtable-wrap { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 .grp-section.single .dtable-wrap { border-radius: var(--radius-xl); }
 
+/* ---- accordion child rows -------------------------------- */
+.acc-child-row {
+  position: relative;
+  padding-left: calc(24px + var(--space-2));
+}
+.acc-child-row::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-subtle);
+  border-radius: 1px;
+}
+
 /* ---- inline edit quantity/quality ------------------------ */
 .qty-edit { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
 .qty-input {
