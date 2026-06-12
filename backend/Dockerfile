@@ -2,11 +2,18 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
 
-COPY . .
-RUN npm run build
+# Copy workspace manifests so pnpm can resolve the full lockfile
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY infra/package.json ./infra/
+
+RUN pnpm install --frozen-lockfile --filter backend... --ignore-scripts
+
+COPY backend/ ./backend/
+RUN pnpm --filter backend run build
 
 FROM node:22-alpine AS runner
 
@@ -14,13 +21,18 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
+RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
+
 RUN addgroup -S station && adduser -S station -G station
 
-COPY package*.json ./
-RUN npm_config_cache=/tmp/.npm npm ci --omit=dev --legacy-peer-deps \
-  && rm -rf /tmp/.npm
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY infra/package.json ./infra/
 
-COPY --from=builder /app/dist ./dist
+RUN pnpm install --frozen-lockfile --filter backend... --prod --ignore-scripts
+
+COPY --from=builder /app/backend/dist ./backend/dist
 
 USER station
 
@@ -29,4 +41,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:3001/health || exit 1
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "backend/dist/main.js"]
