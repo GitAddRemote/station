@@ -22,6 +22,7 @@ import OrganizationsPortlet from '../components/dashboard/portlets/Organizations
 import InvitationsPortlet from '../components/dashboard/portlets/InvitationsPortlet';
 import StubPortlet from '../components/dashboard/portlets/StubPortlet';
 import InventoryPortlet from '../components/inventory/InventoryPortlet';
+import ContractsPortlet from '../components/contracts/ContractsPortlet';
 import '../components/dashboard/Dashboard.css';
 import { api } from '../services/api.service';
 
@@ -193,7 +194,7 @@ const Dashboard = () => {
       case 'fleet':
         return <StubPortlet icon={<RocketLaunchIcon />} label="Fleet" />;
       case 'contracts':
-        return <StubPortlet icon={<ArticleIcon />} label="Contracts" />;
+        return <ContractsPortlet />;
       case 'treasury':
         return <StubPortlet icon={<AccountBalanceIcon />} label="Treasury" />;
       case 'mining':
