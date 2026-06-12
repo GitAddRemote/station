@@ -169,6 +169,7 @@ function ContractsPage() {
       // Clear router state so Back+Forward doesn't re-trigger
       window.history.replaceState({}, '', location.pathname);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally run only once on mount
 
   // rowRefs for keyboard roving focus
@@ -249,7 +250,7 @@ function ContractsPage() {
     return () => document.removeEventListener('keydown', handler);
   }, [dialogOpen, handleNew]);
 
-  const handleAction = useCallback((_action: string, _contractId: string) => {
+  const handleAction = useCallback(() => {
     // TODO: wire actions (#381)
   }, []);
 
@@ -451,7 +452,7 @@ function ContractsPage() {
         orgId={orgId}
         prefill={dialogPrefill}
         onClose={() => { setDialogOpen(false); setDialogPrefill(undefined); }}
-        onCreated={(_id) => {
+        onCreated={() => {
           setDialogOpen(false);
           setDialogPrefill(undefined);
           // TODO: refresh contracts list when real API is wired (#381)
