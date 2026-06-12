@@ -59,7 +59,6 @@ import { AddIsSuperAdminToUser1780150000000 } from './migrations/1780150000000-A
 import { AddOrgGuildMappingAndStationBotPermissions1780160000000 } from './migrations/1780160000000-AddOrgGuildMappingAndStationBotPermissions';
 import { AddInventoryBatches1780180000000 } from './migrations/1780180000000-AddInventoryBatches';
 import { AddUuidDefaultsToMissingPkColumns1780190000000 } from './migrations/1780190000000-AddUuidDefaultsToMissingPkColumns';
-import { AddSlugToOrganization1780200000000 } from './migrations/1780200000000-AddSlugToOrganization';
 import { OrgGuildMapping } from './modules/station-bot-admin/entities/org-guild-mapping.entity';
 import { StationInventoryBatch } from './modules/inventory/entities/station-inventory-batch.entity';
 
@@ -132,7 +131,6 @@ export const AppDataSource = new DataSource({
     AddOrgGuildMappingAndStationBotPermissions1780160000000,
     AddInventoryBatches1780180000000,
     AddUuidDefaultsToMissingPkColumns1780190000000,
-    AddSlugToOrganization1780200000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },

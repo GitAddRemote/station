@@ -20,7 +20,7 @@ export class Organization {
   @Column()
   name!: string;
 
-  @Column({ nullable: true, length: 100 })
+  @Column({ nullable: true })
   slug?: string | null;
 
   @Column({ nullable: true })
