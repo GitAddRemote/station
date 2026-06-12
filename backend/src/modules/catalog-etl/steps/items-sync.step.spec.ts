@@ -69,11 +69,21 @@ function buildDsQuery(
   });
 }
 
+function makeSyncService(syncMode: 'full' | 'delta' = 'full'): object {
+  return {
+    getEtlStepSyncParams: jest
+      .fn()
+      .mockResolvedValue({ syncMode, params: undefined, reason: 'FIRST_SYNC' }),
+    recordEtlStepSync: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
 function buildStep(
   uexGet: jest.Mock,
   dsQuery: jest.Mock,
   repoCreate: jest.Mock,
   repoSave: jest.Mock,
+  syncService: object = makeSyncService(),
 ) {
   const ds = {
     query: dsQuery,
@@ -85,6 +95,7 @@ function buildStep(
   };
   return new ItemsSyncStep(
     { get: uexGet } as never,
+    syncService as never,
     ds as never,
     { create: repoCreate, save: repoSave } as never,
     makeLogger() as never,
@@ -237,6 +248,7 @@ describe('ItemsSyncStep', () => {
       };
       const step = new ItemsSyncStep(
         { get: uexGet } as never,
+        makeSyncService() as never,
         ds as never,
         { create: repoCreate, save: repoSave } as never,
         makeLogger() as never,

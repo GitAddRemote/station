@@ -5,6 +5,15 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
+import { UexSyncService } from '../../uex-sync/uex-sync.service';
+
+// UEX /items supports date_modified_min delta filtering.
+// Note: /items embeds attributes[] inline; the separate /items_attributes endpoint
+// is not currently used because UEX returns the full attribute set in /items.
+// attributes_summary (JSONB on station_item) is derived from these embedded attributes
+// and kept in sync with station_item_attribute rows within the same transaction.
+const UEX_ENDPOINT = '/items';
+const SYNC_STATE_KEY = 'catalog-etl:items';
 
 interface UexItemAttribute {
   id: number;
@@ -48,14 +57,24 @@ function toDate(unixTs: number | null | undefined): Date | null {
   return new Date(unixTs * 1000);
 }
 
-function buildAttributesSummary(
-  attributes: UexItemAttribute[] | undefined,
+/**
+ * Derives attributes_summary from the EAV attribute rows that will be written
+ * to station_item_attribute. The summary is always computed from the same
+ * filtered set that passes EAV validation so the two representations cannot
+ * diverge. Attributes lacking id_category_attribute are excluded (they are
+ * also skipped for station_item_attribute insertion).
+ *
+ * Source: UEX /items embeds attributes[] inline. This is equivalent to
+ * /items_attributes — UEX returns the same attribute dataset either way. We use
+ * the embedded response to avoid a second API call and keep item + attribute
+ * writes in a single atomic transaction.
+ */
+function buildAttributesSummaryFromEav(
+  validAttrs: UexItemAttribute[],
 ): Record<string, string | null> {
-  if (!attributes?.length) return {};
   const summary: Record<string, string | null> = {};
-  for (const attr of attributes) {
-    if (!attr.id_category_attribute) continue;
-    summary[String(attr.id_category_attribute)] = attr.value ?? null;
+  for (const attr of validAttrs) {
+    summary[String(attr.id_category_attribute!)] = attr.value ?? null;
   }
   return summary;
 }
@@ -66,6 +85,7 @@ export class ItemsSyncStep implements EtlStep {
 
   constructor(
     private readonly uexApiClient: UexApiClient,
+    private readonly uexSyncService: UexSyncService,
     private readonly dataSource: DataSource,
     @InjectRepository(EtlWarning)
     private readonly warningsRepo: Repository<EtlWarning>,
@@ -74,10 +94,18 @@ export class ItemsSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
-    const items = await this.uexApiClient.get<UexItem[]>('/items');
+    const { syncMode, params, reason } =
+      await this.uexSyncService.getEtlStepSyncParams(SYNC_STATE_KEY);
 
     this.logger.info(
-      { runId: ctx.runId, count: items.length },
+      { runId: ctx.runId, syncMode, reason },
+      'items-sync starting',
+    );
+
+    const items = await this.uexApiClient.get<UexItem[]>(UEX_ENDPOINT, params);
+
+    this.logger.info(
+      { runId: ctx.runId, syncMode, count: items.length },
       'Fetched items from UEX',
     );
 
@@ -132,8 +160,6 @@ export class ItemsSyncStep implements EtlStep {
         continue;
       }
 
-      const attributesSummary = buildAttributesSummary(record.attributes);
-
       let companyUexId: number | null = record.id_company ?? null;
       if (companyUexId !== null && !knownCompanyUexIds.has(companyUexId)) {
         await this.warningsRepo.save(
@@ -180,6 +206,8 @@ export class ItemsSyncStep implements EtlStep {
 
         validAttrs.push(attr);
       }
+
+      const attributesSummary = buildAttributesSummaryFromEav(validAttrs);
 
       // Column layout (parent_uex_id is a NULL literal — no placeholder):
       // $1  uex_id           $2  category_uex_id   $3  company_uex_id
@@ -435,5 +463,7 @@ export class ItemsSyncStep implements EtlStep {
       { runId: ctx.runId, attrUpserted, attrSkipped },
       'item attributes upserted',
     );
+
+    await this.uexSyncService.recordEtlStepSync(SYNC_STATE_KEY, syncMode);
   }
 }

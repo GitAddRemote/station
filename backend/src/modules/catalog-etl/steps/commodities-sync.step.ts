@@ -5,7 +5,12 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { EtlStep, EtlStepContext } from '../interfaces/etl-step.interface';
 import { EtlWarning } from '../entities/etl-warning.entity';
 import { UexApiClient } from '../../uex-sync/clients/uex-api.client';
+import { UexSyncService } from '../../uex-sync/uex-sync.service';
 import { UexCommodityCategoryMap } from '../../uex/entities/uex-commodity-category-map.entity';
+
+// UEX /commodities supports date_modified_min delta filtering.
+const UEX_ENDPOINT = '/commodities';
+const SYNC_STATE_KEY = 'catalog-etl:commodities';
 
 interface UexCommodity {
   id: number;
@@ -62,6 +67,7 @@ export class CommoditiesSyncStep implements EtlStep {
 
   constructor(
     private readonly uexApiClient: UexApiClient,
+    private readonly uexSyncService: UexSyncService,
     private readonly dataSource: DataSource,
     @InjectRepository(EtlWarning)
     private readonly warningsRepo: Repository<EtlWarning>,
@@ -72,6 +78,14 @@ export class CommoditiesSyncStep implements EtlStep {
   ) {}
 
   async execute(ctx: EtlStepContext): Promise<void> {
+    const { syncMode, params, reason } =
+      await this.uexSyncService.getEtlStepSyncParams(SYNC_STATE_KEY);
+
+    this.logger.info(
+      { runId: ctx.runId, syncMode, reason },
+      'commodities-sync starting',
+    );
+
     const commodityCategoryMapRows = await this.commodityCategoryMapRepo.find({
       select: ['commodityUexId'],
     });
@@ -79,11 +93,13 @@ export class CommoditiesSyncStep implements EtlStep {
       commodityCategoryMapRows.map((row) => row.commodityUexId),
     );
 
-    const commodities =
-      await this.uexApiClient.get<UexCommodity[]>('/commodities');
+    const commodities = await this.uexApiClient.get<UexCommodity[]>(
+      UEX_ENDPOINT,
+      params,
+    );
 
     this.logger.info(
-      { runId: ctx.runId, count: commodities.length },
+      { runId: ctx.runId, syncMode, count: commodities.length },
       'Fetched commodities from UEX',
     );
 
@@ -272,8 +288,10 @@ export class CommoditiesSyncStep implements EtlStep {
     }
 
     this.logger.info(
-      { runId: ctx.runId, upserted, skipped },
+      { runId: ctx.runId, syncMode, upserted, skipped },
       'commodities-sync step complete',
     );
+
+    await this.uexSyncService.recordEtlStepSync(SYNC_STATE_KEY, syncMode);
   }
 }
