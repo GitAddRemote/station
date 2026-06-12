@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   FormControl,
-  FormControlLabel,
   Grid,
   InputLabel,
   ListItemText,
@@ -12,7 +11,6 @@ import {
   Select,
   Slider,
   Stack,
-  Switch,
   TextField,
   Typography,
 } from '@mui/material';
@@ -27,7 +25,6 @@ interface FiltersPanelProps {
   filters: {
     search: string;
     categoryId: string | '';
-    sharedOnly: boolean;
     valueRange: [number, number];
     qualityRange: [number, number];
   };
@@ -43,8 +40,8 @@ interface FiltersPanelProps {
   sortDir: 'asc' | 'desc';
   setSortBy: (value: 'name' | 'quantity' | 'date') => void;
   setSortDir: (updater: (prev: 'asc' | 'desc') => 'asc' | 'desc') => void;
-  groupBy: 'none' | 'category' | 'share';
-  setGroupBy: (value: 'none' | 'category' | 'share') => void;
+  groupBy: 'none' | 'category';
+  setGroupBy: (value: 'none' | 'category') => void;
   density: 'standard' | 'compact';
   setDensity: (value: 'standard' | 'compact') => void;
   viewMode: 'personal' | 'org';
@@ -247,24 +244,6 @@ export const InventoryFiltersPanel = ({
 
       <Grid container spacing={2} alignItems="center">
         <Grid item>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={filters.sharedOnly}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    sharedOnly: e.target.checked,
-                  }))
-                }
-                size="small"
-                disabled={disabled || viewMode === 'org'}
-              />
-            }
-            label="Shared only"
-          />
-        </Grid>
-        <Grid item>
           <Button
             startIcon={<SortIcon />}
             variant="outlined"
@@ -304,13 +283,12 @@ export const InventoryFiltersPanel = ({
               value={groupBy}
               disabled={disabled}
               onChange={(e) =>
-                setGroupBy(e.target.value as 'none' | 'category' | 'share')
+                setGroupBy(e.target.value as 'none' | 'category')
               }
               startAdornment={<GroupWorkIcon sx={{ mr: 1 }} />}
             >
               <MenuItem value="none">No grouping</MenuItem>
               <MenuItem value="category">Category</MenuItem>
-              <MenuItem value="share">Share status</MenuItem>
             </Select>
           </FormControl>
         </Grid>
@@ -327,7 +305,6 @@ export const InventoryFiltersPanel = ({
               setFilters({
                 search: '',
                 categoryId: '',
-                sharedOnly: false,
                 valueRange: reset,
                 qualityRange: [0, 1000],
               });

@@ -3,8 +3,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import IosShareIcon from '@mui/icons-material/IosShare';
-import PersonIcon from '@mui/icons-material/Person';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -36,7 +34,6 @@ const InventoryPortlet = () => {
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [sharedOnly, setSharedOnly] = useState(false);
   const [page, setPage]           = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount]   = useState(0);
@@ -55,7 +52,6 @@ const InventoryPortlet = () => {
         page: page + 1,
         search: debouncedSearch || undefined,
         categoryId: categoryId || undefined,
-        orgAvailable: sharedOnly || undefined,
       });
       setItems(result.data);
       setTotalCount(result.total ?? result.data.length);
@@ -64,10 +60,10 @@ const InventoryPortlet = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, categoryId, sharedOnly, page, rowsPerPage]);
+  }, [debouncedSearch, categoryId, page, rowsPerPage]);
 
   useEffect(() => { fetchInventory(); }, [fetchInventory]);
-  useEffect(() => { setPage(0); }, [debouncedSearch, categoryId, sharedOnly]);
+  useEffect(() => { setPage(0); }, [debouncedSearch, categoryId]);
 
   const totalPages = Math.ceil(totalCount / rowsPerPage);
   const start = totalCount === 0 ? 0 : page * rowsPerPage + 1;
@@ -101,17 +97,6 @@ const InventoryPortlet = () => {
           <ExpandMoreIcon />
         </div>
 
-        <div
-          className={'p-toggle' + (sharedOnly ? ' on' : '')}
-          role="switch"
-          aria-checked={sharedOnly}
-          tabIndex={0}
-          onClick={() => setSharedOnly((v) => !v)}
-          onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? setSharedOnly((v) => !v) : undefined}
-        >
-          <span className="p-switch" />
-          <span>Shared only</span>
-        </div>
       </div>
 
       {/* Table */}
@@ -122,7 +107,7 @@ const InventoryPortlet = () => {
       ) : items.length === 0 ? (
         <div className="p-empty">
           <Inventory2OutlinedIcon />
-          <p>{debouncedSearch || categoryId || sharedOnly ? 'No items match your filters.' : 'No inventory items yet.'}</p>
+          <p>{debouncedSearch || categoryId ? 'No items match your filters.' : 'No inventory items yet.'}</p>
         </div>
       ) : (
         <table className="inv-table">
@@ -155,12 +140,7 @@ const InventoryPortlet = () => {
                 </td>
                 <td className="cell-muted">{item.locationName ?? '—'}</td>
                 <td>
-                  {item.ownerType === 'user' && item.sharedByUsername
-                    ? <span className="chip-badge brand"><PersonIcon style={{ width: 11, height: 11 }} /> {item.sharedByUsername}</span>
-                    : item.isOrgAvailable
-                      ? <span className="chip-badge success"><IosShareIcon /> Shared</span>
-                      : <span className="chip-badge neutral"><LockOutlinedIcon /> Private</span>
-                  }
+                  <span className="chip-badge neutral"><LockOutlinedIcon /> Private</span>
                 </td>
               </tr>
             ))}
