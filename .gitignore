@@ -63,3 +63,6 @@ infra/terraform/terraform.tfvars
 infra/terraform/*.tfstate
 infra/terraform/*.tfstate.backup
 .aider*
+
+# Claude Code
+.claude/
