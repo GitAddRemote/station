@@ -34,8 +34,7 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import EditIcon from '@mui/icons-material/Edit';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
-import ShareIcon from '@mui/icons-material/Share';
-import UnpublishedIcon from '@mui/icons-material/Unpublished';
+
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonIcon from '@mui/icons-material/Person';
@@ -74,7 +73,7 @@ import {
 import { api } from '../services/api.service';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
-type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
+type ActionMode = 'edit' | 'split' | 'delete' | null;
 type InlineDraft = { quantity: number | ''; quality: number | ''; locationId?: string | null; locationName?: string | null };
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
@@ -136,6 +135,7 @@ const InventoryPage = () => {
   const [editLocation, setEditLocation] = useState<LocationDto | null>(null);
   const [editQuality, setEditQuality] = useState<number | ''>('');
   const [editUomId, setEditUomId] = useState<string>('');
+  const [editAlias, setEditAlias] = useState<string>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -152,6 +152,7 @@ const InventoryPage = () => {
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemUomId, setNewItemUomId] = useState<string>('');
   const [newItemNotes, setNewItemNotes] = useState('');
+  const [newItemAlias, setNewItemAlias] = useState('');
   const [newItemLocation, setNewItemLocation] = useState<LocationDto | null>(null);
   const [newItemQuality, setNewItemQuality] = useState<number | ''>('');
   const [addSubmitting, setAddSubmitting] = useState(false);
@@ -165,13 +166,12 @@ const InventoryPage = () => {
   const [filters, setFilters] = useState({
     search: '',
     categoryId: '' as string | '',
-    sharedOnly: false,
     valueRange: [0, SLIDER_QUANTITY_MAX] as [number, number],
     qualityRange: [0, 1000] as [number, number],
   });
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'date'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [groupBy, setGroupBy] = useState<'none' | 'category' | 'share'>(
+  const [groupBy, setGroupBy] = useState<'none' | 'category'>(
     'none',
   );
   const [page, setPage] = useState(0);
@@ -189,9 +189,11 @@ const InventoryPage = () => {
   );
   const [inlineActiveField, setInlineActiveField] = useState<{
     rowKey: string;
-    field: 'quantity' | 'quality' | 'location';
+    field: 'quantity' | 'quality' | 'location' | 'alias';
   } | null>(null);
   const [inlineLocations, setInlineLocations] = useState<Record<string, LocationDto | null>>({});
+  const [inlineAliases, setInlineAliases] = useState<Record<string, string>>({});
+  const [newRowAlias, setNewRowAlias] = useState('');
   const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] =
     useState(false);
   const [newRowDraft, setNewRowDraft] = useState<{
@@ -328,7 +330,7 @@ const InventoryPage = () => {
   const newRowItemCache = useRef<Map<string, CatalogEntryDto[]>>(new Map());
 
   const activateInlineField = useCallback(
-    (rowKey: string, field: 'quantity' | 'quality' | 'location') => {
+    (rowKey: string, field: 'quantity' | 'quality' | 'location' | 'alias') => {
       setInlineActiveField({ rowKey, field });
       setInlineError((prev) => ({ ...prev, [rowKey]: null }));
     },
@@ -392,6 +394,22 @@ const InventoryPage = () => {
       return null;
     });
   }, []);
+
+  const handleInlineAliasChange = useCallback(
+    (itemId: string, value: string) => {
+      setInlineAliases((prev) => ({ ...prev, [itemId]: value }));
+    },
+    [],
+  );
+
+  const handleInlineAliasBlur = useCallback((rowKey: string) => {
+    setInlineActiveField((prev) => {
+      if (!prev || prev.rowKey !== rowKey) return prev;
+      if (prev.field !== 'alias') return prev;
+      return null;
+    });
+  }, []);
+
   const handleQuantityRef = useCallback(
     (ref: HTMLInputElement | null, key: string) => {
       quantityRefs.current[key] = ref;
@@ -589,7 +607,6 @@ const InventoryPage = () => {
           page: page + 1,
           search: debouncedSearch || undefined,
           categoryId,
-          orgAvailable: filters.sharedOnly || undefined,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
           maxQuantity: filters.valueRange[1] < SLIDER_QUANTITY_MAX ? filters.valueRange[1] : undefined,
           minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
@@ -622,7 +639,6 @@ const InventoryPage = () => {
     orgPermissionsLoading,
     canViewOrgInventory,
     filters.categoryId,
-    filters.sharedOnly,
     filters.valueRange,
     filters.qualityRange,
     debouncedSearch,
@@ -647,6 +663,7 @@ const InventoryPage = () => {
     setCatalogPage(0);
     setNewItemQuantity(1);
     setNewItemNotes('');
+    setNewItemAlias('');
     setNewItemLocation(null);
     setNewItemQuality('');
     setCatalogError(null);
@@ -657,6 +674,7 @@ const InventoryPage = () => {
     setAddDialogOpen(false);
     setNewItemLocation(null);
     setNewItemQuality('');
+    setNewItemAlias('');
   };
 
   const handleCreateInventoryItem = async (options?: {
@@ -708,6 +726,8 @@ const InventoryPage = () => {
             });
           }
         } else if (!isOrgView) {
+          const isAliasEligible =
+            selectedCatalogItem.catalogKind === 'item' || selectedCatalogItem.catalogKind === 'vehicle';
           await inventoryService.createItem({
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
@@ -715,6 +735,7 @@ const InventoryPage = () => {
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
+            alias: isAliasEligible && newItemAlias.trim() ? newItemAlias.trim() : null,
           });
         } else {
           setCatalogError('This item already exists in the org inventory.');
@@ -722,6 +743,8 @@ const InventoryPage = () => {
         }
       } else {
         const resolvedUomId = newItemUomId || defaultUomIdFor(selectedCatalogItem.catalogKind);
+        const isAliasEligible =
+          selectedCatalogItem.catalogKind === 'item' || selectedCatalogItem.catalogKind === 'vehicle';
         if (isOrgView && selectedOrgId !== null) {
           await inventoryService.createOrgItem(selectedOrgId, {
             catalogEntryId: selectedCatalogItem.id,
@@ -730,6 +753,7 @@ const InventoryPage = () => {
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
+            alias: isAliasEligible && newItemAlias.trim() ? newItemAlias.trim() : null,
           });
         } else {
           await inventoryService.createItem({
@@ -739,6 +763,7 @@ const InventoryPage = () => {
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
+            alias: isAliasEligible && newItemAlias.trim() ? newItemAlias.trim() : null,
           });
         }
       }
@@ -747,6 +772,7 @@ const InventoryPage = () => {
       if (options?.stayOpen) {
         setNewItemQuantity(1);
         setNewItemNotes('');
+        setNewItemAlias('');
         setNewItemLocation(null);
         setNewItemQuality('');
         setCatalogError(null);
@@ -872,7 +898,6 @@ const InventoryPage = () => {
   }, [
     debouncedSearch,
     filters.categoryId,
-    filters.sharedOnly,
     filters.valueRange,
     filters.qualityRange,
     viewMode,
@@ -931,6 +956,7 @@ const InventoryPage = () => {
         }
         setEditQuality(actionItem.quality != null ? actionItem.quality : '');
         setEditUomId(actionItem.unitOfMeasureId ?? '');
+        setEditAlias(actionItem.alias ?? '');
       }
     }
   }, [actionMode, actionItem]);
@@ -991,8 +1017,6 @@ const InventoryPage = () => {
       let key = 'Other';
       if (groupBy === 'category') {
         key = item.categoryName || 'Uncategorized';
-      } else if (groupBy === 'share') {
-        key = item.isOrgAvailable ? 'Shared' : 'Private';
       }
 
       const current = groups.get(key) || [];
@@ -1028,6 +1052,7 @@ const InventoryPage = () => {
     setNewRowSelectedItem(null);
     setNewRowSelectedLocation(null);
     setNewRowQuality('');
+    setNewRowAlias('');
     setNewRowItemInput('');
     setNewRowErrors({});
   };
@@ -1067,12 +1092,16 @@ const InventoryPage = () => {
     try {
       setNewRowSaving(true);
       setNewRowErrors({});
+      const isAliasEligible =
+        newRowSelectedItem !== null &&
+        (newRowSelectedItem.catalogKind === 'item' || newRowSelectedItem.catalogKind === 'vehicle');
       const payload = {
         catalogEntryId: selectedItemId!,
         quantity: parsedQuantity,
         unitOfMeasureId: newRowUomId || defaultUomIdFor(newRowSelectedItem?.catalogKind ?? null),
         locationId: newRowSelectedLocation?.id ?? null,
         quality: newRowQuality !== '' ? newRowQuality : null,
+        alias: isAliasEligible && newRowAlias.trim() ? newRowAlias.trim() : null,
       };
       if (viewMode === 'org' && selectedOrgId) {
         await inventoryService.createOrgItem(selectedOrgId, payload);
@@ -1319,18 +1348,28 @@ const InventoryPage = () => {
       const draftQuality = draft.quality;
       const parsedQuality = draftQuality !== '' ? Number(draftQuality) : null;
 
+      const aliasIsEligible =
+        item.catalogKind === 'item' || item.catalogKind === 'vehicle';
+      const aliasDraft = inlineAliases[item.id];
+      const aliasPayload: string | null | undefined =
+        aliasIsEligible && aliasDraft !== undefined
+          ? (aliasDraft.trim() || null)
+          : undefined;
+
       try {
         if (viewMode === 'org' && selectedOrgId) {
           await inventoryService.updateOrgItem(selectedOrgId, item.id, {
             quantity: parsedQuantity,
             locationId,
             quality: parsedQuality,
+            ...(aliasPayload !== undefined ? { alias: aliasPayload } : {}),
           });
         } else {
           await inventoryService.updateItem(item.id, {
             quantity: parsedQuantity,
             locationId,
             quality: parsedQuality,
+            ...(aliasPayload !== undefined ? { alias: aliasPayload } : {}),
           });
         }
         setInlineSaved((prev) => {
@@ -1363,7 +1402,7 @@ const InventoryPage = () => {
         setInlineSaving(updated);
       }
     },
-    [focusController, getInlineDraft, inlineLocations, inlineSaving, items, selectedOrgId, viewMode],
+    [focusController, getInlineDraft, inlineAliases, inlineLocations, inlineSaving, items, selectedOrgId, viewMode],
   );
 
   const handleInlineSaveAndAdvance = useCallback(
@@ -1393,6 +1432,7 @@ const InventoryPage = () => {
     notes?: string;
     locationId?: string | null;
     quality?: number | null;
+    alias?: string | null;
   }) => {
     if (!actionItem) return;
     try {
@@ -1427,32 +1467,6 @@ const InventoryPage = () => {
       setError('Split is not yet supported in this version.');
       setActionWorking(false);
       return;
-    } finally {
-      setActionWorking(false);
-    }
-  };
-
-  const handleShare = async () => {
-    if (!actionItem) return;
-    try {
-      setActionWorking(true);
-      setError(null);
-      await inventoryService.updateItem(actionItem.id, { isOrgAvailable: true });
-      closeActionMenu();
-      await fetchInventory();
-    } finally {
-      setActionWorking(false);
-    }
-  };
-
-  const handleUnshare = async () => {
-    if (!actionItem) return;
-    try {
-      setActionWorking(true);
-      setError(null);
-      await inventoryService.updateItem(actionItem.id, { isOrgAvailable: false });
-      closeActionMenu();
-      await fetchInventory();
     } finally {
       setActionWorking(false);
     }
@@ -1502,15 +1516,12 @@ const InventoryPage = () => {
           >
             {actionMode === 'edit' && <EditIcon fontSize="small" />}
             {actionMode === 'split' && <CallSplitIcon fontSize="small" />}
-            {actionMode === 'share' && <ShareIcon fontSize="small" />}
             {actionMode === 'delete' && <DeleteForeverIcon fontSize="small" />}
             {actionMode === 'edit'
               ? 'Edit item'
               : actionMode === 'split'
                 ? 'Split item'
-                : actionMode === 'share'
-                  ? 'Share item'
-                  : 'Delete item'}
+                : 'Delete item'}
           </Typography>
           {actionMode === 'edit' && (
             <>
@@ -1570,6 +1581,16 @@ const InventoryPage = () => {
                   }
                 }}
               />
+              {(actionItem.catalogKind === 'item' || actionItem.catalogKind === 'vehicle') && (
+                <TextField
+                  label="Nickname (optional)"
+                  fullWidth
+                  inputProps={{ maxLength: 64 }}
+                  placeholder="Add a nickname…"
+                  value={editAlias}
+                  onChange={(e) => setEditAlias(e.target.value)}
+                />
+              )}
               <TextField
                 label="Notes"
                 fullWidth
@@ -1595,6 +1616,9 @@ const InventoryPage = () => {
                       notes: actionItem.notes ?? undefined,
                       locationId: editLocation?.id ?? null,
                       quality: editQuality !== '' ? editQuality : null,
+                      alias: (actionItem.catalogKind === 'item' || actionItem.catalogKind === 'vehicle')
+                        ? (editAlias.trim() || null)
+                        : undefined,
                     })
                   }
                   disabled={actionWorking}
@@ -1627,24 +1651,6 @@ const InventoryPage = () => {
                   onClick={() => handleSplit(actionQuantity)}
                 >
                   Split
-                </Button>
-              </Stack>
-            </>
-          )}
-          {actionMode === 'share' && (
-            <>
-              <Typography variant="body2" color="text.secondary">
-                Share <strong style={{ color: 'var(--text-strong)' }}>
-                  {actionItem.itemName || `Item ${actionItem.catalogEntryId}`}
-                </strong> with your organizations?
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: 'var(--text-xs)' }}>
-                Sharing makes this item visible to all organizations you belong to. You can unshare it at any time.
-              </Typography>
-              <Stack direction="row" spacing={1} justifyContent="flex-end">
-                <Button variant="text" onClick={closeActionMenu}>Cancel</Button>
-                <Button variant="contained" disabled={actionWorking} onClick={handleShare}>
-                  Share
                 </Button>
               </Stack>
             </>
@@ -1743,7 +1749,6 @@ const InventoryPage = () => {
   const inventoryBusy = refreshing;
   const showEmptyState = filteredItems.length === 0 && !refreshing;
   const totalQty = items.reduce((s, x) => s + Number(x.quantity), 0);
-  const sharedCount = items.filter((x) => x.isOrgAvailable).length;
   const catCount = new Set(items.map((x) => x.categoryName)).size;
 
   const renderInlineRow = (item: InventoryRecord) => {
@@ -1762,6 +1767,8 @@ const InventoryPage = () => {
       isRowActive && inlineActiveField?.field === 'quality';
     const isLocationActive =
       isRowActive && inlineActiveField?.field === 'location';
+    const isAliasActive =
+      isRowActive && inlineActiveField?.field === 'alias';
     const saving = inlineSaving.has(item.id);
     const errorText = inlineError[item.id];
     const saved = inlineSaved.has(item.id.toString());
@@ -1775,7 +1782,9 @@ const InventoryPage = () => {
         quantityEditing={isQuantityActive}
         qualityEditing={isQualityActive}
         locationEditing={isLocationActive}
+        aliasEditing={isAliasActive}
         inlineLocation={inlineLocation}
+        inlineAlias={inlineAliases[item.id] ?? ''}
         inlineSaving={saving}
         inlineSaved={saved}
         inlineError={errorText}
@@ -1790,6 +1799,8 @@ const InventoryPage = () => {
         onActivateField={activateInlineField}
         onLocationChange={handleInlineLocationChange}
         onLocationBlur={handleInlineLocationBlur}
+        onAliasChange={handleInlineAliasChange}
+        onAliasBlur={handleInlineAliasBlur}
         onSave={handleInlineSaveAndAdvance}
         onOpenActions={handleActionOpen}
         setQuantityRef={handleQuantityRef}
@@ -1818,7 +1829,7 @@ const InventoryPage = () => {
             <h1 className="page-title">Inventory</h1>
             <p className="page-sub">
               Track everything you own and what your org holds — refined ore, components,
-              weapons, and trade goods. Edit quantities inline, split stacks, and share with your org.
+              weapons, and trade goods. Edit quantities inline and split stacks.
             </p>
           </div>
           <div className="page-actions">
@@ -1883,7 +1894,7 @@ const InventoryPage = () => {
         )}
 
         {/* Stat strip */}
-        <div className="statstrip" style={{ '--n': 4 } as React.CSSProperties}>
+        <div className="statstrip" style={{ '--n': 3 } as React.CSSProperties}>
           <div className="statcard">
             <div className="k"><PackageIcon style={{ width: 13, height: 13 }} /> {isOrgMode ? 'Org records' : 'My records'}</div>
             <div className="v">{items.length.toLocaleString()}</div>
@@ -1893,11 +1904,6 @@ const InventoryPage = () => {
             <div className="k"><LayersIcon style={{ width: 13, height: 13 }} /> Total quantity</div>
             <div className="v">{totalQty > 9999 ? `${(totalQty / 1000).toFixed(1)}k` : totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</div>
             <div className="d">units on hand</div>
-          </div>
-          <div className="statcard">
-            <div className="k"><ShareIcon style={{ width: 13, height: 13 }} /> {isOrgMode ? 'Org stock' : 'Shared items'}</div>
-            <div className="v up">{isOrgMode ? items.length.toLocaleString() : sharedCount.toLocaleString()}</div>
-            <div className="d up">{isOrgMode ? 'visible to members' : 'shared to orgs'}</div>
           </div>
           <div className="statcard">
             <div className="k"><LocalOfferIcon style={{ width: 13, height: 13 }} /> Categories</div>
@@ -1931,15 +1937,6 @@ const InventoryPage = () => {
             </select>
             <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
           </span>
-          {!isOrgMode && (
-            <button
-              className="fchip"
-              aria-pressed={filters.sharedOnly}
-              onClick={() => setFilters((prev) => ({ ...prev, sharedOnly: !prev.sharedOnly }))}
-            >
-              <ShareIcon style={{ width: 15, height: 15 }} /> Shared only
-            </button>
-          )}
           <span className="inv-select">
             <SortIcon className="lead" style={{ width: 15, height: 15 }} />
             <select
@@ -1964,12 +1961,11 @@ const InventoryPage = () => {
             <GridViewIcon className="lead" style={{ width: 15, height: 15 }} />
             <select
               value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value as 'none' | 'category' | 'share')}
+              onChange={(e) => setGroupBy(e.target.value as 'none' | 'category')}
               aria-label="Group by"
             >
               <option value="none">No grouping</option>
               <option value="category">Group by category</option>
-              <option value="share">Group by share status</option>
             </select>
             <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
           </span>
@@ -2041,6 +2037,8 @@ const InventoryPage = () => {
                 onLocationChange={setNewRowSelectedLocation}
                 quality={newRowQuality}
                 onQualityChange={setNewRowQuality}
+                alias={newRowAlias}
+                onAliasChange={setNewRowAlias}
                 onItemSelect={(value) => {
                   setNewRowSelectedItem(value);
                   setNewRowDraft((prev) => ({ ...prev, itemId: value ? value.id : '' }));
@@ -2261,6 +2259,19 @@ const InventoryPage = () => {
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); addNotesRef.current?.focus(); } }}
                 />
               </div>
+              {(selectedCatalogItem?.catalogKind === 'item' || selectedCatalogItem?.catalogKind === 'vehicle') && (
+                <div>
+                  <label className="field-lbl">Nickname (optional)</label>
+                  <input
+                    className="field-in"
+                    type="text"
+                    maxLength={64}
+                    value={newItemAlias}
+                    onChange={(e) => setNewItemAlias(e.target.value)}
+                    placeholder="Add a nickname…"
+                  />
+                </div>
+              )}
               <div>
                 <label className="field-lbl">Notes</label>
                 <textarea
@@ -2346,18 +2357,6 @@ const InventoryPage = () => {
           <ListItemIcon><CallSplitIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Split</ListItemText>
         </MenuItem>
-        {viewMode === 'personal' && (
-          <MenuItem onClick={() => openActionDialog('share')}>
-            <ListItemIcon><ShareIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Share</ListItemText>
-          </MenuItem>
-        )}
-        {viewMode === 'personal' && actionItem?.isOrgAvailable && (
-          <MenuItem onClick={handleUnshare}>
-            <ListItemIcon><UnpublishedIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Unshare</ListItemText>
-          </MenuItem>
-        )}
         <MenuItem onClick={() => openActionDialog('delete')}>
           <ListItemIcon><DeleteForeverIcon fontSize="small" color="error" /></ListItemIcon>
           <ListItemText>Delete</ListItemText>

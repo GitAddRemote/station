@@ -21,6 +21,7 @@ import LocationPicker from './LocationPicker';
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
 const MIN_INVENTORY_QUANTITY = 0.000001;
+const ALIAS_ELIGIBLE_KINDS = new Set<string>(['item', 'vehicle']);
 
 export type InventoryRecord = InventoryItem | OrgInventoryItem;
 
@@ -31,7 +32,9 @@ interface InventoryInlineRowProps {
   quantityEditing: boolean;
   qualityEditing: boolean;
   locationEditing: boolean;
+  aliasEditing: boolean;
   inlineLocation: LocationDto | null;
+  inlineAlias: string;
   inlineSaving: boolean;
   inlineSaved?: boolean;
   inlineError?: string | null;
@@ -48,11 +51,13 @@ interface InventoryInlineRowProps {
   onQualityBlur: (rowKey: string) => void;
   onActivateField: (
     rowKey: string,
-    field: 'quantity' | 'quality' | 'location',
+    field: 'quantity' | 'quality' | 'location' | 'alias',
     initialInput?: string,
   ) => void;
   onLocationChange: (itemId: string, location: LocationDto | null) => void;
   onLocationBlur: (rowKey: string) => void;
+  onAliasChange: (itemId: string, value: string) => void;
+  onAliasBlur: (rowKey: string) => void;
   onSave: (item: InventoryRecord) => void;
   onOpenActions?: (
     event: MouseEvent<HTMLElement>,
@@ -70,7 +75,9 @@ const InventoryInlineRow = ({
   quantityEditing,
   qualityEditing,
   locationEditing,
+  aliasEditing,
   inlineLocation,
+  inlineAlias,
   inlineSaving,
   inlineSaved,
   inlineError,
@@ -85,6 +92,8 @@ const InventoryInlineRow = ({
   onActivateField,
   onLocationChange,
   onLocationBlur,
+  onAliasChange,
+  onAliasBlur,
   onSave,
   onOpenActions,
   setQuantityRef,
@@ -95,6 +104,10 @@ const InventoryInlineRow = ({
   const displayQuantity = Number.isFinite(draftQuantityNumber)
     ? draftQuantityNumber
     : Number(item.quantity);
+
+  const isAliasEligible = ALIAS_ELIGIBLE_KINDS.has(item.catalogKind);
+  const displayAlias = inlineAlias !== '' ? inlineAlias : (item.alias ?? '');
+  const hasAlias = displayAlias.trim().length > 0;
 
   return (
     <Box
@@ -117,33 +130,144 @@ const InventoryInlineRow = ({
         },
       }}
     >
+      {/* Name / alias column */}
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
-        <Stack
-          direction="row"
-          spacing={density === 'compact' ? 0.5 : 1}
-          alignItems="center"
-          flexWrap="wrap"
-          columnGap={density === 'compact' ? 0.75 : 1}
-          rowGap={density === 'compact' ? 0.25 : 0.5}
-        >
-          <Typography
-            variant={density === 'compact' ? 'body2' : 'subtitle1'}
-            sx={{ fontWeight: 600 }}
-            noWrap
-            title={item.itemName || `Item #${item.catalogEntryId}`}
-          >
-            {item.itemName || `Item #${item.catalogEntryId}`}
-          </Typography>
-          {item.isOrgAvailable
-            ? <span className="chip-badge success">Shared</span>
-            : <span className="chip-badge neutral">Private</span>
-          }
-          {item.ownerType === 'user' && item.sharedByUsername && (
-            <span className="chip-badge brand">
-              {item.sharedByUsername}
-            </span>
-          )}
-        </Stack>
+        {density === 'compact' && isAliasEligible ? (
+          <>
+            {aliasEditing ? (
+              <TextField
+                size="small"
+                label="Nickname"
+                value={displayAlias}
+                onChange={(e) => onAliasChange(item.id, e.target.value)}
+                onBlur={() => onAliasBlur(rowKey)}
+                inputProps={{ maxLength: 255 }}
+                placeholder="Add a nickname…"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onAliasBlur(rowKey);
+                  } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    onAliasChange(item.id, item.alias ?? '');
+                    onAliasBlur(rowKey);
+                  }
+                }}
+                sx={{ maxWidth: 200 }}
+              />
+            ) : (
+              <Box
+                role="button"
+                tabIndex={0}
+                onClick={() => onActivateField(rowKey, 'alias')}
+                onFocus={() => onActivateField(rowKey, 'alias')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onActivateField(rowKey, 'alias');
+                  }
+                }}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  cursor: 'text',
+                  '&:hover .inline-edit-icon': { opacity: 0.75 },
+                  '&:focus-visible': {
+                    outline: '1px solid rgba(74, 158, 255, 0.6)',
+                    borderRadius: 1,
+                    outlineOffset: 2,
+                  },
+                }}
+                aria-label={`Edit nickname for ${item.itemName ?? `Item ${item.catalogEntryId}`}`}
+              >
+                {hasAlias ? (
+                  <>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600 }}
+                        noWrap
+                        title={displayAlias}
+                      >
+                        {displayAlias}
+                      </Typography>
+                      <EditIcon
+                        className="inline-edit-icon"
+                        fontSize="inherit"
+                        sx={{ opacity: 0, transition: 'opacity 0.2s ease', flexShrink: 0 }}
+                      />
+                    </Stack>
+                    <Typography
+                      variant="caption"
+                      noWrap
+                      sx={{ color: 'var(--text-secondary, rgba(255,255,255,0.5))', fontSize: '0.7rem' }}
+                      title={item.itemName}
+                    >
+                      {item.itemName}
+                    </Typography>
+                  </>
+                ) : (
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 600 }}
+                      noWrap
+                      title={item.itemName || `Item #${item.catalogEntryId}`}
+                    >
+                      {item.itemName || `Item #${item.catalogEntryId}`}
+                    </Typography>
+                    <EditIcon
+                      className="inline-edit-icon"
+                      fontSize="inherit"
+                      sx={{ opacity: 0, transition: 'opacity 0.2s ease', flexShrink: 0 }}
+                    />
+                  </Stack>
+                )}
+              </Box>
+            )}
+          </>
+        ) : (
+          <>
+            <Stack
+              direction="row"
+              spacing={density === 'compact' ? 0.5 : 1}
+              alignItems="center"
+              flexWrap="wrap"
+              columnGap={density === 'compact' ? 0.75 : 1}
+              rowGap={density === 'compact' ? 0.25 : 0.5}
+            >
+              {hasAlias && isAliasEligible ? (
+                <Stack spacing={0} sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography
+                    variant={density === 'compact' ? 'body2' : 'subtitle1'}
+                    sx={{ fontWeight: 600 }}
+                    noWrap
+                    title={displayAlias}
+                  >
+                    {displayAlias}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    noWrap
+                    sx={{ color: 'var(--text-secondary, rgba(255,255,255,0.5))', fontSize: '0.7rem' }}
+                    title={item.itemName}
+                  >
+                    {item.itemName}
+                  </Typography>
+                </Stack>
+              ) : (
+                <Typography
+                  variant={density === 'compact' ? 'body2' : 'subtitle1'}
+                  sx={{ fontWeight: 600 }}
+                  noWrap
+                  title={item.itemName || `Item #${item.catalogEntryId}`}
+                >
+                  {item.itemName || `Item #${item.catalogEntryId}`}
+                </Typography>
+              )}
+            </Stack>
+          </>
+        )}
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>
         {density !== 'compact' ? (
@@ -504,7 +628,9 @@ const areEqual = (
   prev.quantityEditing === next.quantityEditing &&
   prev.qualityEditing === next.qualityEditing &&
   prev.locationEditing === next.locationEditing &&
+  prev.aliasEditing === next.aliasEditing &&
   prev.inlineLocation === next.inlineLocation &&
+  prev.inlineAlias === next.inlineAlias &&
   prev.inlineSaving === next.inlineSaving &&
   prev.inlineSaved === next.inlineSaved &&
   prev.inlineError === next.inlineError &&
@@ -519,6 +645,8 @@ const areEqual = (
   prev.onActivateField === next.onActivateField &&
   prev.onLocationChange === next.onLocationChange &&
   prev.onLocationBlur === next.onLocationBlur &&
+  prev.onAliasChange === next.onAliasChange &&
+  prev.onAliasBlur === next.onAliasBlur &&
   prev.onSave === next.onSave &&
   prev.onOpenActions === next.onOpenActions &&
   prev.setQuantityRef === next.setQuantityRef &&
