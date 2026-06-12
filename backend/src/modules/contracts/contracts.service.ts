@@ -191,7 +191,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.CREATE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { contractTitle: contract.title, orgId: contract.orgId },
     });
@@ -242,7 +242,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.UPDATE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { orgId: contract.orgId },
     });
@@ -265,7 +265,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.DELETE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { orgId: contract.orgId },
     });
@@ -290,7 +290,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.UPDATE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { transition: 'publish', orgId: contract.orgId },
     });
@@ -338,7 +338,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.UPDATE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { transition: 'claim', orgId: contract.orgId },
     });
@@ -365,7 +365,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.UPDATE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { transition: 'start', orgId: contract.orgId },
     });
@@ -396,7 +396,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.UPDATE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { transition: 'complete', orgId: contract.orgId },
     });
@@ -509,7 +509,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.UPDATE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { transition: 'dispute', orgId: contract.orgId },
     });
@@ -543,7 +543,7 @@ export class ContractsService {
     await this.auditLogsService.log({
       userId,
       action: AuditAction.UPDATE,
-      entityType: AuditEntityType.ORGANIZATION,
+      entityType: AuditEntityType.CONTRACT,
       entityId: contract.id,
       metadata: { transition: 'cancel', orgId: contract.orgId },
     });

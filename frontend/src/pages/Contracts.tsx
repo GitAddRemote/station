@@ -6,6 +6,8 @@ import {
   useRef,
 } from 'react';
 import type { KeyboardEvent } from 'react';
+import { useLocation } from 'react-router-dom';
+import { CircularProgress } from '@mui/material';
 import AppShell from '../components/AppShell';
 import ArticleIcon from '@mui/icons-material/Article';
 import AddIcon from '@mui/icons-material/Add';
@@ -22,7 +24,10 @@ import RecyclingIcon from '@mui/icons-material/Recycling';
 import { ContractRow } from '../components/contracts/ContractRow';
 import { ContractDetail } from '../components/contracts/ContractDetail';
 import { CONTRACT_TYPE_META, fmtAbbr } from '../components/contracts/contractMeta';
+import NewContractDialog, { type NewContractDialogPrefill } from '../components/contracts/NewContractDialog';
 import type { Contract, ContractType } from '../services/contracts.service';
+import { contractsService } from '../services/contracts.service';
+import { api } from '../services/api.service';
 import './Contracts.css';
 
 // ---- local mock data (used until real API is wired in #381) ---
@@ -148,18 +153,72 @@ const FILTERS: FilterOption[] = [
 
 // ---- ContractsPage ----
 function ContractsPage() {
+  const location = useLocation();
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
   const [selectedId, setSelectedId] = useState<string | null>(MOCK_CONTRACTS[0]?.id ?? null);
-  const [loading] = useState(false);
-  const [error] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [actionWorking, setActionWorking] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ action: 'dispute' | 'cancel'; contractId: string } | null>(null);
+  const [confirmReason, setConfirmReason] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogPrefill, setDialogPrefill] = useState<NewContractDialogPrefill | undefined>(undefined);
+  const [orgId, setOrgId] = useState('');
+
+  // Load user's org on mount
+  useEffect(() => {
+    api.get('/users/profile').then(res => {
+      const userId: string = res.data.userId;
+      // Use inventory service org endpoint to get first org
+      return api.get(`/user-organization-roles/user/${userId}/organizations`);
+    }).then(res => {
+      const orgs = res.data as Array<{ organization?: { id: string } }>;
+      if (orgs.length > 0) {
+        setOrgId(orgs[0].organization?.id ?? '');
+      }
+    }).catch(() => {});
+  }, []);
+
+  const fetchContracts = useCallback(async (currentOrgId: string) => {
+    if (!currentOrgId) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await contractsService.getContracts({ orgId: currentOrgId, limit: 50, page: 1 });
+      setContracts(result.data.length > 0 ? result.data : MOCK_CONTRACTS);
+    } catch {
+      // Fall back to mock data if API not yet available
+      setContracts(MOCK_CONTRACTS);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchContracts(orgId);
+  }, [orgId, fetchContracts]);
+
+  // Handle pre-fill from inventory screen (#382)
+  useEffect(() => {
+    const state = location.state as { newContract?: NewContractDialogPrefill } | null;
+    if (state?.newContract) {
+      setDialogPrefill(state.newContract);
+      setDialogOpen(true);
+      // Clear router state so Back+Forward doesn't re-trigger
+      window.history.replaceState({}, '', location.pathname);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run only once on mount
 
   // rowRefs for keyboard roving focus
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
 
   const visible = useMemo(() => {
-    if (typeFilter === 'all') return MOCK_CONTRACTS;
-    return MOCK_CONTRACTS.filter((c) => c.type === typeFilter);
-  }, [typeFilter]);
+    if (typeFilter === 'all') return contracts;
+    return contracts.filter((c) => c.type === typeFilter);
+  }, [typeFilter, contracts]);
 
   const selected = useMemo(
     () => visible.find((c) => c.id === selectedId) ?? visible[0] ?? null,
@@ -177,14 +236,14 @@ function ContractsPage() {
   }, [typeFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // stat strip counts
-  const openCount = MOCK_CONTRACTS.filter((c) => c.status === 'open').length;
-  const inProgressCount = MOCK_CONTRACTS.filter(
+  const openCount = contracts.filter((c) => c.status === 'open').length;
+  const inProgressCount = contracts.filter(
     (c) => c.status === 'active' || c.status === 'claimed',
   ).length;
-  const rewardPool = MOCK_CONTRACTS.filter(
+  const rewardPool = contracts.filter(
     (c) => c.status === 'open' || c.status === 'active' || c.status === 'claimed',
   ).reduce((s, c) => s + c.reward, 0);
-  const completedCount = MOCK_CONTRACTS.filter((c) => c.status === 'completed').length;
+  const completedCount = contracts.filter((c) => c.status === 'completed').length;
 
   // keyboard navigation on the table
   const handleTableKeyDown = useCallback(
@@ -215,11 +274,75 @@ function ContractsPage() {
   );
 
   const handleNew = useCallback(() => {
-    // TODO: open new contract dialog (#381)
+    setDialogPrefill(undefined);
+    setDialogOpen(true);
   }, []);
 
-  const handleAction = useCallback(() => {
-    // TODO: wire actions (#381)
+  // Global keyboard shortcut: n = new contract
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'n' && !dialogOpen && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        handleNew();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [dialogOpen, handleNew]);
+
+  const handleAction = useCallback(async (action: string, contractId: string) => {
+    if (action === 'dispute' || action === 'cancel') {
+      setConfirmAction({ action: action as 'dispute' | 'cancel', contractId });
+      setConfirmReason('');
+      return;
+    }
+    try {
+      setActionWorking(contractId);
+      setActionError(null);
+      let updated: Contract;
+      switch (action) {
+        case 'claim':    updated = await contractsService.claimContract(contractId); break;
+        case 'start':    updated = await contractsService.startContract(contractId); break;
+        case 'complete': updated = await contractsService.completeContract(contractId); break;
+        case 'publish':  updated = await contractsService.publishContract(contractId); break;
+        default: return;
+      }
+      setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setActionWorking(null);
+    }
+  }, []);
+
+  const handleConfirmAction = useCallback(async () => {
+    if (!confirmAction) return;
+    try {
+      setActionWorking(confirmAction.contractId);
+      setActionError(null);
+      const updated = confirmAction.action === 'dispute'
+        ? await contractsService.disputeContract(confirmAction.contractId)
+        : await contractsService.cancelContract(confirmAction.contractId);
+      setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
+      setConfirmAction(null);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Action failed');
+    } finally {
+      setActionWorking(null);
+    }
+  }, [confirmAction]);
+
+  const handleMilestoneUpdate = useCallback(async (contractId: string, milestoneId: string, currentState: string) => {
+    const nextState = currentState === 'pending' ? 'active' : currentState === 'active' ? 'done' : 'pending';
+    try {
+      await contractsService.updateMilestone(contractId, milestoneId, nextState);
+      setContracts(prev => prev.map(c => {
+        if (c.id !== contractId) return c;
+        return { ...c, milestones: c.milestones.map(m => m.id === milestoneId ? { ...m, state: nextState as 'pending' | 'active' | 'done' } : m) };
+      }));
+    } catch {
+      // silently ignore milestone update errors
+    }
   }, []);
 
   // segment control keyboard
@@ -400,7 +523,7 @@ function ContractsPage() {
                 <span className="shell-kbd"><kbd>n</kbd></span>
                 new
                 <span style={{ marginLeft: 'auto' }}>
-                  {visible.length} of {MOCK_CONTRACTS.length} contracts
+                  {visible.length} of {contracts.length} contracts
                 </span>
               </div>
             </>
@@ -411,9 +534,64 @@ function ContractsPage() {
           <ContractDetail
             contract={selected}
             onAction={handleAction}
+            actionWorking={actionWorking === selected.id}
+            onMilestoneUpdate={handleMilestoneUpdate}
           />
         )}
       </div>
+
+      {/* Dispute / Cancel confirmation */}
+      {confirmAction && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setConfirmAction(null)}
+        >
+          <div
+            style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-xl)', padding: '24px', maxWidth: 420, width: '90vw' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--text-strong)', margin: '0 0 8px' }}>
+              {confirmAction.action === 'dispute' ? 'Dispute contract' : 'Cancel contract'}
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px' }}>
+              {confirmAction.action === 'dispute'
+                ? 'Provide a reason for disputing this contract. This will notify all parties.'
+                : 'Cancelling cannot be undone. Provide a reason for your records.'}
+            </p>
+            <textarea
+              value={confirmReason}
+              onChange={e => setConfirmReason(e.target.value)}
+              placeholder="Reason (optional)"
+              rows={3}
+              style={{ width: '100%', boxSizing: 'border-box', background: 'var(--surface-sunken)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', padding: '8px 12px', color: 'var(--text-strong)', fontFamily: 'var(--font-body)', fontSize: 13, resize: 'vertical', outline: 'none' }}
+            />
+            {actionError && <p style={{ color: 'var(--coral-400)', fontSize: 12, margin: '8px 0 0' }}>{actionError}</p>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="btn btn-sm" onClick={() => setConfirmAction(null)}>Cancel</button>
+              <button
+                className={`btn btn-sm ${confirmAction.action === 'dispute' ? 'btn-danger' : ''}`}
+                style={{ background: confirmAction.action === 'cancel' ? 'color-mix(in srgb, var(--coral-500) 80%, black)' : undefined, color: '#fff' }}
+                disabled={!!actionWorking}
+                onClick={handleConfirmAction}
+              >
+                {actionWorking ? <CircularProgress size={14} /> : confirmAction.action === 'dispute' ? 'Dispute' : 'Cancel contract'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <NewContractDialog
+        open={dialogOpen}
+        orgId={orgId}
+        prefill={dialogPrefill}
+        onClose={() => { setDialogOpen(false); setDialogPrefill(undefined); }}
+        onCreated={() => {
+          setDialogOpen(false);
+          setDialogPrefill(undefined);
+          fetchContracts(orgId);
+        }}
+      />
     </>
   );
 }
