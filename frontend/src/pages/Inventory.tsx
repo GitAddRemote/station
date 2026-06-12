@@ -99,6 +99,19 @@ const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
 const DENSITY_STORAGE_KEY = 'inventory:density';
 const LAYOUT_MODE_STORAGE_KEY = 'inventory:layoutMode';
 
+const QUALITY_RANGES = [
+  { label: '0 – 99',   min: 0,   max: 99  },
+  { label: '100 – 199', min: 100, max: 199 },
+  { label: '200 – 299', min: 200, max: 299 },
+  { label: '300 – 399', min: 300, max: 399 },
+  { label: '400 – 499', min: 400, max: 499 },
+  { label: '500 – 599', min: 500, max: 599 },
+  { label: '600 – 699', min: 600, max: 699 },
+  { label: '700 – 799', min: 700, max: 799 },
+  { label: '800 – 899', min: 800, max: 899 },
+  { label: '900 – 1000', min: 900, max: 1000 },
+] as const;
+
 const readStoredViewMode = (): 'personal' | 'org' => {
   if (typeof window === 'undefined') return 'personal';
   const stored = window.sessionStorage.getItem(VIEW_MODE_STORAGE_KEY);
@@ -187,7 +200,7 @@ const InventoryPage = () => {
     search: '',
     categoryId: '' as string | '',
     valueRange: [0, SLIDER_QUANTITY_MAX] as [number, number],
-    qualityRange: [0, 1000] as [number, number],
+    qualityBand: null as number | null,
   });
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'date'>('date');
@@ -591,6 +604,7 @@ const InventoryPage = () => {
       }
       const categoryId = filters.categoryId || undefined;
       const limit = rowsPerPage;
+      const activeBand = filters.qualityBand != null ? QUALITY_RANGES[filters.qualityBand] : null;
 
       const sortParam: 'name' | 'quantity' | 'date_modified' =
         sortBy === 'name' ? 'name' : sortBy === 'quantity' ? 'quantity' : 'date_modified';
@@ -610,8 +624,8 @@ const InventoryPage = () => {
           page: page + 1,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
           maxQuantity: filters.valueRange[1] < SLIDER_QUANTITY_MAX ? filters.valueRange[1] : undefined,
-          minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
-          maxQuality: filters.qualityRange[1] < 1000 ? filters.qualityRange[1] : undefined,
+          minQuality: activeBand?.min,
+          maxQuality: activeBand?.max,
           sort: sortParam,
           order: sortDir,
         });
@@ -629,8 +643,8 @@ const InventoryPage = () => {
           categoryId,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
           maxQuantity: filters.valueRange[1] < SLIDER_QUANTITY_MAX ? filters.valueRange[1] : undefined,
-          minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
-          maxQuality: filters.qualityRange[1] < 1000 ? filters.qualityRange[1] : undefined,
+          minQuality: activeBand?.min,
+          maxQuality: activeBand?.max,
           sort: sortParam,
           order: sortDir,
         });
@@ -660,7 +674,7 @@ const InventoryPage = () => {
     canViewOrgInventory,
     filters.categoryId,
     filters.valueRange,
-    filters.qualityRange,
+    filters.qualityBand,
     debouncedSearch,
     page,
     rowsPerPage,
@@ -909,7 +923,7 @@ const InventoryPage = () => {
     debouncedSearch,
     filters.categoryId,
     filters.valueRange,
-    filters.qualityRange,
+    filters.qualityBand,
     viewMode,
     selectedOrgId,
     sortBy,
@@ -1954,6 +1968,21 @@ const InventoryPage = () => {
               <option value="">All categories</option>
               {[...categories].sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
+          </span>
+          <span className="inv-select">
+            <span style={{ fontSize: 13, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>Q</span>
+            <select
+              value={filters.qualityBand ?? ''}
+              onChange={(e) => setFilters((prev) => ({ ...prev, qualityBand: e.target.value === '' ? null : Number(e.target.value) }))}
+              aria-label="Quality range filter"
+              style={{ minWidth: 112 }}
+            >
+              <option value="">Any quality</option>
+              {QUALITY_RANGES.map((r, i) => (
+                <option key={i} value={i}>{r.label}</option>
               ))}
             </select>
             <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
