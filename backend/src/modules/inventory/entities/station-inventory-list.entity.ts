@@ -24,9 +24,6 @@ export class StationInventoryList {
   @Column({ type: 'varchar', length: 100 })
   name!: string;
 
-  @Column({ name: 'is_shared', type: 'boolean', default: false })
-  isShared!: boolean;
-
   @OneToMany(() => StationInventoryListItem, (item) => item.list)
   items!: StationInventoryListItem[];
 

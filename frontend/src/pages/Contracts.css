@@ -1,0 +1,282 @@
+/* ============================================================
+   STATION — Contracts page
+   Service contracts: hauling/transport, security, mining, salvage.
+   Board list + type-specific detail. Builds on AppShell.css tokens.
+   ============================================================ */
+
+/* ---- chip-badge extra tones (info, warn, danger) ----------- */
+.chip-badge.info   { background: color-mix(in srgb, var(--teal-400) 16%, transparent); color: var(--teal-300); }
+.chip-badge.warn   { background: color-mix(in srgb, var(--warning-500) 18%, transparent); color: var(--warning-500); }
+.chip-badge.danger { background: color-mix(in srgb, var(--coral-500) 18%, transparent); color: var(--coral-400); }
+
+/* ---- contract type icon tints ----------------------------- */
+.t-ent .ic.ct-transport, .big-ic.ct-transport { background: color-mix(in srgb, var(--warning-500) 18%, transparent); color: var(--warning-500); border-color: transparent; }
+.t-ent .ic.ct-security,  .big-ic.ct-security  { background: color-mix(in srgb, var(--coral-400) 18%, transparent);  color: var(--coral-300);   border-color: transparent; }
+.t-ent .ic.ct-mining,    .big-ic.ct-mining    { background: color-mix(in srgb, var(--aqua-400) 18%, transparent);   color: var(--aqua-300);    border-color: transparent; }
+.t-ent .ic.ct-salvage,   .big-ic.ct-salvage   { background: color-mix(in srgb, #C879D8 20%, transparent);           color: #D9A6E6;             border-color: transparent; }
+.t-ent .ic.ct-transfer,  .big-ic.ct-transfer  { background: color-mix(in srgb, var(--teal-500) 18%, transparent);   color: var(--teal-300);    border-color: transparent; }
+.t-ent .ic.ct-medical,   .big-ic.ct-medical   { background: color-mix(in srgb, var(--success-500) 18%, transparent);color: var(--success-500); border-color: transparent; }
+.t-ent .ic.ct-refueling, .big-ic.ct-refueling { background: color-mix(in srgb, var(--aqua-600) 18%, transparent);   color: var(--aqua-400);    border-color: transparent; }
+
+/* ---- reward cell ------------------------------------------ */
+.ct-reward {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ct-reward small { color: var(--text-faint); font-weight: var(--weight-regular); margin-left: 3px; }
+
+/* ---- client chip in row ------------------------------------ */
+.ct-client { display: inline-flex; align-items: center; gap: 8px; }
+.ct-client-ic {
+  width: 26px; height: 26px; flex: none; border-radius: 6px;
+  display: grid; place-items: center;
+  background: var(--surface-raised); color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+.ct-client-ic svg { width: 13px; height: 13px; }
+.ct-client-nm { display: block; font-weight: var(--weight-medium); color: var(--text-strong); white-space: nowrap; }
+.ct-client-type { display: block; font-size: var(--text-2xs); color: var(--text-faint); margin-top: 1px; }
+
+/* ---- deadline pill ---------------------------------------- */
+.ct-deadline {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold); color: var(--text-muted); white-space: nowrap;
+}
+.ct-deadline svg { width: 12px; height: 12px; }
+.ct-deadline.urgent { color: var(--coral-400); }
+
+/* ---- toolbar --------------------------------------------- */
+.con-toolbar {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin-top: var(--space-6); flex-wrap: wrap;
+}
+.con-toolbar .grow { flex: 1; }
+
+/* ---- segmented filter control ----------------------------- */
+.con-seg {
+  display: inline-flex; background: var(--surface-sunken);
+  border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  padding: 3px; gap: 2px;
+}
+.con-seg button {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: var(--weight-medium);
+  color: var(--text-muted); background: none; border: none; cursor: pointer;
+  padding: 7px 14px; border-radius: var(--radius-sm);
+  transition: color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+.con-seg button svg { width: 15px; height: 15px; }
+.con-seg button:hover { color: var(--text-strong); }
+.con-seg button[aria-selected="true"] {
+  color: var(--brand); background: var(--surface-card); box-shadow: var(--shadow-sm);
+}
+.con-seg .seg-count {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  color: var(--text-faint);
+}
+.con-seg button[aria-selected="true"] .seg-count { color: var(--brand); }
+
+/* ---- detail panel ----------------------------------------- */
+.con-hero { display: flex; align-items: flex-start; gap: var(--space-3); }
+.con-hero .big-ic {
+  width: 46px; height: 46px; flex: none; border-radius: var(--radius-md);
+  display: grid; place-items: center;
+}
+.con-hero .big-ic svg { width: 22px; height: 22px; }
+.con-hero-text { flex: 1; min-width: 0; }
+.con-hero-title {
+  font-family: var(--font-display); font-weight: var(--weight-semibold);
+  font-size: var(--text-lg); color: var(--text-strong); line-height: 1.2;
+}
+.con-hero-sub {
+  font-size: var(--text-xs); color: var(--text-muted); margin-top: 3px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+
+/* reward hero block */
+.reward-hero {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4);
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: var(--space-4); margin-top: var(--space-4);
+}
+.reward-hero .rk {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint);
+}
+.reward-hero .rv {
+  font-family: var(--font-display); font-weight: var(--weight-bold);
+  font-size: var(--text-2xl); color: var(--brand);
+  font-variant-numeric: tabular-nums; margin-top: 2px;
+}
+.reward-hero .rv small {
+  font-size: var(--text-sm); color: var(--text-muted);
+  font-weight: var(--weight-regular); margin-left: 4px;
+}
+.risk-block { text-align: right; }
+
+/* risk badge */
+.risk-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--text-xs); font-weight: var(--weight-semibold);
+  margin-top: 4px;
+}
+.risk-badge svg { width: 14px; height: 14px; }
+.risk-badge.low  { color: var(--success-500); }
+.risk-badge.med  { color: var(--warning-500); }
+.risk-badge.high { color: var(--coral-400); }
+
+/* detail section */
+.detail-section {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+}
+.ds-cap {
+  font-family: var(--font-mono); font-size: var(--text-2xs);
+  text-transform: uppercase; letter-spacing: var(--tracking-caps);
+  color: var(--text-faint); margin-bottom: var(--space-3);
+}
+
+/* route */
+.ct-route {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+.ct-route-node {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; flex: none;
+}
+.ct-route-dot {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid var(--brand);
+}
+.ct-route-end .ct-route-dot { background: var(--brand); }
+.ct-route-lb {
+  font-size: var(--text-xs); color: var(--text-strong);
+  font-weight: var(--weight-medium); white-space: nowrap;
+}
+.ct-route-sub { font-size: var(--text-2xs); color: var(--text-faint); }
+.ct-route-line {
+  flex: 1; height: 2px;
+  background: repeating-linear-gradient(90deg, var(--border-strong) 0 6px, transparent 6px 12px);
+  position: relative;
+}
+.ct-route-cargo {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted);
+  background: var(--surface-card); padding: 0 6px; white-space: nowrap;
+}
+
+/* description */
+.con-desc {
+  font-size: var(--text-sm); line-height: var(--leading-relaxed);
+  color: var(--text-muted); margin: var(--space-3) 0 0;
+}
+
+/* milestones */
+.ct-miles { display: flex; flex-direction: column; }
+.ct-mile {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 9px 0;
+}
+.ct-mk {
+  width: 22px; height: 22px; flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+  border: 2px solid var(--border-default); color: var(--text-faint);
+}
+.ct-mk svg { width: 12px; height: 12px; }
+.ct-mile.done .ct-mk { background: var(--success-500); border-color: var(--success-500); color: #07140E; }
+.ct-mile.active .ct-mk { border-color: var(--brand); color: var(--brand); }
+.ct-ml { flex: 1; font-size: var(--text-sm); color: var(--text-body); }
+.ct-mile.done .ct-ml { color: var(--text-muted); }
+.ct-mt { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+
+/* assigned crew avatars */
+.ct-assigned { display: flex; align-items: center; gap: 8px; }
+.ct-assigned-stack { display: flex; }
+.ct-av {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: var(--weight-bold);
+  font-size: 11px; color: #fff;
+  border: 2px solid var(--surface-card); margin-left: -8px;
+}
+.ct-av:first-child { margin-left: 0; }
+
+/* faint text helper */
+.t-faint { color: var(--text-faint); font-weight: 400; }
+
+/* action buttons row */
+.con-actions {
+  border-top: 1px solid var(--border-subtle);
+  display: flex; gap: var(--space-3);
+}
+
+/* list hint bar */
+.list-hint {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: 10px var(--space-5);
+  font-size: var(--text-xs); color: var(--text-faint);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* statcard tone variants */
+.statcard.warn .v { color: var(--warning-500); }
+.statcard.up   .v { color: var(--success-500); }
+
+/* loading & empty states */
+.con-loading {
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--space-16); color: var(--text-faint);
+}
+.con-empty {
+  text-align: center; padding: var(--space-16) var(--space-6);
+}
+.con-empty .e-ic {
+  width: 56px; height: 56px; margin: 0 auto var(--space-4);
+  display: grid; place-items: center; border-radius: var(--radius-lg);
+  background: var(--surface-sunken); color: var(--brand);
+}
+.con-empty .e-ic svg { width: 26px; height: 26px; }
+.con-empty h3 {
+  font-family: var(--font-display); font-weight: var(--weight-semibold);
+  font-size: var(--text-lg); color: var(--text-strong); margin: 0 0 var(--space-2);
+}
+.con-empty p { color: var(--text-muted); font-size: var(--text-sm); margin: 0; }
+
+.con-error {
+  background: color-mix(in srgb, var(--coral-500) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--coral-500) 25%, transparent);
+  border-radius: var(--radius-md); padding: var(--space-4) var(--space-5);
+  color: var(--coral-400); font-size: var(--text-sm); margin-bottom: var(--space-4);
+}
+
+/* ---- history -------------------------------------------- */
+.ct-history { display: flex; flex-direction: column; gap: var(--space-2); }
+.ct-history-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+.ct-av-sm {
+  width: 20px; height: 20px; border-radius: 50%;
+  font-size: 9px; font-weight: var(--weight-semibold);
+  display: grid; place-items: center; flex-shrink: 0;
+  color: #fff;
+}
+.ct-history-label { color: var(--text-strong); font-weight: var(--weight-medium); }
+.ct-history-actor { margin-left: auto; }
+.ct-history-time { white-space: nowrap; }
+
+/* ---- responsive ------------------------------------------- */
+@media (max-width: 1080px) {
+  .split { grid-template-columns: 1fr; }
+  .detail { position: static; }
+}
+@media (max-width: 760px) {
+  .con-toolbar { flex-direction: column; align-items: stretch; }
+  .con-seg { overflow-x: auto; }
+}

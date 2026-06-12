@@ -26,7 +26,6 @@ import {
   Grid,
   TextField,
   InputAdornment,
-  Divider,
   Table,
   TableBody,
   TableCell,
@@ -53,7 +52,7 @@ interface OrgOption {
   name: string;
 }
 
-type OwnershipFilter = 'all' | 'org-owned' | 'member-contributed';
+type OwnershipFilter = 'all' | 'org-owned';
 
 const ROWS_PER_PAGE = 50;
 
@@ -155,11 +154,10 @@ const OrgInventoryPage = () => {
         setItems(result.data);
         setTotal(result.total);
         setSummary(result.summary ?? null);
-      } else if (ownershipFilter === 'member-contributed') {
+      } else {
         const result = await inventoryService.listOrgInventory({
-          ownerType: 'user',
-          orgId: selectedOrgId,
-          orgAvailable: true,
+          ownerType: 'org',
+          ownerId: selectedOrgId,
           categoryId: categoryId || undefined,
           search: debouncedSearch || undefined,
           page: page + 1,
@@ -169,30 +167,6 @@ const OrgInventoryPage = () => {
         setItems(result.data);
         setTotal(result.total);
         setSummary(result.summary ?? null);
-      } else {
-        const [orgResult, memberResult] = await Promise.all([
-          inventoryService.listOrgInventory({
-            ownerType: 'org',
-            ownerId: selectedOrgId,
-            categoryId: categoryId || undefined,
-            search: debouncedSearch || undefined,
-            page: page + 1,
-            limit: ROWS_PER_PAGE,
-            includeSummary: true,
-          }),
-          inventoryService.listOrgInventory({
-            ownerType: 'user',
-            orgId: selectedOrgId,
-            orgAvailable: true,
-            categoryId: categoryId || undefined,
-            search: debouncedSearch || undefined,
-            page: 1,
-            limit: ROWS_PER_PAGE,
-          }),
-        ]);
-        setItems([...orgResult.data, ...memberResult.data]);
-        setTotal(orgResult.total + memberResult.total);
-        setSummary(orgResult.summary ?? null);
       }
     } catch (err) {
       console.error('Failed to load org inventory', err);
@@ -261,11 +235,6 @@ const OrgInventoryPage = () => {
 
   const orgOwned = useMemo(
     () => items.filter((i) => i.ownerType === 'org'),
-    [items],
-  );
-
-  const memberContributed = useMemo(
-    () => items.filter((i) => i.ownerType === 'user'),
     [items],
   );
 
@@ -387,7 +356,6 @@ const OrgInventoryPage = () => {
             >
               <MenuItem value="all">All</MenuItem>
               <MenuItem value="org-owned">Org-Owned</MenuItem>
-              <MenuItem value="member-contributed">Member-Contributed</MenuItem>
             </Select>
           </FormControl>
 
@@ -480,16 +448,10 @@ const OrgInventoryPage = () => {
           <>
             {loading && <LinearProgress sx={{ mb: 1, borderRadius: 1 }} />}
 
-            {ownershipFilter === 'all' ? (
-              <>
-                {renderItemTable(orgOwned, 'Org-Owned', '#f2a255')}
-                <Divider sx={{ my: 2 }} />
-                {renderItemTable(memberContributed, 'Member-Contributed', '#4A9EFF')}
-              </>
-            ) : ownershipFilter === 'org-owned' ? (
+            {ownershipFilter === 'org-owned' ? (
               renderItemTable(items, 'Org-Owned', '#f2a255')
             ) : (
-              renderItemTable(items, 'Member-Contributed', '#4A9EFF')
+              renderItemTable(orgOwned, 'Org-Owned', '#f2a255')
             )}
 
             {total > ROWS_PER_PAGE && (

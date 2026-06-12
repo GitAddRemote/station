@@ -141,7 +141,7 @@ const InventoryInlineRow = ({
                 value={displayAlias}
                 onChange={(e) => onAliasChange(item.id, e.target.value)}
                 onBlur={() => onAliasBlur(rowKey)}
-                inputProps={{ maxLength: 64 }}
+                inputProps={{ maxLength: 255 }}
                 placeholder="Add a nickname…"
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
@@ -225,15 +225,11 @@ const InventoryInlineRow = ({
                 )}
               </Box>
             )}
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" columnGap={0.5}>
-              {item.isOrgAvailable
-                ? <span className="chip-badge success">Shared</span>
-                : <span className="chip-badge neutral">Private</span>
-              }
-              {item.ownerType === 'user' && item.sharedByUsername && (
+            {item.ownerType === 'user' && item.sharedByUsername && (
+              <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" columnGap={0.5}>
                 <span className="chip-badge brand">{item.sharedByUsername}</span>
-              )}
-            </Stack>
+              </Stack>
+            )}
           </>
         ) : (
           <>
@@ -274,10 +270,6 @@ const InventoryInlineRow = ({
                   {item.itemName || `Item #${item.catalogEntryId}`}
                 </Typography>
               )}
-              {item.isOrgAvailable
-                ? <span className="chip-badge success">Shared</span>
-                : <span className="chip-badge neutral">Private</span>
-              }
               {item.ownerType === 'user' && item.sharedByUsername && (
                 <span className="chip-badge brand">
                   {item.sharedByUsername}
