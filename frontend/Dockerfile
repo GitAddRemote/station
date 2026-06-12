@@ -1,5 +1,7 @@
 FROM node:22-alpine AS builder
 
+ENV HUSKY=0
+
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
