@@ -9,7 +9,7 @@ import {
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InventoryMetricsService } from '../../metrics/inventory-metrics.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { StationCatalogEntry } from '../catalog/entities/station-catalog-entry.entity';
 import { StationLocation } from '../locations/entities/station-location.entity';
 import { Organization } from '../organizations/organization.entity';

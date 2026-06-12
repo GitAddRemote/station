@@ -225,11 +225,6 @@ const InventoryInlineRow = ({
                 )}
               </Box>
             )}
-            {item.ownerType === 'user' && item.sharedByUsername && (
-              <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" columnGap={0.5}>
-                <span className="chip-badge brand">{item.sharedByUsername}</span>
-              </Stack>
-            )}
           </>
         ) : (
           <>
@@ -269,11 +264,6 @@ const InventoryInlineRow = ({
                 >
                   {item.itemName || `Item #${item.catalogEntryId}`}
                 </Typography>
-              )}
-              {item.ownerType === 'user' && item.sharedByUsername && (
-                <span className="chip-badge brand">
-                  {item.sharedByUsername}
-                </span>
               )}
             </Stack>
           </>
