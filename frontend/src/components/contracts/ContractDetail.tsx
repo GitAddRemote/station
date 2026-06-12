@@ -1,3 +1,4 @@
+import { CircularProgress } from '@mui/material';
 import type { Contract } from '../../services/contracts.service';
 import BusinessIcon from '@mui/icons-material/Business';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -30,6 +31,8 @@ import ContractSpec from './ContractSpec';
 interface ContractDetailProps {
   contract: Contract;
   onAction?: (action: string, contractId: string) => void;
+  actionWorking?: boolean;
+  onMilestoneUpdate?: (contractId: string, milestoneId: string, currentState: string) => void;
 }
 
 const RISK_ICON = {
@@ -40,7 +43,7 @@ const RISK_ICON = {
 
 const RISK_LABEL = { low: 'Low', med: 'Medium', high: 'High' } as const;
 
-export function ContractDetail({ contract, onAction }: ContractDetailProps) {
+export function ContractDetail({ contract, onAction, actionWorking, onMilestoneUpdate }: ContractDetailProps) {
   const ty = CONTRACT_TYPE_META[contract.type] ?? CONTRACT_TYPE_META.transport;
   const st = CONTRACT_STATUS_META[contract.status] ?? CONTRACT_STATUS_META.draft;
   const RiskIcon = RISK_ICON[contract.risk] ?? ShieldIcon;
@@ -141,7 +144,21 @@ export function ContractDetail({ contract, onAction }: ContractDetailProps) {
         <div className="ds-cap"><span>Progress</span></div>
         <div className="ct-miles">
           {(contract.milestones ?? []).map((m, i) => (
-            <div className={`ct-mile ${m.state}`} key={m.id ?? i}>
+            <div
+              className={`ct-mile ${m.state}`}
+              key={m.id ?? i}
+              role={onMilestoneUpdate ? 'button' : undefined}
+              tabIndex={onMilestoneUpdate ? 0 : undefined}
+              style={{ cursor: onMilestoneUpdate ? 'pointer' : undefined }}
+              onClick={() => onMilestoneUpdate && m.id && onMilestoneUpdate(contract.id, m.id, m.state)}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && onMilestoneUpdate && m.id) {
+                  e.preventDefault();
+                  onMilestoneUpdate(contract.id, m.id, m.state);
+                }
+              }}
+              title={onMilestoneUpdate ? `Click to advance: ${m.state} → ${m.state === 'pending' ? 'active' : m.state === 'active' ? 'done' : 'pending'}` : undefined}
+            >
               <span className="ct-mk">
                 {m.state === 'done' ? (
                   <CheckCircleIcon />
@@ -160,15 +177,27 @@ export function ContractDetail({ contract, onAction }: ContractDetailProps) {
 
       {/* action buttons */}
       <div className="panel-body con-actions">
+        {contract.status === 'draft' && (
+          <button
+            className="btn btn-primary btn-sm"
+            style={{ flex: 1 }}
+            disabled={actionWorking}
+            onClick={() => onAction?.('publish', contract.id)}
+          >
+            {actionWorking ? <CircularProgress size={14} /> : null}
+            Publish contract
+          </button>
+        )}
         {contract.status === 'open' && (
           <>
             <button
               className="btn btn-primary btn-sm"
               style={{ flex: 1 }}
+              disabled={actionWorking}
               onClick={() => onAction?.('claim', contract.id)}
             >
-              <PanToolIcon />
-              Claim contract
+              {actionWorking ? <CircularProgress size={14} /> : <PanToolIcon />}
+              Claim
             </button>
             <button
               className="btn btn-ghost btn-sm"
@@ -178,27 +207,52 @@ export function ContractDetail({ contract, onAction }: ContractDetailProps) {
               <PersonAddAltIcon />
               Assign crew
             </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => onAction?.('cancel', contract.id)}
+            >
+              Cancel
+            </button>
           </>
         )}
         {contract.status === 'claimed' && (
-          <button
-            className="btn btn-primary btn-sm"
-            style={{ flex: 1 }}
-            onClick={() => onAction?.('start', contract.id)}
-          >
-            <PlayArrowIcon />
-            Start contract
-          </button>
+          <>
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ flex: 1 }}
+              disabled={actionWorking}
+              onClick={() => onAction?.('start', contract.id)}
+            >
+              {actionWorking ? <CircularProgress size={14} /> : <PlayArrowIcon />}
+              Start
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => onAction?.('cancel', contract.id)}
+            >
+              Cancel
+            </button>
+          </>
         )}
         {contract.status === 'active' && (
-          <button
-            className="btn btn-primary btn-sm"
-            style={{ flex: 1 }}
-            onClick={() => onAction?.('complete', contract.id)}
-          >
-            <DoneAllIcon />
-            Mark complete
-          </button>
+          <>
+            <button
+              className="btn btn-primary btn-sm"
+              style={{ flex: 1 }}
+              disabled={actionWorking}
+              onClick={() => onAction?.('complete', contract.id)}
+            >
+              {actionWorking ? <CircularProgress size={14} /> : <DoneAllIcon />}
+              Mark complete
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => onAction?.('dispute', contract.id)}
+            >
+              <GavelIcon />
+              Dispute
+            </button>
+          </>
         )}
         {contract.status === 'completed' && (
           <button
@@ -207,17 +261,28 @@ export function ContractDetail({ contract, onAction }: ContractDetailProps) {
             onClick={() => onAction?.('repost', contract.id)}
           >
             <ContentCopyIcon />
-            Repost contract
+            Repost
           </button>
         )}
         {contract.status === 'disputed' && (
           <button
             className="btn btn-ghost btn-sm"
             style={{ flex: 1 }}
+            disabled={actionWorking}
             onClick={() => onAction?.('resolve', contract.id)}
           >
-            <GavelIcon />
+            {actionWorking ? <CircularProgress size={14} /> : <GavelIcon />}
             Resolve dispute
+          </button>
+        )}
+        {contract.status === 'cancelled' && (
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ flex: 1 }}
+            onClick={() => onAction?.('repost', contract.id)}
+          >
+            <ContentCopyIcon />
+            Repost
           </button>
         )}
         <button
