@@ -97,7 +97,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_MANAGE_STATION_BOT_GUILD_ADMINS]: false,
   },
   Viewer: {
-    [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_ORG_INVENTORY]: false,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
     [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: false,

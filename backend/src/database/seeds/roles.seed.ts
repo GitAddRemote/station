@@ -17,7 +17,8 @@ const ROLE_DESCRIPTIONS: Record<DefaultRoleName, string> = {
     'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
   Member:
     'Standard member access. Can view organization inventory and member shared items.',
-  Viewer: 'Read-only access. Can only view organization inventory.',
+  Viewer:
+    'Guest-level access. Cannot view organization inventory or member items.',
 };
 
 export const defaultRoles: Partial<Role>[] = (
