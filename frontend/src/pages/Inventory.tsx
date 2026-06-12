@@ -35,6 +35,7 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import EditIcon from '@mui/icons-material/Edit';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
 import ShareIcon from '@mui/icons-material/Share';
+import ArticleIcon from '@mui/icons-material/Article';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import SearchIcon from '@mui/icons-material/Search';
@@ -2427,6 +2428,26 @@ const InventoryPage = () => {
           <ListItemIcon><CallSplitIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Split</ListItemText>
         </MenuItem>
+        {viewMode === 'personal' && actionItem && (
+          <MenuItem onClick={() => {
+            closeActionMenu();
+            navigate('/contracts', {
+              state: {
+                newContract: {
+                  type: 'transfer',
+                  inventoryItemId: actionItem.id,
+                  itemName: actionItem.alias || actionItem.itemName,
+                  pickupLocationId: actionItem.locationId ?? '',
+                  pickupLocationName: actionItem.locationName ?? '',
+                  availableQty: Number(actionItem.quantity) || 0,
+                },
+              },
+            });
+          }}>
+            <ListItemIcon><ArticleIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Create contract</ListItemText>
+          </MenuItem>
+        )}
         {viewMode === 'personal' && (
           <MenuItem onClick={() => openActionDialog('share')}>
             <ListItemIcon><ShareIcon fontSize="small" /></ListItemIcon>
