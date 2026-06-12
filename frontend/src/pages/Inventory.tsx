@@ -62,6 +62,8 @@ import {
 } from '../services/inventory.service';
 import { catalogService, CatalogEntryDto, LocationDto } from '../services/catalog.service';
 import LocationPicker from '../components/inventory/LocationPicker';
+import InventoryCard from '../components/inventory/InventoryCard';
+import InventoryItemDrawer from '../components/inventory/InventoryItemDrawer';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
@@ -94,6 +96,7 @@ const SLIDER_QUANTITY_MAX = 10000;
 const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
 const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
 const DENSITY_STORAGE_KEY = 'inventory:density';
+const LAYOUT_MODE_STORAGE_KEY = 'inventory:layoutMode';
 
 const readStoredViewMode = (): 'personal' | 'org' => {
   if (typeof window === 'undefined') return 'personal';
@@ -104,6 +107,12 @@ const readStoredViewMode = (): 'personal' | 'org' => {
 const readStoredOrgId = (): string | null => {
   if (typeof window === 'undefined') return null;
   return window.sessionStorage.getItem(ORG_ID_STORAGE_KEY) || null;
+};
+
+const readStoredLayoutMode = (): 'table' | 'card' => {
+  if (typeof window === 'undefined') return 'table';
+  const stored = window.sessionStorage.getItem(LAYOUT_MODE_STORAGE_KEY);
+  return stored === 'card' ? 'card' : 'table';
 };
 
 const readStoredDensity = (): 'standard' | 'compact' => {
@@ -190,6 +199,10 @@ const InventoryPage = () => {
   const [density, setDensity] = useState<'standard' | 'compact'>(() =>
     readStoredDensity(),
   );
+  const [layoutMode, setLayoutMode] = useState<'table' | 'card'>(() =>
+    readStoredLayoutMode(),
+  );
+  const [selectedDrawerGroup, setSelectedDrawerGroup] = useState<GroupedRow | null>(null);
   const [inlineDrafts, setInlineDrafts] = useState<Record<string, InlineDraft>>(
     {},
   );
@@ -249,6 +262,10 @@ const InventoryPage = () => {
   useEffect(() => {
     window.sessionStorage.setItem(DENSITY_STORAGE_KEY, density);
   }, [density]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(LAYOUT_MODE_STORAGE_KEY, layoutMode);
+  }, [layoutMode]);
 
   useEffect(() => {
     if (!orgsLoaded.current || selectedOrgId === null) return;
@@ -1982,10 +1999,58 @@ const InventoryPage = () => {
               </button>
             </div>
           )}
+          {/* Layout toggle: table / card */}
+          <div className="density-toggle" role="group" aria-label="Layout">
+            <button
+              aria-pressed={layoutMode === 'table'}
+              onClick={() => setLayoutMode('table')}
+              title="Table view"
+            >
+              <ViewAgendaIcon style={{ width: 16, height: 16 }} />
+            </button>
+            <button
+              aria-pressed={layoutMode === 'card'}
+              onClick={() => setLayoutMode('card')}
+              title="Card view"
+            >
+              <GridViewIcon style={{ width: 16, height: 16 }} />
+            </button>
+          </div>
         </div>
 
+        {/* Card view */}
+        {layoutMode === 'card' && (
+          <div style={{ marginTop: 'var(--space-6)' }} aria-busy={inventoryBusy}>
+            {refreshing && <LinearProgress sx={{ mb: 1 }} color="primary" />}
+            {error && <div className="inv-error">{error}</div>}
+            {initialLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-12)' }}>
+                <CircularProgress size={32} />
+              </div>
+            ) : groupedByEntry.length === 0 ? (
+              <div className="inv-empty">No items match the current filters.</div>
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: 'var(--space-4)',
+                }}
+              >
+                {groupedByEntry.map((group) => (
+                  <InventoryCard
+                    key={group.catalogEntryId}
+                    group={group}
+                    onClick={setSelectedDrawerGroup}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Table content */}
-        <div style={{ marginTop: 'var(--space-6)', position: 'relative' }} aria-busy={inventoryBusy}>
+        <div style={{ marginTop: 'var(--space-6)', position: 'relative', display: layoutMode === 'card' ? 'none' : undefined }} aria-busy={inventoryBusy}>
           {refreshing && <LinearProgress sx={{ mb: 1 }} color="primary" />}
           {error && <div className="inv-error">{error}</div>}
 
@@ -2417,6 +2482,13 @@ const InventoryPage = () => {
       </Menu>
 
       {renderActionDialog()}
+
+      <InventoryItemDrawer
+        open={selectedDrawerGroup !== null}
+        group={selectedDrawerGroup}
+        onClose={() => setSelectedDrawerGroup(null)}
+        onMutated={fetchInventory}
+      />
     </AppShell>
   );
 };
