@@ -9,7 +9,7 @@ import {
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InventoryMetricsService } from '../../metrics/inventory-metrics.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { StationCatalogEntry } from '../catalog/entities/station-catalog-entry.entity';
 import { StationLocation } from '../locations/entities/station-location.entity';
 import { Organization } from '../organizations/organization.entity';
@@ -92,6 +92,12 @@ export class InventoryService {
       unitCode: unitOfMeasure.abbreviation,
     });
 
+    if (dto.alias != null && catalogEntry.catalogKind === 'commodity') {
+      throw new UnprocessableEntityException(
+        'Alias is not supported for commodity inventory items',
+      );
+    }
+
     const item = this.inventoryItemRepository.create({
       ownerType: ownership.ownerType,
       ownerId: ownership.ownerId,
@@ -101,7 +107,7 @@ export class InventoryService {
       unitOfMeasureId: unitOfMeasure.id,
       quantity: dto.quantity.toFixed(6),
       quality: dto.quality ?? null,
-      alias: dto.customName?.trim() || null,
+      alias: dto.alias?.trim() || null,
       notes: dto.notes?.trim() || null,
       effectiveProperties: null,
     });
@@ -213,8 +219,13 @@ export class InventoryService {
       item.notes = dto.notes?.trim() || null;
     }
 
-    if (dto.customName !== undefined) {
-      item.alias = dto.customName?.trim() || null;
+    if (dto.alias !== undefined) {
+      if (dto.alias != null && item.catalogKind === 'commodity') {
+        throw new UnprocessableEntityException(
+          'Alias is not supported for commodity inventory items',
+        );
+      }
+      item.alias = dto.alias?.trim() || null;
     }
 
     this.validateQuantityAndUomPolicy({
@@ -496,9 +507,15 @@ export class InventoryService {
     }
 
     if (query.search) {
-      queryBuilder.andWhere('catalogEntry.name ILIKE :search', {
-        search: `%${query.search}%`,
-      });
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where('catalogEntry.name ILIKE :search', {
+            search: `%${query.search}%`,
+          }).orWhere('item.alias ILIKE :search', {
+            search: `%${query.search}%`,
+          });
+        }),
+      );
     }
 
     if (query.minQuantity !== undefined) {

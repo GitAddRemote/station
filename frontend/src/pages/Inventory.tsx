@@ -135,6 +135,7 @@ const InventoryPage = () => {
   const [editLocation, setEditLocation] = useState<LocationDto | null>(null);
   const [editQuality, setEditQuality] = useState<number | ''>('');
   const [editUomId, setEditUomId] = useState<string>('');
+  const [editAlias, setEditAlias] = useState<string>('');
   const [actionQuantity, setActionQuantity] = useState<number>(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -151,6 +152,7 @@ const InventoryPage = () => {
   const [newItemQuantity, setNewItemQuantity] = useState<number>(1);
   const [newItemUomId, setNewItemUomId] = useState<string>('');
   const [newItemNotes, setNewItemNotes] = useState('');
+  const [newItemAlias, setNewItemAlias] = useState('');
   const [newItemLocation, setNewItemLocation] = useState<LocationDto | null>(null);
   const [newItemQuality, setNewItemQuality] = useState<number | ''>('');
   const [addSubmitting, setAddSubmitting] = useState(false);
@@ -187,9 +189,11 @@ const InventoryPage = () => {
   );
   const [inlineActiveField, setInlineActiveField] = useState<{
     rowKey: string;
-    field: 'quantity' | 'quality' | 'location';
+    field: 'quantity' | 'quality' | 'location' | 'alias';
   } | null>(null);
   const [inlineLocations, setInlineLocations] = useState<Record<string, LocationDto | null>>({});
+  const [inlineAliases, setInlineAliases] = useState<Record<string, string>>({});
+  const [newRowAlias, setNewRowAlias] = useState('');
   const [pendingFocusAfterPageChange, setPendingFocusAfterPageChange] =
     useState(false);
   const [newRowDraft, setNewRowDraft] = useState<{
@@ -326,7 +330,7 @@ const InventoryPage = () => {
   const newRowItemCache = useRef<Map<string, CatalogEntryDto[]>>(new Map());
 
   const activateInlineField = useCallback(
-    (rowKey: string, field: 'quantity' | 'quality' | 'location') => {
+    (rowKey: string, field: 'quantity' | 'quality' | 'location' | 'alias') => {
       setInlineActiveField({ rowKey, field });
       setInlineError((prev) => ({ ...prev, [rowKey]: null }));
     },
@@ -390,6 +394,22 @@ const InventoryPage = () => {
       return null;
     });
   }, []);
+
+  const handleInlineAliasChange = useCallback(
+    (itemId: string, value: string) => {
+      setInlineAliases((prev) => ({ ...prev, [itemId]: value }));
+    },
+    [],
+  );
+
+  const handleInlineAliasBlur = useCallback((rowKey: string) => {
+    setInlineActiveField((prev) => {
+      if (!prev || prev.rowKey !== rowKey) return prev;
+      if (prev.field !== 'alias') return prev;
+      return null;
+    });
+  }, []);
+
   const handleQuantityRef = useCallback(
     (ref: HTMLInputElement | null, key: string) => {
       quantityRefs.current[key] = ref;
@@ -643,6 +663,7 @@ const InventoryPage = () => {
     setCatalogPage(0);
     setNewItemQuantity(1);
     setNewItemNotes('');
+    setNewItemAlias('');
     setNewItemLocation(null);
     setNewItemQuality('');
     setCatalogError(null);
@@ -653,6 +674,7 @@ const InventoryPage = () => {
     setAddDialogOpen(false);
     setNewItemLocation(null);
     setNewItemQuality('');
+    setNewItemAlias('');
   };
 
   const handleCreateInventoryItem = async (options?: {
@@ -704,6 +726,8 @@ const InventoryPage = () => {
             });
           }
         } else if (!isOrgView) {
+          const isAliasEligible =
+            selectedCatalogItem.catalogKind === 'item' || selectedCatalogItem.catalogKind === 'vehicle';
           await inventoryService.createItem({
             catalogEntryId: selectedCatalogItem.id,
             quantity: newItemQuantity,
@@ -711,6 +735,7 @@ const InventoryPage = () => {
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
+            alias: isAliasEligible && newItemAlias.trim() ? newItemAlias.trim() : null,
           });
         } else {
           setCatalogError('This item already exists in the org inventory.');
@@ -718,6 +743,8 @@ const InventoryPage = () => {
         }
       } else {
         const resolvedUomId = newItemUomId || defaultUomIdFor(selectedCatalogItem.catalogKind);
+        const isAliasEligible =
+          selectedCatalogItem.catalogKind === 'item' || selectedCatalogItem.catalogKind === 'vehicle';
         if (isOrgView && selectedOrgId !== null) {
           await inventoryService.createOrgItem(selectedOrgId, {
             catalogEntryId: selectedCatalogItem.id,
@@ -726,6 +753,7 @@ const InventoryPage = () => {
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
+            alias: isAliasEligible && newItemAlias.trim() ? newItemAlias.trim() : null,
           });
         } else {
           await inventoryService.createItem({
@@ -735,6 +763,7 @@ const InventoryPage = () => {
             notes: newItemNotes || null,
             locationId: newItemLocation?.id ?? null,
             quality: newItemQuality !== '' ? newItemQuality : null,
+            alias: isAliasEligible && newItemAlias.trim() ? newItemAlias.trim() : null,
           });
         }
       }
@@ -743,6 +772,7 @@ const InventoryPage = () => {
       if (options?.stayOpen) {
         setNewItemQuantity(1);
         setNewItemNotes('');
+        setNewItemAlias('');
         setNewItemLocation(null);
         setNewItemQuality('');
         setCatalogError(null);
@@ -926,6 +956,7 @@ const InventoryPage = () => {
         }
         setEditQuality(actionItem.quality != null ? actionItem.quality : '');
         setEditUomId(actionItem.unitOfMeasureId ?? '');
+        setEditAlias(actionItem.alias ?? '');
       }
     }
   }, [actionMode, actionItem]);
@@ -1021,6 +1052,7 @@ const InventoryPage = () => {
     setNewRowSelectedItem(null);
     setNewRowSelectedLocation(null);
     setNewRowQuality('');
+    setNewRowAlias('');
     setNewRowItemInput('');
     setNewRowErrors({});
   };
@@ -1060,12 +1092,16 @@ const InventoryPage = () => {
     try {
       setNewRowSaving(true);
       setNewRowErrors({});
+      const isAliasEligible =
+        newRowSelectedItem !== null &&
+        (newRowSelectedItem.catalogKind === 'item' || newRowSelectedItem.catalogKind === 'vehicle');
       const payload = {
         catalogEntryId: selectedItemId!,
         quantity: parsedQuantity,
         unitOfMeasureId: newRowUomId || defaultUomIdFor(newRowSelectedItem?.catalogKind ?? null),
         locationId: newRowSelectedLocation?.id ?? null,
         quality: newRowQuality !== '' ? newRowQuality : null,
+        alias: isAliasEligible && newRowAlias.trim() ? newRowAlias.trim() : null,
       };
       if (viewMode === 'org' && selectedOrgId) {
         await inventoryService.createOrgItem(selectedOrgId, payload);
@@ -1312,18 +1348,28 @@ const InventoryPage = () => {
       const draftQuality = draft.quality;
       const parsedQuality = draftQuality !== '' ? Number(draftQuality) : null;
 
+      const aliasIsEligible =
+        item.catalogKind === 'item' || item.catalogKind === 'vehicle';
+      const aliasDraft = inlineAliases[item.id];
+      const aliasPayload: string | null | undefined =
+        aliasIsEligible && aliasDraft !== undefined
+          ? (aliasDraft.trim() || null)
+          : undefined;
+
       try {
         if (viewMode === 'org' && selectedOrgId) {
           await inventoryService.updateOrgItem(selectedOrgId, item.id, {
             quantity: parsedQuantity,
             locationId,
             quality: parsedQuality,
+            ...(aliasPayload !== undefined ? { alias: aliasPayload } : {}),
           });
         } else {
           await inventoryService.updateItem(item.id, {
             quantity: parsedQuantity,
             locationId,
             quality: parsedQuality,
+            ...(aliasPayload !== undefined ? { alias: aliasPayload } : {}),
           });
         }
         setInlineSaved((prev) => {
@@ -1356,7 +1402,7 @@ const InventoryPage = () => {
         setInlineSaving(updated);
       }
     },
-    [focusController, getInlineDraft, inlineLocations, inlineSaving, items, selectedOrgId, viewMode],
+    [focusController, getInlineDraft, inlineAliases, inlineLocations, inlineSaving, items, selectedOrgId, viewMode],
   );
 
   const handleInlineSaveAndAdvance = useCallback(
@@ -1386,6 +1432,7 @@ const InventoryPage = () => {
     notes?: string;
     locationId?: string | null;
     quality?: number | null;
+    alias?: string | null;
   }) => {
     if (!actionItem) return;
     try {
@@ -1534,6 +1581,16 @@ const InventoryPage = () => {
                   }
                 }}
               />
+              {(actionItem.catalogKind === 'item' || actionItem.catalogKind === 'vehicle') && (
+                <TextField
+                  label="Nickname (optional)"
+                  fullWidth
+                  inputProps={{ maxLength: 64 }}
+                  placeholder="Add a nickname…"
+                  value={editAlias}
+                  onChange={(e) => setEditAlias(e.target.value)}
+                />
+              )}
               <TextField
                 label="Notes"
                 fullWidth
@@ -1559,6 +1616,9 @@ const InventoryPage = () => {
                       notes: actionItem.notes ?? undefined,
                       locationId: editLocation?.id ?? null,
                       quality: editQuality !== '' ? editQuality : null,
+                      alias: (actionItem.catalogKind === 'item' || actionItem.catalogKind === 'vehicle')
+                        ? (editAlias.trim() || null)
+                        : undefined,
                     })
                   }
                   disabled={actionWorking}
@@ -1707,6 +1767,8 @@ const InventoryPage = () => {
       isRowActive && inlineActiveField?.field === 'quality';
     const isLocationActive =
       isRowActive && inlineActiveField?.field === 'location';
+    const isAliasActive =
+      isRowActive && inlineActiveField?.field === 'alias';
     const saving = inlineSaving.has(item.id);
     const errorText = inlineError[item.id];
     const saved = inlineSaved.has(item.id.toString());
@@ -1720,7 +1782,9 @@ const InventoryPage = () => {
         quantityEditing={isQuantityActive}
         qualityEditing={isQualityActive}
         locationEditing={isLocationActive}
+        aliasEditing={isAliasActive}
         inlineLocation={inlineLocation}
+        inlineAlias={inlineAliases[item.id] ?? ''}
         inlineSaving={saving}
         inlineSaved={saved}
         inlineError={errorText}
@@ -1735,6 +1799,8 @@ const InventoryPage = () => {
         onActivateField={activateInlineField}
         onLocationChange={handleInlineLocationChange}
         onLocationBlur={handleInlineLocationBlur}
+        onAliasChange={handleInlineAliasChange}
+        onAliasBlur={handleInlineAliasBlur}
         onSave={handleInlineSaveAndAdvance}
         onOpenActions={handleActionOpen}
         setQuantityRef={handleQuantityRef}
@@ -1971,6 +2037,8 @@ const InventoryPage = () => {
                 onLocationChange={setNewRowSelectedLocation}
                 quality={newRowQuality}
                 onQualityChange={setNewRowQuality}
+                alias={newRowAlias}
+                onAliasChange={setNewRowAlias}
                 onItemSelect={(value) => {
                   setNewRowSelectedItem(value);
                   setNewRowDraft((prev) => ({ ...prev, itemId: value ? value.id : '' }));
@@ -2191,6 +2259,19 @@ const InventoryPage = () => {
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); addNotesRef.current?.focus(); } }}
                 />
               </div>
+              {(selectedCatalogItem?.catalogKind === 'item' || selectedCatalogItem?.catalogKind === 'vehicle') && (
+                <div>
+                  <label className="field-lbl">Nickname (optional)</label>
+                  <input
+                    className="field-in"
+                    type="text"
+                    maxLength={64}
+                    value={newItemAlias}
+                    onChange={(e) => setNewItemAlias(e.target.value)}
+                    placeholder="Add a nickname…"
+                  />
+                </div>
+              )}
               <div>
                 <label className="field-lbl">Notes</label>
                 <textarea

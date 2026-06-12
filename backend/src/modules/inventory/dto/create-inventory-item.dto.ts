@@ -75,8 +75,8 @@ export class CreateInventoryItemDto {
 
   @ApiPropertyOptional({ nullable: true, maxLength: 255 })
   @IsOptional()
-  @Transform(fallback('custom_name'))
+  @Transform(fallback('alias'))
   @IsString()
-  @MaxLength(255)
-  customName?: string | null;
+  @MaxLength(64)
+  alias?: string | null;
 }
