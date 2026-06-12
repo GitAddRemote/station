@@ -8,9 +8,6 @@ export class InventoryListDto {
   name!: string;
 
   @ApiProperty()
-  isShared!: boolean;
-
-  @ApiProperty()
   createdAt!: Date;
 
   @ApiProperty()

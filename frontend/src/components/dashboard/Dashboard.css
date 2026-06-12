@@ -396,6 +396,33 @@
 .pcard .p-empty svg { width: 28px; height: 28px; opacity: 0.35; margin-bottom: var(--space-3); }
 .pcard .p-empty p { font-size: var(--text-sm); color: var(--text-muted); margin: 0; }
 
+/* ---- contract portlet rows ------------------------------ */
+.ct-portlet-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ct-portlet-row:last-of-type { border-bottom: none; }
+.ct-portlet-ic {
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  display: grid; place-items: center; flex-shrink: 0;
+  background: var(--surface-raised); color: var(--text-muted);
+}
+.ct-portlet-ic svg { width: 14px; height: 14px; }
+.ct-portlet-body { flex: 1; min-width: 0; }
+.ct-portlet-title {
+  font-size: var(--text-sm); font-weight: var(--weight-medium);
+  color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ct-portlet-meta { display: flex; align-items: center; gap: var(--space-2); margin-top: 2px; }
+.ct-portlet-dl {
+  font-size: var(--text-xs); color: var(--text-faint);
+}
+.ct-portlet-dl.urgent { color: var(--warning-400); font-weight: var(--weight-medium); }
+.ct-portlet-reward { text-align: right; flex-shrink: 0; }
+.ct-portlet-auec { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-strong); }
+.ct-portlet-auec-unit { font-size: var(--text-xs); color: var(--text-faint); margin-left: 2px; }
+
 /* ---- responsive ------------------------------------------ */
 @media (max-width: 980px) {
   .dash-pgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -23,6 +23,7 @@ export enum AuditEntityType {
   ROLE = 'ROLE',
   USER_ORGANIZATION_ROLE = 'USER_ORGANIZATION_ROLE',
   AUTH = 'AUTH',
+  CONTRACT = 'CONTRACT',
 }
 
 @Entity()
