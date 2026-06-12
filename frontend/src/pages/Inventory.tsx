@@ -62,6 +62,8 @@ import {
 } from '../services/inventory.service';
 import { catalogService, CatalogEntryDto, LocationDto } from '../services/catalog.service';
 import LocationPicker from '../components/inventory/LocationPicker';
+import InventoryCard from '../components/inventory/InventoryCard';
+import InventoryItemDrawer from '../components/inventory/InventoryItemDrawer';
 import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
@@ -75,6 +77,18 @@ import { api } from '../services/api.service';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
 type ActionMode = 'edit' | 'split' | 'delete' | null;
+
+interface GroupedRow {
+  catalogEntryId: string;
+  itemName: string;
+  catalogKind: 'item' | 'commodity' | 'vehicle';
+  categoryName: string;
+  totalQuantity: number;
+  maxQuality: number | null;
+  maxQualityCount: number;
+  subRows: InventoryRecord[];
+  representative: InventoryRecord;
+}
 type InlineDraft = { quantity: number | ''; quality: number | ''; locationId?: string | null; locationName?: string | null };
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
@@ -83,6 +97,7 @@ const SLIDER_QUANTITY_MAX = 10000;
 const VIEW_MODE_STORAGE_KEY = 'inventory:viewMode';
 const ORG_ID_STORAGE_KEY = 'inventory:selectedOrgId';
 const DENSITY_STORAGE_KEY = 'inventory:density';
+const LAYOUT_MODE_STORAGE_KEY = 'inventory:layoutMode';
 
 const readStoredViewMode = (): 'personal' | 'org' => {
   if (typeof window === 'undefined') return 'personal';
@@ -93,6 +108,12 @@ const readStoredViewMode = (): 'personal' | 'org' => {
 const readStoredOrgId = (): string | null => {
   if (typeof window === 'undefined') return null;
   return window.sessionStorage.getItem(ORG_ID_STORAGE_KEY) || null;
+};
+
+const readStoredLayoutMode = (): 'table' | 'card' => {
+  if (typeof window === 'undefined') return 'table';
+  const stored = window.sessionStorage.getItem(LAYOUT_MODE_STORAGE_KEY);
+  return stored === 'card' ? 'card' : 'table';
 };
 
 const readStoredDensity = (): 'standard' | 'compact' => {
@@ -168,6 +189,7 @@ const InventoryPage = () => {
     valueRange: [0, SLIDER_QUANTITY_MAX] as [number, number],
     qualityRange: [0, 1000] as [number, number],
   });
+  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'date'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [groupBy, setGroupBy] = useState<'none' | 'category'>(
@@ -178,6 +200,10 @@ const InventoryPage = () => {
   const [density, setDensity] = useState<'standard' | 'compact'>(() =>
     readStoredDensity(),
   );
+  const [layoutMode, setLayoutMode] = useState<'table' | 'card'>(() =>
+    readStoredLayoutMode(),
+  );
+  const [selectedDrawerGroup, setSelectedDrawerGroup] = useState<GroupedRow | null>(null);
   const [inlineDrafts, setInlineDrafts] = useState<Record<string, InlineDraft>>(
     {},
   );
@@ -239,6 +265,10 @@ const InventoryPage = () => {
   useEffect(() => {
     window.sessionStorage.setItem(DENSITY_STORAGE_KEY, density);
   }, [density]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(LAYOUT_MODE_STORAGE_KEY, layoutMode);
+  }, [layoutMode]);
 
   useEffect(() => {
     if (!orgsLoaded.current || selectedOrgId === null) return;
@@ -961,6 +991,40 @@ const InventoryPage = () => {
 
   const filteredItems = useMemo(() => items, [items]);
 
+  const groupedByEntry = useMemo((): GroupedRow[] => {
+    const map = new Map<string, InventoryRecord[]>();
+    filteredItems.forEach((item) => {
+      const key = item.catalogEntryId;
+      const bucket = map.get(key) ?? [];
+      bucket.push(item);
+      map.set(key, bucket);
+    });
+    return Array.from(map.entries()).map(([catalogEntryId, rows]) => {
+      const sorted = [...rows].sort((a, b) => {
+        const locA = a.locationName ?? '';
+        const locB = b.locationName ?? '';
+        if (locA !== locB) return locA.localeCompare(locB);
+        return (b.quality ?? -1) - (a.quality ?? -1);
+      });
+      const totalQuantity = rows.reduce((s, r) => s + Number(r.quantity), 0);
+      const qualities = rows.map((r) => r.quality).filter((q): q is number => q != null);
+      const maxQuality = qualities.length > 0 ? Math.max(...qualities) : null;
+      const maxQualityCount = maxQuality != null ? rows.filter((r) => r.quality === maxQuality).length : 0;
+      const rep = sorted[0];
+      return {
+        catalogEntryId,
+        itemName: rep.itemName || `Item #${catalogEntryId}`,
+        catalogKind: rep.catalogKind,
+        categoryName: rep.categoryName,
+        totalQuantity,
+        maxQuality,
+        maxQualityCount,
+        subRows: sorted,
+        representative: rep,
+      };
+    });
+  }, [filteredItems]);
+
   useEffect(() => {
     if (!items.length) {
       setInlineDrafts({});
@@ -1005,6 +1069,18 @@ const InventoryPage = () => {
 
     return groups;
   }, [groupBy, filteredItems]);
+
+  const toggleEntryExpanded = useCallback((catalogEntryId: string) => {
+    setExpandedEntries((prev) => {
+      const next = new Set(prev);
+      if (next.has(catalogEntryId)) {
+        next.delete(catalogEntryId);
+      } else {
+        next.add(catalogEntryId);
+      }
+      return next;
+    });
+  }, []);
 
   const newRowQuantityNumber = useMemo(
     () => (newRowDraft.quantity === '' ? NaN : Number(newRowDraft.quantity)),
@@ -1700,6 +1776,7 @@ const InventoryPage = () => {
   const showEmptyState = filteredItems.length === 0 && !refreshing;
   const totalQty = items.reduce((s, x) => s + Number(x.quantity), 0);
   const catCount = new Set(items.map((x) => x.categoryName)).size;
+  const uniqueItemCount = groupedByEntry.length;
 
   const renderInlineRow = (item: InventoryRecord) => {
     const rowKey = item.id.toString();
@@ -1840,9 +1917,9 @@ const InventoryPage = () => {
         {/* Stat strip */}
         <div className="statstrip" style={{ '--n': 3 } as React.CSSProperties}>
           <div className="statcard">
-            <div className="k"><PackageIcon style={{ width: 13, height: 13 }} /> {isOrgMode ? 'Org records' : 'My records'}</div>
-            <div className="v">{items.length.toLocaleString()}</div>
-            <div className="d">{catCount} categories</div>
+            <div className="k"><PackageIcon style={{ width: 13, height: 13 }} /> {isOrgMode ? 'Org items' : 'My items'}</div>
+            <div className="v">{uniqueItemCount.toLocaleString()}</div>
+            <div className="d">{items.length.toLocaleString()} record{items.length === 1 ? '' : 's'} · {catCount} categories</div>
           </div>
           <div className="statcard">
             <div className="k"><LayersIcon style={{ width: 13, height: 13 }} /> Total quantity</div>
@@ -1932,10 +2009,58 @@ const InventoryPage = () => {
               </button>
             </div>
           )}
+          {/* Layout toggle: table / card */}
+          <div className="density-toggle" role="group" aria-label="Layout">
+            <button
+              aria-pressed={layoutMode === 'table'}
+              onClick={() => setLayoutMode('table')}
+              title="Table view"
+            >
+              <ViewAgendaIcon style={{ width: 16, height: 16 }} />
+            </button>
+            <button
+              aria-pressed={layoutMode === 'card'}
+              onClick={() => setLayoutMode('card')}
+              title="Card view"
+            >
+              <GridViewIcon style={{ width: 16, height: 16 }} />
+            </button>
+          </div>
         </div>
 
+        {/* Card view */}
+        {layoutMode === 'card' && (
+          <div style={{ marginTop: 'var(--space-6)' }} aria-busy={inventoryBusy}>
+            {refreshing && <LinearProgress sx={{ mb: 1 }} color="primary" />}
+            {error && <div className="inv-error">{error}</div>}
+            {initialLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-12)' }}>
+                <CircularProgress size={32} />
+              </div>
+            ) : groupedByEntry.length === 0 ? (
+              <div className="inv-empty">No items match the current filters.</div>
+            ) : (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  gap: 'var(--space-4)',
+                }}
+              >
+                {groupedByEntry.map((group) => (
+                  <InventoryCard
+                    key={group.catalogEntryId}
+                    group={group}
+                    onClick={setSelectedDrawerGroup}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Table content */}
-        <div style={{ marginTop: 'var(--space-6)', position: 'relative' }} aria-busy={inventoryBusy}>
+        <div style={{ marginTop: 'var(--space-6)', position: 'relative', display: layoutMode === 'card' ? 'none' : undefined }} aria-busy={inventoryBusy}>
           {refreshing && <LinearProgress sx={{ mb: 1 }} color="primary" />}
           {error && <div className="inv-error">{error}</div>}
 
@@ -2027,38 +2152,112 @@ const InventoryPage = () => {
               {!showEmptyState && (
                 <div className="inv-count-bar">
                   <ViewAgendaIcon style={{ width: 16, height: 16 }} />
-                  <span>Showing {items.length.toLocaleString()} of {totalCount.toLocaleString()} items</span>
+                  <span>Showing {groupedByEntry.length.toLocaleString()} item type{groupedByEntry.length === 1 ? '' : 's'} ({items.length.toLocaleString()} record{items.length === 1 ? '' : 's'}) of {totalCount.toLocaleString()} total</span>
                 </div>
               )}
               <div className={isEditorMode ? 'editor' : ''}>
-                {Array.from(groupedItems.entries()).map(([group, groupItems]) => (
-                  <div
-                    key={group}
-                    className={'grp-section' + (groupBy === 'none' ? ' single' : '')}
-                  >
-                    {groupBy !== 'none' && (
-                      <div className="grp-header">
-                        <span className="gchip">{group}</span>
-                        <span className="gcount">{groupItems.length} item{groupItems.length === 1 ? '' : 's'}</span>
-                      </div>
-                    )}
-                    <div className="dtable-wrap">
-                      <div className="inv-row-head" role="row">
-                        <span>Item</span>
-                        <span>Location</span>
-                        <span>Quality</span>
-                        <span>Qty</span>
-                        <span>Updated</span>
-                        <span>Category</span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                      <div role="rowgroup">
-                        {groupItems.map((item) => renderInlineRow(item))}
+                {Array.from(groupedItems.entries()).map(([group, groupItems]) => {
+                  const groupEntries = groupedByEntry.filter((g) =>
+                    groupItems.some((i) => i.catalogEntryId === g.catalogEntryId),
+                  );
+                  return (
+                    <div
+                      key={group}
+                      className={'grp-section' + (groupBy === 'none' ? ' single' : '')}
+                    >
+                      {groupBy !== 'none' && (
+                        <div className="grp-header">
+                          <span className="gchip">{group}</span>
+                          <span className="gcount">{groupEntries.length} item{groupEntries.length === 1 ? '' : 's'}</span>
+                        </div>
+                      )}
+                      <div className="dtable-wrap">
+                        <div className="inv-row-head" role="row">
+                          <span></span>
+                          <span>Item</span>
+                          <span>Location</span>
+                          <span>Quality</span>
+                          <span>Qty</span>
+                          <span>Updated</span>
+                          <span>Category</span>
+                          <span></span>
+                        </div>
+                        <div role="rowgroup">
+                          {groupEntries.map((group) => {
+                            const isExpanded = expandedEntries.has(group.catalogEntryId);
+                            const hasSubs = group.subRows.length > 1;
+                            return (
+                              <div key={group.catalogEntryId} className="acc-entry">
+                                {/* Parent row */}
+                                <div
+                                  className={'acc-parent' + (isExpanded ? ' expanded' : '')}
+                                  role="row"
+                                >
+                                  <button
+                                    className={'acc-chevron' + (hasSubs ? '' : ' invisible')}
+                                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                                    aria-expanded={isExpanded}
+                                    onClick={() => hasSubs && toggleEntryExpanded(group.catalogEntryId)}
+                                    tabIndex={hasSubs ? 0 : -1}
+                                  >
+                                    <ChevronRightIcon style={{ width: 16, height: 16, transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 150ms ease-out' }} />
+                                  </button>
+                                  <span className="acc-name" title={group.itemName}>
+                                    {group.itemName}
+                                    <span className="chip-badge neutral" style={{ marginLeft: 8 }}>Private</span>
+                                  </span>
+                                  <span className="acc-location">
+                                    {group.subRows.length === 1
+                                      ? (group.subRows[0].locationName ?? <>&mdash;</>)
+                                      : <span className="acc-multi">{group.subRows.length} locations</span>}
+                                  </span>
+                                  <span className="acc-quality">
+                                    {group.maxQuality != null ? (
+                                      <span className="quality-pill">
+                                        Q{group.maxQuality}
+                                        {group.maxQualityCount > 1 && (
+                                          <span className="quality-pill-count">&thinsp;&times;{group.maxQualityCount}</span>
+                                        )}
+                                      </span>
+                                    ) : <>&mdash;</>}
+                                  </span>
+                                  <span className="acc-qty">
+                                    {group.totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                                  </span>
+                                  <span className="acc-date">
+                                    {new Date(group.representative.updatedAt || group.representative.createdAt || '').toLocaleDateString()}
+                                  </span>
+                                  <span className="acc-cat">
+                                    <span className="chip-badge neutral" style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {group.categoryName || 'General'}
+                                    </span>
+                                  </span>
+                                  <span className="acc-actions">
+                                    <button
+                                      className="row-act"
+                                      onClick={(e) => handleActionOpen(e as unknown as React.MouseEvent<HTMLElement>, group.representative)}
+                                      aria-label="Actions"
+                                    >
+                                      <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 16, height: 16 }}>
+                                        <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
+                                      </svg>
+                                    </button>
+                                  </span>
+                                </div>
+                                {/* Sub-rows */}
+                                {isExpanded && hasSubs && (
+                                  <div className="acc-subrows" role="rowgroup">
+                                    {group.subRows.map((item) => renderInlineRow(item))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Pagination */}
@@ -2312,6 +2511,13 @@ const InventoryPage = () => {
         open={batchDrawerOpen}
         mode={batchDrawerMode}
         onClose={() => { setBatchDrawerOpen(false); setBatchDrawerMode(null); }}
+        onMutated={fetchInventory}
+      />
+
+      <InventoryItemDrawer
+        open={selectedDrawerGroup !== null}
+        group={selectedDrawerGroup}
+        onClose={() => setSelectedDrawerGroup(null)}
         onMutated={fetchInventory}
       />
     </AppShell>
