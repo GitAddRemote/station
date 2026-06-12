@@ -218,7 +218,7 @@ function ContractsPage() {
     // TODO: open new contract dialog (#381)
   }, []);
 
-  const handleAction = useCallback((_action: string, _contractId: string) => {
+  const handleAction = useCallback(() => {
     // TODO: wire actions (#381)
   }, []);
 
