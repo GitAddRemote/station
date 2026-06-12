@@ -10,7 +10,6 @@ export enum OrgPermission {
   CAN_VIEW_ORG_INVENTORY = 'can_view_org_inventory',
   CAN_EDIT_ORG_INVENTORY = 'can_edit_org_inventory',
   CAN_ADMIN_ORG_INVENTORY = 'can_admin_org_inventory',
-  CAN_VIEW_MEMBER_SHARED_ITEMS = 'can_view_member_shared_items',
   CAN_MANAGE_INVENTORY = 'can_manage_inventory',
 
   // Station-Bot Administration Permissions (guild-scoped)
@@ -35,7 +34,6 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
-    [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: true,
@@ -48,7 +46,6 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
-    [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: true,
@@ -61,7 +58,6 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
-    [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
@@ -74,7 +70,6 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
-    [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
@@ -87,7 +82,6 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: true,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
-    [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: false,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
@@ -100,7 +94,6 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_INVENTORY]: false,
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
-    [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]: false,
     [OrgPermission.CAN_MANAGE_INVENTORY]: false,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
@@ -121,8 +114,6 @@ export const PERMISSION_DESCRIPTIONS: Record<OrgPermission, string> = {
     'Create, update, and delete organization inventory items',
   [OrgPermission.CAN_ADMIN_ORG_INVENTORY]:
     'Manage inventory settings, perform bulk operations, and export data',
-  [OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS]:
-    'View items that members have shared with the organization',
   [OrgPermission.CAN_MANAGE_INVENTORY]:
     'Perform all inventory management operations for the organization',
   [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]:

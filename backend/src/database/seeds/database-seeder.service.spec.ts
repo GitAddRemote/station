@@ -537,12 +537,9 @@ describe('DatabaseSeederService', () => {
         expect(byName[roleName]?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
           true,
         );
-        expect(
-          byName[roleName]?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
-        ).toBe(true);
       }
 
-      // Member: can view and view shared, but not edit or admin
+      // Member: can view, but not edit or admin
       expect(byName['Member']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
         true,
       );
@@ -552,13 +549,10 @@ describe('DatabaseSeederService', () => {
       expect(byName['Member']?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
         false,
       );
-      expect(
-        byName['Member']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
-      ).toBe(true);
 
-      // Viewer: can only view inventory, nothing else
+      // Viewer: cannot view inventory
       expect(byName['Viewer']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
-        true,
+        false,
       );
       expect(byName['Viewer']?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
         false,
@@ -566,9 +560,6 @@ describe('DatabaseSeederService', () => {
       expect(byName['Viewer']?.[OrgPermission.CAN_ADMIN_ORG_INVENTORY]).toBe(
         false,
       );
-      expect(
-        byName['Viewer']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
-      ).toBe(false);
     });
 
     it('should not overwrite a user-customized role description when permissions are current', async () => {
