@@ -146,7 +146,6 @@ describe('InventoryService', () => {
 
   const mockUserOrganizationRolesService = {
     getUserOrganizations: jest.fn(),
-    getOrganizationMembers: jest.fn(),
   };
 
   const createQueryBuilder = () => {
@@ -366,7 +365,6 @@ describe('InventoryService', () => {
           unitOfMeasure: unit,
           quantity: '2.000000',
           quality: null,
-          isOrgAvailable: false,
           alias: null,
           notes: null,
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -384,20 +382,11 @@ describe('InventoryService', () => {
     expect(result.data[0].ownerId).toBe(user.id);
   });
 
-  it('lists org inventory including member-contributed shared items and returns a summary', async () => {
-    const member = {
-      id: '00000000-0000-0000-0000-000000000008',
-      isSystemUser: false,
-    } as User;
+  it('lists org inventory and returns a summary', async () => {
     mockOrganizationRepository.findOne.mockResolvedValue(organization);
     mockUserOrganizationRolesService.getUserOrganizations.mockResolvedValue([
       { organizationId: organization.id },
     ]);
-    mockUserOrganizationRolesService.getOrganizationMembers.mockResolvedValue([
-      { userId: user.id },
-      { userId: member.id },
-    ]);
-    mockUserRepository.find.mockResolvedValue([user, member]);
 
     const builder = createQueryBuilder();
     const orgItem = {
@@ -413,22 +402,13 @@ describe('InventoryService', () => {
       unitOfMeasure: scu,
       quantity: '4.000000',
       quality: null,
-      isOrgAvailable: false,
       alias: null,
       notes: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     } as StationInventoryItem;
-    const sharedUserItem = {
-      ...orgItem,
-      id: '00000000-0000-0000-0000-000000000602',
-      ownerType: 'user',
-      ownerId: member.id,
-      isOrgAvailable: true,
-      quantity: '2.500000',
-    } as StationInventoryItem;
-    builder.getManyAndCount.mockResolvedValue([[orgItem, sharedUserItem], 2]);
-    builder.getMany.mockResolvedValue([orgItem, sharedUserItem]);
+    builder.getManyAndCount.mockResolvedValue([[orgItem], 1]);
+    builder.getMany.mockResolvedValue([orgItem]);
 
     const result = await service.listItems(user.id, {
       ownerType: 'org',
@@ -436,8 +416,8 @@ describe('InventoryService', () => {
       includeSummary: true,
     });
 
-    expect(result.total).toBe(2);
-    expect(result.summary?.totalQuantity).toBe(6.5);
+    expect(result.total).toBe(1);
+    expect(result.summary?.totalQuantity).toBe(4);
     expect(result.summary?.byCategory[0].categoryId).toBe(category.id);
   });
 
@@ -455,7 +435,6 @@ describe('InventoryService', () => {
       unitOfMeasure: unit,
       quantity: '2.000000',
       quality: null,
-      isOrgAvailable: false,
       alias: null,
       notes: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -489,7 +468,6 @@ describe('InventoryService', () => {
       unitOfMeasure: unit,
       quantity: '2.000000',
       quality: null,
-      isOrgAvailable: false,
       alias: null,
       notes: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -517,7 +495,6 @@ describe('InventoryService', () => {
       unitOfMeasure: unit,
       quantity: '2.000000',
       quality: null,
-      isOrgAvailable: false,
       alias: null,
       notes: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -563,13 +540,11 @@ describe('InventoryService', () => {
         ownerType: 'user',
         ownerId: '00000000-0000-0000-0000-000000000007',
         name: 'To Sell',
-        isShared: false,
       },
     );
     expect(result).toEqual({
       id: '00000000-0000-0000-0000-000000000101',
       name: 'To Sell',
-      isShared: false,
       createdAt,
       updatedAt,
     });
@@ -590,7 +565,6 @@ describe('InventoryService', () => {
       {
         id: '00000000-0000-0000-0000-000000000101',
         name: 'To Sell',
-        isShared: false,
         createdAt,
         updatedAt,
       },
@@ -609,7 +583,6 @@ describe('InventoryService', () => {
       {
         id: '00000000-0000-0000-0000-000000000101',
         name: 'To Sell',
-        isShared: false,
         createdAt,
         updatedAt,
       },

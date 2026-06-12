@@ -8,17 +8,15 @@ import { DEFAULT_ROLE_PERMISSIONS } from '../../modules/permissions/permissions.
 type DefaultRoleName = keyof typeof DEFAULT_ROLE_PERMISSIONS;
 const ROLE_DESCRIPTIONS: Record<DefaultRoleName, string> = {
   Owner:
-    'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
+    'Full inventory access. Can view, edit, and administer organization inventory.',
   Admin:
-    'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
+    'Full inventory access. Can view, edit, and administer organization inventory.',
   Director:
-    'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
+    'Full inventory access. Can view, edit, and administer organization inventory.',
   'Inventory Manager':
-    'Full inventory access. Can view, edit, and administer organization inventory, and view member shared items.',
-  Member:
-    'Standard member access. Can view organization inventory and member shared items.',
-  Viewer:
-    'Guest-level access. Cannot view organization inventory or member items.',
+    'Full inventory access. Can view, edit, and administer organization inventory.',
+  Member: 'Standard member access. Can view organization inventory.',
+  Viewer: 'Guest-level access. Cannot view organization inventory.',
 };
 
 export const defaultRoles: Partial<Role>[] = (

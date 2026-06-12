@@ -34,9 +34,7 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import EditIcon from '@mui/icons-material/Edit';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
-import ShareIcon from '@mui/icons-material/Share';
 import ArticleIcon from '@mui/icons-material/Article';
-import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
 import SearchIcon from '@mui/icons-material/Search';
 import PersonIcon from '@mui/icons-material/Person';
@@ -75,7 +73,7 @@ import {
 import { api } from '../services/api.service';
 
 type InventoryRecord = InventoryItem | OrgInventoryItem;
-type ActionMode = 'edit' | 'split' | 'share' | 'delete' | null;
+type ActionMode = 'edit' | 'split' | 'delete' | null;
 type InlineDraft = { quantity: number | ''; quality: number | ''; locationId?: string | null; locationName?: string | null };
 
 const EDITOR_MODE_QUANTITY_MAX = 999999.999999;
@@ -168,13 +166,12 @@ const InventoryPage = () => {
   const [filters, setFilters] = useState({
     search: '',
     categoryId: '' as string | '',
-    sharedOnly: false,
     valueRange: [0, SLIDER_QUANTITY_MAX] as [number, number],
     qualityRange: [0, 1000] as [number, number],
   });
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'date'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [groupBy, setGroupBy] = useState<'none' | 'category' | 'share'>(
+  const [groupBy, setGroupBy] = useState<'none' | 'category'>(
     'none',
   );
   const [page, setPage] = useState(0);
@@ -610,7 +607,6 @@ const InventoryPage = () => {
           page: page + 1,
           search: debouncedSearch || undefined,
           categoryId,
-          orgAvailable: filters.sharedOnly || undefined,
           minQuantity: filters.valueRange[0] > 0 ? filters.valueRange[0] : undefined,
           maxQuantity: filters.valueRange[1] < SLIDER_QUANTITY_MAX ? filters.valueRange[1] : undefined,
           minQuality: filters.qualityRange[0] > 0 ? filters.qualityRange[0] : undefined,
@@ -643,7 +639,6 @@ const InventoryPage = () => {
     orgPermissionsLoading,
     canViewOrgInventory,
     filters.categoryId,
-    filters.sharedOnly,
     filters.valueRange,
     filters.qualityRange,
     debouncedSearch,
@@ -903,7 +898,6 @@ const InventoryPage = () => {
   }, [
     debouncedSearch,
     filters.categoryId,
-    filters.sharedOnly,
     filters.valueRange,
     filters.qualityRange,
     viewMode,
@@ -1023,8 +1017,6 @@ const InventoryPage = () => {
       let key = 'Other';
       if (groupBy === 'category') {
         key = item.categoryName || 'Uncategorized';
-      } else if (groupBy === 'share') {
-        key = item.isOrgAvailable ? 'Shared' : 'Private';
       }
 
       const current = groups.get(key) || [];
@@ -1480,32 +1472,6 @@ const InventoryPage = () => {
     }
   };
 
-  const handleShare = async () => {
-    if (!actionItem) return;
-    try {
-      setActionWorking(true);
-      setError(null);
-      await inventoryService.updateItem(actionItem.id, { isOrgAvailable: true });
-      closeActionMenu();
-      await fetchInventory();
-    } finally {
-      setActionWorking(false);
-    }
-  };
-
-  const handleUnshare = async () => {
-    if (!actionItem) return;
-    try {
-      setActionWorking(true);
-      setError(null);
-      await inventoryService.updateItem(actionItem.id, { isOrgAvailable: false });
-      closeActionMenu();
-      await fetchInventory();
-    } finally {
-      setActionWorking(false);
-    }
-  };
-
   const handleDelete = async () => {
     if (!actionItem) return;
     try {
@@ -1550,15 +1516,12 @@ const InventoryPage = () => {
           >
             {actionMode === 'edit' && <EditIcon fontSize="small" />}
             {actionMode === 'split' && <CallSplitIcon fontSize="small" />}
-            {actionMode === 'share' && <ShareIcon fontSize="small" />}
             {actionMode === 'delete' && <DeleteForeverIcon fontSize="small" />}
             {actionMode === 'edit'
               ? 'Edit item'
               : actionMode === 'split'
                 ? 'Split item'
-                : actionMode === 'share'
-                  ? 'Share item'
-                  : 'Delete item'}
+                : 'Delete item'}
           </Typography>
           {actionMode === 'edit' && (
             <>
@@ -1692,24 +1655,6 @@ const InventoryPage = () => {
               </Stack>
             </>
           )}
-          {actionMode === 'share' && (
-            <>
-              <Typography variant="body2" color="text.secondary">
-                Share <strong style={{ color: 'var(--text-strong)' }}>
-                  {actionItem.itemName || `Item ${actionItem.catalogEntryId}`}
-                </strong> with your organizations?
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: 'var(--text-xs)' }}>
-                Sharing makes this item visible to all organizations you belong to. You can unshare it at any time.
-              </Typography>
-              <Stack direction="row" spacing={1} justifyContent="flex-end">
-                <Button variant="text" onClick={closeActionMenu}>Cancel</Button>
-                <Button variant="contained" disabled={actionWorking} onClick={handleShare}>
-                  Share
-                </Button>
-              </Stack>
-            </>
-          )}
           {actionMode === 'delete' && (
             <>
               <Typography variant="body2">
@@ -1804,7 +1749,6 @@ const InventoryPage = () => {
   const inventoryBusy = refreshing;
   const showEmptyState = filteredItems.length === 0 && !refreshing;
   const totalQty = items.reduce((s, x) => s + Number(x.quantity), 0);
-  const sharedCount = items.filter((x) => x.isOrgAvailable).length;
   const catCount = new Set(items.map((x) => x.categoryName)).size;
 
   const renderInlineRow = (item: InventoryRecord) => {
@@ -1885,7 +1829,7 @@ const InventoryPage = () => {
             <h1 className="page-title">Inventory</h1>
             <p className="page-sub">
               Track everything you own and what your org holds — refined ore, components,
-              weapons, and trade goods. Edit quantities inline, split stacks, and share with your org.
+              weapons, and trade goods. Edit quantities inline and split stacks.
             </p>
           </div>
           <div className="page-actions">
@@ -1950,7 +1894,7 @@ const InventoryPage = () => {
         )}
 
         {/* Stat strip */}
-        <div className="statstrip" style={{ '--n': 4 } as React.CSSProperties}>
+        <div className="statstrip" style={{ '--n': 3 } as React.CSSProperties}>
           <div className="statcard">
             <div className="k"><PackageIcon style={{ width: 13, height: 13 }} /> {isOrgMode ? 'Org records' : 'My records'}</div>
             <div className="v">{items.length.toLocaleString()}</div>
@@ -1960,11 +1904,6 @@ const InventoryPage = () => {
             <div className="k"><LayersIcon style={{ width: 13, height: 13 }} /> Total quantity</div>
             <div className="v">{totalQty > 9999 ? `${(totalQty / 1000).toFixed(1)}k` : totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</div>
             <div className="d">units on hand</div>
-          </div>
-          <div className="statcard">
-            <div className="k"><ShareIcon style={{ width: 13, height: 13 }} /> {isOrgMode ? 'Org stock' : 'Shared items'}</div>
-            <div className="v up">{isOrgMode ? items.length.toLocaleString() : sharedCount.toLocaleString()}</div>
-            <div className="d up">{isOrgMode ? 'visible to members' : 'shared to orgs'}</div>
           </div>
           <div className="statcard">
             <div className="k"><LocalOfferIcon style={{ width: 13, height: 13 }} /> Categories</div>
@@ -1998,15 +1937,6 @@ const InventoryPage = () => {
             </select>
             <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
           </span>
-          {!isOrgMode && (
-            <button
-              className="fchip"
-              aria-pressed={filters.sharedOnly}
-              onClick={() => setFilters((prev) => ({ ...prev, sharedOnly: !prev.sharedOnly }))}
-            >
-              <ShareIcon style={{ width: 15, height: 15 }} /> Shared only
-            </button>
-          )}
           <span className="inv-select">
             <SortIcon className="lead" style={{ width: 15, height: 15 }} />
             <select
@@ -2031,12 +1961,11 @@ const InventoryPage = () => {
             <GridViewIcon className="lead" style={{ width: 15, height: 15 }} />
             <select
               value={groupBy}
-              onChange={(e) => setGroupBy(e.target.value as 'none' | 'category' | 'share')}
+              onChange={(e) => setGroupBy(e.target.value as 'none' | 'category')}
               aria-label="Group by"
             >
               <option value="none">No grouping</option>
               <option value="category">Group by category</option>
-              <option value="share">Group by share status</option>
             </select>
             <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
           </span>
@@ -2446,18 +2375,6 @@ const InventoryPage = () => {
           }}>
             <ListItemIcon><ArticleIcon fontSize="small" /></ListItemIcon>
             <ListItemText>Create contract</ListItemText>
-          </MenuItem>
-        )}
-        {viewMode === 'personal' && (
-          <MenuItem onClick={() => openActionDialog('share')}>
-            <ListItemIcon><ShareIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Share</ListItemText>
-          </MenuItem>
-        )}
-        {viewMode === 'personal' && actionItem?.isOrgAvailable && (
-          <MenuItem onClick={handleUnshare}>
-            <ListItemIcon><UnpublishedIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Unshare</ListItemText>
           </MenuItem>
         )}
         <MenuItem onClick={() => openActionDialog('delete')}>

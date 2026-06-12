@@ -28,8 +28,6 @@ jest.mock('../services/inventory.service', () => ({
     updateOrgItem: (...args: unknown[]) => mockUpdateOrgItem(...args),
     createItem: (...args: unknown[]) => mockCreateItem(...args),
     createOrgItem: (...args: unknown[]) => mockCreateOrgItem(...args),
-    shareItem: jest.fn(),
-    unshareItem: jest.fn(),
   },
 }));
 
@@ -44,7 +42,6 @@ jest.mock('../services/permissions.service', () => ({
     CAN_VIEW_ORG_INVENTORY: 'can_view_org_inventory',
     CAN_EDIT_ORG_INVENTORY: 'can_edit_org_inventory',
     CAN_ADMIN_ORG_INVENTORY: 'can_admin_org_inventory',
-    CAN_VIEW_MEMBER_SHARED_ITEMS: 'can_view_member_shared_items',
   },
   permissionsService: {
     getUserPermissions: (...args: unknown[]) => mockGetUserPermissions(...args),
@@ -58,7 +55,6 @@ const mockItem = {
   catalogEntryId: 'catalog-entry-100',
   quantity: 2,
   notes: '',
-  sharedOrgId: null,
   active: true,
   dateAdded: new Date().toISOString(),
   dateModified: new Date().toISOString(),

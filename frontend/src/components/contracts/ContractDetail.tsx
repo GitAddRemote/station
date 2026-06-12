@@ -1,5 +1,7 @@
 import { CircularProgress } from '@mui/material';
+import { useEffect, useState } from 'react';
 import type { Contract } from '../../services/contracts.service';
+import { api } from '../../services/api.service';
 import BusinessIcon from '@mui/icons-material/Business';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PeopleIcon from '@mui/icons-material/People';
@@ -35,6 +37,15 @@ interface ContractDetailProps {
   onMilestoneUpdate?: (contractId: string, milestoneId: string, currentState: string) => void;
 }
 
+interface AuditLogEntry {
+  id: string;
+  userId?: string;
+  username?: string;
+  action: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
 const RISK_ICON = {
   low:  GppGoodIcon,
   med:  GppMaybeIcon,
@@ -43,12 +54,58 @@ const RISK_ICON = {
 
 const RISK_LABEL = { low: 'Low', med: 'Medium', high: 'High' } as const;
 
+const ACTION_LABEL: Record<string, string> = {
+  CREATE: 'Contract created',
+  UPDATE: 'Contract updated',
+  DELETE: 'Contract deleted',
+};
+
+function historyLabel(entry: AuditLogEntry): string {
+  const transition = entry.metadata?.transition as string | undefined;
+  if (transition) {
+    const map: Record<string, string> = {
+      publish: 'Published',
+      claim: 'Claimed',
+      start: 'Started',
+      complete: 'Completed',
+      dispute: 'Disputed',
+      cancel: 'Cancelled',
+    };
+    return map[transition] ?? transition;
+  }
+  return ACTION_LABEL[entry.action] ?? entry.action;
+}
+
+function fmtRelative(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 export function ContractDetail({ contract, onAction, actionWorking, onMilestoneUpdate }: ContractDetailProps) {
   const ty = CONTRACT_TYPE_META[contract.type] ?? CONTRACT_TYPE_META.transport;
   const st = CONTRACT_STATUS_META[contract.status] ?? CONTRACT_STATUS_META.draft;
   const RiskIcon = RISK_ICON[contract.risk] ?? ShieldIcon;
   const deadlineText = fmtDeadline(contract.deadline);
   const specTitle = contract.type === 'transport' ? 'Route' : 'Brief';
+
+  const [history, setHistory] = useState<AuditLogEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    setHistoryLoading(true);
+    api.get<{ data: AuditLogEntry[] }>(`/audit-logs/entity/CONTRACT/${contract.id}`, {
+      params: { limit: 20 },
+    })
+      .then((res) => setHistory(res.data.data ?? []))
+      .catch(() => setHistory([]))
+      .finally(() => setHistoryLoading(false));
+  }, [contract.id]);
 
   return (
     <div className="panel detail">
@@ -294,12 +351,37 @@ export function ContractDetail({ contract, onAction, actionWorking, onMilestoneU
         </button>
       </div>
 
-      {/* history placeholder */}
+      {/* history */}
       <div className="detail-section">
         <div className="ds-cap"><span>History</span></div>
-        <p className="t-faint" style={{ fontSize: 'var(--text-xs)', margin: 0 }}>
-          Activity history will appear here.
-        </p>
+        {historyLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-3)' }}>
+            <CircularProgress size={18} />
+          </div>
+        ) : history.length === 0 ? (
+          <p className="t-faint" style={{ fontSize: 'var(--text-xs)', margin: 0 }}>
+            No activity recorded yet.
+          </p>
+        ) : (
+          <div className="ct-history">
+            {history.map((entry) => (
+              <div key={entry.id} className="ct-history-row">
+                <span
+                  className="ct-av ct-av-sm"
+                  style={{ background: avColor(entry.username ?? entry.userId ?? '?') }}
+                  title={entry.username ?? entry.userId}
+                >
+                  {initials(entry.username ?? entry.userId ?? '?')}
+                </span>
+                <span className="ct-history-label">{historyLabel(entry)}</span>
+                {entry.username && (
+                  <span className="ct-history-actor t-faint">by {entry.username}</span>
+                )}
+                <span className="ct-history-time t-faint">{fmtRelative(entry.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
