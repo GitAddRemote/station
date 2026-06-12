@@ -9,7 +9,7 @@ import {
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InventoryMetricsService } from '../../metrics/inventory-metrics.service';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, In, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { StationCatalogEntry } from '../catalog/entities/station-catalog-entry.entity';
 import { StationLocation } from '../locations/entities/station-location.entity';
 import { Organization } from '../organizations/organization.entity';
@@ -107,7 +107,6 @@ export class InventoryService {
       unitOfMeasureId: unitOfMeasure.id,
       quantity: dto.quantity.toFixed(6),
       quality: dto.quality ?? null,
-      isOrgAvailable: dto.isOrgAvailable ?? false,
       alias: dto.alias?.trim() || null,
       notes: dto.notes?.trim() || null,
       effectiveProperties: null,
@@ -159,13 +158,7 @@ export class InventoryService {
     const [items, total] = await queryBuilder.getManyAndCount();
 
     const response: PaginatedInventoryItemsDto = {
-      data: items.map((item) => {
-        const ownerUser =
-          context.scope === 'org' && item.ownerType === 'user'
-            ? context.memberUsersById.get(item.ownerId)
-            : undefined;
-        return this.toInventoryItemDto(item, ownerUser);
-      }),
+      data: items.map((item) => this.toInventoryItemDto(item)),
       total,
       page: normalizedPage,
       limit: normalizedLimit,
@@ -235,10 +228,6 @@ export class InventoryService {
       item.alias = dto.alias?.trim() || null;
     }
 
-    if (dto.isOrgAvailable !== undefined) {
-      item.isOrgAvailable = dto.isOrgAvailable;
-    }
-
     this.validateQuantityAndUomPolicy({
       catalogKind: item.catalogKind,
       quantity: nextQuantity,
@@ -303,7 +292,6 @@ export class InventoryService {
           ownerType: 'user',
           ownerId,
           name,
-          isShared: false,
         });
 
         return manager.save(StationInventoryList, list);
@@ -437,13 +425,7 @@ export class InventoryService {
     currentUser: User,
     query: ListInventoryItemsDto,
   ): Promise<
-    | { scope: 'user'; ownerId: string }
-    | {
-        scope: 'org';
-        ownerId: string;
-        memberOwnerIds: string[];
-        memberUsersById: Map<string, User>;
-      }
+    { scope: 'user'; ownerId: string } | { scope: 'org'; ownerId: string }
   > {
     const ownerType = query.ownerType ?? 'user';
 
@@ -476,27 +458,7 @@ export class InventoryService {
       throw new ForbiddenException('You are not a member of this organization');
     }
 
-    const members =
-      await this.userOrganizationRolesService.getOrganizationMembers(
-        organization.id,
-      );
-    const memberUserIds = Array.from(
-      new Set(members.map((member) => member.userId)),
-    );
-    const memberUsers =
-      memberUserIds.length === 0
-        ? []
-        : await this.userRepository.find({
-            where: { id: In(memberUserIds), isSystemUser: false },
-          });
-
-    const memberUsersById = new Map(memberUsers.map((u) => [u.id, u]));
-    return {
-      scope: 'org',
-      ownerId: organization.id,
-      memberOwnerIds: memberUsers.map((user) => user.id),
-      memberUsersById,
-    };
+    return { scope: 'org', ownerId: organization.id };
   }
 
   private createInventoryBaseQueryBuilder() {
@@ -514,12 +476,7 @@ export class InventoryService {
     >,
     context:
       | { scope: 'user'; ownerId: string }
-      | {
-          scope: 'org';
-          ownerId: string;
-          memberOwnerIds: string[];
-          memberUsersById: Map<string, User>;
-        },
+      | { scope: 'org'; ownerId: string },
     query: ListInventoryItemsDto,
   ): void {
     if (context.scope === 'user') {
@@ -527,33 +484,13 @@ export class InventoryService {
       queryBuilder.andWhere('item.owner_id = :ownerId', {
         ownerId: context.ownerId,
       });
-
-      if (query.orgAvailable !== undefined) {
-        queryBuilder.andWhere('item.is_org_available = :orgAvailable', {
-          orgAvailable: query.orgAvailable,
-        });
-      }
     } else {
       queryBuilder.where(
-        new Brackets((qb) => {
-          qb.where(
-            'item.owner_type = :orgOwnerType AND item.owner_id = :orgOwnerId',
-            {
-              orgOwnerType: 'org',
-              orgOwnerId: context.ownerId,
-            },
-          );
-
-          if (context.memberOwnerIds.length > 0) {
-            qb.orWhere(
-              'item.owner_type = :userOwnerType AND item.is_org_available = TRUE AND item.owner_id IN (:...memberOwnerIds)',
-              {
-                userOwnerType: 'user',
-                memberOwnerIds: context.memberOwnerIds,
-              },
-            );
-          }
-        }),
+        'item.owner_type = :orgOwnerType AND item.owner_id = :orgOwnerId',
+        {
+          orgOwnerType: 'org',
+          orgOwnerId: context.ownerId,
+        },
       );
     }
 
@@ -816,7 +753,6 @@ export class InventoryService {
     return {
       id: list.id,
       name: list.name,
-      isShared: list.isShared,
       createdAt: list.createdAt,
       updatedAt: list.updatedAt,
     };
@@ -832,10 +768,7 @@ export class InventoryService {
     };
   }
 
-  private toInventoryItemDto(
-    item: StationInventoryItem,
-    ownerUser?: User,
-  ): InventoryItemDto {
+  private toInventoryItemDto(item: StationInventoryItem): InventoryItemDto {
     return {
       id: item.id,
       ownerType: item.ownerType,
@@ -854,11 +787,6 @@ export class InventoryService {
       unitOfMeasureDescription: null,
       quantity: Number(item.quantity),
       quality: item.quality,
-      isOrgAvailable: item.isOrgAvailable,
-      sharedByUserId:
-        item.ownerType === 'user' && ownerUser ? ownerUser.id : null,
-      sharedByUsername:
-        item.ownerType === 'user' && ownerUser ? ownerUser.username : null,
       alias: item.alias,
       notes: item.notes,
       createdAt: item.createdAt,

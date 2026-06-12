@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
-  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -74,18 +73,7 @@ export class CreateInventoryItemDto {
   @IsString()
   notes?: string | null;
 
-  @ApiPropertyOptional({ default: false })
-  @IsOptional()
-  @Transform(
-    fallback<boolean>(
-      'is_org_available',
-      (resolved) => resolved === 'true' || resolved === true,
-    ),
-  )
-  @IsBoolean()
-  isOrgAvailable?: boolean;
-
-  @ApiPropertyOptional({ nullable: true, maxLength: 64 })
+  @ApiPropertyOptional({ nullable: true, maxLength: 255 })
   @IsOptional()
   @Transform(fallback('alias'))
   @IsString()
