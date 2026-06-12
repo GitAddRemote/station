@@ -4,9 +4,13 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
 
-COPY pnpm-lock.yaml package.json ./
+# Copy workspace manifests so pnpm can resolve the full lockfile
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY backend/package.json ./backend/
-RUN pnpm install --frozen-lockfile --filter backend
+COPY frontend/package.json ./frontend/
+COPY infra/package.json ./infra/
+
+RUN pnpm install --frozen-lockfile --filter backend...
 
 COPY backend/ ./backend/
 RUN pnpm --filter backend run build
@@ -21,9 +25,12 @@ RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
 
 RUN addgroup -S station && adduser -S station -G station
 
-COPY pnpm-lock.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY backend/package.json ./backend/
-RUN pnpm install --frozen-lockfile --filter backend --prod
+COPY frontend/package.json ./frontend/
+COPY infra/package.json ./infra/
+
+RUN pnpm install --frozen-lockfile --filter backend... --prod
 
 COPY --from=builder /app/backend/dist ./backend/dist
 

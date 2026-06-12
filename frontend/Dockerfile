@@ -4,9 +4,13 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
 
-COPY pnpm-lock.yaml package.json ./
+# Copy workspace manifests so pnpm can resolve the full lockfile
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
-RUN pnpm install --frozen-lockfile --filter frontend
+COPY infra/package.json ./infra/
+
+RUN pnpm install --frozen-lockfile --filter frontend...
 
 COPY frontend/ ./frontend/
 RUN pnpm --filter frontend run build
