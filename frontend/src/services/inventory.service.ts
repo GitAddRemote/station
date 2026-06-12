@@ -12,6 +12,7 @@ export interface InventoryItem {
   categoryPath: string;
   locationId: string | null;
   locationName: string | null;
+  batchId: string | null;
   unitOfMeasureId: string;
   unitOfMeasureCode: string;
   unitOfMeasureLabel: string;

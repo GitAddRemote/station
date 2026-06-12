@@ -66,6 +66,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
 import InventoryNewRow from '../components/inventory/InventoryNewRow';
+import BatchDrawer, { BatchDrawerMode } from '../components/inventory/BatchDrawer';
 import {
   OrgPermission,
   permissionsService,
@@ -216,6 +217,8 @@ const InventoryPage = () => {
     api?: string | null;
   }>({});
   const [newRowSaving, setNewRowSaving] = useState(false);
+  const [batchDrawerOpen, setBatchDrawerOpen] = useState(false);
+  const [batchDrawerMode, setBatchDrawerMode] = useState<BatchDrawerMode | null>(null);
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
   const isOrgMode = viewMode === 'org';
@@ -422,6 +425,13 @@ const InventoryPage = () => {
     },
     [],
   );
+
+  const openBatchDrawer = useCallback((mode: BatchDrawerMode) => {
+    setBatchDrawerMode(mode);
+    setBatchDrawerOpen(true);
+    setActionAnchor(null);
+    setActionItem(null);
+  }, []);
 
   const canViewOrgInventory = useMemo(
     () =>
@@ -2276,6 +2286,20 @@ const InventoryPage = () => {
           <ListItemIcon><CallSplitIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Split</ListItemText>
         </MenuItem>
+        {viewMode === 'personal' && (
+          <>
+            <MenuItem onClick={() => openBatchDrawer({ kind: 'create' })}>
+              <ListItemIcon><LayersIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Create batch</ListItemText>
+            </MenuItem>
+            {actionItem && !actionItem.batchId && (
+              <MenuItem onClick={() => openBatchDrawer({ kind: 'add-to-batch', item: actionItem as InventoryItem })}>
+                <ListItemIcon><PackageIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Add to batch</ListItemText>
+              </MenuItem>
+            )}
+          </>
+        )}
         <MenuItem onClick={() => openActionDialog('delete')}>
           <ListItemIcon><DeleteForeverIcon fontSize="small" color="error" /></ListItemIcon>
           <ListItemText>Delete</ListItemText>
@@ -2283,6 +2307,13 @@ const InventoryPage = () => {
       </Menu>
 
       {renderActionDialog()}
+
+      <BatchDrawer
+        open={batchDrawerOpen}
+        mode={batchDrawerMode}
+        onClose={() => { setBatchDrawerOpen(false); setBatchDrawerMode(null); }}
+        onMutated={fetchInventory}
+      />
     </AppShell>
   );
 };
