@@ -12,6 +12,11 @@ export enum OrgPermission {
   CAN_ADMIN_ORG_INVENTORY = 'can_admin_org_inventory',
   CAN_MANAGE_INVENTORY = 'can_manage_inventory',
 
+  // Contracts Permissions
+  CAN_VIEW_ORG_CONTRACTS = 'can_view_org_contracts',
+  CAN_MANAGE_CONTRACTS = 'can_manage_contracts',
+  CAN_CLAIM_CONTRACT = 'can_claim_contract',
+
   // Station-Bot Administration Permissions (guild-scoped)
   CAN_VIEW_STATION_BOT_ADMIN = 'can_view_station_bot_admin',
   CAN_MANAGE_STATION_BOT_VERIFICATION = 'can_manage_station_bot_verification',
@@ -35,6 +40,9 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
+    [OrgPermission.CAN_MANAGE_CONTRACTS]: true,
+    [OrgPermission.CAN_CLAIM_CONTRACT]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: true,
@@ -47,6 +55,9 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
+    [OrgPermission.CAN_MANAGE_CONTRACTS]: true,
+    [OrgPermission.CAN_CLAIM_CONTRACT]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: true,
@@ -59,6 +70,9 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
+    [OrgPermission.CAN_MANAGE_CONTRACTS]: true,
+    [OrgPermission.CAN_CLAIM_CONTRACT]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
@@ -71,6 +85,9 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: true,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: true,
     [OrgPermission.CAN_MANAGE_INVENTORY]: true,
+    [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
+    [OrgPermission.CAN_MANAGE_CONTRACTS]: false,
+    [OrgPermission.CAN_CLAIM_CONTRACT]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
@@ -83,6 +100,9 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
     [OrgPermission.CAN_MANAGE_INVENTORY]: false,
+    [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
+    [OrgPermission.CAN_MANAGE_CONTRACTS]: false,
+    [OrgPermission.CAN_CLAIM_CONTRACT]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
@@ -95,6 +115,9 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_EDIT_ORG_INVENTORY]: false,
     [OrgPermission.CAN_ADMIN_ORG_INVENTORY]: false,
     [OrgPermission.CAN_MANAGE_INVENTORY]: false,
+    [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: false,
+    [OrgPermission.CAN_MANAGE_CONTRACTS]: false,
+    [OrgPermission.CAN_CLAIM_CONTRACT]: false,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
@@ -116,6 +139,11 @@ export const PERMISSION_DESCRIPTIONS: Record<OrgPermission, string> = {
     'Manage inventory settings, perform bulk operations, and export data',
   [OrgPermission.CAN_MANAGE_INVENTORY]:
     'Perform all inventory management operations for the organization',
+  [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: 'View contracts for the organization',
+  [OrgPermission.CAN_MANAGE_CONTRACTS]:
+    'Create, update, publish, cancel, and dispute contracts',
+  [OrgPermission.CAN_CLAIM_CONTRACT]:
+    'Claim open contracts and mark them active or complete',
   [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]:
     'View the Station-Bot administration area for this guild',
   [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]:
