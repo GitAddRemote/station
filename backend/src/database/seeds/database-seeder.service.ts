@@ -42,11 +42,66 @@ const LEGACY_PERMISSION_KEYS = new Set<string>([
   'canViewSettings',
   'canManageInventory',
 ]);
-// Bare key pattern — no Keyv namespace prefix is configured in app.module.ts,
-// so permission keys are stored as-is in Redis. TTL is 15 min (900000ms) per
-// PermissionsService. If a namespace is ever added, this pattern must be
-// updated to match (e.g. 'namespace:permissions:user:*').
+
 const PERMISSION_CACHE_PATTERN = 'permissions:user:*';
+
+const DEMO_PASSWORD = 'password123';
+
+interface SeedUser {
+  username: string;
+  email: string;
+}
+
+interface SeedAssignment {
+  username: string;
+  orgName: string;
+  roleName: string;
+}
+
+const SEED_ORGS = [
+  { name: 'Demo Organization', slug: 'demo' },
+  { name: 'Dreadnought Industries', slug: 'drdnt' },
+];
+
+const SEED_USERS: SeedUser[] = [
+  { username: 'demo', email: 'demo@example.com' },
+  { username: 'admin', email: 'admin@demo.station' },
+  { username: 'demo.member1', email: 'demo.member1@example.com' },
+  { username: 'demo.member2', email: 'demo.member2@example.com' },
+  { username: 'ddi.admin', email: 'ddi.admin@example.com' },
+  { username: 'ddi.member1', email: 'ddi.member1@example.com' },
+  { username: 'ddi.member2', email: 'ddi.member2@example.com' },
+];
+
+const SEED_ASSIGNMENTS: SeedAssignment[] = [
+  { username: 'demo', orgName: 'Demo Organization', roleName: 'Owner' },
+  { username: 'admin', orgName: 'Demo Organization', roleName: 'Owner' },
+  {
+    username: 'demo.member1',
+    orgName: 'Demo Organization',
+    roleName: 'Member',
+  },
+  {
+    username: 'demo.member2',
+    orgName: 'Demo Organization',
+    roleName: 'Member',
+  },
+  {
+    username: 'ddi.admin',
+    orgName: 'Dreadnought Industries',
+    roleName: 'Owner',
+  },
+  {
+    username: 'ddi.member1',
+    orgName: 'Dreadnought Industries',
+    roleName: 'Member',
+  },
+  {
+    username: 'ddi.member2',
+    orgName: 'Dreadnought Industries',
+    roleName: 'Member',
+  },
+];
 
 @Injectable()
 export class DatabaseSeederService {
@@ -71,15 +126,13 @@ export class DatabaseSeederService {
     this.logger.info('🌱 Starting database seeding...');
 
     try {
-      // Always safe to run in any environment
       await this.seedGames();
       await this.seedRoles();
 
-      // Demo credentials must never be created in production
       if (process.env.NODE_ENV !== 'production') {
-        await this.seedTestOrganization();
-        await this.seedTestUser();
-        await this.seedUserOrganizationRoles();
+        await this.seedDemoOrganizations();
+        await this.seedDemoUsers();
+        await this.seedDemoRoleAssignments();
       } else {
         this.logger.info(
           '⊙ Skipping demo data seeding in production environment',
@@ -114,11 +167,11 @@ export class DatabaseSeederService {
     ];
 
     for (const gameData of games) {
-      const existingGame = await this.gamesRepository.findOne({
+      const existing = await this.gamesRepository.findOne({
         where: { code: gameData.code },
       });
 
-      if (!existingGame) {
+      if (!existing) {
         const game = this.gamesRepository.create(gameData);
         await this.gamesRepository.save(game);
         this.logger.info(`  ✓ Created game: ${game.name}`);
@@ -143,8 +196,6 @@ export class DatabaseSeederService {
         await this.rolesRepository.save(role);
         this.logger.info(`  ✓ Created role: ${role.name}`);
       } else {
-        // Strip only known legacy camelCase keys from existing permissions;
-        // unknown custom keys are preserved and carried forward.
         const sanitizedExisting = Object.fromEntries(
           Object.entries(existingRole.permissions ?? {}).filter(
             ([k]) => !LEGACY_PERMISSION_KEYS.has(k),
@@ -152,15 +203,10 @@ export class DatabaseSeederService {
         );
         const merged = { ...sanitizedExisting, ...roleData.permissions };
 
-        // Use key-sorted stringify because JSONB does not preserve key order,
-        // so a naive stringify can differ even for semantically equal objects.
         const sortedKeys = (obj: Record<string, unknown>) =>
           JSON.stringify(obj, Object.keys(obj).sort());
         const permissionsChanged =
           sortedKeys(existingRole.permissions ?? {}) !== sortedKeys(merged);
-        // Only update the description if it is a known legacy seeded value or
-        // still matches the current seed text (i.e. was never customized).
-        // Any other description is treated as a user customization and preserved.
         const isReplaceableDescription =
           existingRole.description !== undefined &&
           (LEGACY_ROLE_DESCRIPTIONS.has(existingRole.description) ||
@@ -171,17 +217,12 @@ export class DatabaseSeederService {
           isReplaceableDescription;
 
         if (permissionsChanged || descriptionChanged) {
-          if (permissionsChanged) {
-            existingRole.permissions = merged;
-          }
-          if (descriptionChanged) {
+          if (permissionsChanged) existingRole.permissions = merged;
+          if (descriptionChanged)
             existingRole.description = roleData.description!;
-          }
           await this.rolesRepository.save(existingRole);
           this.logger.info(`  ✓ Updated role: ${roleData.name}`);
-          if (permissionsChanged) {
-            permissionsUpdated = true;
-          }
+          if (permissionsChanged) permissionsUpdated = true;
         } else {
           this.logger.info(`  ⊙ Role unchanged: ${roleData.name}`);
         }
@@ -190,18 +231,11 @@ export class DatabaseSeederService {
 
     if (permissionsUpdated) {
       const cacheCleared = await this.invalidatePermissionCache();
-      if (cacheCleared) {
-        this.logger.info('  ✓ Cleared permission cache');
-      }
+      if (cacheCleared) this.logger.info('  ✓ Cleared permission cache');
     }
   }
 
   private async invalidatePermissionCache(): Promise<boolean> {
-    // cache-manager v7 exposes backing stores via `cacheManager.stores` (Keyv[]).
-    // Each Keyv wraps a store adapter; for cache-manager-redis-yet the adapter
-    // exposes `.client` (the node-redis 4.x client).
-    // Use SCAN (non-blocking cursor iteration) instead of KEYS to avoid stalling
-    // Redis on large keyspaces. node-redis 4.x del() takes an array, not variadic args.
     type RedisClient = {
       scanIterator?: (opts: {
         MATCH: string;
@@ -230,19 +264,12 @@ export class DatabaseSeederService {
             batch = [];
           }
         }
-        if (batch.length > 0) {
-          await client.del(batch);
-        }
+        if (batch.length > 0) await client.del(batch);
         invalidated = true;
       }
     }
 
     if (!invalidated) {
-      // No Redis-backed store was found — the running backend may be using an
-      // in-memory cache (USE_REDIS_CACHE=false or Redis unavailable). In-memory
-      // caches are per-process: this seeder process cannot reach the backend's
-      // cache instance. Stale permission entries will expire naturally at TTL
-      // (15 min) or be cleared on backend restart.
       this.logger.warn(
         '  ⚠️  No Redis store found — backend in-memory permission cache cannot be invalidated from this process. Restart the backend or wait for TTL expiry.',
       );
@@ -251,95 +278,99 @@ export class DatabaseSeederService {
     return invalidated;
   }
 
-  private async seedTestOrganization(): Promise<void> {
-    this.logger.info('Seeding test organization...');
+  private async seedDemoOrganizations(): Promise<void> {
+    this.logger.info('Seeding demo organizations...');
 
-    const existingOrg = await this.organizationsRepository.findOne({
-      where: { name: 'Demo Organization' },
+    const starCitizen = await this.gamesRepository.findOne({
+      where: { code: 'sc' },
     });
 
-    if (!existingOrg) {
-      // Get Star Citizen game (default)
-      const starCitizen = await this.gamesRepository.findOne({
-        where: { code: 'sc' },
+    for (const orgData of SEED_ORGS) {
+      const existing = await this.organizationsRepository.findOne({
+        where: { name: orgData.name },
       });
 
-      const organization = this.organizationsRepository.create({
-        name: 'Demo Organization',
-        description: 'A demo organization for testing and development',
-        isActive: true,
-        gameId: starCitizen!.id,
-      });
-      await this.organizationsRepository.save(organization);
-      this.logger.info(`  ✓ Created organization: ${organization.name}`);
-    } else {
-      this.logger.info('  ⊙ Test organization already exists');
-    }
-  }
-
-  private async seedTestUser(): Promise<void> {
-    this.logger.info('Seeding test user...');
-
-    const existingUser = await this.usersRepository.findOne({
-      where: { username: 'demo' },
-    });
-
-    if (!existingUser) {
-      const hashedPassword = await bcrypt.hash('password123', 10);
-      const user = this.usersRepository.create({
-        username: 'demo',
-        email: 'demo@example.com',
-        password: hashedPassword,
-        isActive: true,
-      });
-      await this.usersRepository.save(user);
-      this.logger.info('  ✓ Created test user: demo');
-    } else {
-      this.logger.info('  ⊙ Test user already exists');
-    }
-  }
-
-  private async seedUserOrganizationRoles(): Promise<void> {
-    this.logger.info('Seeding user-organization-role assignments...');
-
-    const user = await this.usersRepository.findOne({
-      where: { username: 'demo' },
-    });
-    const organization = await this.organizationsRepository.findOne({
-      where: { name: 'Demo Organization' },
-    });
-    const ownerRole = await this.rolesRepository.findOne({
-      where: { name: 'Owner' },
-    });
-
-    if (user && organization && ownerRole) {
-      const existingAssignment = await this.userOrgRolesRepository.findOne({
-        where: {
-          userId: user.id,
-          organizationId: organization.id,
-          roleId: ownerRole.id,
-        },
-      });
-
-      if (!existingAssignment) {
-        const assignment = this.userOrgRolesRepository.create({
-          userId: user.id,
-          organizationId: organization.id,
-          roleId: ownerRole.id,
+      if (!existing) {
+        const org = this.organizationsRepository.create({
+          name: orgData.name,
+          slug: orgData.slug,
+          description: `Seeded demo organization — ${orgData.name}`,
+          isActive: true,
+          gameId: starCitizen!.id,
         });
-        await this.userOrgRolesRepository.save(assignment);
+        await this.organizationsRepository.save(org);
+        this.logger.info(`  ✓ Created organization: ${org.name} (${org.slug})`);
+      } else {
+        this.logger.info(`  ⊙ Organization already exists: ${orgData.name}`);
+      }
+    }
+  }
+
+  private async seedDemoUsers(): Promise<void> {
+    this.logger.info('Seeding demo users...');
+
+    const hashedPassword = await bcrypt.hash(DEMO_PASSWORD, 10);
+
+    for (const userData of SEED_USERS) {
+      const existing = await this.usersRepository.findOne({
+        where: { username: userData.username },
+      });
+
+      if (!existing) {
+        const user = this.usersRepository.create({
+          username: userData.username,
+          email: userData.email,
+          password: hashedPassword,
+          isActive: true,
+        });
+        await this.usersRepository.save(user);
+        this.logger.info(`  ✓ Created user: ${userData.username}`);
+      } else {
+        this.logger.info(`  ⊙ User already exists: ${userData.username}`);
+      }
+    }
+  }
+
+  private async seedDemoRoleAssignments(): Promise<void> {
+    this.logger.info('Seeding demo role assignments...');
+
+    for (const assignment of SEED_ASSIGNMENTS) {
+      const user = await this.usersRepository.findOne({
+        where: { username: assignment.username },
+      });
+      const org = await this.organizationsRepository.findOne({
+        where: { name: assignment.orgName },
+      });
+      const role = await this.rolesRepository.findOne({
+        where: { name: assignment.roleName },
+      });
+
+      if (!user || !org || !role) {
+        this.logger.warn(
+          `  ⚠️  Skipping assignment for ${assignment.username} → ${assignment.orgName} (${assignment.roleName}): missing entity`,
+        );
+        continue;
+      }
+
+      const existing = await this.userOrgRolesRepository.findOne({
+        where: { userId: user.id, organizationId: org.id, roleId: role.id },
+      });
+
+      if (!existing) {
+        const record = this.userOrgRolesRepository.create({
+          userId: user.id,
+          organizationId: org.id,
+          roleId: role.id,
+        });
+        await this.userOrgRolesRepository.save(record);
         this.logger.info(
-          `  ✓ Assigned "${ownerRole.name}" role to "${user.username}" in "${organization.name}"`,
+          `  ✓ Assigned ${assignment.roleName} to ${assignment.username} in ${assignment.orgName}`,
         );
       } else {
         this.logger.info(
-          '  ⊙ User-organization-role assignment already exists',
+          `  ⊙ Assignment already exists: ${assignment.username} → ${assignment.orgName}`,
         );
       }
-    } else {
-      this.logger.warn(
-        '  ⚠️  Could not create assignment - missing user, org, or role',
-      );
     }
   }
 }

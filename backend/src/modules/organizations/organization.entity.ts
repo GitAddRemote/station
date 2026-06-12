@@ -20,6 +20,9 @@ export class Organization {
   @Column()
   name!: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  slug?: string | null;
+
   @Column({ nullable: true })
   description?: string;
 
