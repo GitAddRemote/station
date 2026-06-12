@@ -1,7 +1,5 @@
 FROM node:22-alpine AS builder
 
-ENV HUSKY=0
-
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
@@ -12,7 +10,7 @@ COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY infra/package.json ./infra/
 
-RUN pnpm install --frozen-lockfile --filter backend...
+RUN pnpm install --frozen-lockfile --filter backend... --ignore-scripts
 
 COPY backend/ ./backend/
 RUN pnpm --filter backend run build
@@ -20,7 +18,6 @@ RUN pnpm --filter backend run build
 FROM node:22-alpine AS runner
 
 ENV NODE_ENV=production
-ENV HUSKY=0
 
 WORKDIR /app
 
@@ -33,7 +30,7 @@ COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY infra/package.json ./infra/
 
-RUN pnpm install --frozen-lockfile --filter backend... --prod
+RUN pnpm install --frozen-lockfile --filter backend... --prod --ignore-scripts
 
 COPY --from=builder /app/backend/dist ./backend/dist
 

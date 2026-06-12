@@ -1,7 +1,5 @@
 FROM node:22-alpine AS builder
 
-ENV HUSKY=0
-
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.22.0 --activate
@@ -12,7 +10,7 @@ COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
 COPY infra/package.json ./infra/
 
-RUN pnpm install --frozen-lockfile --filter frontend...
+RUN pnpm install --frozen-lockfile --filter frontend... --ignore-scripts
 
 COPY frontend/ ./frontend/
 RUN pnpm --filter frontend run build
