@@ -12,6 +12,8 @@ import { StationInventoryItem } from './entities/station-inventory-item.entity';
 import { StationInventoryListItem } from './entities/station-inventory-list-item.entity';
 import { StationInventoryList } from './entities/station-inventory-list.entity';
 import { StationUnitOfMeasure } from './entities/station-unit-of-measure.entity';
+import { BatchController } from './batch.controller';
+import { BatchService } from './batch.service';
 import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
 
@@ -32,8 +34,8 @@ import { InventoryService } from './inventory.service';
       StationInventoryListItem,
     ]),
   ],
-  controllers: [InventoryController],
-  providers: [InventoryService],
-  exports: [TypeOrmModule, InventoryService],
+  controllers: [InventoryController, BatchController],
+  providers: [InventoryService, BatchService],
+  exports: [TypeOrmModule, InventoryService, BatchService],
 })
 export class InventoryModule {}
