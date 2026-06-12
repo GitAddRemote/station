@@ -1,0 +1,23 @@
+<!-- @dsCard group="Spacing" viewport="700x180" name="Shadows & glows" subtitle="Elevation sm → xl, plus coral & aqua brand glows" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; padding: 28px 24px; background: var(--ink-50); font-family: var(--font-mono); }
+  .row { display: flex; gap: 22px; align-items: center; }
+  .item { text-align: center; }
+  .box { width: 84px; height: 56px; background: #fff; border-radius: 12px; }
+  .item .k { font-size: 10px; color: var(--ink-600); margin-top: 12px; }
+  .glow-c { background: var(--coral-500); }
+  .glow-a { background: var(--aqua-500); }
+</style></head>
+<body>
+  <div class="row">
+    <div class="item"><div class="box" style="box-shadow:var(--shadow-sm)"></div><div class="k">sm</div></div>
+    <div class="item"><div class="box" style="box-shadow:var(--shadow-md)"></div><div class="k">md</div></div>
+    <div class="item"><div class="box" style="box-shadow:var(--shadow-lg)"></div><div class="k">lg</div></div>
+    <div class="item"><div class="box" style="box-shadow:var(--shadow-xl)"></div><div class="k">xl</div></div>
+    <div class="item"><div class="box glow-c" style="box-shadow:var(--glow-coral)"></div><div class="k">glow-coral</div></div>
+    <div class="item"><div class="box glow-a" style="box-shadow:var(--glow-aqua)"></div><div class="k">glow-aqua</div></div>
+  </div>
+</body></html>

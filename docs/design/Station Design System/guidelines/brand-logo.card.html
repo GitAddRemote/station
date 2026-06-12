@@ -1,0 +1,22 @@
+<!-- @dsCard group="Brand" viewport="700x180" name="Station logo lockup" subtitle="Orbit mark + wordmark, on dark and light" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.js"></script>
+<style>
+  body { margin: 0; font-family: var(--font-display); display: grid; grid-template-columns: 1fr 1fr; }
+  .panel { height: 180px; display: flex; align-items: center; justify-content: center; }
+  .dark { background: #0E1012; }
+  .light { background: #fff; }
+  .logo { display: inline-flex; align-items: center; gap: 11px; }
+  .mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: linear-gradient(140deg, #53AEF7, #1E7FD6); color: #06151F; box-shadow: var(--glow-aqua); }
+  .mark svg { width: 23px; height: 23px; stroke-width: 2.4; }
+  .word { font-weight: 700; font-size: 26px; letter-spacing: .06em; }
+  .dark .word { color: #F4F6F7; }
+  .light .word { color: #1F2328; }
+</style></head>
+<body>
+  <div class="panel dark"><span class="logo"><span class="mark"><i data-lucide="orbit"></i></span><span class="word">STATION</span></span></div>
+  <div class="panel light"><span class="logo"><span class="mark"><i data-lucide="orbit"></i></span><span class="word">STATION</span></span></div>
+  <script>lucide.createIcons();</script>
+</body></html>

@@ -1,0 +1,21 @@
+<!-- @dsCard group="Spacing" viewport="700x160" name="Spacing scale" subtitle="4px base · space-1 → space-20" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; padding: 22px 24px; background: var(--white); font-family: var(--font-mono); }
+  .row { display: flex; align-items: flex-end; gap: 12px; }
+  .item { text-align: center; }
+  .bar { background: var(--aqua-500); border-radius: 3px; width: 100%; }
+  .item .k { font-size: 9px; color: var(--ink-400); margin-top: 6px; }
+  .item .v { font-size: 10px; color: var(--ink-700); font-weight: 600; }
+</style></head>
+<body>
+  <div class="row" id="r"></div>
+  <script>
+    const steps = [['1','4'],['2','8'],['3','12'],['4','16'],['5','20'],['6','24'],['8','32'],['10','40'],['12','48'],['16','64'],['20','80']];
+    document.getElementById('r').innerHTML = steps.map(([n,px]) =>
+      `<div class="item" style="width:${px}px;min-width:18px"><div class="bar" style="height:${px}px"></div><div class="v">${px}</div><div class="k">${n}</div></div>`
+    ).join('');
+  </script>
+</body></html>

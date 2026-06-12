@@ -1,0 +1,21 @@
+<!-- @dsCard group="Spacing" viewport="700x160" name="Radii" subtitle="xs 4 → 2xl 32 · pill 999" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<link rel="stylesheet" href="../styles.css" />
+<style>
+  body { margin: 0; padding: 22px 24px; background: var(--white); font-family: var(--font-mono); }
+  .row { display: flex; gap: 16px; align-items: flex-end; }
+  .item { text-align: center; }
+  .box { width: 72px; height: 56px; background: var(--aqua-50); border: 1.5px solid var(--aqua-500); border-bottom: 0; border-right: 0; }
+  .item .k { font-size: 10px; color: var(--ink-700); font-weight: 600; margin-top: 8px; }
+  .item .v { font-size: 9px; color: var(--ink-400); }
+</style></head>
+<body>
+  <div class="row" id="r"></div>
+  <script>
+    const steps = [['sm','8'],['md','12'],['lg','16'],['xl','24'],['2xl','32'],['pill','999']];
+    document.getElementById('r').innerHTML = steps.map(([n,px]) =>
+      `<div class="item"><div class="box" style="border-top-left-radius:${px}px"></div><div class="k">${n}</div><div class="v">${px==='999'?'pill':px+'px'}</div></div>`
+    ).join('');
+  </script>
+</body></html>

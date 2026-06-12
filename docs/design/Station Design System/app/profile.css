@@ -1,0 +1,133 @@
+/* ============================================================
+   STATION — My Profile
+   Single-user profile on the shared shell. Reuses members.css
+   field controls (.fctl/.fgrid/.cert/.mstat/.rank). Adds the hero
+   banner, social connections, and org membership cards.
+   Tokens only.
+   ============================================================ */
+
+/* ---- hero banner ----------------------------------------- */
+.pf-hero {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-xl);
+  background: var(--surface-card); margin-top: var(--space-7);
+}
+.pf-cover {
+  height: 132px;
+  background:
+    radial-gradient(620px 220px at 12% -40%, color-mix(in srgb, var(--brand) 38%, transparent), transparent 70%),
+    radial-gradient(520px 200px at 88% 140%, color-mix(in srgb, var(--teal-400) 26%, transparent), transparent 70%),
+    linear-gradient(120deg, color-mix(in srgb, var(--brand) 16%, var(--surface-sunken)), var(--surface-sunken));
+  border-bottom: 1px solid var(--border-subtle);
+}
+.app[data-accent="coral"] .pf-cover {
+  background:
+    radial-gradient(620px 220px at 12% -40%, color-mix(in srgb, var(--coral-400) 38%, transparent), transparent 70%),
+    radial-gradient(520px 200px at 88% 140%, color-mix(in srgb, var(--warning-500) 22%, transparent), transparent 70%),
+    linear-gradient(120deg, color-mix(in srgb, var(--coral-400) 16%, var(--surface-sunken)), var(--surface-sunken));
+}
+.pf-body { padding: 0 var(--space-7) var(--space-6); display: flex; align-items: flex-end; gap: var(--space-5); flex-wrap: wrap; }
+.pf-av {
+  width: 104px; height: 104px; flex: none; border-radius: 24px; margin-top: -52px;
+  display: grid; place-items: center; font-family: var(--font-display); font-weight: var(--weight-bold);
+  font-size: 40px; color: #fff; border: 4px solid var(--surface-card); box-shadow: var(--shadow-dark-md);
+  position: relative;
+}
+.pf-av .pres { position: absolute; right: 6px; bottom: 6px; width: 18px; height: 18px; border-radius: 50%; border: 3px solid var(--surface-card); }
+.pf-av .pres.online { background: var(--success-500); }
+.pf-av .pres.away { background: var(--warning-500); }
+.pf-av .pres.offline { background: var(--text-faint); }
+.pf-id { flex: 1; min-width: 0; padding-bottom: 4px; }
+.pf-name { font-family: var(--font-display); font-weight: var(--weight-bold); font-size: clamp(24px, 3vw, 30px); color: var(--text-strong); line-height: 1.1; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.pf-handle { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--brand); margin-top: 5px; display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.pf-handle .dot { color: var(--text-faint); }
+.pf-handle .muted { color: var(--text-muted); }
+.pf-meta { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); flex-wrap: wrap; font-size: var(--text-xs); color: var(--text-muted); }
+.pf-meta .mi { display: inline-flex; align-items: center; gap: 6px; }
+.pf-meta .mi svg { width: 13px; height: 13px; color: var(--text-faint); }
+.pf-actions { display: flex; gap: var(--space-3); padding-bottom: 4px; }
+
+/* quick stats inside hero */
+.pf-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); padding: 0 var(--space-7) var(--space-6); }
+.pf-stat { background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: var(--space-4); }
+.pf-stat .v { font-family: var(--font-display); font-weight: var(--weight-bold); font-size: var(--text-xl); color: var(--text-strong); font-variant-numeric: tabular-nums; line-height: 1; }
+.pf-stat .k { font-family: var(--font-mono); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); margin-top: 6px; }
+
+/* ---- two-column layout ----------------------------------- */
+.pf-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--space-5); margin-top: var(--space-5); align-items: start; }
+@media (max-width: 1080px) { .pf-grid { grid-template-columns: 1fr; } .pf-stats { grid-template-columns: repeat(2, 1fr); } }
+
+/* bio display */
+.pf-bio { font-size: var(--text-sm); line-height: var(--leading-relaxed); color: var(--text-body); white-space: pre-wrap; }
+.pf-bio.empty { color: var(--text-faint); font-style: italic; }
+.charcount { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); text-align: right; margin-top: 6px; }
+
+/* ---- social connections ---------------------------------- */
+.soc-list { display: flex; flex-direction: column; gap: 2px; }
+.soc-row { display: flex; align-items: center; gap: var(--space-3); padding: 11px 0; border-bottom: 1px solid var(--border-subtle); }
+.soc-row:last-child { border-bottom: none; }
+.soc-ic { width: 36px; height: 36px; flex: none; border-radius: var(--radius-md); display: grid; place-items: center; color: #fff; }
+.soc-ic svg { width: 18px; height: 18px; }
+.soc-info { flex: 1; min-width: 0; }
+.soc-net { font-size: var(--text-2xs); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); }
+.soc-val { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.soc-val.empty { color: var(--text-faint); font-weight: var(--weight-regular); font-style: italic; }
+.soc-go { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: var(--radius-sm); border: 1px solid var(--border-default); background: transparent; color: var(--text-faint); cursor: pointer; transition: all var(--dur-base) var(--ease-out); }
+.soc-go:hover { color: var(--brand); border-color: var(--border-brand); }
+.soc-go svg { width: 14px; height: 14px; }
+.soc-verified { color: var(--success-500); display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-2xs); font-family: var(--font-mono); }
+.soc-verified svg { width: 12px; height: 12px; }
+
+/* social brand tints */
+.soc-discord { background: #5865F2; }
+.soc-rsi     { background: linear-gradient(140deg, var(--aqua-400), var(--aqua-600)); }
+.soc-twitch  { background: #9146FF; }
+.soc-youtube { background: #FF0000; }
+.soc-twitter { background: #111418; border: 1px solid var(--border-default); }
+.soc-tiktok  { background: #010101; border: 1px solid var(--border-default); }
+
+/* edit row for socials */
+.soc-edit { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+.soc-edit:last-child { margin-bottom: 0; }
+.soc-edit .soc-ic { width: 32px; height: 32px; border-radius: var(--radius-sm); }
+.soc-edit .soc-ic svg { width: 15px; height: 15px; }
+.soc-edit .prefix { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint); flex: none; }
+.soc-edit input { flex: 1; min-width: 0; box-sizing: border-box; font-family: var(--font-body); font-size: var(--text-sm); background: var(--surface-sunken); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 8px 12px; color: var(--text-strong); outline: none; transition: border-color var(--dur-base) var(--ease-out); }
+.soc-edit input:focus { border-color: var(--border-brand); }
+
+/* ---- organizations --------------------------------------- */
+.org-card { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: var(--space-3); transition: border-color var(--dur-base) var(--ease-out); }
+.org-card:last-child { margin-bottom: 0; }
+.org-card:hover { border-color: var(--border-default); }
+.org-card.primary { border-color: var(--border-brand); background: var(--brand-subtle); }
+.org-logo { width: 44px; height: 44px; flex: none; border-radius: var(--radius-md); display: grid; place-items: center; font-family: var(--font-display); font-weight: var(--weight-bold); font-size: 15px; color: var(--brand-contrast); box-shadow: var(--shadow-dark-sm); }
+.org-info { flex: 1; min-width: 0; }
+.org-nm { font-family: var(--font-display); font-weight: var(--weight-semibold); font-size: var(--text-sm); color: var(--text-strong); display: flex; align-items: center; gap: 8px; }
+.org-tag { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
+.org-meta { font-size: var(--text-xs); color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.org-meta .sep { color: var(--text-faint); }
+.org-primary-badge { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--brand); border: 1px solid var(--border-brand); border-radius: 4px; padding: 1px 5px; }
+.org-leave { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: var(--radius-sm); border: 1px solid var(--border-default); background: transparent; color: var(--text-faint); cursor: pointer; transition: all var(--dur-base) var(--ease-out); }
+.org-leave:hover { color: var(--coral-400); border-color: var(--coral-400); }
+.org-leave svg { width: 14px; height: 14px; }
+
+/* ---- account / security ---------------------------------- */
+.sec-note { display: flex; align-items: flex-start; gap: 9px; font-size: var(--text-xs); color: var(--text-muted); padding: 11px 12px; border-radius: var(--radius-md); background: var(--surface-sunken); border: 1px solid var(--border-subtle); margin-top: var(--space-3); }
+.sec-note svg { width: 14px; height: 14px; color: var(--text-faint); flex: none; margin-top: 1px; }
+.locked-field { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface-sunken); border: 1px solid var(--border-subtle); }
+.locked-field .lv { font-size: var(--text-sm); color: var(--text-strong); font-weight: var(--weight-medium); }
+.locked-field .lock { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); display: inline-flex; align-items: center; gap: 5px; }
+.locked-field .lock svg { width: 12px; height: 12px; }
+
+/* save bar that appears in edit mode */
+.pf-savebar { display: flex; align-items: center; gap: var(--space-3); }
+.pf-savebar .hint { font-size: var(--text-xs); color: var(--text-muted); margin-right: auto; display: inline-flex; align-items: center; gap: 7px; }
+.pf-savebar .hint svg { width: 14px; height: 14px; color: var(--warning-500); }
+
+/* pronoun / small inline tag */
+.inline-tag { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted); background: var(--surface-sunken); border: 1px solid var(--border-default); border-radius: var(--radius-pill); padding: 2px 9px; }
+
+/* keep kv labels on one line; let values wrap */
+.pf-grid .kv .k { white-space: nowrap; flex: none; }
+.pf-grid .kv .v { text-align: right; }
+.pf-meta .mi { white-space: nowrap; }
