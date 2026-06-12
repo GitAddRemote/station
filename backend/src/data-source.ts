@@ -57,7 +57,14 @@ import { MigrateRemainingEntitiesToUuidV7_1780130000000 } from './migrations/178
 import { AddManageInventoryPermissionToManagementRoles_1780140000000 } from './migrations/1780140000000-AddManageInventoryPermissionToManagementRoles';
 import { AddIsSuperAdminToUser1780150000000 } from './migrations/1780150000000-AddIsSuperAdminToUser';
 import { AddOrgGuildMappingAndStationBotPermissions1780160000000 } from './migrations/1780160000000-AddOrgGuildMappingAndStationBotPermissions';
+import { AddContractsTables1780170000000 } from './migrations/1780170000000-AddContractsTables';
+import { RemoveOrgInventorySharing1780170000000 } from './migrations/1780170000000-RemoveOrgInventorySharing';
+import { DropCategoryAttributeFkAndAddPoiSubtype1780040000000 } from './migrations/1780040000000-DropCategoryAttributeFkAndAddPoiSubtype';
 import { OrgGuildMapping } from './modules/station-bot-admin/entities/org-guild-mapping.entity';
+import { Contract } from './modules/contracts/entities/contract.entity';
+import { ContractItem } from './modules/contracts/entities/contract-item.entity';
+import { ContractMilestone } from './modules/contracts/entities/contract-milestone.entity';
+import { ContractParty } from './modules/contracts/entities/contract-party.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -99,6 +106,10 @@ export const AppDataSource = new DataSource({
     StationInventoryList,
     StationInventoryListItem,
     OrgGuildMapping,
+    Contract,
+    ContractItem,
+    ContractMilestone,
+    ContractParty,
   ],
   migrations: [
     BigBangBaselineMigration1748000000000,
@@ -113,6 +124,7 @@ export const AppDataSource = new DataSource({
     MakeItemFksDeferrable1780020000000,
     MigrateTablePksToUuidV71780030000000,
     AddStationCatalogCategory1780040000000,
+    DropCategoryAttributeFkAndAddPoiSubtype1780040000000,
     AddStationLocationProjection1780050000000,
     AddCatalogCategoryMaps1780060000000,
     AddStationCatalogEntry1780070000000,
@@ -125,6 +137,8 @@ export const AppDataSource = new DataSource({
     AddManageInventoryPermissionToManagementRoles_1780140000000,
     AddIsSuperAdminToUser1780150000000,
     AddOrgGuildMappingAndStationBotPermissions1780160000000,
+    AddContractsTables1780170000000,
+    RemoveOrgInventorySharing1780170000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },

@@ -30,27 +30,35 @@ export class RemoveOrgInventorySharing1780170000000
 
     // 3. Drop the identity index that embeds shared_org_id as a sentinel,
     //    recreate it without that column, then drop the FK and column.
+    //    Guards against databases where user_inventory_item was already dropped
+    //    by a later migration (table was renamed to station_inventory_item).
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_inv_identity"`);
 
-    // Recreate the identity index without shared_org_id
-    await queryRunner.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS "idx_user_inv_identity"
-        ON "user_inventory_item"
-        ("user_id", "game_id", "uex_item_id", "unit_of_measure",
-         COALESCE("location_type", ''), COALESCE("location_uex_id", -1))
-        WHERE "deleted" = false AND "active" = true
+    const [{ exists: legacyTableExists }] = await queryRunner.query(`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'user_inventory_item'
+      ) AS exists
     `);
 
-    // Drop FK constraint referencing organization
-    await queryRunner.query(
-      `ALTER TABLE "user_inventory_item"
-         DROP CONSTRAINT IF EXISTS "user_inventory_item_shared_org_id_fkey"`,
-    );
+    if (legacyTableExists) {
+      await queryRunner.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "idx_user_inv_identity"
+          ON "user_inventory_item"
+          ("user_id", "game_id", "uex_item_id", "unit_of_measure",
+           COALESCE("location_type", ''), COALESCE("location_uex_id", -1))
+          WHERE "deleted" = false AND "active" = true
+      `);
 
-    // Drop the shared_org_id column
-    await queryRunner.query(
-      `ALTER TABLE "user_inventory_item" DROP COLUMN IF EXISTS "shared_org_id"`,
-    );
+      await queryRunner.query(
+        `ALTER TABLE "user_inventory_item"
+           DROP CONSTRAINT IF EXISTS "user_inventory_item_shared_org_id_fkey"`,
+      );
+
+      await queryRunner.query(
+        `ALTER TABLE "user_inventory_item" DROP COLUMN IF EXISTS "shared_org_id"`,
+      );
+    }
 
     // 4. Drop is_org_available from station_inventory_item
     await queryRunner.query(
