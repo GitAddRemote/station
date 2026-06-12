@@ -7,10 +7,13 @@ import { Organization } from '../organizations/organization.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { UserOrganizationRolesModule } from '../user-organization-roles/user-organization-roles.module';
 import { User } from '../users/user.entity';
+import { StationInventoryBatch } from './entities/station-inventory-batch.entity';
 import { StationInventoryItem } from './entities/station-inventory-item.entity';
 import { StationInventoryListItem } from './entities/station-inventory-list-item.entity';
 import { StationInventoryList } from './entities/station-inventory-list.entity';
 import { StationUnitOfMeasure } from './entities/station-unit-of-measure.entity';
+import { BatchController } from './batch.controller';
+import { BatchService } from './batch.service';
 import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
 
@@ -25,13 +28,14 @@ import { InventoryService } from './inventory.service';
       StationCatalogEntry,
       StationLocation,
       StationUnitOfMeasure,
+      StationInventoryBatch,
       StationInventoryItem,
       StationInventoryList,
       StationInventoryListItem,
     ]),
   ],
-  controllers: [InventoryController],
-  providers: [InventoryService],
-  exports: [TypeOrmModule, InventoryService],
+  controllers: [InventoryController, BatchController],
+  providers: [InventoryService, BatchService],
+  exports: [TypeOrmModule, InventoryService, BatchService],
 })
 export class InventoryModule {}

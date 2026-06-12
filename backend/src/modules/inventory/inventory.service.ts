@@ -764,6 +764,7 @@ export class InventoryService {
       categoryPath: item.catalogEntry.category.path,
       locationId: item.locationId ?? null,
       locationName: item.location?.name ?? null,
+      batchId: item.batchId ?? null,
       unitOfMeasureId: item.unitOfMeasureId,
       unitOfMeasureCode: item.unitOfMeasure.abbreviation,
       unitOfMeasureLabel: item.unitOfMeasure.name,
