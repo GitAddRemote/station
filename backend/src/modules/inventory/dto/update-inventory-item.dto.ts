@@ -69,10 +69,10 @@ export class UpdateInventoryItemDto {
   @IsBoolean()
   isOrgAvailable?: boolean;
 
-  @ApiPropertyOptional({ nullable: true, maxLength: 255 })
+  @ApiPropertyOptional({ nullable: true, maxLength: 64 })
   @IsOptional()
-  @Transform(fallback('custom_name'))
+  @Transform(fallback('alias'))
   @IsString()
-  @MaxLength(255)
-  customName?: string | null;
+  @MaxLength(64)
+  alias?: string | null;
 }

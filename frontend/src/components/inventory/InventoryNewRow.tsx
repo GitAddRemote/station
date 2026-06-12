@@ -15,6 +15,8 @@ import type { CatalogEntryDto, LocationDto } from '../../services/catalog.servic
 import type { UnitOfMeasure } from '../../services/inventory.service';
 import LocationPicker from './LocationPicker';
 
+const ALIAS_ELIGIBLE_KINDS = new Set<string>(['item', 'vehicle']);
+
 interface InventoryNewRowProps {
   isEditorMode: boolean;
   itemOptions: CatalogEntryDto[];
@@ -38,6 +40,7 @@ interface InventoryNewRowProps {
   showQuantityWarning: boolean;
   selectedLocation: LocationDto | null;
   quality: number | '';
+  alias: string;
   onItemInputChange: (value: string, reason: string) => void;
   onItemSelect: (item: CatalogEntryDto | null) => void;
   uomOptions: UnitOfMeasure[];
@@ -45,6 +48,7 @@ interface InventoryNewRowProps {
   onUomChange: (id: string) => void;
   onLocationChange: (location: LocationDto | null) => void;
   onQualityChange: (value: number | '') => void;
+  onAliasChange: (value: string) => void;
   onQuantityChange: (value: string) => void;
   onQuantityEnter: () => void;
   onSave: () => void;
@@ -69,6 +73,7 @@ export const InventoryNewRow = ({
   showQuantityWarning,
   selectedLocation,
   quality,
+  alias,
   uomOptions,
   uomId,
   onUomChange,
@@ -76,6 +81,7 @@ export const InventoryNewRow = ({
   onItemSelect,
   onLocationChange,
   onQualityChange,
+  onAliasChange,
   onQuantityChange,
   onQuantityEnter,
   onSave,
@@ -85,6 +91,7 @@ export const InventoryNewRow = ({
   saveRef,
 }: InventoryNewRowProps) => {
   const isCommodity = selectedItem?.catalogKind === 'commodity';
+  const isAliasEligible = selectedItem !== null && ALIAS_ELIGIBLE_KINDS.has(selectedItem.catalogKind);
   if (!isEditorMode) return null;
 
   return (
@@ -237,6 +244,24 @@ export const InventoryNewRow = ({
           inputProps={{ min: 0, max: 1000, step: 1 }}
         />
       </Stack>
+      {isAliasEligible && (
+        <Stack spacing={0.5}>
+          <TextField
+            size="small"
+            label="Nickname (optional)"
+            value={alias}
+            onChange={(e) => onAliasChange(e.target.value)}
+            inputProps={{ maxLength: 64 }}
+            placeholder="Add a nickname…"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onSave();
+              }
+            }}
+          />
+        </Stack>
+      )}
       <Stack spacing={0.5}>
         <Typography variant="body2" color="text.secondary">
           New entry

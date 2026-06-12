@@ -199,6 +199,7 @@ export const inventoryService = {
     quality?: number | null;
     notes?: string | null;
     isOrgAvailable?: boolean;
+    alias?: string | null;
   }): Promise<InventoryItem> {
     const response = await api.post(`/api/inventory`, item, {
     });
@@ -212,6 +213,7 @@ export const inventoryService = {
     quality?: number | null;
     notes?: string | null;
     isOrgAvailable?: boolean;
+    alias?: string | null;
   }): Promise<InventoryItem> {
     const response = await api.patch(`/api/inventory/${id}`, updates, {
     });
@@ -272,6 +274,7 @@ export const inventoryService = {
       locationId?: string | null;
       quality?: number | null;
       notes?: string | null;
+      alias?: string | null;
     },
   ): Promise<InventoryItem> {
     const response = await api.post(
@@ -284,7 +287,7 @@ export const inventoryService = {
   async updateOrgItem(
     _orgId: string,
     id: string,
-    updates: { quantity?: number; unitOfMeasureId?: string; notes?: string | null; locationId?: string | null; quality?: number | null },
+    updates: { quantity?: number; unitOfMeasureId?: string; notes?: string | null; locationId?: string | null; quality?: number | null; alias?: string | null },
   ): Promise<InventoryItem> {
     return inventoryService.updateItem(id, updates);
   },

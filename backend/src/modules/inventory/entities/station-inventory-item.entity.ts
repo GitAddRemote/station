@@ -70,7 +70,7 @@ export class StationInventoryItem {
   @Column({ name: 'is_org_available', type: 'boolean', default: false })
   isOrgAvailable!: boolean;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 64, nullable: true })
   alias!: string | null;
 
   @Column({ name: 'effective_properties', type: 'jsonb', nullable: true })
