@@ -556,9 +556,9 @@ describe('DatabaseSeederService', () => {
         byName['Member']?.[OrgPermission.CAN_VIEW_MEMBER_SHARED_ITEMS],
       ).toBe(true);
 
-      // Viewer: can only view inventory, nothing else
+      // Viewer: cannot view inventory
       expect(byName['Viewer']?.[OrgPermission.CAN_VIEW_ORG_INVENTORY]).toBe(
-        true,
+        false,
       );
       expect(byName['Viewer']?.[OrgPermission.CAN_EDIT_ORG_INVENTORY]).toBe(
         false,

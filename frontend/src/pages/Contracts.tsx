@@ -209,6 +209,7 @@ function ContractsPage() {
       // Clear router state so Back+Forward doesn't re-trigger
       window.history.replaceState({}, '', location.pathname);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally run only once on mount
 
   // rowRefs for keyboard roving focus
@@ -585,7 +586,7 @@ function ContractsPage() {
         orgId={orgId}
         prefill={dialogPrefill}
         onClose={() => { setDialogOpen(false); setDialogPrefill(undefined); }}
-        onCreated={(_id) => {
+        onCreated={() => {
           setDialogOpen(false);
           setDialogPrefill(undefined);
           fetchContracts(orgId);
