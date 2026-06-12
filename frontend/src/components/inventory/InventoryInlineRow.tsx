@@ -134,15 +134,7 @@ const InventoryInlineRow = ({
           >
             {item.itemName || `Item #${item.catalogEntryId}`}
           </Typography>
-          {item.isOrgAvailable
-            ? <span className="chip-badge success">Shared</span>
-            : <span className="chip-badge neutral">Private</span>
-          }
-          {item.ownerType === 'user' && item.sharedByUsername && (
-            <span className="chip-badge brand">
-              {item.sharedByUsername}
-            </span>
-          )}
+          <span className="chip-badge neutral">Private</span>
         </Stack>
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>

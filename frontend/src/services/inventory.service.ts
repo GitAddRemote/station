@@ -18,9 +18,6 @@ export interface InventoryItem {
   unitOfMeasureDescription: string | null;
   quantity: number;
   quality: number | null;
-  isOrgAvailable: boolean;
-  sharedByUserId: string | null;
-  sharedByUsername: string | null;
   alias: string | null;
   notes: string | null;
   createdAt: Date;
@@ -57,7 +54,6 @@ export interface UserOrganizationMembership {
 export interface InventorySearchParams {
   ownerType?: 'user' | 'org';
   ownerId?: string;
-  orgAvailable?: boolean;
   catalogKind?: 'item' | 'commodity' | 'vehicle';
   categoryId?: string;
   search?: string;
@@ -105,9 +101,6 @@ export interface OrgInventoryItemV2 {
   unitOfMeasureDescription: string | null;
   quantity: number;
   quality: number | null;
-  isOrgAvailable: boolean;
-  sharedByUserId: string | null;
-  sharedByUsername: string | null;
   alias: string | null;
   notes: string | null;
   createdAt: string;
@@ -139,7 +132,6 @@ export interface OrgInventoryQueryParams {
   ownerType?: 'org' | 'user';
   ownerId?: string;
   orgId?: string;
-  orgAvailable?: boolean;
   catalogKind?: 'item' | 'commodity' | 'vehicle';
   categoryId?: string;
   search?: string;
@@ -159,7 +151,6 @@ export const inventoryService = {
     const query: Record<string, string | number | boolean> = {};
     if (params.ownerType !== undefined) query.ownerType = params.ownerType;
     if (params.ownerId !== undefined) query.ownerId = params.ownerId;
-    if (params.orgAvailable !== undefined) query.orgAvailable = params.orgAvailable;
     if (params.catalogKind !== undefined) query.catalogKind = params.catalogKind;
     if (params.categoryId !== undefined) query.categoryId = params.categoryId;
     if (params.search) query.search = params.search;
@@ -198,7 +189,6 @@ export const inventoryService = {
     locationId?: string | null;
     quality?: number | null;
     notes?: string | null;
-    isOrgAvailable?: boolean;
   }): Promise<InventoryItem> {
     const response = await api.post(`/api/inventory`, item, {
     });
@@ -211,7 +201,6 @@ export const inventoryService = {
     locationId?: string | null;
     quality?: number | null;
     notes?: string | null;
-    isOrgAvailable?: boolean;
   }): Promise<InventoryItem> {
     const response = await api.patch(`/api/inventory/${id}`, updates, {
     });
@@ -301,7 +290,6 @@ export const inventoryService = {
         ...(params.ownerType && { ownerType: params.ownerType }),
         ...(params.ownerId && { ownerId: params.ownerId }),
         ...(params.orgId && { orgId: params.orgId }),
-        ...(params.orgAvailable !== undefined && { orgAvailable: params.orgAvailable }),
         ...(params.catalogKind && { catalogKind: params.catalogKind }),
         ...(params.categoryId && { categoryId: params.categoryId }),
         ...(params.search && { search: params.search }),

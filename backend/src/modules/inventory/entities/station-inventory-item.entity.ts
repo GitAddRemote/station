@@ -67,9 +67,6 @@ export class StationInventoryItem {
   @Column({ type: 'integer', nullable: true })
   quality!: number | null;
 
-  @Column({ name: 'is_org_available', type: 'boolean', default: false })
-  isOrgAvailable!: boolean;
-
   @Column({ type: 'varchar', length: 255, nullable: true })
   alias!: string | null;
 

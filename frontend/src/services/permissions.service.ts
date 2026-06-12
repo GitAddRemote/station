@@ -4,7 +4,6 @@ export const OrgPermission = {
   CAN_VIEW_ORG_INVENTORY: 'can_view_org_inventory',
   CAN_EDIT_ORG_INVENTORY: 'can_edit_org_inventory',
   CAN_ADMIN_ORG_INVENTORY: 'can_admin_org_inventory',
-  CAN_VIEW_MEMBER_SHARED_ITEMS: 'can_view_member_shared_items',
   CAN_MANAGE_INVENTORY: 'can_manage_inventory',
   CAN_VIEW_STATION_BOT_ADMIN: 'can_view_station_bot_admin',
   CAN_MANAGE_STATION_BOT_VERIFICATION: 'can_manage_station_bot_verification',
