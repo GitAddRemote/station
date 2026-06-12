@@ -44,7 +44,7 @@ interface NavItem {
 const NAV_PRIMARY: NavItem[] = [
   { id: 'dashboard',  label: 'Dashboard',   icon: <DashboardIcon />, href: '/dashboard',  key: 'd' },
   { id: 'workorders', label: 'Work Orders',  icon: <PickaxeIcon />,   href: '/work-orders', key: 'w', soon: true },
-  { id: 'contracts',  label: 'Contracts',    icon: <ContractsIcon />, href: '/contracts',  key: 'c', soon: true },
+  { id: 'contracts',  label: 'Contracts',    icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
   { id: 'fleet',      label: 'Fleet',        icon: <FleetIcon />,     href: '/fleet',      key: 'f', soon: true },
   { id: 'members',    label: 'Members',      icon: <MembersIcon />,   href: '/members',    key: 'm', soon: true },
 ];
