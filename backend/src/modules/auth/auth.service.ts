@@ -44,6 +44,10 @@ export interface RedisClientLike {
   sMembers(key: string): Promise<string[]>;
   sRem(key: string, member: string): Promise<unknown>;
   expire(key: string, seconds: number): Promise<unknown>;
+  eval(
+    script: string,
+    options: { keys: string[]; arguments: string[] },
+  ): Promise<unknown>;
   quit(): Promise<void>;
 }
 
@@ -322,10 +326,9 @@ export class AuthService implements OnModuleDestroy {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // Verify the session family is still alive. If logout already deleted
-    // session:{sid}, all rotated tokens in this family are also invalidated.
-    const sessionAlive = await this.authGet(`session:${sid}`);
-    if (!sessionAlive) {
+    // Verify the session family is still alive. Checks for missing key AND
+    // the revoked tombstone written by logout to win concurrent refresh races.
+    if (!(await this.isSessionAlive(sid))) {
       throw new UnauthorizedException('Session has been revoked');
     }
 
@@ -351,7 +354,14 @@ export class AuthService implements OnModuleDestroy {
     // Renew the session TTL so it slides with the refresh token. Without this
     // the original 7-day session window would expire before the client's
     // most-recently issued refresh token, causing spurious 401s.
-    await this.authSet(`session:${sid}`, String(userId), REFRESH_TTL_MS);
+    // Use a conditional write that refuses to overwrite a tombstone written by
+    // a concurrent logout — if the tombstone is already there, the session is
+    // already dead and we must not resurrect it.
+    await this.authSetIfNotTombstone(
+      `session:${sid}`,
+      String(userId),
+      REFRESH_TTL_MS,
+    );
 
     // Slide the user-sessions set TTL in lockstep — the SID is stable so no
     // SADD/SREM is needed here, only the EXPIRE must be refreshed.
@@ -502,6 +512,46 @@ export class AuthService implements OnModuleDestroy {
       return;
     }
     await this.cacheManager.set(key, value, Math.ceil(ttlMs));
+  }
+
+  /**
+   * Atomically sets key=value with TTL only when the current value is not the
+   * revoked tombstone. Prevents a concurrent refresh from resurrecting a session
+   * after logout has already written the tombstone.
+   *
+   * On Redis: Lua script — read + conditional write in a single round trip.
+   * On in-memory: read-then-write (single-process, no real concurrency risk).
+   */
+  private async authSetIfNotTombstone(
+    key: string,
+    value: string,
+    ttlMs: number,
+  ): Promise<void> {
+    if (ttlMs <= 0) {
+      throw new Error(
+        `authSetIfNotTombstone called with non-positive TTL for key ${key}`,
+      );
+    }
+    if (this.redisClient) {
+      const ttlSeconds = Math.ceil(ttlMs / 1000);
+      // Lua: set key=value with EX only if current value is not the tombstone.
+      // Returns 1 if written, 0 if blocked by tombstone.
+      await this.redisClient.eval(
+        `local cur = redis.call('GET', KEYS[1])
+if cur == ARGV[1] then return 0 end
+redis.call('SET', KEYS[1], ARGV[2], 'EX', tonumber(ARGV[3]))
+return 1`,
+        {
+          keys: [key],
+          arguments: [SESSION_REVOKED_TOMBSTONE, value, String(ttlSeconds)],
+        },
+      );
+      return;
+    }
+    const cur = await this.cacheManager.get<string>(key);
+    if (cur !== SESSION_REVOKED_TOMBSTONE) {
+      await this.cacheManager.set(key, value, Math.ceil(ttlMs));
+    }
   }
 
   /** Delete an auth-state key. Uses raw Redis client when available. */
@@ -829,23 +879,15 @@ export class AuthService implements OnModuleDestroy {
   }
 
   isLocalLoginEnabled(): boolean {
-    return (
-      this.configService.get<string>('AUTH_LOCAL_LOGIN_ENABLED', 'true') ===
-      'true'
-    );
+    return (process.env['AUTH_LOCAL_LOGIN_ENABLED'] ?? 'true') === 'true';
   }
 
   isLocalRegisterEnabled(): boolean {
-    return (
-      this.configService.get<string>('AUTH_LOCAL_REGISTER_ENABLED', 'true') ===
-      'true'
-    );
+    return (process.env['AUTH_LOCAL_REGISTER_ENABLED'] ?? 'true') === 'true';
   }
 
   isDiscordEnabled(): boolean {
-    return (
-      this.configService.get<string>('AUTH_DISCORD_ENABLED', 'true') === 'true'
-    );
+    return (process.env['AUTH_DISCORD_ENABLED'] ?? 'true') === 'true';
   }
 
   /** Issue tokens for a Discord-authenticated user (no expiry/forced-change checks). */
