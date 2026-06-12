@@ -6,6 +6,7 @@ import {
   useRef,
 } from 'react';
 import type { KeyboardEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import ArticleIcon from '@mui/icons-material/Article';
 import AddIcon from '@mui/icons-material/Add';
@@ -22,6 +23,7 @@ import RecyclingIcon from '@mui/icons-material/Recycling';
 import { ContractRow } from '../components/contracts/ContractRow';
 import { ContractDetail } from '../components/contracts/ContractDetail';
 import { CONTRACT_TYPE_META, fmtAbbr } from '../components/contracts/contractMeta';
+import NewContractDialog, { type NewContractDialogPrefill } from '../components/contracts/NewContractDialog';
 import type { Contract, ContractType } from '../services/contracts.service';
 import './Contracts.css';
 
@@ -148,10 +150,26 @@ const FILTERS: FilterOption[] = [
 
 // ---- ContractsPage ----
 function ContractsPage() {
+  const location = useLocation();
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedId, setSelectedId] = useState<string | null>(MOCK_CONTRACTS[0]?.id ?? null);
   const [loading] = useState(false);
   const [error] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogPrefill, setDialogPrefill] = useState<NewContractDialogPrefill | undefined>(undefined);
+  // org context — TODO: wire from auth context in a follow-up
+  const orgId = 'placeholder-org-id';
+
+  // Handle pre-fill from inventory screen (#382)
+  useEffect(() => {
+    const state = location.state as { newContract?: NewContractDialogPrefill } | null;
+    if (state?.newContract) {
+      setDialogPrefill(state.newContract);
+      setDialogOpen(true);
+      // Clear router state so Back+Forward doesn't re-trigger
+      window.history.replaceState({}, '', location.pathname);
+    }
+  }, []); // intentionally run only once on mount
 
   // rowRefs for keyboard roving focus
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
@@ -215,8 +233,21 @@ function ContractsPage() {
   );
 
   const handleNew = useCallback(() => {
-    // TODO: open new contract dialog (#381)
+    setDialogPrefill(undefined);
+    setDialogOpen(true);
   }, []);
+
+  // Global keyboard shortcut: n = new contract
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'n' && !dialogOpen && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        handleNew();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [dialogOpen, handleNew]);
 
   const handleAction = useCallback((_action: string, _contractId: string) => {
     // TODO: wire actions (#381)
@@ -414,6 +445,18 @@ function ContractsPage() {
           />
         )}
       </div>
+
+      <NewContractDialog
+        open={dialogOpen}
+        orgId={orgId}
+        prefill={dialogPrefill}
+        onClose={() => { setDialogOpen(false); setDialogPrefill(undefined); }}
+        onCreated={(_id) => {
+          setDialogOpen(false);
+          setDialogPrefill(undefined);
+          // TODO: refresh contracts list when real API is wired (#381)
+        }}
+      />
     </>
   );
 }
