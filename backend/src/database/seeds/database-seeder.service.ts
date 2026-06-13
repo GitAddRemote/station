@@ -10,6 +10,26 @@ import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
 import { Game } from '../../modules/games/game.entity';
 import { BusinessUnit } from '../../modules/business-units/business-unit.entity';
+import { StationInventoryItem } from '../../modules/inventory/entities/station-inventory-item.entity';
+import {
+  Contract,
+  ContractType,
+  ContractStatus,
+  ContractRisk,
+} from '../../modules/contracts/entities/contract.entity';
+import {
+  ContractItem,
+  ContractItemSubtype,
+  VehicleSubtype,
+} from '../../modules/contracts/entities/contract-item.entity';
+import {
+  ContractMilestone,
+  MilestoneState,
+} from '../../modules/contracts/entities/contract-milestone.entity';
+import {
+  ContractParty,
+  ContractPartyRole,
+} from '../../modules/contracts/entities/contract-party.entity';
 import { defaultRoles } from './roles.seed';
 import * as bcrypt from 'bcrypt';
 
@@ -124,6 +144,16 @@ export class DatabaseSeederService {
     private gamesRepository: Repository<Game>,
     @InjectRepository(BusinessUnit)
     private businessUnitsRepository: Repository<BusinessUnit>,
+    @InjectRepository(StationInventoryItem)
+    private inventoryItemRepository: Repository<StationInventoryItem>,
+    @InjectRepository(Contract)
+    private contractRepository: Repository<Contract>,
+    @InjectRepository(ContractItem)
+    private contractItemRepository: Repository<ContractItem>,
+    @InjectRepository(ContractMilestone)
+    private contractMilestoneRepository: Repository<ContractMilestone>,
+    @InjectRepository(ContractParty)
+    private contractPartyRepository: Repository<ContractParty>,
   ) {}
 
   async seedAll(): Promise<void> {
@@ -138,6 +168,8 @@ export class DatabaseSeederService {
         await this.seedDemoUsers();
         await this.seedDemoRoleAssignments();
         await this.seedBusinessUnits();
+        await this.seedInventory();
+        await this.seedContracts();
       } else {
         this.logger.info(
           '⊙ Skipping demo data seeding in production environment',
@@ -731,6 +763,992 @@ export class DatabaseSeederService {
         await upsertUnit(org.id, HIERARCHY[i], null, i);
       }
       this.logger.info(`  ✓ Done: ${org.name}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Inventory seed
+  // ---------------------------------------------------------------------------
+
+  private async seedInventory(): Promise<void> {
+    this.logger.info('Seeding inventory...');
+
+    // All IDs are stable — sourced from the live DB at seed-write time.
+    const LOC = {
+      area18: '019ebf08-3d13-7ab4-86b2-e3aa5b3416ef',
+      lorville: '019ebf08-3d1b-77ff-a99c-5f00295d7b2a',
+      newBabbage: '019ebf08-3d22-768d-b13c-a4e10335fb71',
+      orison: '019ebf08-3d29-7a3c-bf33-e81b1d8eb47e',
+      baijini: '019ebf08-3d5a-7af5-8131-618973a815ec',
+      everus: '019ebf08-3d7d-792e-9279-594ebab87d20',
+      portTressler: '019ebf08-3de9-7703-8d70-5e0b264324ef',
+      arcL1: '019ebf08-3d32-7715-936c-4e439ca9948c',
+      checkmate: '019ebf08-3e31-71a8-814d-c715cd071f81',
+      brioBreaker: '019ebf08-3f59-7db3-adb7-09ce290ee8ae',
+    };
+
+    const UOM = {
+      unit: '019ebefc-1943-73f9-8cf4-97b785a57463',
+      scu: '019ebefc-1944-708e-aacc-1fb6edb9343d',
+      cscu: '019ebefc-1944-7a59-97db-2c688a67e339',
+    };
+
+    // catalog_kind = 'vehicle'
+    const SHIP = {
+      caterpillar: '019ebf08-f82f-715e-be26-7a4ca799327c',
+      constellation: '019ebf08-fe24-74b0-9433-9d920368d1f6',
+      freelancer: '019ebf08-fe4b-7fd2-9f5e-b9f3c7f9adeb',
+      cutlassBlack: '019ebf08-f873-780e-973b-3218ad0c4b08',
+      prospector: '019ebf08-fb1b-7634-9972-853b626310d2',
+      vulture: '019ebf08-feb0-70e6-83db-bc47a5d21c45',
+      hullC: '019ebf08-fe62-7217-b167-dae8c156428e',
+      carrack: '019ebf08-f81f-7778-83f1-50ccef84c076',
+      hammerhead: '019ebf08-f9a1-7fbb-b63b-deac5c932e9d',
+      reclaimer: '019ebf08-fb62-7201-a031-95496fea5159',
+    };
+
+    // catalog_kind = 'commodity'
+    const COMM = {
+      agricium: '019ebf08-fef2-75fb-b278-c5ca839333c5',
+      agriSupply: '019ebf08-ff02-7ba5-8de0-825ec8ae46e3',
+      aluminum: '019ebf08-ff12-7c1e-983e-07681f6fe185',
+      diamond: '019ebf08-ffa6-7f32-a785-1ea3f30f0f12',
+      distilled: '019ebf08-ffb1-7079-af07-519006ddd337',
+      gold: '019ebf08-ffd0-7140-8076-73b6f1581c25',
+      hydrogen: '019ebf08-fffa-72f5-81d8-09e95ae823d9',
+      laranite: '019ebf09-001a-7bf7-b62b-ae13a11c19c2',
+      medical: '019ebf09-0033-7f8a-ab57-45ffa519f66e',
+      scrap: '019ebf09-009b-72fd-bcdb-775c6cdcd325',
+      stims: '019ebf09-00ac-7b51-8b3b-96f70e7b1acb',
+      titanium: '019ebf09-00c6-715d-8c12-d4fa3b00264a',
+    };
+
+    const orgs = await this.organizationsRepository.find();
+    const users = await this.usersRepository.find({
+      where: { isSuperAdmin: false },
+    });
+
+    // Helper: upsert by (ownerType, ownerId, catalogEntryId, locationId)
+    const upsertItem = async (
+      ownerType: 'user' | 'org',
+      ownerId: string,
+      catalogEntryId: string,
+      catalogKind: 'item' | 'commodity' | 'vehicle',
+      locationId: string,
+      unitOfMeasureId: string,
+      quantity: string,
+      quality: number | null,
+      notes: string | null,
+    ): Promise<StationInventoryItem> => {
+      const existing = await this.inventoryItemRepository.findOne({
+        where: { ownerType, ownerId, catalogEntryId, locationId },
+      });
+      if (existing) return existing;
+
+      const item = this.inventoryItemRepository.create({
+        ownerType,
+        ownerId,
+        catalogEntryId,
+        catalogKind,
+        locationId,
+        unitOfMeasureId,
+        quantity,
+        quality,
+        notes,
+        batchId: null,
+      });
+      return this.inventoryItemRepository.save(item);
+    };
+
+    for (const org of orgs) {
+      const existingCount = await this.inventoryItemRepository.count({
+        where: { ownerType: 'org', ownerId: org.id },
+      });
+      if (existingCount > 0) {
+        this.logger.info(`  ⊙ Org inventory already exists: ${org.name}`);
+        continue;
+      }
+
+      // --- Ships (vehicles) ---
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.caterpillar,
+        'vehicle',
+        LOC.area18,
+        UOM.unit,
+        '2',
+        850,
+        'Primary cargo haulers',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.constellation,
+        'vehicle',
+        LOC.lorville,
+        UOM.unit,
+        '3',
+        920,
+        'Multi-crew exploration vessels',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.cutlassBlack,
+        'vehicle',
+        LOC.baijini,
+        UOM.unit,
+        '4',
+        780,
+        'Combat and escort fighters',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.hullC,
+        'vehicle',
+        LOC.area18,
+        UOM.unit,
+        '1',
+        900,
+        'Heavy freight transport',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.prospector,
+        'vehicle',
+        LOC.arcL1,
+        UOM.unit,
+        '3',
+        810,
+        'Mining operations',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.vulture,
+        'vehicle',
+        LOC.brioBreaker,
+        UOM.unit,
+        '2',
+        750,
+        'Salvage operations',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.carrack,
+        'vehicle',
+        LOC.newBabbage,
+        UOM.unit,
+        '1',
+        980,
+        'Long-range exploration flagship',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.hammerhead,
+        'vehicle',
+        LOC.everus,
+        UOM.unit,
+        '1',
+        960,
+        'Capital escort and patrol',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.reclaimer,
+        'vehicle',
+        LOC.brioBreaker,
+        UOM.unit,
+        '1',
+        870,
+        'Large-scale salvage platform',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        SHIP.freelancer,
+        'vehicle',
+        LOC.portTressler,
+        UOM.unit,
+        '5',
+        690,
+        'General purpose utility craft',
+      );
+
+      // --- Commodities (high value) ---
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.laranite,
+        'commodity',
+        LOC.arcL1,
+        UOM.scu,
+        '48',
+        920,
+        'High-grade laranite stockpile',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.gold,
+        'commodity',
+        LOC.area18,
+        UOM.scu,
+        '120',
+        875,
+        null,
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.diamond,
+        'commodity',
+        LOC.area18,
+        UOM.scu,
+        '30',
+        950,
+        'Premium cut',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.titanium,
+        'commodity',
+        LOC.lorville,
+        UOM.scu,
+        '200',
+        800,
+        null,
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.agricium,
+        'commodity',
+        LOC.orison,
+        UOM.scu,
+        '75',
+        860,
+        null,
+      );
+
+      // --- Commodities (bulk / industrial) ---
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.aluminum,
+        'commodity',
+        LOC.lorville,
+        UOM.scu,
+        '500',
+        null,
+        'Bulk structural stock',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.scrap,
+        'commodity',
+        LOC.brioBreaker,
+        UOM.scu,
+        '1200',
+        null,
+        'Salvage yard collection',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.hydrogen,
+        'commodity',
+        LOC.arcL1,
+        UOM.scu,
+        '300',
+        null,
+        'Fuel reserves',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.agriSupply,
+        'commodity',
+        LOC.orison,
+        UOM.scu,
+        '80',
+        null,
+        null,
+      );
+
+      // --- Medical & consumables ---
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.medical,
+        'commodity',
+        LOC.newBabbage,
+        UOM.scu,
+        '40',
+        980,
+        'Emergency medical stockpile',
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.stims,
+        'commodity',
+        LOC.area18,
+        UOM.scu,
+        '20',
+        700,
+        null,
+      );
+      await upsertItem(
+        'org',
+        org.id,
+        COMM.distilled,
+        'commodity',
+        LOC.orison,
+        UOM.scu,
+        '60',
+        null,
+        'Distilled spirits — crew rations',
+      );
+
+      this.logger.info(`  ✓ Seeded org inventory: ${org.name}`);
+    }
+
+    // Personal inventory for demo users
+    for (const user of users.slice(0, 4)) {
+      const existingCount = await this.inventoryItemRepository.count({
+        where: { ownerType: 'user', ownerId: user.id },
+      });
+      if (existingCount > 0) continue;
+
+      // Each user gets a personal ship and a small stash of commodities
+      await upsertItem(
+        'user',
+        user.id,
+        SHIP.cutlassBlack,
+        'vehicle',
+        LOC.area18,
+        UOM.unit,
+        '1',
+        720 + Math.floor(Math.random() * 200),
+        'Personal fighter',
+      );
+      await upsertItem(
+        'user',
+        user.id,
+        COMM.laranite,
+        'commodity',
+        LOC.area18,
+        UOM.cscu,
+        '500',
+        880,
+        'Personal stash',
+      );
+      await upsertItem(
+        'user',
+        user.id,
+        COMM.stims,
+        'commodity',
+        LOC.lorville,
+        UOM.cscu,
+        '50',
+        null,
+        null,
+      );
+      this.logger.info(`  ✓ Seeded personal inventory: ${user.username}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Contracts seed
+  // ---------------------------------------------------------------------------
+
+  private async seedContracts(): Promise<void> {
+    this.logger.info('Seeding contracts...');
+
+    const LOC = {
+      area18: '019ebf08-3d13-7ab4-86b2-e3aa5b3416ef',
+      lorville: '019ebf08-3d1b-77ff-a99c-5f00295d7b2a',
+      newBabbage: '019ebf08-3d22-768d-b13c-a4e10335fb71',
+      orison: '019ebf08-3d29-7a3c-bf33-e81b1d8eb47e',
+      baijini: '019ebf08-3d5a-7af5-8131-618973a815ec',
+      everus: '019ebf08-3d7d-792e-9279-594ebab87d20',
+      portTressler: '019ebf08-3de9-7703-8d70-5e0b264324ef',
+      arcL1: '019ebf08-3d32-7715-936c-4e439ca9948c',
+      checkmate: '019ebf08-3e31-71a8-814d-c715cd071f81',
+      brioBreaker: '019ebf08-3f59-7db3-adb7-09ce290ee8ae',
+    };
+
+    const COMM = {
+      laranite: '019ebf09-001a-7bf7-b62b-ae13a11c19c2',
+      gold: '019ebf08-ffd0-7140-8076-73b6f1581c25',
+      medical: '019ebf09-0033-7f8a-ab57-45ffa519f66e',
+      aluminum: '019ebf08-ff12-7c1e-983e-07681f6fe185',
+      scrap: '019ebf09-009b-72fd-bcdb-775c6cdcd325',
+      hydrogen: '019ebf08-fffa-72f5-81d8-09e95ae823d9',
+      titanium: '019ebf09-00c6-715d-8c12-d4fa3b00264a',
+    };
+
+    const SHIP = {
+      caterpillar: '019ebf08-f82f-715e-be26-7a4ca799327c',
+      cutlassBlack: '019ebf08-f873-780e-973b-3218ad0c4b08',
+      prospector: '019ebf08-fb1b-7634-9972-853b626310d2',
+      vulture: '019ebf08-feb0-70e6-83db-bc47a5d21c45',
+    };
+
+    const orgs = await this.organizationsRepository.find();
+    const users = await this.usersRepository.find({
+      where: { isSuperAdmin: false },
+    });
+
+    // Find inventory items seeded above so transfer contracts can reference them
+    const orgInventory = await this.inventoryItemRepository.find({
+      where: { ownerType: 'org' },
+    });
+    const byOrgAndCatalog = (orgId: string, catalogId: string) =>
+      orgInventory.find(
+        (i) => i.ownerId === orgId && i.catalogEntryId === catalogId,
+      ) ?? null;
+
+    // Helper — create a contract with optional items, milestones, and creator party
+    const createContract = async (spec: {
+      orgId: string;
+      creatorId: string;
+      type: ContractType;
+      status: ContractStatus;
+      risk: ContractRisk | null;
+      title: string;
+      description: string | null;
+      rewardAuec: string | null;
+      deadline: Date | null;
+      deliveryLocationId: string | null;
+      details: Record<string, unknown> | null;
+      milestones: Array<{ label: string; state: MilestoneState }>;
+      items: Array<{
+        subtype: ContractItemSubtype;
+        catalogEntryId: string | null;
+        inventoryItemId: string | null;
+        pickupLocationId: string | null;
+        quantity: string;
+        quality: string | null;
+        vehicleSubtype: VehicleSubtype | null;
+      }>;
+    }): Promise<void> => {
+      // Skip if a contract with same title already exists for this org
+      const existing = await this.contractRepository.findOne({
+        where: { orgId: spec.orgId, title: spec.title },
+      });
+      if (existing) return;
+
+      const contract = this.contractRepository.create({
+        orgId: spec.orgId,
+        creatorId: spec.creatorId,
+        type: spec.type,
+        status: spec.status,
+        risk: spec.risk ?? undefined,
+        title: spec.title,
+        description: spec.description,
+        rewardAuec: spec.rewardAuec,
+        deadline: spec.deadline,
+        deliveryLocationId: spec.deliveryLocationId,
+        details: spec.details,
+      });
+      await this.contractRepository.save(contract);
+
+      // Creator party
+      const party = this.contractPartyRepository.create({
+        contractId: contract.id,
+        userId: spec.creatorId,
+        orgId: spec.orgId,
+        role: ContractPartyRole.CREATOR,
+      });
+      await this.contractPartyRepository.save(party);
+
+      // Milestones
+      for (let i = 0; i < spec.milestones.length; i++) {
+        const m = this.contractMilestoneRepository.create({
+          contractId: contract.id,
+          label: spec.milestones[i].label,
+          state: spec.milestones[i].state,
+          sortOrder: i,
+        });
+        await this.contractMilestoneRepository.save(m);
+      }
+
+      // Items
+      for (let i = 0; i < spec.items.length; i++) {
+        const ci = spec.items[i];
+        const item = this.contractItemRepository.create({
+          contractId: contract.id,
+          itemSubtype: ci.subtype,
+          catalogEntryId: ci.catalogEntryId,
+          inventoryItemId: ci.inventoryItemId,
+          pickupLocationId: ci.pickupLocationId,
+          quantity: ci.quantity,
+          quality: ci.quality,
+          vehicleSubtype: ci.vehicleSubtype,
+          sortOrder: i,
+        });
+        await this.contractItemRepository.save(item);
+      }
+
+      this.logger.info(`    + contract [${spec.type}]: ${spec.title}`);
+    };
+
+    const inTwoWeeks = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const inOneMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    for (const org of orgs) {
+      // Pick stable creator users for this org
+      const orgMembers = await this.userOrgRolesRepository.find({
+        where: { organizationId: org.id },
+        relations: ['user'],
+      });
+      const creator = orgMembers[0]?.user ?? users[0];
+
+      // ----------------------------------------------------------------
+      // TRANSFER contracts — inventory-in-transit between members/locations
+      // ----------------------------------------------------------------
+      const laraniteItem = byOrgAndCatalog(org.id, COMM.laranite);
+      const goldItem = byOrgAndCatalog(org.id, COMM.gold);
+      const medItem = byOrgAndCatalog(org.id, COMM.medical);
+      const titaniumItem = byOrgAndCatalog(org.id, COMM.titanium);
+
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.TRANSFER,
+        status: ContractStatus.ACTIVE,
+        risk: ContractRisk.LOW,
+        title: 'Laranite Stockpile Transfer — ARC-L1 to Area 18',
+        description:
+          'Move high-grade laranite from ARC-L1 holding to Area 18 warehouse for resale.',
+        rewardAuec: '45000.00',
+        deadline: inTwoWeeks,
+        deliveryLocationId: LOC.area18,
+        details: null,
+        milestones: [
+          { label: 'Load cargo at ARC-L1', state: MilestoneState.DONE },
+          { label: 'Transit to Area 18', state: MilestoneState.ACTIVE },
+          {
+            label: 'Offload and confirm receipt',
+            state: MilestoneState.PENDING,
+          },
+        ],
+        items: laraniteItem
+          ? [
+              {
+                subtype: ContractItemSubtype.COMMODITY,
+                catalogEntryId: COMM.laranite,
+                inventoryItemId: laraniteItem.id,
+                pickupLocationId: LOC.arcL1,
+                quantity: '24',
+                quality: '920',
+                vehicleSubtype: null,
+              },
+            ]
+          : [],
+      });
+
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.TRANSFER,
+        status: ContractStatus.OPEN,
+        risk: ContractRisk.MEDIUM,
+        title: 'Gold Bullion Run — Area 18 to Baijini Point',
+        description:
+          'Escorted transfer of gold reserves. High-value shipment — request combat escort.',
+        rewardAuec: '120000.00',
+        deadline: inTwoWeeks,
+        deliveryLocationId: LOC.baijini,
+        details: null,
+        milestones: [
+          { label: 'Secure cargo and escort', state: MilestoneState.PENDING },
+          {
+            label: 'Transit Stanton to Crusader',
+            state: MilestoneState.PENDING,
+          },
+          { label: 'Delivery and sign-off', state: MilestoneState.PENDING },
+        ],
+        items: goldItem
+          ? [
+              {
+                subtype: ContractItemSubtype.COMMODITY,
+                catalogEntryId: COMM.gold,
+                inventoryItemId: goldItem.id,
+                pickupLocationId: LOC.area18,
+                quantity: '60',
+                quality: '875',
+                vehicleSubtype: null,
+              },
+            ]
+          : [],
+      });
+
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.TRANSFER,
+        status: ContractStatus.DRAFT,
+        risk: ContractRisk.LOW,
+        title: 'Medical Supplies Redistribution — New Babbage to Orison',
+        description:
+          'Routine redistribution of medical stockpile between org-held warehouses.',
+        rewardAuec: '18000.00',
+        deadline: inOneMonth,
+        deliveryLocationId: LOC.orison,
+        details: null,
+        milestones: [
+          {
+            label: 'Inventory check and manifest',
+            state: MilestoneState.PENDING,
+          },
+          { label: 'Load and transit', state: MilestoneState.PENDING },
+          { label: 'Delivery confirmation', state: MilestoneState.PENDING },
+        ],
+        items: medItem
+          ? [
+              {
+                subtype: ContractItemSubtype.COMMODITY,
+                catalogEntryId: COMM.medical,
+                inventoryItemId: medItem.id,
+                pickupLocationId: LOC.newBabbage,
+                quantity: '20',
+                quality: '980',
+                vehicleSubtype: null,
+              },
+            ]
+          : [],
+      });
+
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.TRANSFER,
+        status: ContractStatus.COMPLETED,
+        risk: ContractRisk.LOW,
+        title: 'Titanium Structural Stock Delivery',
+        description:
+          'Completed delivery of bulk titanium to Lorville industrial depot.',
+        rewardAuec: '30000.00',
+        deadline: null,
+        deliveryLocationId: LOC.lorville,
+        details: null,
+        milestones: [
+          { label: 'Load at ARC-L1', state: MilestoneState.DONE },
+          { label: 'Transit to Lorville', state: MilestoneState.DONE },
+          { label: 'Weigh-in and sign-off', state: MilestoneState.DONE },
+        ],
+        items: titaniumItem
+          ? [
+              {
+                subtype: ContractItemSubtype.COMMODITY,
+                catalogEntryId: COMM.titanium,
+                inventoryItemId: titaniumItem.id,
+                pickupLocationId: LOC.arcL1,
+                quantity: '100',
+                quality: '800',
+                vehicleSubtype: null,
+              },
+            ]
+          : [],
+      });
+
+      // ----------------------------------------------------------------
+      // TRANSPORT contract
+      // ----------------------------------------------------------------
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.TRANSPORT,
+        status: ContractStatus.OPEN,
+        risk: ContractRisk.MEDIUM,
+        title: 'Caterpillar Freight Run — Lorville to Port Tressler',
+        description:
+          'Cargo haul using Caterpillar. 140 SCU mixed aluminum and agricultural supplies. No combat expected.',
+        rewardAuec: '55000.00',
+        deadline: inTwoWeeks,
+        deliveryLocationId: LOC.portTressler,
+        details: {
+          pickup: {
+            kind: 'location',
+            locationId: LOC.lorville,
+            locationName: 'Lorville',
+          },
+          delivery: {
+            kind: 'location',
+            locationId: LOC.portTressler,
+            locationName: 'Port Tressler',
+          },
+          cargoDescription: '140 SCU mixed aluminum and agricultural supplies',
+          scuRequired: '140',
+        },
+        milestones: [
+          { label: 'Pick up cargo at Lorville', state: MilestoneState.PENDING },
+          { label: 'Transit to Port Tressler', state: MilestoneState.PENDING },
+          { label: 'Deliver and confirm', state: MilestoneState.PENDING },
+        ],
+        items: [
+          {
+            subtype: ContractItemSubtype.VEHICLE,
+            catalogEntryId: SHIP.caterpillar,
+            inventoryItemId: null,
+            pickupLocationId: LOC.lorville,
+            quantity: '1',
+            quality: null,
+            vehicleSubtype: VehicleSubtype.SHIP,
+          },
+        ],
+      });
+
+      // ----------------------------------------------------------------
+      // MINING contract
+      // ----------------------------------------------------------------
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.MINING,
+        status: ContractStatus.ACTIVE,
+        risk: ContractRisk.MEDIUM,
+        title: 'Laranite Mining Operation — Aaron Halo',
+        description:
+          'Prospector wing assigned to Aaron Halo belt. Target: 200 SCU laranite. Deliver refined yield to ARC-L1.',
+        rewardAuec: '280000.00',
+        deadline: inOneMonth,
+        deliveryLocationId: LOC.arcL1,
+        details: {
+          targetMineral: 'Laranite',
+          targetScuYield: 200,
+          miningZone: 'Aaron Halo asteroid belt',
+          allowedVehicles: ['Prospector', 'Mole'],
+        },
+        milestones: [
+          {
+            label: 'Deploy mining wing to Aaron Halo',
+            state: MilestoneState.DONE,
+          },
+          { label: 'Reach 100 SCU yield', state: MilestoneState.ACTIVE },
+          { label: 'Reach 200 SCU yield', state: MilestoneState.PENDING },
+          {
+            label: 'Refine and deliver to ARC-L1',
+            state: MilestoneState.PENDING,
+          },
+        ],
+        items: [
+          {
+            subtype: ContractItemSubtype.COMMODITY,
+            catalogEntryId: COMM.laranite,
+            inventoryItemId: null,
+            pickupLocationId: null,
+            quantity: '200',
+            quality: null,
+            vehicleSubtype: null,
+          },
+        ],
+      });
+
+      // ----------------------------------------------------------------
+      // SECURITY contract
+      // ----------------------------------------------------------------
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.SECURITY,
+        status: ContractStatus.CLAIMED,
+        risk: ContractRisk.HIGH,
+        title: 'Cargo Escort — Everus Harbor to Checkmate Station',
+        description:
+          'Escort Caterpillar carrying gold through high-risk corridor. Pirate activity reported along route. Three fighters minimum.',
+        rewardAuec: '95000.00',
+        deadline: inTwoWeeks,
+        deliveryLocationId: LOC.checkmate,
+        details: {
+          escortTarget: 'Hull C — gold shipment',
+          minimumFighters: 3,
+          knownThreats:
+            'Pirate interdiction reported on MIC-L1 approach vector',
+        },
+        milestones: [
+          {
+            label: 'Assemble fighter escort at Everus',
+            state: MilestoneState.DONE,
+          },
+          {
+            label: 'Escort through MIC-L1 corridor',
+            state: MilestoneState.ACTIVE,
+          },
+          {
+            label: 'Deliver escorted vessel to Checkmate',
+            state: MilestoneState.PENDING,
+          },
+        ],
+        items: [
+          {
+            subtype: ContractItemSubtype.VEHICLE,
+            catalogEntryId: SHIP.cutlassBlack,
+            inventoryItemId: null,
+            pickupLocationId: LOC.everus,
+            quantity: '3',
+            quality: null,
+            vehicleSubtype: VehicleSubtype.SHIP,
+          },
+        ],
+      });
+
+      // ----------------------------------------------------------------
+      // SALVAGE contract
+      // ----------------------------------------------------------------
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.SALVAGE,
+        status: ContractStatus.OPEN,
+        risk: ContractRisk.MEDIUM,
+        title: 'Derelict Reclamation — Contested Zone Wreck',
+        description:
+          'Known Hammerhead wreck in contested zone near Pyro jump point. Estimated 400+ SCU recoverable scrap. Bring Vulture + Reclaimer.',
+        rewardAuec: '180000.00',
+        deadline: inOneMonth,
+        deliveryLocationId: LOC.brioBreaker,
+        details: {
+          targetWreck: 'Hammerhead (derelict)',
+          estimatedScuYield: 400,
+          hazards: 'Contested space, possible leftover turret activity',
+          deliverTo: "Brio's Breaker Yard",
+        },
+        milestones: [
+          { label: 'Locate and survey wreck', state: MilestoneState.PENDING },
+          { label: 'Begin hull stripping', state: MilestoneState.PENDING },
+          { label: "Transport scrap to Brio's", state: MilestoneState.PENDING },
+          { label: 'Weigh-in and payout', state: MilestoneState.PENDING },
+        ],
+        items: [
+          {
+            subtype: ContractItemSubtype.VEHICLE,
+            catalogEntryId: SHIP.vulture,
+            inventoryItemId: null,
+            pickupLocationId: LOC.brioBreaker,
+            quantity: '1',
+            quality: null,
+            vehicleSubtype: VehicleSubtype.SHIP,
+          },
+          {
+            subtype: ContractItemSubtype.COMMODITY,
+            catalogEntryId: COMM.scrap,
+            inventoryItemId: null,
+            pickupLocationId: null,
+            quantity: '400',
+            quality: null,
+            vehicleSubtype: null,
+          },
+        ],
+      });
+
+      // ----------------------------------------------------------------
+      // MEDICAL contract
+      // ----------------------------------------------------------------
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.MEDICAL,
+        status: ContractStatus.ACTIVE,
+        risk: ContractRisk.HIGH,
+        title: 'Combat Medic Support — Active Mining Op',
+        description:
+          'Provide Apollo Medivac coverage for mining wing in contested belt. On-call extraction for injuries or incapacitation.',
+        rewardAuec: '40000.00',
+        deadline: inTwoWeeks,
+        deliveryLocationId: null,
+        details: {
+          supportZone: 'Aaron Halo asteroid belt',
+          requiredShip: 'Apollo Medivac or Cutlass Red',
+          priority: 'Combat extraction and field stabilization',
+        },
+        milestones: [
+          {
+            label: 'Station medical ship at ARC-L1 standby',
+            state: MilestoneState.DONE,
+          },
+          {
+            label: 'Provide coverage through mining op',
+            state: MilestoneState.ACTIVE,
+          },
+          {
+            label: 'Return crew — debrief and payout',
+            state: MilestoneState.PENDING,
+          },
+        ],
+        items: [
+          {
+            subtype: ContractItemSubtype.COMMODITY,
+            catalogEntryId: COMM.medical,
+            inventoryItemId: null,
+            pickupLocationId: null,
+            quantity: '10',
+            quality: '999',
+            vehicleSubtype: null,
+          },
+        ],
+      });
+
+      // ----------------------------------------------------------------
+      // REFUELING contract
+      // ----------------------------------------------------------------
+      await createContract({
+        orgId: org.id,
+        creatorId: creator.id,
+        type: ContractType.REFUELING,
+        status: ContractStatus.OPEN,
+        risk: ContractRisk.LOW,
+        title: 'Fleet Refuel — Exploration Wing Resupply',
+        description:
+          'Starfarer to rendezvous with exploration wing near Pyro jump point and top off hydrogen reserves for the next leg.',
+        rewardAuec: '22000.00',
+        deadline: inOneMonth,
+        deliveryLocationId: null,
+        details: {
+          fuelType: 'Hydrogen',
+          targetScuFuel: 120,
+          rendezvousPoint: 'Pyro Jump Point — Stanton side',
+          recipientVessels: ['Carrack', 'Constellation Andromeda x2'],
+        },
+        milestones: [
+          {
+            label: 'Load 120 SCU hydrogen at ARC-L1',
+            state: MilestoneState.PENDING,
+          },
+          {
+            label: 'Transit to Pyro jump point',
+            state: MilestoneState.PENDING,
+          },
+          {
+            label: 'Transfer fuel to fleet vessels',
+            state: MilestoneState.PENDING,
+          },
+        ],
+        items: [
+          {
+            subtype: ContractItemSubtype.COMMODITY,
+            catalogEntryId: COMM.hydrogen,
+            inventoryItemId: null,
+            pickupLocationId: LOC.arcL1,
+            quantity: '120',
+            quality: null,
+            vehicleSubtype: null,
+          },
+        ],
+      });
+
+      this.logger.info(`  ✓ Seeded contracts for org: ${org.name}`);
     }
   }
 }
