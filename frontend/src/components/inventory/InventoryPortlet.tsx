@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -152,9 +152,8 @@ const InventoryPortlet = () => {
                 const isOpen = expanded.has(group.catalogEntryId);
                 const multiLoc = group.subRows.length > 1;
                 return (
-                  <>
+                  <React.Fragment key={group.catalogEntryId}>
                     <tr
-                      key={group.catalogEntryId}
                       className={'inv-group-row' + (isOpen ? ' open' : '') + (multiLoc ? ' expandable' : '')}
                       onClick={() => multiLoc && toggle(group.catalogEntryId)}
                       style={{ cursor: multiLoc ? 'pointer' : 'default' }}
@@ -208,7 +207,7 @@ const InventoryPortlet = () => {
                         <td className="cell-muted">{sub.locationName ?? '—'}</td>
                       </tr>
                     ))}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>

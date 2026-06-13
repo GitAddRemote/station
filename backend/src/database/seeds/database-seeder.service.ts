@@ -9,6 +9,7 @@ import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
 import { Game } from '../../modules/games/game.entity';
+import { BusinessUnit } from '../../modules/business-units/business-unit.entity';
 import { defaultRoles } from './roles.seed';
 import * as bcrypt from 'bcrypt';
 
@@ -121,6 +122,8 @@ export class DatabaseSeederService {
     private userOrgRolesRepository: Repository<UserOrganizationRole>,
     @InjectRepository(Game)
     private gamesRepository: Repository<Game>,
+    @InjectRepository(BusinessUnit)
+    private businessUnitsRepository: Repository<BusinessUnit>,
   ) {}
 
   async seedAll(): Promise<void> {
@@ -134,6 +137,7 @@ export class DatabaseSeederService {
         await this.seedDemoOrganizations();
         await this.seedDemoUsers();
         await this.seedDemoRoleAssignments();
+        await this.seedBusinessUnits();
       } else {
         this.logger.info(
           '⊙ Skipping demo data seeding in production environment',
@@ -373,6 +377,217 @@ export class DatabaseSeederService {
           `  ⊙ Assignment already exists: ${assignment.username} → ${assignment.orgName}`,
         );
       }
+    }
+  }
+
+  private async seedBusinessUnits(): Promise<void> {
+    this.logger.info('Seeding business units...');
+
+    // Default hierarchy seeded for every org:
+    //   Division → Department → Team
+    // Names are space/science themed so orgs can rename or extend them.
+    const HIERARCHY: Array<{
+      division: { name: string; description: string };
+      departments: Array<{
+        name: string;
+        description: string;
+        teams: Array<{ name: string; description: string }>;
+      }>;
+    }> = [
+      {
+        division: {
+          name: 'Exploration Division',
+          description:
+            'Deep-space survey, cartography, and first-contact operations.',
+        },
+        departments: [
+          {
+            name: 'Stellar Cartography',
+            description: 'Mapping star systems, jump points, and anomalies.',
+            teams: [
+              {
+                name: 'Void Scouts',
+                description: 'Forward recon into unmapped systems.',
+              },
+              {
+                name: 'Jump Point Survey',
+                description: 'Jump point stability analysis and cataloguing.',
+              },
+            ],
+          },
+          {
+            name: 'Xenobiology',
+            description:
+              'Flora, fauna, and atmospheric research on alien worlds.',
+            teams: [
+              {
+                name: 'Surface Analysis',
+                description: 'Ground-team sample collection and bio-scans.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        division: {
+          name: 'Combat Division',
+          description: 'Security, escort, patrol, and offensive operations.',
+        },
+        departments: [
+          {
+            name: 'Interceptor Wing',
+            description:
+              'Fast-response fighter coverage and hostile interception.',
+            teams: [
+              {
+                name: 'Alpha Squadron',
+                description: 'Primary strike and intercept.',
+              },
+              {
+                name: 'Vanguard Squadron',
+                description: 'Escort and close air support.',
+              },
+            ],
+          },
+          {
+            name: 'Ground Forces',
+            description: 'EVA boarding operations and base defense.',
+            teams: [
+              {
+                name: 'Breach Team',
+                description: 'Hostile ship boarding and extraction.',
+              },
+              {
+                name: 'Shield Wall',
+                description: 'Defensive perimeter and fortification.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        division: {
+          name: 'Commerce Division',
+          description: 'Trade, hauling, arbitrage, and market intelligence.',
+        },
+        departments: [
+          {
+            name: 'Logistics',
+            description: 'Cargo routing, fleet coordination, and supply chain.',
+            teams: [
+              {
+                name: 'Hauler Fleet',
+                description: 'Bulk commodity transport runs.',
+              },
+              {
+                name: 'Route Optimization',
+                description: 'Trade lane analysis and scheduling.',
+              },
+            ],
+          },
+          {
+            name: 'Market Intelligence',
+            description:
+              'Price tracking, arbitrage identification, and commodity forecasting.',
+            teams: [
+              {
+                name: 'Data Brokers',
+                description: 'Real-time market data collection and analysis.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        division: {
+          name: 'Industrial Division',
+          description:
+            'Mining, refining, salvage, and manufacturing operations.',
+        },
+        departments: [
+          {
+            name: 'Extraction',
+            description: 'Asteroid and planetary mining operations.',
+            teams: [
+              {
+                name: 'Rock Breakers',
+                description: 'Heavy ship-mining operations.',
+              },
+              {
+                name: 'Hand Mining Corps',
+                description: 'Cave and surface hand-mining runs.',
+              },
+            ],
+          },
+          {
+            name: 'Salvage & Reclamation',
+            description: 'Wreck salvage, scrapping, and materials recovery.',
+            teams: [
+              {
+                name: 'Wreck Raiders',
+                description: 'Deep-space derelict salvage.',
+              },
+              {
+                name: 'Tow & Reclaim',
+                description: 'Ship towing and on-site recycling.',
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const orgs = await this.organizationsRepository.find();
+
+    for (const org of orgs) {
+      const existingCount = await this.businessUnitsRepository.count({
+        where: { organizationId: org.id },
+      });
+
+      if (existingCount > 0) {
+        this.logger.info(
+          `  ⊙ Business units already exist for org: ${org.name}`,
+        );
+        continue;
+      }
+
+      for (const { division, departments } of HIERARCHY) {
+        const divUnit = this.businessUnitsRepository.create({
+          organizationId: org.id,
+          name: division.name,
+          kind: 'division',
+          description: division.description,
+          parentId: null,
+          sortOrder: HIERARCHY.indexOf({ division, departments }),
+        });
+        await this.businessUnitsRepository.save(divUnit);
+
+        for (const dept of departments) {
+          const deptUnit = this.businessUnitsRepository.create({
+            organizationId: org.id,
+            name: dept.name,
+            kind: 'department',
+            description: dept.description,
+            parentId: divUnit.id,
+            sortOrder: departments.indexOf(dept),
+          });
+          await this.businessUnitsRepository.save(deptUnit);
+
+          for (const team of dept.teams) {
+            const teamUnit = this.businessUnitsRepository.create({
+              organizationId: org.id,
+              name: team.name,
+              kind: 'team',
+              description: team.description,
+              parentId: deptUnit.id,
+              sortOrder: dept.teams.indexOf(team),
+            });
+            await this.businessUnitsRepository.save(teamUnit);
+          }
+        }
+      }
+
+      this.logger.info(`  ✓ Seeded business units for org: ${org.name}`);
     }
   }
 }
