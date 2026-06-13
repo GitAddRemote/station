@@ -7,6 +7,7 @@ import { Organization } from '../organizations/organization.entity';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { UserOrganizationRolesModule } from '../user-organization-roles/user-organization-roles.module';
 import { User } from '../users/user.entity';
+import { ContractItem } from '../contracts/entities/contract-item.entity';
 import { StationInventoryBatch } from './entities/station-inventory-batch.entity';
 import { StationInventoryItem } from './entities/station-inventory-item.entity';
 import { StationInventoryListItem } from './entities/station-inventory-list-item.entity';
@@ -28,6 +29,7 @@ import { InventoryService } from './inventory.service';
       StationCatalogEntry,
       StationLocation,
       StationUnitOfMeasure,
+      ContractItem,
       StationInventoryBatch,
       StationInventoryItem,
       StationInventoryList,

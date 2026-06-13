@@ -29,6 +29,7 @@ import {
 } from './dto/inventory-item.dto';
 import { ListInventoryItemsDto } from './dto/list-inventory-items.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
+import { ContractItem } from '../contracts/entities/contract-item.entity';
 import { StationInventoryItem } from './entities/station-inventory-item.entity';
 import { StationInventoryListItem } from './entities/station-inventory-list-item.entity';
 import { StationInventoryList } from './entities/station-inventory-list.entity';
@@ -60,6 +61,8 @@ export class InventoryService {
     private readonly inventoryListRepository: Repository<StationInventoryList>,
     @InjectRepository(StationInventoryListItem)
     private readonly inventoryListItemRepository: Repository<StationInventoryListItem>,
+    @InjectRepository(ContractItem)
+    private readonly contractItemRepository: Repository<ContractItem>,
     private readonly dataSource: DataSource,
     private readonly permissionsService: PermissionsService,
     private readonly userOrganizationRolesService: UserOrganizationRolesService,
@@ -151,8 +154,14 @@ export class InventoryService {
 
     const [items, total] = await queryBuilder.getManyAndCount();
 
+    const contractedQtyMap = await this.getContractedQuantities(
+      items.map((i) => i.id),
+    );
+
     const response: PaginatedInventoryItemsDto = {
-      data: items.map((item) => this.toInventoryItemDto(item)),
+      data: items.map((item) =>
+        this.toInventoryItemDto(item, contractedQtyMap[item.id] ?? null),
+      ),
       total,
       page: normalizedPage,
       limit: normalizedLimit,
@@ -448,6 +457,25 @@ export class InventoryService {
     }
 
     return { scope: 'org', ownerId: organization.id };
+  }
+
+  private async getContractedQuantities(
+    itemIds: string[],
+  ): Promise<Record<string, number>> {
+    if (itemIds.length === 0) return {};
+    const rows: Array<{ inventory_item_id: string; total: string }> =
+      await this.contractItemRepository
+        .createQueryBuilder('ci')
+        .select('ci.inventory_item_id', 'inventory_item_id')
+        .addSelect('SUM(ci.quantity)', 'total')
+        .innerJoin('ci.contract', 'c')
+        .where('ci.inventory_item_id IN (:...itemIds)', { itemIds })
+        .andWhere("c.status IN ('open','claimed','active')")
+        .groupBy('ci.inventory_item_id')
+        .getRawMany();
+    return Object.fromEntries(
+      rows.map((r) => [r.inventory_item_id, parseFloat(r.total)]),
+    );
   }
 
   private createInventoryBaseQueryBuilder() {
@@ -757,7 +785,10 @@ export class InventoryService {
     };
   }
 
-  private toInventoryItemDto(item: StationInventoryItem): InventoryItemDto {
+  private toInventoryItemDto(
+    item: StationInventoryItem,
+    contractedQuantity: number | null = null,
+  ): InventoryItemDto {
     return {
       id: item.id,
       ownerType: item.ownerType,
@@ -779,6 +810,7 @@ export class InventoryService {
       quality: item.quality,
       alias: item.alias,
       notes: item.notes,
+      contractedQuantity,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     };

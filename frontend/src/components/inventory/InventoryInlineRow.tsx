@@ -134,7 +134,9 @@ const InventoryInlineRow = ({
           >
             {item.itemName || `Item #${item.catalogEntryId}`}
           </Typography>
-          <span className="chip-badge neutral">Private</span>
+          {(item.contractedQuantity ?? 0) > 0 && (
+            <span className="chip-badge warm">Contracted | {(item.contractedQuantity!).toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+          )}
         </Stack>
       </Stack>
       <Stack spacing={density === 'compact' ? 0.25 : 0.5}>

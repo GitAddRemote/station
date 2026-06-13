@@ -2254,7 +2254,12 @@ const InventoryPage = () => {
                                   </button>
                                   <span className="acc-name" title={group.itemName}>
                                     {group.itemName}
-                                    <span className="chip-badge neutral" style={{ marginLeft: 8 }}>Private</span>
+                                    {(() => {
+                                      const rolledUp = group.subRows.reduce((sum, r) => sum + (r.contractedQuantity ?? 0), 0);
+                                      return rolledUp > 0 ? (
+                                        <span className="chip-badge warm" style={{ marginLeft: 8 }}>Contracted | {rolledUp.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+                                      ) : null;
+                                    })()}
                                   </span>
                                   <span className="acc-location">
                                     <span className="acc-multi">
