@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -110,42 +109,38 @@ const InventoryPortlet = () => {
           <p>{debouncedSearch || categoryId ? 'No items match your filters.' : 'No inventory items yet.'}</p>
         </div>
       ) : (
-        <table className="inv-table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Category</th>
-              <th className="num">Quantity</th>
-              <th>Location</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <div className="inv-item">
-                    <span className="thumb">
-                      {categoryIcon(item.categoryPath)}
-                    </span>
-                    <div>
-                      <div className="nm">{item.itemName || `Item #${item.catalogEntryId}`}</div>
-                      <div className="sku">{item.categoryPath || item.categoryName || '—'}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="cell-muted">{item.categoryName || '—'}</td>
-                <td className="cell-num">
-                  {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                </td>
-                <td className="cell-muted">{item.locationName ?? '—'}</td>
-                <td>
-                  <span className="chip-badge neutral"><LockOutlinedIcon /> Private</span>
-                </td>
+        <div className="pcard-scroll">
+          <table className="inv-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th className="num">Qty</th>
+                <th>Location</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <div className="inv-item">
+                      <span className="thumb">
+                        {categoryIcon(item.categoryPath)}
+                      </span>
+                      <div>
+                        <div className="nm">{item.itemName || `Item #${item.catalogEntryId}`}</div>
+                        <div className="sku">{item.categoryName || '—'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="cell-num">
+                    {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                  </td>
+                  <td className="cell-muted">{item.locationName ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Pagination */}

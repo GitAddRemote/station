@@ -109,57 +109,52 @@ const ContractsPortlet = () => {
 
   return (
     <>
-      <table className="inv-table">
-        <thead>
-          <tr>
-            <th>Contract</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th className="num">Reward</th>
-            <th>Deadline</th>
-          </tr>
-        </thead>
-        <tbody>
-          {contracts.map((c) => {
-            const meta = TYPE_META[c.type] ?? TYPE_META.transport;
-            const chipCls = STATUS_CHIP[c.status] ?? 'neutral';
-            const deadline = formatDeadline(c.deadline);
-            return (
-              <tr key={c.id}>
-                <td>
-                  <div className="inv-item">
-                    <div className="nm">{c.title}</div>
-                  </div>
-                </td>
-                <td>
-                  <span className="chip-badge neutral" style={{ gap: 4 }}>
-                    {meta.icon}{meta.label}
-                  </span>
-                </td>
-                <td>
-                  <span className={`chip-badge ${chipCls}`}>
-                    {STATUS_LABEL[c.status]}
-                  </span>
-                </td>
-                <td className="cell-num">{formatAuec(c.rewardAuec)}</td>
-                <td className="cell-muted">
-                  {deadline ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <AccessTimeIcon style={{ width: 13, height: 13 }} />
-                      {deadline}
+      <div className="pcard-scroll">
+        <table className="inv-table">
+          <thead>
+            <tr>
+              <th>Contract</th>
+              <th>Status</th>
+              <th className="num">Reward</th>
+              <th>Deadline</th>
+            </tr>
+          </thead>
+          <tbody>
+            {contracts.map((c) => {
+              const meta = TYPE_META[c.type] ?? TYPE_META.transport;
+              const chipCls = STATUS_CHIP[c.status] ?? 'neutral';
+              const deadline = formatDeadline(c.deadline);
+              return (
+                <tr key={c.id}>
+                  <td>
+                    <div className="inv-item">
+                      <span className="thumb">{meta.icon}</span>
+                      <div className="nm">{c.title}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`chip-badge ${chipCls}`}>
+                      {STATUS_LABEL[c.status]}
                     </span>
-                  ) : '—'}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {total > 5 && (
-        <div className="p-pagination">
-          <span className="p-count">Showing 5 of {total.toLocaleString()} contracts</span>
-        </div>
-      )}
+                  </td>
+                  <td className="cell-num">{formatAuec(c.rewardAuec)}</td>
+                  <td className="cell-muted">
+                    {deadline ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AccessTimeIcon style={{ width: 12, height: 12 }} />
+                        {deadline}
+                      </span>
+                    ) : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="p-pagination">
+        <span className="p-count">{Math.min(5, total)} of {total.toLocaleString()} contracts</span>
+      </div>
     </>
   );
 };

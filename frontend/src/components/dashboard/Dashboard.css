@@ -93,13 +93,16 @@
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
+  height: 420px;
   min-height: 168px;
+  overflow: hidden;
   transition:
     transform var(--dur-base) var(--ease-out),
     border-color var(--dur-base) var(--ease-out),
     box-shadow var(--dur-base) var(--ease-out),
     opacity var(--dur-base) var(--ease-out);
 }
+.pcard.pcard--full { height: 480px; }
 .pcard-head {
   display: flex;
   align-items: center;
@@ -155,8 +158,21 @@
 .pcard-body {
   padding: var(--space-5);
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* scrollable content area inside a portlet body */
+.pcard-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 calc(-1 * var(--space-5));
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
 }
 
 /* ---- edit mode ------------------------------------------- */
@@ -280,10 +296,11 @@
 
 /* ---- inventory portlet overrides (full-bleed table inside pcard-body) --- */
 .pcard .portlet-controls {
-  padding: var(--space-4) var(--space-5) var(--space-3);
+  padding: var(--space-3) var(--space-5);
   display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
   margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
   border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 .pcard .portlet-controls .search {
   flex: 1; min-width: 200px;
@@ -334,8 +351,6 @@
 /* inv-table inside portlet */
 .pcard .inv-table {
   width: 100%; border-collapse: collapse;
-  margin: 0 calc(-1 * var(--space-5));
-  width: calc(100% + 2 * var(--space-5));
 }
 .pcard .inv-table thead th {
   text-align: left;
@@ -345,31 +360,33 @@
   border-block: 1px solid var(--border-subtle); white-space: nowrap;
 }
 .pcard .inv-table thead th.num { text-align: right; }
-.pcard .inv-table tbody td { padding: 13px var(--space-5); border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.pcard .inv-table tbody td { padding: 7px var(--space-5); border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
 .pcard .inv-table tbody tr { transition: background var(--dur-fast) var(--ease-out); }
 .pcard .inv-table tbody tr:hover { background: var(--surface-sunken); }
 .pcard .inv-table tbody tr:last-child td { border-bottom: none; }
 .inv-item { display: flex; align-items: center; gap: var(--space-3); }
 .inv-item .thumb {
-  width: 34px; height: 34px; flex: none; border-radius: 8px;
+  width: 26px; height: 26px; flex: none; border-radius: 6px;
   display: grid; place-items: center;
   background: var(--surface-raised); color: var(--text-faint);
   border: 1px solid var(--border-subtle);
 }
-.inv-item .thumb svg { width: 16px; height: 16px; }
+.inv-item .thumb svg { width: 13px; height: 13px; }
 .inv-item > div { min-width: 0; }
 .inv-item .nm { font-weight: var(--weight-medium); color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .inv-item .sku { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); margin-top: 1px; }
 .cell-muted { color: var(--text-muted); }
 .cell-num { text-align: right; font-family: var(--font-mono); font-weight: var(--weight-semibold); color: var(--text-body); font-variant-numeric: tabular-nums; }
 
-/* portlet pagination */
+/* portlet pagination — always pinned to bottom of pcard-body */
 .pcard .p-pagination {
-  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4);
-  padding: var(--space-3) var(--space-5);
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
   font-size: var(--text-sm); color: var(--text-muted);
   margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
   border-top: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  flex-shrink: 0;
 }
 .pcard .p-pagination .rpp { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); }
 .pcard .p-pagination .rpp select {
