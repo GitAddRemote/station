@@ -2230,7 +2230,7 @@ const InventoryPage = () => {
                         <div role="rowgroup">
                           {groupEntries.map((group) => {
                             const isExpanded = expandedEntries.has(group.catalogEntryId);
-                            const hasSubs = group.subRows.length > 1;
+                            const hasSubs = group.subRows.length >= 1;
                             return (
                               <div key={group.catalogEntryId} className="acc-entry">
                                 {/* Parent row */}
@@ -2252,9 +2252,9 @@ const InventoryPage = () => {
                                     <span className="chip-badge neutral" style={{ marginLeft: 8 }}>Private</span>
                                   </span>
                                   <span className="acc-location">
-                                    {group.subRows.length === 1
-                                      ? (group.subRows[0].locationName ?? <>&mdash;</>)
-                                      : <span className="acc-multi">{group.subRows.length} locations</span>}
+                                    <span className="acc-multi">
+                                      {group.subRows.length} {group.subRows.length === 1 ? 'location' : 'locations'}
+                                    </span>
                                   </span>
                                   <span className="acc-quality">
                                     {group.maxQuality != null ? (
