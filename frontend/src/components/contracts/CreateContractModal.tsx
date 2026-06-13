@@ -65,9 +65,6 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
   const [itemQty, setItemQty] = useState<string>(inventoryItem ? String(inventoryItem.quantity) : '');
   const [details, setDetails] = useState<TypeDetails>(() => defaultDetails(initialType));
 
-  useEffect(() => {
-    setDetails(defaultDetails(type));
-  }, [type]);
 
   useEffect(() => {
     api.get('/users/profile').then((r) => {
@@ -169,7 +166,7 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
 
             <div className="field-row">
               <label className="field-label">Type *</label>
-              <select className="field-input" value={type} onChange={(e) => setType(e.target.value as ContractType)}>
+              <select className="field-input" value={type} onChange={(e) => { const t = e.target.value as ContractType; setType(t); setDetails(defaultDetails(t)); }}>
                 {(Object.keys(TYPE_LABELS) as ContractType[]).map((v) => (
                   <option key={v} value={v}>{TYPE_LABELS[v]}</option>
                 ))}
