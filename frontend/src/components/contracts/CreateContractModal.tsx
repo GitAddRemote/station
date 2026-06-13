@@ -54,8 +54,11 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
       if (!uid) return;
       return api.get<Array<{ organization: Org }>>(`/user-organization-roles/user/${uid}/organizations`)
         .then((r2) => {
+          const seen = new Set<string>();
           const list = Array.isArray(r2.data)
-            ? r2.data.map((row) => row.organization).filter(Boolean)
+            ? r2.data
+                .map((row) => row.organization)
+                .filter((o) => o && !seen.has(o.id) && seen.add(o.id))
             : [];
           setOrgs(list);
           if (list.length > 0) setOrgId(list[0].id);

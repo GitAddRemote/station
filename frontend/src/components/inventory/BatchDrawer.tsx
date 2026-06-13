@@ -145,11 +145,8 @@ export default function BatchDrawer({ open, mode, onClose, onMutated, onSelectBa
 
   const extractConflict = (err: unknown): BatchLocationConflictItem[] | null => {
     const data = (err as { response?: { data?: unknown } })?.response?.data;
-    if (!data || typeof data !== 'object') return null;
-    // NestJS wraps ConflictException payload in { message: <payload> }
-    const payload = 'message' in data ? (data as { message: unknown }).message : data;
-    if (payload && typeof payload === 'object' && 'conflictingItems' in payload) {
-      return (payload as { conflictingItems: BatchLocationConflictItem[] }).conflictingItems;
+    if (data && typeof data === 'object' && 'conflictingItems' in data) {
+      return (data as { conflictingItems: BatchLocationConflictItem[] }).conflictingItems;
     }
     return null;
   };
