@@ -50,6 +50,7 @@ const DEMO_PASSWORD = 'password123';
 interface SeedUser {
   username: string;
   email: string;
+  isSuperAdmin?: boolean;
 }
 
 interface SeedAssignment {
@@ -65,7 +66,7 @@ const SEED_ORGS = [
 
 const SEED_USERS: SeedUser[] = [
   { username: 'demo', email: 'demo@example.com' },
-  { username: 'admin', email: 'admin@demo.station' },
+  { username: 'admin', email: 'admin@demo.station', isSuperAdmin: true },
   { username: 'demo.member1', email: 'demo.member1@example.com' },
   { username: 'demo.member2', email: 'demo.member2@example.com' },
   { username: 'ddi.admin', email: 'ddi.admin@example.com' },
@@ -322,6 +323,7 @@ export class DatabaseSeederService {
           email: userData.email,
           password: hashedPassword,
           isActive: true,
+          isSuperAdmin: userData.isSuperAdmin ?? false,
         });
         await this.usersRepository.save(user);
         this.logger.info(`  ✓ Created user: ${userData.username}`);
