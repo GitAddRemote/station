@@ -26,6 +26,7 @@ import { api } from '../../services/api.service';
 
 export type BatchDrawerMode =
   | { kind: 'create' }
+  | { kind: 'list' }
   | { kind: 'add-to-batch'; item: InventoryItem }
   | { kind: 'detail'; batchId: string };
 
@@ -91,7 +92,7 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
     if (!open) { reset(); return; }
     if (!mode) return;
 
-    if (mode.kind === 'add-to-batch') {
+    if (mode.kind === 'list' || mode.kind === 'add-to-batch') {
       setBatchesLoading(true);
       setBatchesError(null);
       batchService.list().then((r) => {
@@ -226,6 +227,7 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
 
   const title =
     mode?.kind === 'create' ? 'New batch'
+    : mode?.kind === 'list' ? 'My batches'
     : mode?.kind === 'add-to-batch' ? 'Add to batch'
     : detail?.name ?? 'Batch';
 
@@ -315,6 +317,48 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
             >
               Create batch
             </Button>
+          </Stack>
+        </Box>
+      )}
+
+      {/* Batch list */}
+      {!conflict && mode?.kind === 'list' && (
+        <Box sx={{ flex: 1, overflowY: 'auto', p: 3 }}>
+          <Stack spacing={1.5}>
+            {batchesError && <Alert severity="error">{batchesError}</Alert>}
+            {batchesLoading && <CircularProgress size={24} sx={{ mx: 'auto' }} />}
+            {!batchesLoading && batches.length === 0 && (
+              <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
+                No batches yet. Use the menu on any inventory item to create one.
+              </Typography>
+            )}
+            {batches.map((batch) => (
+              <Box
+                key={batch.id}
+                onClick={() => {
+                  // navigate to detail — reuse parent openBatchDrawer by closing and re-opening
+                  onClose();
+                  setTimeout(() => onMutated(), 0); // signal parent to open detail
+                }}
+                sx={{
+                  p: 2, borderRadius: 1, border: '1px solid var(--border-default)',
+                  bgcolor: 'var(--surface-overlay)', cursor: 'pointer',
+                  '&:hover': { borderColor: 'var(--brand)', bgcolor: 'var(--surface-raised)' },
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <LayersIcon sx={{ color: 'var(--brand)', fontSize: 20, flexShrink: 0 }} />
+                  <Box flex={1} minWidth={0}>
+                    <Typography variant="body2" fontWeight={600} color="var(--text-strong)" noWrap>
+                      {batch.name}
+                    </Typography>
+                    <Typography variant="caption" color="var(--text-faint)">
+                      {batch.locationName ?? 'Unknown location'} · {batch.itemCount} item{batch.itemCount !== 1 ? 's' : ''}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            ))}
           </Stack>
         </Box>
       )}

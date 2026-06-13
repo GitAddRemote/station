@@ -2020,6 +2020,15 @@ const InventoryPage = () => {
             <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
           </span>
           <span className="inv-spacer" />
+          {viewMode === 'personal' && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => openBatchDrawer({ kind: 'list' })}
+              title="View my batches"
+            >
+              <LayersIcon style={{ width: 15, height: 15 }} /> Batches
+            </button>
+          )}
           {(viewMode === 'personal' || canManageOrgInventory) && (
             <div className="density-toggle" role="group" aria-label="Density">
               <button
