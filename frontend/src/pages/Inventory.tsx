@@ -559,6 +559,7 @@ const InventoryPage = () => {
       ).filter((org): org is { id: string; name: string } => org !== null);
       setOrgOptions(viewableOrgs);
       orgsLoaded.current = true;
+      setSelectedOrgId((prev) => prev ?? viewableOrgs[0]?.id ?? null);
     } catch (err) {
       console.error('Error loading organizations', err);
     }
