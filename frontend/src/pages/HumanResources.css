@@ -1,0 +1,260 @@
+/* ============================================================
+   Human Resources dashboard
+   ============================================================ */
+
+.hr-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* ---- Page header ---- */
+.hr-header {
+  margin-bottom: var(--space-6);
+}
+.hr-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+.hr-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-1);
+}
+.hr-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ---- Widget grid ---- */
+.hr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: var(--space-4);
+}
+
+/* ---- Widget card ---- */
+.hr-widget {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ---- Widget header ---- */
+.hr-widget-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.hr-widget-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.hr-widget-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.hr-widget-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.hr-view-all {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  transition: background 120ms;
+}
+.hr-view-all:hover { background: var(--surface-sunken); }
+
+/* ---- Loading / empty ---- */
+.hr-loading,
+.hr-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: var(--space-3) 0;
+  text-align: center;
+}
+
+/* ---- Member list ---- */
+.hr-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hr-member-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 120ms;
+}
+.hr-member-row:hover { background: var(--surface-sunken); }
+
+.hr-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.hr-member-info {
+  flex: 1;
+  min-width: 0;
+}
+.hr-member-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hr-member-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 1px;
+}
+.hr-role-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+.hr-discord-dot {
+  display: flex;
+  align-items: center;
+  color: #5865f2;
+  opacity: 0.8;
+}
+.hr-member-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.hr-more {
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: background 120ms;
+}
+.hr-more:hover { background: var(--surface-sunken); }
+
+/* ---- Kind pills ---- */
+.hr-kind-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.hr-kind-pill {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 100px;
+  padding: 2px 10px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+/* Kind colour accents */
+.hr-kind-division   { border-color: #7c6fcd; color: #7c6fcd; }
+.hr-kind-department { border-color: #3b82f6; color: #3b82f6; }
+.hr-kind-team       { border-color: #10b981; color: #10b981; }
+.hr-kind-squad      { border-color: #f59e0b; color: #f59e0b; }
+.hr-kind-wing       { border-color: #ef4444; color: #ef4444; }
+.hr-kind-custom     { border-color: var(--border); color: var(--text-muted); }
+
+/* ---- Mini tree ---- */
+.hr-tree-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  padding: var(--space-1);
+  transition: background 120ms;
+}
+.hr-tree-preview:hover { background: var(--surface-sunken); }
+
+.hr-tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px 0;
+}
+.hr-tree-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--border);
+}
+.hr-tree-dot-division   { background: #7c6fcd; }
+.hr-tree-dot-department { background: #3b82f6; }
+.hr-tree-dot-team       { background: #10b981; }
+.hr-tree-dot-squad      { background: #f59e0b; }
+.hr-tree-dot-wing       { background: #ef4444; }
+.hr-tree-dot-custom     { background: var(--text-muted); }
+
+.hr-tree-name {
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.hr-tree-kind {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: capitalize;
+  flex-shrink: 0;
+}

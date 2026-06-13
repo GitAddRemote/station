@@ -275,7 +275,7 @@ export default function Members() {
   const sel = members.find((m) => m.userId === selId) ?? null;
 
   return (
-    <AppShell active="members" searchPlaceholder="Search members…">
+    <AppShell active="hr" searchPlaceholder="Search members…">
       <div className="mem-layout">
         {/* Main panel */}
         <div className={'mem-main' + (drawerOpen ? ' drawer-open' : '')}>

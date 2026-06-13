@@ -14,6 +14,7 @@ import OrgInventory from './pages/OrgInventory';
 import Contracts from './pages/Contracts';
 import WorkOrders from './pages/WorkOrders';
 import Fleet from './pages/Fleet';
+import HumanResources from './pages/HumanResources';
 import Members from './pages/Members';
 import BusinessUnits from './pages/BusinessUnits';
 import Treasury from './pages/Treasury';
@@ -39,8 +40,9 @@ const AppRoutes = () => (
         <Route path="/contracts" element={<Contracts />} />
         <Route path="/work-orders" element={<WorkOrders />} />
         <Route path="/fleet" element={<Fleet />} />
-        <Route path="/members" element={<Members />} />
-        <Route path="/members/business-units" element={<BusinessUnits />} />
+        <Route path="/hr" element={<HumanResources />} />
+        <Route path="/hr/members" element={<Members />} />
+        <Route path="/hr/business-units" element={<BusinessUnits />} />
         <Route path="/treasury" element={<Treasury />} />
         <Route path="/refinery" element={<Refinery />} />
       </Route>

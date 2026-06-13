@@ -14,7 +14,6 @@ import {
   Article as ContractsIcon,
   RocketLaunch as FleetIcon,
   Group as MembersIcon,
-  AccountTree as BusinessUnitsIcon,
   Inventory2 as InventoryIcon,
   AccountBalance as TreasuryIcon,
   PrecisionManufacturing as RefineryIcon,
@@ -49,11 +48,10 @@ const NAV_HOME: NavItem[] = [
 ];
 
 const NAV_PRIMARY: NavItem[] = [
-  { id: 'contracts',       label: 'Contracts',       icon: <ContractsIcon />,     href: '/contracts',               key: 'c' },
-  { id: 'members',         label: 'Members',          icon: <MembersIcon />,       href: '/members',                 key: 'm' },
-  { id: 'business-units',  label: 'Business Units',   icon: <BusinessUnitsIcon />, href: '/members/business-units',  sub: true },
-  { id: 'refinery',        label: 'Refinery',         icon: <RefineryIcon />,      href: '/refinery' },
-  { id: 'workorders',      label: 'Work Orders',      icon: <PickaxeIcon />,       href: '/work-orders',             key: 'w' },
+  { id: 'contracts',  label: 'Contracts',        icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
+  { id: 'hr',         label: 'Human Resources',  icon: <MembersIcon />,   href: '/hr',         key: 'm' },
+  { id: 'refinery',   label: 'Refinery',         icon: <RefineryIcon />,  href: '/refinery' },
+  { id: 'workorders', label: 'Work Orders',      icon: <PickaxeIcon />,   href: '/work-orders', key: 'w' },
 ];
 
 const NAV_ASSETS: NavItem[] = [
@@ -197,7 +195,7 @@ function KeyHelp({ open, onClose, extra = [] }: KeyHelpProps) {
       ['Command palette', ['⌘', 'K']], ['Search', ['/']], ['This help', ['?']], ['Close / back', ['Esc']],
     ] as Array<[string, string[]]> },
     { cap: 'Go to', rows: [
-      ['Dashboard', ['g', 'd']], ['Work Orders', ['g', 'w']], ['Contracts', ['g', 'c']], ['Fleet', ['g', 'f']], ['Members', ['g', 'm']],
+      ['Dashboard', ['g', 'd']], ['Work Orders', ['g', 'w']], ['Contracts', ['g', 'c']], ['Fleet', ['g', 'f']], ['Human Resources', ['g', 'm']],
     ] as Array<[string, string[]]> },
     { cap: 'Lists & tables', rows: [
       ['Move selection', ['↑', '↓']], ['Vim move', ['j', 'k']], ['First / last', ['Home', 'End']], ['Open row', ['↵']],

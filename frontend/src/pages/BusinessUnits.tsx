@@ -338,7 +338,7 @@ export default function BusinessUnits() {
   })();
 
   return (
-    <AppShell active="members" searchPlaceholder="Search members, units…">
+    <AppShell active="hr" searchPlaceholder="Search members, units…">
       <div className="bu-page">
         <div className="bu-header">
           <div className="bu-header-copy">
