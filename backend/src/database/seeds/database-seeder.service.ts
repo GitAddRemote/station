@@ -383,153 +383,308 @@ export class DatabaseSeederService {
   private async seedBusinessUnits(): Promise<void> {
     this.logger.info('Seeding business units...');
 
-    // Default hierarchy seeded for every org:
-    //   Division → Department → Team
-    // Names are space/science themed so orgs can rename or extend them.
-    const HIERARCHY: Array<{
-      division: { name: string; description: string };
-      departments: Array<{
-        name: string;
-        description: string;
-        teams: Array<{ name: string; description: string }>;
-      }>;
-    }> = [
+    // Each entry describes a full sub-tree. Re-running is safe — units are
+    // matched by (organizationId, name) so duplicates are never created and
+    // units added by users are left untouched.
+    type UnitSpec = {
+      name: string;
+      kind: 'division' | 'department' | 'team' | 'squad' | 'wing' | 'custom';
+      description: string;
+      children?: UnitSpec[];
+    };
+
+    const HIERARCHY: UnitSpec[] = [
       {
-        division: {
-          name: 'Exploration Division',
-          description:
-            'Deep-space survey, cartography, and first-contact operations.',
-        },
-        departments: [
+        name: 'Exploration Division',
+        kind: 'division',
+        description:
+          'Deep-space survey, cartography, and first-contact operations.',
+        children: [
           {
             name: 'Stellar Cartography',
+            kind: 'department',
             description: 'Mapping star systems, jump points, and anomalies.',
-            teams: [
+            children: [
               {
                 name: 'Void Scouts',
+                kind: 'team',
                 description: 'Forward recon into unmapped systems.',
               },
               {
                 name: 'Jump Point Survey',
+                kind: 'team',
                 description: 'Jump point stability analysis and cataloguing.',
               },
             ],
           },
           {
             name: 'Xenobiology',
+            kind: 'department',
             description:
               'Flora, fauna, and atmospheric research on alien worlds.',
-            teams: [
+            children: [
               {
                 name: 'Surface Analysis',
+                kind: 'team',
                 description: 'Ground-team sample collection and bio-scans.',
+              },
+              {
+                name: 'Orbital Sciences',
+                kind: 'team',
+                description: 'Remote-sensor atmospheric and orbital surveys.',
               },
             ],
           },
         ],
       },
       {
-        division: {
-          name: 'Combat Division',
-          description: 'Security, escort, patrol, and offensive operations.',
-        },
-        departments: [
+        name: 'Combat Division',
+        kind: 'division',
+        description: 'Security, escort, patrol, and offensive operations.',
+        children: [
           {
-            name: 'Interceptor Wing',
+            name: 'Fighter Corps',
+            kind: 'department',
             description:
-              'Fast-response fighter coverage and hostile interception.',
-            teams: [
+              'All fighter and interceptor assets under unified command.',
+            children: [
               {
-                name: 'Alpha Squadron',
-                description: 'Primary strike and intercept.',
+                name: 'Raptor Wing',
+                kind: 'wing',
+                description:
+                  'Fast-attack wing specialising in hostile interception and suppression.',
+                children: [
+                  {
+                    name: 'Alpha Squadron',
+                    kind: 'squad',
+                    description: 'Primary strike and intercept.',
+                  },
+                  {
+                    name: 'Vanguard Squadron',
+                    kind: 'squad',
+                    description: 'Escort and close-air support.',
+                  },
+                ],
               },
               {
-                name: 'Vanguard Squadron',
-                description: 'Escort and close air support.',
+                name: 'Phantom Wing',
+                kind: 'wing',
+                description:
+                  'Stealth ops, electronic warfare, and reconnaissance runs.',
+                children: [
+                  {
+                    name: 'Ghost Squadron',
+                    kind: 'squad',
+                    description: 'Stealth recon and shadow escort.',
+                  },
+                ],
               },
             ],
           },
           {
             name: 'Ground Forces',
-            description: 'EVA boarding operations and base defense.',
-            teams: [
+            kind: 'department',
+            description: 'EVA boarding operations and base defence.',
+            children: [
               {
                 name: 'Breach Team',
+                kind: 'team',
                 description: 'Hostile ship boarding and extraction.',
               },
               {
                 name: 'Shield Wall',
+                kind: 'team',
                 description: 'Defensive perimeter and fortification.',
+              },
+              {
+                name: 'Pathfinders',
+                kind: 'squad',
+                description: 'Light infantry and advance scouting.',
+              },
+            ],
+          },
+          {
+            name: 'Capital Operations',
+            kind: 'department',
+            description:
+              'Capital ship crews, fleet coordination, and large-scale engagements.',
+            children: [
+              {
+                name: 'Bridge Crew',
+                kind: 'team',
+                description: 'Command and navigation staff.',
+              },
+              {
+                name: 'Turret Battery',
+                kind: 'team',
+                description: 'Fixed and turreted weapons systems.',
               },
             ],
           },
         ],
       },
       {
-        division: {
-          name: 'Commerce Division',
-          description: 'Trade, hauling, arbitrage, and market intelligence.',
-        },
-        departments: [
+        name: 'Commerce Division',
+        kind: 'division',
+        description: 'Trade, hauling, arbitrage, and market intelligence.',
+        children: [
           {
             name: 'Logistics',
+            kind: 'department',
             description: 'Cargo routing, fleet coordination, and supply chain.',
-            teams: [
+            children: [
               {
                 name: 'Hauler Fleet',
+                kind: 'team',
                 description: 'Bulk commodity transport runs.',
               },
               {
                 name: 'Route Optimization',
+                kind: 'team',
                 description: 'Trade lane analysis and scheduling.',
+              },
+              {
+                name: 'Quartermaster Corps',
+                kind: 'squad',
+                description: 'On-site inventory and requisitions.',
               },
             ],
           },
           {
             name: 'Market Intelligence',
+            kind: 'department',
             description:
               'Price tracking, arbitrage identification, and commodity forecasting.',
-            teams: [
+            children: [
               {
                 name: 'Data Brokers',
+                kind: 'team',
                 description: 'Real-time market data collection and analysis.',
+              },
+              {
+                name: 'Arbitrage Desk',
+                kind: 'squad',
+                description:
+                  'Cross-system price spread identification and execution.',
+              },
+            ],
+          },
+          {
+            name: 'Diplomatic Corps',
+            kind: 'department',
+            description:
+              'Inter-org relations, alliance negotiations, and trade treaty management.',
+            children: [
+              {
+                name: 'Alliance Envoys',
+                kind: 'team',
+                description: 'Liaison officers and treaty negotiators.',
               },
             ],
           },
         ],
       },
       {
-        division: {
-          name: 'Industrial Division',
-          description:
-            'Mining, refining, salvage, and manufacturing operations.',
-        },
-        departments: [
+        name: 'Industrial Division',
+        kind: 'division',
+        description: 'Mining, refining, salvage, and manufacturing operations.',
+        children: [
           {
             name: 'Extraction',
+            kind: 'department',
             description: 'Asteroid and planetary mining operations.',
-            teams: [
+            children: [
               {
                 name: 'Rock Breakers',
+                kind: 'team',
                 description: 'Heavy ship-mining operations.',
               },
               {
                 name: 'Hand Mining Corps',
+                kind: 'team',
                 description: 'Cave and surface hand-mining runs.',
+              },
+              {
+                name: 'Deep Core Squad',
+                kind: 'squad',
+                description: 'High-yield core-fracture specialist team.',
+              },
+            ],
+          },
+          {
+            name: 'Refinery & Processing',
+            kind: 'department',
+            description:
+              'Raw material refining, alloy production, and quantum fuel processing.',
+            children: [
+              {
+                name: 'Refinery Crew',
+                kind: 'team',
+                description: 'Station and ship-based ore processing.',
+              },
+              {
+                name: 'Quality Control',
+                kind: 'squad',
+                description: 'Yield auditing and impurity monitoring.',
               },
             ],
           },
           {
             name: 'Salvage & Reclamation',
+            kind: 'department',
             description: 'Wreck salvage, scrapping, and materials recovery.',
-            teams: [
+            children: [
               {
                 name: 'Wreck Raiders',
+                kind: 'team',
                 description: 'Deep-space derelict salvage.',
               },
               {
                 name: 'Tow & Reclaim',
+                kind: 'team',
                 description: 'Ship towing and on-site recycling.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Command & Administration',
+        kind: 'division',
+        description: 'Org leadership, HR, finance, and internal governance.',
+        children: [
+          {
+            name: 'Leadership Council',
+            kind: 'department',
+            description: 'Executive decision-making and strategic direction.',
+            children: [
+              {
+                name: 'High Command',
+                kind: 'team',
+                description: 'Senior officers and org leaders.',
+              },
+              {
+                name: 'Strategy Cell',
+                kind: 'squad',
+                description: 'Planning, objectives, and after-action review.',
+              },
+            ],
+          },
+          {
+            name: 'Internal Affairs',
+            kind: 'department',
+            description: 'Recruitment, discipline, and member relations.',
+            children: [
+              {
+                name: 'Recruitment',
+                kind: 'team',
+                description: 'New member outreach and onboarding.',
+              },
+              {
+                name: 'Conduct Board',
+                kind: 'squad',
+                description:
+                  'Discipline, dispute resolution, and code of conduct.',
               },
             ],
           },
@@ -537,57 +692,45 @@ export class DatabaseSeederService {
       },
     ];
 
+    // Upsert helper — finds by (orgId, name) or creates new.
+    const upsertUnit = async (
+      orgId: string,
+      spec: UnitSpec,
+      parentId: string | null,
+      sortOrder: number,
+    ): Promise<string> => {
+      let unit = await this.businessUnitsRepository.findOne({
+        where: { organizationId: orgId, name: spec.name },
+      });
+
+      if (!unit) {
+        unit = this.businessUnitsRepository.create({
+          organizationId: orgId,
+          name: spec.name,
+          kind: spec.kind,
+          description: spec.description,
+          parentId,
+          sortOrder,
+        });
+        await this.businessUnitsRepository.save(unit);
+        this.logger.info(`    + ${spec.kind}: ${spec.name}`);
+      }
+
+      for (let i = 0; i < (spec.children ?? []).length; i++) {
+        await upsertUnit(orgId, spec.children![i], unit.id, i);
+      }
+
+      return unit.id;
+    };
+
     const orgs = await this.organizationsRepository.find();
 
     for (const org of orgs) {
-      const existingCount = await this.businessUnitsRepository.count({
-        where: { organizationId: org.id },
-      });
-
-      if (existingCount > 0) {
-        this.logger.info(
-          `  ⊙ Business units already exist for org: ${org.name}`,
-        );
-        continue;
+      this.logger.info(`  Seeding business units for org: ${org.name}`);
+      for (let i = 0; i < HIERARCHY.length; i++) {
+        await upsertUnit(org.id, HIERARCHY[i], null, i);
       }
-
-      for (const { division, departments } of HIERARCHY) {
-        const divUnit = this.businessUnitsRepository.create({
-          organizationId: org.id,
-          name: division.name,
-          kind: 'division',
-          description: division.description,
-          parentId: null,
-          sortOrder: HIERARCHY.indexOf({ division, departments }),
-        });
-        await this.businessUnitsRepository.save(divUnit);
-
-        for (const dept of departments) {
-          const deptUnit = this.businessUnitsRepository.create({
-            organizationId: org.id,
-            name: dept.name,
-            kind: 'department',
-            description: dept.description,
-            parentId: divUnit.id,
-            sortOrder: departments.indexOf(dept),
-          });
-          await this.businessUnitsRepository.save(deptUnit);
-
-          for (const team of dept.teams) {
-            const teamUnit = this.businessUnitsRepository.create({
-              organizationId: org.id,
-              name: team.name,
-              kind: 'team',
-              description: team.description,
-              parentId: deptUnit.id,
-              sortOrder: dept.teams.indexOf(team),
-            });
-            await this.businessUnitsRepository.save(teamUnit);
-          }
-        }
-      }
-
-      this.logger.info(`  ✓ Seeded business units for org: ${org.name}`);
+      this.logger.info(`  ✓ Done: ${org.name}`);
     }
   }
 }
