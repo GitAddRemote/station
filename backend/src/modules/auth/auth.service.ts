@@ -30,7 +30,12 @@ import { OauthClient } from '../oauth-clients/oauth-client.entity';
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
 
-export const DISCORD_NONCE_COOKIE = '__Host-oauth_state';
+// __Host- prefix requires Secure + HTTPS; only safe in production.
+// In local dev (HTTP) browsers silently drop __Host- cookies, breaking OAuth.
+export const DISCORD_NONCE_COOKIE =
+  process.env['NODE_ENV'] === 'production'
+    ? '__Host-oauth_state'
+    : 'oauth_state';
 export const DISCORD_STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 /** Minimal interface for the operations AuthService needs on the raw client. */
