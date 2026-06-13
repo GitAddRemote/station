@@ -112,8 +112,8 @@ export default function BatchDrawer({ open, mode, onClose, onMutated, onSelectBa
       setDetailError(null);
       Promise.all([
         api.get<BatchDto>(`/api/inventory/batches/${mode.batchId}`).then((r) => r.data),
-        api.get<{ data: InventoryItem[] }>('/api/inventory/items', {
-          params: { batchId: mode.batchId, limit: 200 },
+        api.get<{ data: InventoryItem[] }>('/api/inventory', {
+          params: { batchId: mode.batchId, limit: 100 },
         }).then((r) => r.data.data).catch(() => [] as InventoryItem[]),
       ]).then(([b, items]) => {
         setDetail(b);

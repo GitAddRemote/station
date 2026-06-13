@@ -524,6 +524,12 @@ export class InventoryService {
         maxQuality: query.maxQuality,
       });
     }
+
+    if (query.batchId !== undefined) {
+      queryBuilder.andWhere('item.batch_id = :batchId', {
+        batchId: query.batchId,
+      });
+    }
   }
 
   private async getInventoryItemOrThrow(

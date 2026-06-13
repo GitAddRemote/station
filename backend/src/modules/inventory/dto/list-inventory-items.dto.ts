@@ -41,6 +41,11 @@ export class ListInventoryItemsDto {
   @IsUUID()
   orgId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  batchId?: string;
+
   @ApiPropertyOptional({ enum: ['item', 'commodity', 'vehicle'] })
   @IsOptional()
   @IsIn(['item', 'commodity', 'vehicle'])
