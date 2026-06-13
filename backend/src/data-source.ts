@@ -57,6 +57,8 @@ import { MigrateRemainingEntitiesToUuidV7_1780130000000 } from './migrations/178
 import { AddManageInventoryPermissionToManagementRoles_1780140000000 } from './migrations/1780140000000-AddManageInventoryPermissionToManagementRoles';
 import { AddIsSuperAdminToUser1780150000000 } from './migrations/1780150000000-AddIsSuperAdminToUser';
 import { AddOrgGuildMappingAndStationBotPermissions1780160000000 } from './migrations/1780160000000-AddOrgGuildMappingAndStationBotPermissions';
+import { RemoveOrgInventorySharing1780170000000 } from './migrations/1780170000000-RemoveOrgInventorySharing';
+import { AddContractsTables1780170000000 } from './migrations/1780170000000-AddContractsTables';
 import { AddInventoryBatches1780180000000 } from './migrations/1780180000000-AddInventoryBatches';
 import { AddUuidDefaultsToMissingPkColumns1780190000000 } from './migrations/1780190000000-AddUuidDefaultsToMissingPkColumns';
 import { OrgGuildMapping } from './modules/station-bot-admin/entities/org-guild-mapping.entity';
@@ -129,6 +131,8 @@ export const AppDataSource = new DataSource({
     AddManageInventoryPermissionToManagementRoles_1780140000000,
     AddIsSuperAdminToUser1780150000000,
     AddOrgGuildMappingAndStationBotPermissions1780160000000,
+    RemoveOrgInventorySharing1780170000000,
+    AddContractsTables1780170000000,
     AddInventoryBatches1780180000000,
     AddUuidDefaultsToMissingPkColumns1780190000000,
   ],
