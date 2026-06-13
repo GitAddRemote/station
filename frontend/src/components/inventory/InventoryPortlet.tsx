@@ -76,7 +76,7 @@ const InventoryPortlet = () => {
     setLoading(true);
     try {
       const result = await inventoryService.getInventory({
-        limit: 200,
+        limit: 500,
         page: 1,
         search: debouncedSearch || undefined,
         categoryId: categoryId || undefined,
