@@ -352,6 +352,10 @@ export class ContractsService {
       throw new BadRequestException('Only open contracts can be claimed');
     }
 
+    if (contract.creatorId === userId) {
+      throw new BadRequestException('You cannot claim a contract you created');
+    }
+
     await this.dataSource.transaction(async (manager) => {
       contract.status = ContractStatus.CLAIMED;
       await manager.save(Contract, contract);

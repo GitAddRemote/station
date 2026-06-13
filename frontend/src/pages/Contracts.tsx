@@ -181,13 +181,15 @@ function TypeDetailsSection({ details }: { details: Record<string, unknown> | nu
   );
 }
 
-function ContractDetail({ contract, onAction, onClose }: { contract: Contract; onAction: (action: string) => void; onClose: () => void }) {
+function ContractDetail({ contract, onAction, onClose, currentUserId }: { contract: Contract; onAction: (action: string) => void; onClose: () => void; currentUserId: string | null }) {
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const ty = TYPE_META[contract.type] ?? TYPE_META.transport;
   const st = STATUS_META[contract.status] ?? STATUS_META.draft;
   const risk = contract.risk ? RISK_META[contract.risk] : null;
   const deadline = fmtDeadline(contract.deadline);
   const milestones = [...(contract.milestones ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
   const isTerminal = contract.status === 'completed' || contract.status === 'cancelled';
+  const isOwnContract = currentUserId !== null && contract.creatorId === currentUserId;
 
   return (
     <div className="panel con-detail">
@@ -261,40 +263,52 @@ function ContractDetail({ contract, onAction, onClose }: { contract: Contract; o
       )}
 
       <div className="panel-body con-actions">
-        {contract.status === 'draft' && (
-          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('publish')}>
-            Publish
-          </button>
-        )}
-        {contract.status === 'open' && (
-          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('claim')}>
-            Claim contract
-          </button>
-        )}
-        {contract.status === 'claimed' && (
-          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('start')}>
-            Start contract
-          </button>
-        )}
-        {contract.status === 'active' && (
-          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('complete')}>
-            Mark complete
-          </button>
-        )}
-        {(contract.status === 'active' || contract.status === 'completed') && (
-          <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => onAction('dispute')}>
-            Dispute
-          </button>
-        )}
-        {contract.status === 'disputed' && (
-          <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
-            Resolve dispute
-          </button>
-        )}
-        {!isTerminal && (
-          <button className="btn btn-ghost btn-sm" onClick={() => onAction('cancel')} aria-label="Cancel contract">
-            Cancel
-          </button>
+        {confirmingCancel ? (
+          <div className="con-cancel-confirm">
+            <span className="con-cancel-msg">Cancel this contract? This cannot be undone.</span>
+            <div className="con-cancel-btns">
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmingCancel(false)}>Keep it</button>
+              <button className="btn btn-danger btn-sm" onClick={() => { setConfirmingCancel(false); onAction('cancel'); }}>Yes, cancel</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {contract.status === 'draft' && (
+              <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('publish')}>
+                Publish
+              </button>
+            )}
+            {contract.status === 'open' && !isOwnContract && (
+              <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('claim')}>
+                Claim contract
+              </button>
+            )}
+            {contract.status === 'claimed' && (
+              <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('start')}>
+                Start contract
+              </button>
+            )}
+            {contract.status === 'active' && (
+              <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('complete')}>
+                Mark complete
+              </button>
+            )}
+            {(contract.status === 'active' || contract.status === 'completed') && (
+              <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => onAction('dispute')}>
+                Dispute
+              </button>
+            )}
+            {contract.status === 'disputed' && (
+              <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
+                Resolve dispute
+              </button>
+            )}
+            {!isTerminal && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmingCancel(true)} aria-label="Cancel contract">
+                Cancel
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -308,10 +322,17 @@ const Contracts = () => {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('open');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(searchParams.get('contract'));
   const [drawerOpen, setDrawerOpen] = useState(!!searchParams.get('contract'));
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [showCreate, setShowCreate] = useState(false);
+
+  useEffect(() => {
+    api.get('/users/profile').then((res) => {
+      setCurrentUserId(res.data.userId ?? res.data.id ?? null);
+    }).catch(() => {});
+  }, []);
 
   const fetchContracts = useCallback(async () => {
     setLoading(true);
@@ -541,7 +562,7 @@ const Contracts = () => {
 
           {/* slide-in detail drawer */}
           <div className={`con-drawer${drawerOpen ? ' open' : ''}`} aria-hidden={!drawerOpen}>
-            {sel && <ContractDetail contract={sel} onAction={handleAction} onClose={() => setDrawerOpen(false)} />}
+            {sel && <ContractDetail contract={sel} onAction={handleAction} onClose={() => setDrawerOpen(false)} currentUserId={currentUserId} />}
           </div>
           {drawerOpen && <div className="con-drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
         </div>

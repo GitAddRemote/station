@@ -133,7 +133,32 @@
 .mile.completed .ml { color: var(--text-muted); text-decoration: line-through; }
 .mile .mt { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); }
 
-.con-actions { display: flex; gap: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.con-actions { display: flex; gap: var(--space-3); border-top: 1px solid var(--border-subtle); min-height: 56px; align-items: center; }
+
+/* ---- cancel confirmation -------------------------------- */
+.con-cancel-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+.con-cancel-msg {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.con-cancel-btns {
+  display: flex;
+  gap: var(--space-2);
+}
+.btn-danger {
+  background: var(--coral-400);
+  color: #fff;
+  border-color: var(--coral-400);
+}
+.btn-danger:hover {
+  background: var(--coral-300);
+  border-color: var(--coral-300);
+}
 
 /* ---- toolbar -------------------------------------------- */
 .con-toolbar {
