@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SecurityIcon from '@mui/icons-material/Security';
 import DiamondIcon from '@mui/icons-material/Diamond';
@@ -75,6 +76,7 @@ function formatAuec(val: string | null): string {
 }
 
 const ContractsPortlet = () => {
+  const navigate = useNavigate();
   const [contracts, setContracts] = useState<ContractRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -125,7 +127,11 @@ const ContractsPortlet = () => {
               const chipCls = STATUS_CHIP[c.status] ?? 'neutral';
               const deadline = formatDeadline(c.deadline);
               return (
-                <tr key={c.id}>
+                <tr
+                  key={c.id}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => navigate(`/contracts?contract=${c.id}`)}
+                >
                   <td>
                     <div className="inv-item">
                       <span className="thumb">{meta.icon}</span>

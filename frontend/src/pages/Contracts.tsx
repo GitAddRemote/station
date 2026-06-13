@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CreateContractModal from '../components/contracts/CreateContractModal';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SecurityIcon from '@mui/icons-material/Security';
@@ -295,12 +296,13 @@ function ContractDetail({ contract, onAction }: { contract: Contract; onAction: 
 }
 
 const Contracts = () => {
+  const [searchParams] = useSearchParams();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selId, setSelId] = useState<string | null>(null);
+  const [selId, setSelId] = useState<string | null>(searchParams.get('contract'));
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [showCreate, setShowCreate] = useState(false);
 
@@ -327,11 +329,14 @@ const Contracts = () => {
   );
 
   useEffect(() => {
-    if (!selId && visible.length > 0) setSelId(visible[0].id);
-    if (selId && visible.length > 0 && !visible.find((c) => c.id === selId)) {
+    if (!selId && visible.length > 0) {
       setSelId(visible[0].id);
+      return;
     }
-  }, [visible, selId]);
+    if (selId && !loading && contracts.length > 0 && !contracts.find((c) => c.id === selId)) {
+      setSelId(visible[0]?.id ?? null);
+    }
+  }, [visible, selId, loading, contracts]);
 
   const sel = visible.find((c) => c.id === selId) ?? null;
 
