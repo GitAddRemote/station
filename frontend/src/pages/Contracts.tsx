@@ -15,6 +15,7 @@ import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import BusinessIcon from '@mui/icons-material/Business';
 import PlusIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import ScrollTextIcon from '@mui/icons-material/Article';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CoinsIcon from '@mui/icons-material/MonetizationOn';
@@ -180,7 +181,7 @@ function TypeDetailsSection({ details }: { details: Record<string, unknown> | nu
   );
 }
 
-function ContractDetail({ contract, onAction }: { contract: Contract; onAction: (action: string) => void }) {
+function ContractDetail({ contract, onAction, onClose }: { contract: Contract; onAction: (action: string) => void; onClose: () => void }) {
   const ty = TYPE_META[contract.type] ?? TYPE_META.transport;
   const st = STATUS_META[contract.status] ?? STATUS_META.draft;
   const risk = contract.risk ? RISK_META[contract.risk] : null;
@@ -190,6 +191,11 @@ function ContractDetail({ contract, onAction }: { contract: Contract; onAction: 
 
   return (
     <div className="panel con-detail">
+      <div className="con-detail-head">
+        <button className="con-detail-close" onClick={onClose} aria-label="Close">
+          <CloseIcon style={{ width: 16, height: 16 }} />
+        </button>
+      </div>
       <div className="panel-body">
         <div className="con-hero">
           <span className={`big-ic ${ty.cls}`}>{ty.icon}</span>
@@ -303,6 +309,7 @@ const Contracts = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('open');
   const [selId, setSelId] = useState<string | null>(searchParams.get('contract'));
+  const [drawerOpen, setDrawerOpen] = useState(!!searchParams.get('contract'));
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [showCreate, setShowCreate] = useState(false);
 
@@ -347,6 +354,23 @@ const Contracts = () => {
     .reduce((s, c) => s + parseFloat(c.rewardAuec ?? '0'), 0);
   const done = contracts.filter((c) => c.status === 'completed').length;
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  const handleRowClick = useCallback((id: string) => {
+    if (selId === id && drawerOpen) {
+      setDrawerOpen(false);
+    } else {
+      setSelId(id);
+      setDrawerOpen(true);
+    }
+  }, [selId, drawerOpen]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!visible.length) return;
     const idx = visible.findIndex((c) => c.id === selId);
@@ -354,11 +378,13 @@ const Contracts = () => {
       e.preventDefault();
       const next = visible[Math.min(visible.length - 1, idx + 1)];
       setSelId(next.id);
+      setDrawerOpen(true);
       rowRefs.current[next.id]?.focus();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const prev = visible[Math.max(0, idx - 1)];
       setSelId(prev.id);
+      setDrawerOpen(true);
       rowRefs.current[prev.id]?.focus();
     }
   }, [visible, selId]);
@@ -452,7 +478,7 @@ const Contracts = () => {
           </button>
         </div>
       ) : (
-        <div className="con-split">
+        <div className="con-layout">
           <div className="dtable-wrap">
             <table
               className="dtable"
@@ -478,10 +504,10 @@ const Contracts = () => {
                       key={c.id}
                       ref={(el) => { rowRefs.current[c.id] = el; }}
                       tabIndex={0}
-                      aria-selected={c.id === selId}
-                      className={c.id === selId ? 'selected' : ''}
-                      onClick={() => setSelId(c.id)}
-                      onFocus={() => setSelId(c.id)}
+                      aria-selected={c.id === selId && drawerOpen}
+                      className={c.id === selId && drawerOpen ? 'selected' : ''}
+                      onClick={() => handleRowClick(c.id)}
+                      onFocus={() => { setSelId(c.id); setDrawerOpen(true); }}
                     >
                       <td>
                         <div className="t-ent">
@@ -512,7 +538,12 @@ const Contracts = () => {
               <span style={{ marginLeft: 'auto' }}>{visible.length} of {total} contracts</span>
             </div>
           </div>
-          {sel && <ContractDetail contract={sel} onAction={handleAction} />}
+
+          {/* slide-in detail drawer */}
+          <div className={`con-drawer${drawerOpen ? ' open' : ''}`} aria-hidden={!drawerOpen}>
+            {sel && <ContractDetail contract={sel} onAction={handleAction} onClose={() => setDrawerOpen(false)} />}
+          </div>
+          {drawerOpen && <div className="con-drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
         </div>
       )}
 
