@@ -111,10 +111,14 @@ export class AuthController {
   ) {}
 
   private cookieOptions(maxAge: number) {
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
     return {
       httpOnly: true,
-      secure: this.configService.get<string>('NODE_ENV') === 'production',
-      sameSite: 'strict' as const,
+      secure: isProduction,
+      // Strict blocks cookies on cross-origin requests; the frontend and
+      // backend run on different ports (5173 vs 3001) so lax is required.
+      sameSite: 'lax' as const,
       path: '/',
       maxAge,
     };
