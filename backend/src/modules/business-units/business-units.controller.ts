@@ -15,7 +15,7 @@ import { BusinessUnitsService } from './business-units.service';
 import { CreateBusinessUnitDto } from './dto/create-business-unit.dto';
 import { UpdateBusinessUnitDto } from './dto/update-business-unit.dto';
 
-@Controller('organizations/:orgId/business-units')
+@Controller('api/organizations/:orgId/business-units')
 @UseGuards(JwtAuthGuard)
 export class BusinessUnitsController {
   constructor(private readonly service: BusinessUnitsService) {}
