@@ -2,6 +2,9 @@ import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import ViewCompactIcon from '@mui/icons-material/ViewCompact';
+import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
+import ViewColumnIcon from '@mui/icons-material/ViewColumn';
 
 export type PortletSize = 'compact' | 'standard' | 'full';
 
@@ -19,12 +22,23 @@ interface PortletProps {
   children: ReactNode;
 }
 
-const SIZE_LABELS: Record<PortletSize, string> = {
-  compact:  'Compact',
-  standard: 'Standard',
-  full:     'Full width',
+const SIZE_CYCLE: Record<PortletSize, PortletSize> = {
+  compact:  'standard',
+  standard: 'full',
+  full:     'compact',
 };
-const SIZE_ORDER: PortletSize[] = ['compact', 'standard', 'full'];
+
+const SIZE_ICON: Record<PortletSize, ReactNode> = {
+  compact:  <ViewCompactIcon />,
+  standard: <ViewAgendaIcon />,
+  full:     <ViewColumnIcon />,
+};
+
+const SIZE_TITLE: Record<PortletSize, string> = {
+  compact:  'Compact (1/3) — click to expand',
+  standard: 'Standard (2/3) — click to expand',
+  full:     'Full width — click to collapse',
+};
 
 function Portlet({
   id,
@@ -54,20 +68,17 @@ function Portlet({
     )
     : null;
 
-  const sizeMenu = editing && onSizeChange
+  const sizeBtn = onSizeChange
     ? (
-      <select
-        className="pcard-size-select"
-        value={size}
-        onChange={(e) => onSizeChange(e.target.value as PortletSize)}
-        onClick={(e) => e.stopPropagation()}
+      <button
+        className="pcard-act pcard-size-btn"
+        title={SIZE_TITLE[size]}
+        aria-label={SIZE_TITLE[size]}
+        onClick={(e) => { e.stopPropagation(); onSizeChange(SIZE_CYCLE[size]); }}
         onMouseDown={(e) => e.stopPropagation()}
-        aria-label="Widget size"
       >
-        {SIZE_ORDER.map((s) => (
-          <option key={s} value={s}>{SIZE_LABELS[s]}</option>
-        ))}
-      </select>
+        {SIZE_ICON[size]}
+      </button>
     )
     : null;
 
@@ -87,7 +98,7 @@ function Portlet({
         </span>
         <span className="pcard-ico">{icon}</span>
         <span className="pcard-title">{title}</span>
-        {sizeMenu}
+        {sizeBtn}
         {headAction}
       </div>
       <div className="pcard-body">{children}</div>

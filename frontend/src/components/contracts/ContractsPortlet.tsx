@@ -67,6 +67,14 @@ const STATUS_LABEL: Record<ContractStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+function formatAuec(val: string | null): string {
+  if (!val) return '—';
+  const n = parseFloat(val);
+  if (n >= 1_000_000) return `${(n / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })}M`;
+  if (n >= 1_000) return `${(n / 1_000).toLocaleString(undefined, { maximumFractionDigits: 0 })}K`;
+  return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
 function formatEnds(deadline: string | null): string | null {
   if (!deadline) return null;
   const diff = new Date(deadline).getTime() - Date.now();
@@ -120,6 +128,8 @@ const ContractsPortlet = ({ size }: ContractsPortletProps) => {
   }
 
   const isStandardOrFull = size === 'standard' || size === 'full';
+  const isFull = size === 'full';
+  const nameMaxWidth = size === 'compact' ? 120 : size === 'standard' ? 180 : 220;
 
   return (
     <>
@@ -128,10 +138,12 @@ const ContractsPortlet = ({ size }: ContractsPortletProps) => {
           <thead>
             <tr>
               <th>Contract</th>
+              {isFull && <th>Type</th>}
               <th>Status</th>
               <th>Ends</th>
               {isStandardOrFull && <th>Accepted By</th>}
               {isStandardOrFull && <th>Owned By</th>}
+              {isFull && <th className="num">Reward</th>}
             </tr>
           </thead>
           <tbody>
@@ -150,9 +162,12 @@ const ContractsPortlet = ({ size }: ContractsPortletProps) => {
                   <td>
                     <div className="inv-item">
                       <span className="thumb">{meta.icon}</span>
-                      <div className="nm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: size === 'compact' ? 120 : 200 }}>{c.title}</div>
+                      <div className="nm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: nameMaxWidth }}>{c.title}</div>
                     </div>
                   </td>
+                  {isFull && (
+                    <td className="cell-muted" style={{ whiteSpace: 'nowrap' }}>{meta.label}</td>
+                  )}
                   <td>
                     <span className={`chip-badge ${chipCls}`}>
                       {STATUS_LABEL[c.status]}
@@ -171,6 +186,9 @@ const ContractsPortlet = ({ size }: ContractsPortletProps) => {
                   )}
                   {isStandardOrFull && (
                     <td className="cell-muted">{creator ? displayName(creator) : '—'}</td>
+                  )}
+                  {isFull && (
+                    <td className="cell-num" style={{ whiteSpace: 'nowrap' }}>{formatAuec(c.rewardAuec)} aUEC</td>
                   )}
                 </tr>
               );

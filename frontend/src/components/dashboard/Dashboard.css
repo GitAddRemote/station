@@ -126,19 +126,11 @@
 .pcard-grip:hover { color: var(--text-muted); }
 .pcard-grip svg { width: 16px; height: 16px; }
 
-.pcard-size-select {
-  appearance: none;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  padding: 3px 8px;
-  cursor: pointer;
-  display: none;
+.pcard-size-btn {
+  opacity: 0.45;
+  transition: opacity var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
 }
-.dash-pgrid.editing .pcard-size-select { display: block; }
+.pcard-size-btn:hover { opacity: 1; }
 
 .pcard-ico {
   width: 34px;
