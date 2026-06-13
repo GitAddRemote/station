@@ -106,7 +106,24 @@ export class UserOrganizationRolesService {
     return this.userOrgRoleRepository.find({
       where: { userId },
       relations: ['organization', 'role'],
+      order: { orgPriority: 'ASC', assignedAt: 'ASC' },
     });
+  }
+
+  async updateOrgPriorities(
+    userId: string,
+    orderedOrgIds: string[],
+  ): Promise<void> {
+    await Promise.all(
+      orderedOrgIds.map((orgId, index) =>
+        this.userOrgRoleRepository.manager.query(
+          `UPDATE "user_organization_role"
+             SET "org_priority" = $1
+           WHERE "userId" = $2 AND "organizationId" = $3 AND "deleted_at" IS NULL`,
+          [index, userId, orgId],
+        ),
+      ),
+    );
   }
 
   async getOrganizationMembers(

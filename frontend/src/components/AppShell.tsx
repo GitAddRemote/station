@@ -7,6 +7,7 @@ import {
   ReactNode,
 } from 'react';
 import { ToastContext, PushToast } from '../contexts/ToastContext';
+import { useOrg, OrgEntry } from '../contexts/OrgContext';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Dashboard as DashboardIcon,
@@ -25,11 +26,15 @@ import {
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
   Notifications as NotificationsIcon,
-  CheckCircleOutline as CheckIcon,
+  CheckCircleOutline as CheckCircleIcon,
+  Check as CheckIcon,
   UnfoldMoreDouble as ChevronUpDownIcon,
   Logout as LogoutIcon,
   ChevronRight as ChevronRightIcon,
   AccountTree as OrgIcon,
+  ArrowUpward as ArrowUpIcon,
+  ArrowDownward as ArrowDownIcon,
+  Star as StarIcon,
 } from '@mui/icons-material';
 import { api } from '../services/api.service';
 import './AppShell.css';
@@ -245,6 +250,70 @@ function KeyHelp({ open, onClose, extra = [] }: KeyHelpProps) {
   );
 }
 
+// ---- Org Switcher panel ----------------------------------------------
+function OrgSwitcher({ onClose }: { onClose: () => void }) {
+  const { orgs, activeOrg, setActiveOrg, reorderOrgs } = useOrg();
+  const [localOrgs, setLocalOrgs] = useState<OrgEntry[]>(orgs);
+  const navigate = useNavigate();
+
+  useEffect(() => { setLocalOrgs(orgs); }, [orgs]);
+
+  const move = (index: number, dir: -1 | 1) => {
+    const next = [...localOrgs];
+    const swap = index + dir;
+    if (swap < 0 || swap >= next.length) return;
+    [next[index], next[swap]] = [next[swap], next[index]];
+    setLocalOrgs(next);
+    reorderOrgs(next.map((o) => o.id));
+  };
+
+  const select = (org: OrgEntry) => {
+    setActiveOrg(org);
+    onClose();
+    navigate('/dashboard');
+  };
+
+  return (
+    <div className="org-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="org-panel-head">
+        <span className="org-panel-title">Organizations</span>
+        <span className="org-panel-hint">Drag priority order</span>
+      </div>
+      <ul className="org-panel-list">
+        {localOrgs.map((org, i) => (
+          <li key={org.id} className={'org-panel-item' + (org.id === activeOrg?.id ? ' selected' : '')}>
+            <button className="org-panel-select" onClick={() => select(org)}>
+              <span className="org-panel-badge">{org.name.slice(0, 2).toUpperCase()}</span>
+              <span className="org-panel-info">
+                <span className="org-panel-name">
+                  {org.name}
+                  {i === 0 && <span className="org-primary-chip"><StarIcon style={{ width: 9, height: 9 }} /> Primary</span>}
+                </span>
+                <span className="org-panel-role">{org.role}</span>
+              </span>
+              {org.id === activeOrg?.id && <CheckIcon style={{ width: 14, height: 14 }} className="org-panel-check" />}
+            </button>
+            <div className="org-panel-arrows">
+              <button
+                className="org-arrow-btn"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                aria-label="Move up"
+              ><ArrowUpIcon style={{ width: 12, height: 12 }} /></button>
+              <button
+                className="org-arrow-btn"
+                onClick={() => move(i, 1)}
+                disabled={i === localOrgs.length - 1}
+                aria-label="Move down"
+              ><ArrowDownIcon style={{ width: 12, height: 12 }} /></button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ---- AppShell --------------------------------------------------------
 export interface AppShellProps {
   active: string;
@@ -254,8 +323,6 @@ export interface AppShellProps {
   onNew?: () => void;
   searchPlaceholder?: string;
   userInitial?: string;
-  orgName?: string;
-  orgRole?: string;
   showStationBotAdmin?: boolean;
 }
 
@@ -267,14 +334,14 @@ export function AppShell({
   onNew,
   searchPlaceholder = 'Search…',
   userInitial = 'U',
-  orgName = 'My Organization',
-  orgRole = 'Member',
   showStationBotAdmin = false,
 }: AppShellProps) {
   const { theme, setTheme, accent } = useChrome();
+  const { activeOrg } = useOrg();
   const [cmdOpen, setCmdOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
     try {
@@ -368,6 +435,7 @@ export function AppShell({
         setCmdOpen(false);
         setHelpOpen(false);
         setNavOpen(false);
+        setOrgSwitcherOpen(false);
         return;
       }
       if (typing) return;
@@ -413,16 +481,31 @@ export function AppShell({
         {/* Sidebar */}
         <aside className="shell-sidebar">
           <div className="side-head">
-            <button className="side-org" aria-label="Switch organization">
-              <span className="side-org-badge">{orgName.slice(0, 2).toUpperCase()}</span>
-              <span>
-                <span className="side-org-name">{orgName}</span>
-                <span className="side-org-role">{orgRole}</span>
-              </span>
-              <span className="side-org-chev">
+            <div className="side-org-wrap">
+              <Link className="side-org-home" to="/dashboard" aria-label="Go to dashboard">
+                <span className="side-org-badge">
+                  {activeOrg ? activeOrg.name.slice(0, 2).toUpperCase() : '??'}
+                </span>
+                <span className="side-org-text">
+                  <span className="side-org-name">{activeOrg?.name ?? 'Loading…'}</span>
+                  <span className="side-org-role">{activeOrg?.role ?? ''}</span>
+                </span>
+              </Link>
+              <button
+                className={'side-org-switch' + (orgSwitcherOpen ? ' open' : '')}
+                onClick={() => setOrgSwitcherOpen((o) => !o)}
+                aria-label="Switch organization"
+                aria-expanded={orgSwitcherOpen}
+              >
                 <ChevronUpDownIcon style={{ width: 15, height: 15 }} />
-              </span>
-            </button>
+              </button>
+              {orgSwitcherOpen && (
+                <>
+                  <div className="org-panel-scrim" onClick={() => setOrgSwitcherOpen(false)} />
+                  <OrgSwitcher onClose={() => setOrgSwitcherOpen(false)} />
+                </>
+              )}
+            </div>
           </div>
 
           <nav className="side-nav" aria-label="Primary">
@@ -603,7 +686,7 @@ export function AppShell({
         <div className="shell-toasts" aria-live="polite">
           {toasts.map((t) => (
             <div className="shell-toast" key={t.id}>
-              <CheckIcon style={{ width: 16, height: 16 }} />
+              <CheckCircleIcon style={{ width: 16, height: 16 }} />
               {t.msg}
             </div>
           ))}

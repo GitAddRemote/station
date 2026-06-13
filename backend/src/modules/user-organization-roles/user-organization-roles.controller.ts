@@ -61,6 +61,18 @@ export class UserOrganizationRolesController {
     return this.userOrgRolesService.getUserOrganizations(userId);
   }
 
+  @Patch('user/:userId/org-priorities')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async updateOrgPriorities(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() body: { orderedOrgIds: string[] },
+  ) {
+    await this.userOrgRolesService.updateOrgPriorities(
+      userId,
+      body.orderedOrgIds,
+    );
+  }
+
   @Get('organization/:organizationId/members')
   async getOrganizationMembers(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,

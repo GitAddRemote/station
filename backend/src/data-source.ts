@@ -67,6 +67,7 @@ import { StationInventoryBatch } from './modules/inventory/entities/station-inve
 import { BusinessUnit } from './modules/business-units/business-unit.entity';
 import { AddBusinessUnits1780210000000 } from './migrations/1780210000000-AddBusinessUnits';
 import { AddSoftDeleteToUsersAndMemberships1780220000000 } from './migrations/1780220000000-AddSoftDeleteToUsersAndMemberships';
+import { AddOrgPriorityToUserOrganizationRole1780230000000 } from './migrations/1780230000000-AddOrgPriorityToUserOrganizationRole';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -143,6 +144,7 @@ export const AppDataSource = new DataSource({
     AddContractStatusHistory1780200000000,
     AddBusinessUnits1780210000000,
     AddSoftDeleteToUsersAndMemberships1780220000000,
+    AddOrgPriorityToUserOrganizationRole1780230000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },

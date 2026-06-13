@@ -50,6 +50,9 @@ export class UserOrganizationRole {
   @JoinColumn({ name: 'business_unit_id' })
   businessUnit!: BusinessUnit | null;
 
+  @Column({ name: 'org_priority', type: 'integer', default: 0 })
+  orgPriority!: number;
+
   @CreateDateColumn()
   assignedAt!: Date;
 

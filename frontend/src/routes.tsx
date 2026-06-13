@@ -20,6 +20,12 @@ import BusinessUnits from './pages/BusinessUnits';
 import Treasury from './pages/Treasury';
 import Refinery from './pages/Refinery';
 import ProtectedRoute from './components/ProtectedRoute';
+import { OrgProvider } from './contexts/OrgContext';
+import { Outlet } from 'react-router-dom';
+
+function OrgLayout() {
+  return <OrgProvider><Outlet /></OrgProvider>;
+}
 
 const AppRoutes = () => (
   <Router>
@@ -33,18 +39,20 @@ const AppRoutes = () => (
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/org-inventory" element={<OrgInventory />} />
-        <Route path="/contracts" element={<Contracts />} />
-        <Route path="/work-orders" element={<WorkOrders />} />
-        <Route path="/fleet" element={<Fleet />} />
-        <Route path="/hr" element={<HumanResources />} />
-        <Route path="/hr/members" element={<Members />} />
-        <Route path="/hr/business-units" element={<BusinessUnits />} />
-        <Route path="/treasury" element={<Treasury />} />
-        <Route path="/refinery" element={<Refinery />} />
+        <Route element={<OrgLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/org-inventory" element={<OrgInventory />} />
+          <Route path="/contracts" element={<Contracts />} />
+          <Route path="/work-orders" element={<WorkOrders />} />
+          <Route path="/fleet" element={<Fleet />} />
+          <Route path="/hr" element={<HumanResources />} />
+          <Route path="/hr/members" element={<Members />} />
+          <Route path="/hr/business-units" element={<BusinessUnits />} />
+          <Route path="/treasury" element={<Treasury />} />
+          <Route path="/refinery" element={<Refinery />} />
+        </Route>
       </Route>
     </Routes>
   </Router>
