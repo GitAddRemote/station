@@ -505,12 +505,9 @@ const Contracts = () => {
   );
 
   useEffect(() => {
-    if (!selId && visible.length > 0) {
-      setSelId(visible[0].id);
-      return;
-    }
     if (selId && !loading && contracts.length > 0 && !contracts.find((c) => c.id === selId)) {
-      setSelId(visible[0]?.id ?? null);
+      setSelId(null);
+      setDrawerOpen(false);
     }
   }, [visible, selId, loading, contracts]);
 
