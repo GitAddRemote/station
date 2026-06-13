@@ -83,7 +83,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-5);
 }
-.dash-pgrid .pcard--full { grid-column: 1 / -1; }
+/* size variants — names reflect intent, not raw fractions */
+.dash-pgrid .pcard--compact  { grid-column: span 1; } /* 1/3 — Compact    */
+.dash-pgrid .pcard--standard { grid-column: span 2; } /* 2/3 — Standard   */
+.dash-pgrid .pcard--full     { grid-column: 1 / -1; } /* 3/3 — Full width */
 
 /* ---- portlet shell --------------------------------------- */
 .pcard {
@@ -102,7 +105,8 @@
     box-shadow var(--dur-base) var(--ease-out),
     opacity var(--dur-base) var(--ease-out);
 }
-.pcard.pcard--full { height: 480px; }
+.pcard.pcard--standard { height: 420px; }
+.pcard.pcard--full     { height: 480px; }
 .pcard-head {
   display: flex;
   align-items: center;
@@ -121,6 +125,21 @@
 .pcard-grip:active { cursor: grabbing; }
 .pcard-grip:hover { color: var(--text-muted); }
 .pcard-grip svg { width: 16px; height: 16px; }
+
+.pcard-size-select {
+  appearance: none;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: 3px 8px;
+  cursor: pointer;
+  display: none;
+}
+.dash-pgrid.editing .pcard-size-select { display: block; }
+
 .pcard-ico {
   width: 34px;
   height: 34px;

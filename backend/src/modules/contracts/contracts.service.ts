@@ -76,8 +76,8 @@ export class ContractsService {
 
     const qb = this.contractRepository
       .createQueryBuilder('contract')
-      .leftJoinAndSelect('contract.milestones', 'milestones')
       .leftJoinAndSelect('contract.parties', 'parties')
+      .leftJoinAndSelect('parties.user', 'partyUser')
       .orderBy('contract.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
