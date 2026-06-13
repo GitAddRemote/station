@@ -33,9 +33,15 @@
 .deadline.urgent { color: var(--coral-400); }
 
 /* ---- selected row --------------------------------------- */
-.dtable tbody tr.selected td { background: color-mix(in srgb, var(--brand) 8%, transparent); }
+.dtable tbody tr.selected td {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+.dtable tbody tr.selected td:first-child {
+  border-left: 3px solid var(--brand);
+  padding-left: calc(var(--space-5) - 3px);
+}
 .dtable tbody tr:focus { outline: none; }
-.dtable tbody tr:focus td { background: color-mix(in srgb, var(--brand) 12%, transparent); }
+.dtable tbody tr:focus td { background: color-mix(in srgb, var(--brand) 14%, transparent); }
 
 /* ---- split layout --------------------------------------- */
 .con-split {
