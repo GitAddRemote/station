@@ -38,6 +38,7 @@ interface ContractParty {
   id: string;
   userId: string;
   role: string;
+  user?: { id: string; username: string; firstName?: string; lastName?: string } | null;
 }
 
 interface Contract {
@@ -102,6 +103,12 @@ const TYPE_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'medical',   label: 'Medical' },
   { value: 'refueling', label: 'Refueling' },
 ];
+
+function partyName(parties: ContractParty[], role: string): string {
+  const p = parties?.find((x) => x.role === role);
+  if (!p?.user) return '—';
+  return p.user.firstName || p.user.username || '—';
+}
 
 function fmtAuec(val: string | null): string {
   if (!val) return '—';
@@ -510,8 +517,11 @@ const Contracts = () => {
               <thead>
                 <tr>
                   <th>Contract</th>
+                  <th>Type</th>
                   <th>Status</th>
                   <th>Deadline</th>
+                  <th>Claimed By</th>
+                  <th>Owned By</th>
                   <th className="num">Reward</th>
                 </tr>
               </thead>
@@ -535,10 +545,10 @@ const Contracts = () => {
                           <span className={`ic ${ty.cls}`}>{ty.icon}</span>
                           <div>
                             <div className="nm">{c.title}</div>
-                            <div className="sub">{ty.label}</div>
                           </div>
                         </div>
                       </td>
+                      <td className="cell-muted">{ty.label}</td>
                       <td><span className={`chip-badge ${st.chip}`}>{st.label}</span></td>
                       <td>
                         <span className={`deadline${dl.urgent ? ' urgent' : ''}`}>
@@ -546,6 +556,8 @@ const Contracts = () => {
                           {dl.text}
                         </span>
                       </td>
+                      <td className="cell-muted">{partyName(c.parties, 'assignee')}</td>
+                      <td className="cell-muted">{partyName(c.parties, 'creator')}</td>
                       <td className="num">
                         <span className="reward">{fmtAuec(c.rewardAuec)} <small>aUEC</small></span>
                       </td>
