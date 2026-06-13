@@ -143,6 +143,17 @@ export default function BatchDrawer({ open, mode, onClose, onMutated, onSelectBa
     }
   };
 
+  const extractConflict = (err: unknown): BatchLocationConflictItem[] | null => {
+    const data = (err as { response?: { data?: unknown } })?.response?.data;
+    if (!data || typeof data !== 'object') return null;
+    // NestJS wraps ConflictException payload in { message: <payload> }
+    const payload = 'message' in data ? (data as { message: unknown }).message : data;
+    if (payload && typeof payload === 'object' && 'conflictingItems' in payload) {
+      return (payload as { conflictingItems: BatchLocationConflictItem[] }).conflictingItems;
+    }
+    return null;
+  };
+
   const handleAddToBatch = async (batch: BatchDto, item: InventoryItem, force = false) => {
     setAddWorking(batch.id);
     try {
@@ -150,15 +161,10 @@ export default function BatchDrawer({ open, mode, onClose, onMutated, onSelectBa
       onMutated();
       onClose();
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number; data?: unknown } })?.response?.status;
-      const data = (err as { response?: { data?: unknown } })?.response?.data;
-      if (status === 409 && data && typeof data === 'object' && 'conflictingItems' in data) {
-        setConflict({
-          batchId: batch.id,
-          itemIds: [item.id],
-          conflictingItems: (data as { conflictingItems: BatchLocationConflictItem[] }).conflictingItems,
-          force: false,
-        });
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const conflictingItems = status === 409 ? extractConflict(err) : null;
+      if (conflictingItems) {
+        setConflict({ batchId: batch.id, itemIds: [item.id], conflictingItems, force: false });
       } else {
         setBatchesError('Failed to add item to batch.');
       }
@@ -196,15 +202,10 @@ export default function BatchDrawer({ open, mode, onClose, onMutated, onSelectBa
       setEditLocation({ id: updated.locationId, name: updated.locationName ?? '' } as LocationDto);
       onMutated();
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number; data?: unknown } })?.response?.status;
-      const data = (err as { response?: { data?: unknown } })?.response?.data;
-      if (status === 409 && data && typeof data === 'object' && 'conflictingItems' in data) {
-        setConflict({
-          batchId: detail.id,
-          itemIds: [],
-          conflictingItems: (data as { conflictingItems: BatchLocationConflictItem[] }).conflictingItems,
-          force: false,
-        });
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const conflictingItems = status === 409 ? extractConflict(err) : null;
+      if (conflictingItems) {
+        setConflict({ batchId: detail.id, itemIds: [], conflictingItems, force: false });
       } else {
         setDetailError('Failed to update batch.');
       }
