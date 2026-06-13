@@ -42,8 +42,11 @@ interface NavItem {
   soon?: boolean;
 }
 
-const NAV_PRIMARY: NavItem[] = [
+const NAV_HOME: NavItem[] = [
   { id: 'dashboard',  label: 'Dashboard',   icon: <DashboardIcon />, href: '/dashboard',  key: 'd' },
+];
+
+const NAV_PRIMARY: NavItem[] = [
   { id: 'contracts',  label: 'Contracts',    icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
   { id: 'fleet',      label: 'Fleet',        icon: <FleetIcon />,     href: '/fleet',      key: 'f' },
   { id: 'members',    label: 'Members',      icon: <MembersIcon />,   href: '/members',    key: 'm' },
@@ -282,7 +285,7 @@ export function AppShell({
   }, [navigate]);
 
   const allCommands = useMemo<Command[]>(() => {
-    const navCmds = NAV_PRIMARY
+    const navCmds = [...NAV_HOME, ...NAV_PRIMARY, ...NAV_ASSETS]
       .filter((n) => !n.soon)
       .map((n) => ({
         id: 'nav-' + n.id,
@@ -343,7 +346,7 @@ export function AppShell({
 
       if (gPending.current) {
         gPending.current = false;
-        const target = NAV_PRIMARY.find((n) => n.key === e.key.toLowerCase());
+        const target = [...NAV_HOME, ...NAV_PRIMARY].find((n) => n.key === e.key.toLowerCase());
         if (target && !target.soon) {
           e.preventDefault();
           go(target.href);
@@ -394,6 +397,20 @@ export function AppShell({
           </div>
 
           <nav className="side-nav" aria-label="Primary">
+            {NAV_HOME.map((n) => (
+              <Link
+                key={n.id}
+                className={'side-link' + (n.id === active ? ' active' : '')}
+                to={n.href}
+                aria-current={n.id === active ? 'page' : undefined}
+                onClick={() => setNavOpen(false)}
+              >
+                {n.icon}
+                <span className="side-link-label">{n.label}</span>
+                <span className="side-link-key">{n.key}</span>
+              </Link>
+            ))}
+
             <div className="side-cap">Operations</div>
             {NAV_PRIMARY.map((n) => (
               <Link
