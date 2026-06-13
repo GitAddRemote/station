@@ -44,16 +44,16 @@ interface NavItem {
 
 const NAV_PRIMARY: NavItem[] = [
   { id: 'dashboard',  label: 'Dashboard',   icon: <DashboardIcon />, href: '/dashboard',  key: 'd' },
-  { id: 'workorders', label: 'Work Orders',  icon: <PickaxeIcon />,   href: '/work-orders', key: 'w' },
   { id: 'contracts',  label: 'Contracts',    icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
   { id: 'fleet',      label: 'Fleet',        icon: <FleetIcon />,     href: '/fleet',      key: 'f' },
   { id: 'members',    label: 'Members',      icon: <MembersIcon />,   href: '/members',    key: 'm' },
+  { id: 'workorders', label: 'Work Orders',  icon: <PickaxeIcon />,   href: '/work-orders', key: 'w' },
 ];
 
 const NAV_ASSETS: NavItem[] = [
   { id: 'inventory', label: 'Inventory',  icon: <InventoryIcon />, href: '/inventory' },
-  { id: 'treasury',  label: 'Treasury',   icon: <TreasuryIcon />,  href: '/treasury' },
   { id: 'refinery',  label: 'Refinery',   icon: <RefineryIcon />,  href: '/refinery' },
+  { id: 'treasury',  label: 'Treasury',   icon: <TreasuryIcon />,  href: '/treasury' },
 ];
 
 // ---- theme persistence -----------------------------------------------
