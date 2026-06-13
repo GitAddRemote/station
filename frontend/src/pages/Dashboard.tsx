@@ -115,7 +115,18 @@ const Dashboard = () => {
         if (!userId) throw new Error('No user id in profile response');
         const orgsRes = await api.get(`/user-organization-roles/user/${userId}/organizations`).catch(() => ({ data: [] }));
         setUser(profileRes.data);
-        setOrgs(Array.isArray(orgsRes.data) ? orgsRes.data : []);
+        const seen = new Set<string>();
+        const mappedOrgs: Org[] = Array.isArray(orgsRes.data)
+          ? (orgsRes.data as Array<{ organization?: { id: string; name: string }; role?: { name: string } }>)
+              .filter((row) => row.organization?.id && row.organization?.name)
+              .filter((row) => !seen.has(row.organization!.id) && seen.add(row.organization!.id))
+              .map((row) => ({
+                id: row.organization!.id,
+                name: row.organization!.name,
+                role: row.role?.name,
+              }))
+          : [];
+        setOrgs(mappedOrgs);
       } catch {
         navigate('/login');
       } finally {
