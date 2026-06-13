@@ -53,6 +53,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import PackageIcon from '@mui/icons-material/Inventory2';
 import LayersIcon from '@mui/icons-material/Layers';
+import ArticleIcon from '@mui/icons-material/Article';
 import './Inventory.css';
 import {
   inventoryService,
@@ -69,6 +70,7 @@ import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
 import InventoryNewRow from '../components/inventory/InventoryNewRow';
 import BatchDrawer, { BatchDrawerMode } from '../components/inventory/BatchDrawer';
+import CreateContractModal from '../components/contracts/CreateContractModal';
 import {
   OrgPermission,
   permissionsService,
@@ -259,6 +261,8 @@ const InventoryPage = () => {
   const [batchDrawerOpen, setBatchDrawerOpen] = useState(false);
   const [batchDrawerMode, setBatchDrawerMode] = useState<BatchDrawerMode | null>(null);
   const [batchDrawerFromList, setBatchDrawerFromList] = useState(false);
+  const [contractModalOpen, setContractModalOpen] = useState(false);
+  const [contractModalTitle, setContractModalTitle] = useState('');
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
   const isOrgMode = viewMode === 'org';
@@ -2542,6 +2546,14 @@ const InventoryPage = () => {
                 <ListItemText>Add to batch</ListItemText>
               </MenuItem>
             )}
+            <MenuItem onClick={() => {
+              setContractModalTitle((actionItem as InventoryItem | null)?.itemName ?? '');
+              setContractModalOpen(true);
+              closeActionMenu();
+            }}>
+              <ListItemIcon><ArticleIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Create contract</ListItemText>
+            </MenuItem>
           </>
         )}
         <MenuItem onClick={() => openActionDialog('delete')}>
@@ -2567,6 +2579,15 @@ const InventoryPage = () => {
         onClose={() => setSelectedDrawerGroup(null)}
         onMutated={fetchInventory}
       />
+
+      {contractModalOpen && (
+        <CreateContractModal
+          initialType="transfer"
+          initialTitle={contractModalTitle}
+          onClose={() => setContractModalOpen(false)}
+          onCreated={() => {}}
+        />
+      )}
     </AppShell>
   );
 };

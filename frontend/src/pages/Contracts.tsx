@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import CreateContractModal from '../components/contracts/CreateContractModal';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SecurityIcon from '@mui/icons-material/Security';
 import DiamondIcon from '@mui/icons-material/Diamond';
@@ -229,10 +230,6 @@ function ContractDetail({ contract, onAction }: { contract: Contract; onAction: 
   );
 }
 
-interface Org { id: string; name: string; }
-
-const BLANK_FORM = { title: '', type: 'transport' as ContractType, orgId: '', rewardAuec: '', deadline: '', description: '' };
-
 const Contracts = () => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [total, setTotal] = useState(0);
@@ -242,9 +239,6 @@ const Contracts = () => {
   const [selId, setSelId] = useState<string | null>(null);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [showCreate, setShowCreate] = useState(false);
-  const [orgs, setOrgs] = useState<Org[]>([]);
-  const [form, setForm] = useState(BLANK_FORM);
-  const [saving, setSaving] = useState(false);
 
   const fetchContracts = useCallback(async () => {
     setLoading(true);
@@ -262,39 +256,6 @@ const Contracts = () => {
   }, [statusFilter]);
 
   useEffect(() => { fetchContracts(); }, [fetchContracts]);
-
-  useEffect(() => {
-    api.get('/users/profile').then((r) => {
-      const uid = r.data.userId ?? r.data.id;
-      if (!uid) return;
-      return api.get<Org[]>(`/user-organization-roles/user/${uid}/organizations`)
-        .then((r2) => setOrgs(Array.isArray(r2.data) ? r2.data : []));
-    }).catch(() => {});
-  }, []);
-
-  const openCreate = useCallback(() => {
-    setForm({ ...BLANK_FORM, orgId: orgs[0]?.id ?? '' });
-    setShowCreate(true);
-  }, [orgs]);
-
-  const handleCreate = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.post('/api/contracts', {
-        title: form.title,
-        type: form.type,
-        orgId: form.orgId,
-        ...(form.rewardAuec ? { rewardAuec: parseFloat(form.rewardAuec) } : {}),
-        ...(form.deadline ? { deadline: form.deadline } : {}),
-        ...(form.description ? { description: form.description } : {}),
-      });
-      setShowCreate(false);
-      fetchContracts();
-    } catch { /* server errors surface as 400/422 */ } finally {
-      setSaving(false);
-    }
-  }, [form, fetchContracts]);
 
   const visible = useMemo(() =>
     typeFilter === 'all' ? contracts : contracts.filter((c) => c.type === typeFilter),
@@ -355,7 +316,7 @@ const Contracts = () => {
           <p className="page-sub">Service contracts across every discipline — transport, security, mining, and salvage.</p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
             <PlusIcon style={{ width: 16, height: 16 }} /> New contract
           </button>
         </div>
@@ -417,7 +378,7 @@ const Contracts = () => {
         <div className="con-empty">
           <ArticleIcon style={{ width: 40, height: 40, opacity: 0.25 }} />
           <p>No contracts yet.</p>
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
             <PlusIcon style={{ width: 16, height: 16 }} /> New contract
           </button>
         </div>
@@ -487,79 +448,10 @@ const Contracts = () => {
       )}
 
       {showCreate && (
-        <div className="modal-backdrop" onClick={() => setShowCreate(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <span className="modal-title">New contract</span>
-              <button className="btn-icon" onClick={() => setShowCreate(false)} aria-label="Close">✕</button>
-            </div>
-            <form className="modal-body" onSubmit={handleCreate}>
-              <div className="field-row">
-                <label className="field-label">Title *</label>
-                <input
-                  className="field-input"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Contract title"
-                  required
-                  maxLength={255}
-                />
-              </div>
-              <div className="field-row">
-                <label className="field-label">Type *</label>
-                <select className="field-input" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as ContractType }))}>
-                  {Object.entries(TYPE_META).map(([v, m]) => (
-                    <option key={v} value={v}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="field-row">
-                <label className="field-label">Organization *</label>
-                <select className="field-input" value={form.orgId} onChange={(e) => setForm((f) => ({ ...f, orgId: e.target.value }))} required>
-                  <option value="">Select organization…</option>
-                  {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
-              </div>
-              <div className="field-row">
-                <label className="field-label">Reward (aUEC)</label>
-                <input
-                  className="field-input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.rewardAuec}
-                  onChange={(e) => setForm((f) => ({ ...f, rewardAuec: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-              <div className="field-row">
-                <label className="field-label">Deadline</label>
-                <input
-                  className="field-input"
-                  type="datetime-local"
-                  value={form.deadline}
-                  onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
-                />
-              </div>
-              <div className="field-row">
-                <label className="field-label">Description</label>
-                <textarea
-                  className="field-input"
-                  rows={3}
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Optional description…"
-                />
-              </div>
-              <div className="modal-foot">
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowCreate(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary btn-sm" disabled={saving || !form.title || !form.orgId}>
-                  {saving ? 'Creating…' : 'Create contract'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CreateContractModal
+          onClose={() => setShowCreate(false)}
+          onCreated={fetchContracts}
+        />
       )}
     </AppShell>
   );
