@@ -410,6 +410,41 @@
 .cell-muted { color: var(--text-muted); }
 .cell-num { text-align: right; font-family: var(--font-mono); font-weight: var(--weight-semibold); color: var(--text-body); font-variant-numeric: tabular-nums; }
 
+/* ---- inventory accordion portlet ------------------------- */
+.inv-toggle-ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+.inv-toggle-spacer { visibility: hidden; }
+.inv-group-row.expandable:hover .inv-toggle-ic { color: var(--text-muted); }
+.inv-group-row.open > td:first-child { color: var(--brand); }
+.inv-multi-loc {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-faint);
+}
+.inv-sub-row td {
+  background: var(--surface-sunken);
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+.inv-sub-row:last-child td { border-bottom: 1px solid var(--border-subtle) !important; }
+.inv-sub-row td:last-child { border-bottom: 1px solid var(--border-subtle); }
+.inv-item--sub { gap: var(--space-2); }
+.inv-sub-indent {
+  width: 18px;
+  height: 1px;
+  flex: none;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 1px;
+  align-self: center;
+}
+.inv-sub-name { font-size: var(--text-xs); color: var(--text-muted); font-weight: var(--weight-regular); }
+
 /* portlet pagination — always pinned to bottom of pcard-body */
 .pcard .p-pagination {
   display: flex; align-items: center; gap: var(--space-3);
