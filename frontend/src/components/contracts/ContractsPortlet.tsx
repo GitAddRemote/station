@@ -84,7 +84,7 @@ const ContractsPortlet = () => {
   useEffect(() => {
     setLoading(true);
     api
-      .get<PaginatedContracts>('/api/contracts', { params: { limit: 5, page: 1 } })
+      .get<PaginatedContracts>('/api/contracts', { params: { limit: 5, page: 1, status: 'open' } })
       .then((res) => {
         setContracts(res.data.data ?? []);
         setTotal(res.data.total ?? 0);

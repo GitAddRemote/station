@@ -301,7 +301,7 @@ const Contracts = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('open');
   const [selId, setSelId] = useState<string | null>(searchParams.get('contract'));
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [showCreate, setShowCreate] = useState(false);
