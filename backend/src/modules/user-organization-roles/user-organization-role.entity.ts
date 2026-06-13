@@ -6,6 +6,7 @@ import {
   JoinColumn,
   Index,
   CreateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Organization } from '../organizations/organization.entity';
@@ -51,4 +52,7 @@ export class UserOrganizationRole {
 
   @CreateDateColumn()
   assignedAt!: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deletedAt?: Date | null;
 }

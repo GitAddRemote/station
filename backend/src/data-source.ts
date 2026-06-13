@@ -66,6 +66,7 @@ import { OrgGuildMapping } from './modules/station-bot-admin/entities/org-guild-
 import { StationInventoryBatch } from './modules/inventory/entities/station-inventory-batch.entity';
 import { BusinessUnit } from './modules/business-units/business-unit.entity';
 import { AddBusinessUnits1780210000000 } from './migrations/1780210000000-AddBusinessUnits';
+import { AddSoftDeleteToUsersAndMemberships1780220000000 } from './migrations/1780220000000-AddSoftDeleteToUsersAndMemberships';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -141,6 +142,7 @@ export const AppDataSource = new DataSource({
     AddUuidDefaultsToMissingPkColumns1780190000000,
     AddContractStatusHistory1780200000000,
     AddBusinessUnits1780210000000,
+    AddSoftDeleteToUsersAndMemberships1780220000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },

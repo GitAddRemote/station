@@ -1,4 +1,11 @@
-import { Entity, Column, PrimaryColumn, OneToMany, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryColumn,
+  OneToMany,
+  Index,
+  DeleteDateColumn,
+} from 'typeorm';
 import { UserOrganizationRole } from '../user-organization-roles/user-organization-role.entity';
 
 @Entity()
@@ -50,6 +57,9 @@ export class User {
 
   @Column({ name: 'password_expires_at', type: 'timestamptz', nullable: true })
   passwordExpiresAt?: Date | null;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+  deletedAt?: Date | null;
 
   @OneToMany(() => UserOrganizationRole, (uor) => uor.user)
   userOrganizationRoles!: UserOrganizationRole[];

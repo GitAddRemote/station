@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -65,6 +66,28 @@ export class UserOrganizationRolesController {
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
   ) {
     return this.userOrgRolesService.getOrganizationMembers(organizationId);
+  }
+
+  @Patch('organization/:organizationId/members/:userId/business-unit')
+  async updateMemberBusinessUnit(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() body: { businessUnitId: string | null },
+  ) {
+    return this.userOrgRolesService.updateMemberBusinessUnit(
+      organizationId,
+      userId,
+      body.businessUnitId,
+    );
+  }
+
+  @Delete('organization/:organizationId/members/:userId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeMemberFromOrg(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    await this.userOrgRolesService.removeMemberFromOrg(organizationId, userId);
   }
 
   @Get('organization/:organizationId/role/:roleId/users')
