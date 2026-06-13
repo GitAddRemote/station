@@ -6,10 +6,17 @@ import { UserOrganizationRole } from './user-organization-role.entity';
 import { User } from '../users/user.entity';
 import { Organization } from '../organizations/organization.entity';
 import { Role } from '../roles/role.entity';
+import { BusinessUnit } from '../business-units/business-unit.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserOrganizationRole, User, Organization, Role]),
+    TypeOrmModule.forFeature([
+      UserOrganizationRole,
+      User,
+      Organization,
+      Role,
+      BusinessUnit,
+    ]),
   ],
   providers: [UserOrganizationRolesService],
   controllers: [UserOrganizationRolesController],

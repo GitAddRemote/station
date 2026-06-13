@@ -10,6 +10,7 @@ import {
 import { User } from '../users/user.entity';
 import { Organization } from '../organizations/organization.entity';
 import { Role } from '../roles/role.entity';
+import { BusinessUnit } from '../business-units/business-unit.entity';
 
 @Entity()
 @Index(['userId', 'organizationId'])
@@ -40,6 +41,13 @@ export class UserOrganizationRole {
   @ManyToOne(() => Role, { onDelete: 'RESTRICT' }) // Don't delete roles if in use
   @JoinColumn({ name: 'roleId' })
   role!: Role;
+
+  @Column({ type: 'uuid', nullable: true, name: 'business_unit_id' })
+  businessUnitId!: string | null;
+
+  @ManyToOne(() => BusinessUnit, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'business_unit_id' })
+  businessUnit!: BusinessUnit | null;
 
   @CreateDateColumn()
   assignedAt!: Date;

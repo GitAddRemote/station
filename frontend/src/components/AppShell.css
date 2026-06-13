@@ -113,6 +113,12 @@
   width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--brand);
 }
 .side-link.soon { opacity: 0.5; cursor: default; pointer-events: none; }
+.side-link-sub {
+  padding-left: calc(var(--space-4) + 14px);
+  font-size: 12px;
+  opacity: 0.85;
+}
+.side-link-sub svg { width: 14px; height: 14px; }
 .side-link-soon-tag {
   font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-faint); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 1px 5px;

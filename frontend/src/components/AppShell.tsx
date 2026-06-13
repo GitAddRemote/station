@@ -14,6 +14,7 @@ import {
   Article as ContractsIcon,
   RocketLaunch as FleetIcon,
   Group as MembersIcon,
+  AccountTree as BusinessUnitsIcon,
   Inventory2 as InventoryIcon,
   AccountBalance as TreasuryIcon,
   PrecisionManufacturing as RefineryIcon,
@@ -40,6 +41,7 @@ interface NavItem {
   href: string;
   key?: string;
   soon?: boolean;
+  sub?: boolean;
 }
 
 const NAV_HOME: NavItem[] = [
@@ -47,10 +49,11 @@ const NAV_HOME: NavItem[] = [
 ];
 
 const NAV_PRIMARY: NavItem[] = [
-  { id: 'contracts',  label: 'Contracts',    icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
-  { id: 'members',    label: 'Members',      icon: <MembersIcon />,   href: '/members',    key: 'm' },
-  { id: 'refinery',   label: 'Refinery',     icon: <RefineryIcon />,  href: '/refinery' },
-  { id: 'workorders', label: 'Work Orders',  icon: <PickaxeIcon />,   href: '/work-orders', key: 'w' },
+  { id: 'contracts',       label: 'Contracts',       icon: <ContractsIcon />,     href: '/contracts',               key: 'c' },
+  { id: 'members',         label: 'Members',          icon: <MembersIcon />,       href: '/members',                 key: 'm' },
+  { id: 'business-units',  label: 'Business Units',   icon: <BusinessUnitsIcon />, href: '/members/business-units',  sub: true },
+  { id: 'refinery',        label: 'Refinery',         icon: <RefineryIcon />,      href: '/refinery' },
+  { id: 'workorders',      label: 'Work Orders',      icon: <PickaxeIcon />,       href: '/work-orders',             key: 'w' },
 ];
 
 const NAV_ASSETS: NavItem[] = [
@@ -415,7 +418,7 @@ export function AppShell({
             {NAV_PRIMARY.map((n) => (
               <Link
                 key={n.id}
-                className={'side-link' + (n.id === active ? ' active' : '') + (n.soon ? ' soon' : '')}
+                className={'side-link' + (n.id === active ? ' active' : '') + (n.soon ? ' soon' : '') + (n.sub ? ' side-link-sub' : '')}
                 to={n.soon ? '#' : n.href}
                 aria-current={n.id === active ? 'page' : undefined}
                 onClick={(e) => { if (n.soon) e.preventDefault(); if (!n.soon) setNavOpen(false); }}

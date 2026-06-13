@@ -15,6 +15,7 @@ import Contracts from './pages/Contracts';
 import WorkOrders from './pages/WorkOrders';
 import Fleet from './pages/Fleet';
 import Members from './pages/Members';
+import BusinessUnits from './pages/BusinessUnits';
 import Treasury from './pages/Treasury';
 import Refinery from './pages/Refinery';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -39,6 +40,7 @@ const AppRoutes = () => (
         <Route path="/work-orders" element={<WorkOrders />} />
         <Route path="/fleet" element={<Fleet />} />
         <Route path="/members" element={<Members />} />
+        <Route path="/members/business-units" element={<BusinessUnits />} />
         <Route path="/treasury" element={<Treasury />} />
         <Route path="/refinery" element={<Refinery />} />
       </Route>
