@@ -137,8 +137,6 @@ function MilestoneIcon({ state }: { state: ContractMilestone['state'] }) {
 }
 
 const DETAILS_LABELS: Record<string, string> = {
-  pickupLocationName:  'Pickup location',
-  deliveryLocationName: 'Delivery location',
   cargoDescription:    'Cargo',
   scuRequired:         'SCU required',
   targetSystem:        'Target system',
@@ -168,8 +166,40 @@ const DETAILS_ENUM_LABELS: Record<string, Record<string, string>> = {
   fuelType:      { hydrogen: 'Hydrogen', quantum: 'Quantum' },
 };
 
-function TypeDetailsSection({ details }: { details: Record<string, unknown> | null }) {
+function locationDisplay(loc: { kind: string; locationName?: string } | null | undefined): string {
+  if (!loc) return '—';
+  const name = loc.locationName || '';
+  if (!name) return '—';
+  return loc.kind === 'space_marker' ? `${name} (space marker)` : name;
+}
+
+function TypeDetailsSection({ details, type }: { details: Record<string, unknown> | null; type?: ContractType }) {
   if (!details) return null;
+
+  if (type === 'transport') {
+    const pickup = details['pickup'] as { kind: string; locationName?: string } | undefined;
+    const delivery = details['delivery'] as { kind: string; locationName?: string } | undefined;
+    const cargo = details['cargoDescription'] as string | undefined;
+    const scu = details['scuRequired'];
+    const rows = [
+      { label: 'Pickup', value: locationDisplay(pickup) },
+      { label: 'Delivery', value: locationDisplay(delivery) },
+      ...(cargo ? [{ label: 'Cargo', value: cargo }] : []),
+      ...(scu != null && scu !== '' ? [{ label: 'SCU required', value: String(scu) }] : []),
+    ];
+    return (
+      <div className="detail-section">
+        <div className="ds-cap">Details</div>
+        {rows.map(({ label, value }) => (
+          <div key={label} className="kv">
+            <span className="k">{label}</span>
+            <span className="v">{value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const rows = Object.entries(details).filter(([, v]) => v !== null && v !== undefined && v !== '');
   if (rows.length === 0) return null;
   return (
@@ -363,7 +393,7 @@ function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }:
         </div>
       </div>
 
-      <TypeDetailsSection details={contract.details} />
+      <TypeDetailsSection details={contract.details} type={contract.type} />
 
       {milestones.length > 0 && (
         <div className="detail-section">

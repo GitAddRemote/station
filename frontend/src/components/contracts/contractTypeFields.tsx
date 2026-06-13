@@ -1,9 +1,10 @@
+import { LocationPicker } from './LocationPicker';
+
 export type ContractType = 'transport' | 'transfer' | 'mining' | 'security' | 'salvage' | 'medical' | 'refueling';
 
 export interface TransportDetails {
-  pickupLocationId: string;
-  pickupLocationName: string;
-  deliveryLocationName: string;
+  pickup: { kind: 'location' | 'space_marker'; locationId?: string; locationName: string };
+  delivery: { kind: 'location' | 'space_marker'; locationId?: string; locationName: string };
   cargoDescription: string;
   scuRequired: string;
 }
@@ -42,7 +43,7 @@ export type TypeDetails =
 
 export function defaultDetails(type: ContractType): TypeDetails {
   switch (type) {
-    case 'transport':  return { pickupLocationId: '', pickupLocationName: '', deliveryLocationName: '', cargoDescription: '', scuRequired: '' };
+    case 'transport':  return { pickup: { kind: 'location', locationName: '' }, delivery: { kind: 'location', locationName: '' }, cargoDescription: '', scuRequired: '' };
     case 'mining':     return { targetSystem: '', targetBody: '', resourceType: '', targetScu: '', miningMethod: '' };
     case 'security':   return { missionKind: '', areaDescription: '', threatLevel: '', headCount: '' };
     case 'salvage':    return { targetLocation: '', scuEstimate: '', salvageKind: '' };
@@ -53,6 +54,22 @@ export function defaultDetails(type: ContractType): TypeDetails {
 }
 
 export function detailsFromRecord(type: ContractType, saved: Record<string, unknown> | null): TypeDetails {
+  if (type === 'transport') {
+    const defaults = defaultDetails('transport') as TransportDetails;
+    if (!saved) return defaults;
+    const pickupRaw = saved['pickup'] as Record<string, unknown> | undefined;
+    const deliveryRaw = saved['delivery'] as Record<string, unknown> | undefined;
+    return {
+      pickup: pickupRaw
+        ? { kind: (pickupRaw['kind'] as 'location' | 'space_marker') || 'location', locationId: pickupRaw['locationId'] as string | undefined, locationName: String(pickupRaw['locationName'] || '') }
+        : defaults.pickup,
+      delivery: deliveryRaw
+        ? { kind: (deliveryRaw['kind'] as 'location' | 'space_marker') || 'location', locationId: deliveryRaw['locationId'] as string | undefined, locationName: String(deliveryRaw['locationName'] || '') }
+        : defaults.delivery,
+      cargoDescription: saved['cargoDescription'] != null ? String(saved['cargoDescription']) : '',
+      scuRequired: saved['scuRequired'] != null ? String(saved['scuRequired']) : '',
+    };
+  }
   const defaults = defaultDetails(type) as Record<string, unknown>;
   if (!saved) return defaults as TypeDetails;
   const merged: Record<string, unknown> = { ...defaults };
@@ -65,12 +82,22 @@ export function detailsFromRecord(type: ContractType, saved: Record<string, unkn
 }
 
 export function buildDetailsPayload(type: ContractType, details: TypeDetails): Record<string, unknown> | null {
+  if (type === 'transport') {
+    const d = details as TransportDetails;
+    const out: Record<string, unknown> = {
+      pickup: { kind: d.pickup.kind, locationName: d.pickup.locationName, ...(d.pickup.locationId ? { locationId: d.pickup.locationId } : {}) },
+      delivery: { kind: d.delivery.kind, locationName: d.delivery.locationName, ...(d.delivery.locationId ? { locationId: d.delivery.locationId } : {}) },
+    };
+    if (d.cargoDescription) out['cargoDescription'] = d.cargoDescription;
+    if (d.scuRequired !== '' && d.scuRequired != null) out['scuRequired'] = parseFloat(d.scuRequired);
+    return out;
+  }
   const entries = Object.entries(details).filter(([, v]) => v !== '' && v !== null && v !== undefined);
   if (entries.length === 0) return null;
   const out: Record<string, unknown> = {};
   for (const [k, v] of entries) out[k] = v;
   const numKeys = ['scuRequired', 'targetScu', 'scuEstimate'];
-  if (['transport', 'mining', 'salvage', 'refueling'].includes(type)) {
+  if (['mining', 'salvage', 'refueling'].includes(type)) {
     for (const key of numKeys) {
       if (key in out && out[key] !== '') out[key] = parseFloat(out[key] as string);
     }
@@ -88,8 +115,16 @@ export function TypeSpecificFields({ type, details, onChange }: { type: Contract
   if (type === 'transport') {
     const d = details as TransportDetails;
     return (<>
-      <div className="field-row"><label className="field-label">Pickup location</label><input className="field-input" type="text" value={d.pickupLocationName} onChange={(e) => set('pickupLocationName', e.target.value)} placeholder="e.g. Port Olisar" /></div>
-      <div className="field-row"><label className="field-label">Delivery location</label><input className="field-input" type="text" value={d.deliveryLocationName} onChange={(e) => set('deliveryLocationName', e.target.value)} placeholder="e.g. Area 18" /></div>
+      <LocationPicker
+        label="Pickup location"
+        value={d.pickup}
+        onChange={(v) => onChange({ ...d, pickup: v })}
+      />
+      <LocationPicker
+        label="Delivery location"
+        value={d.delivery}
+        onChange={(v) => onChange({ ...d, delivery: v })}
+      />
       <div className="field-row"><label className="field-label">Cargo description</label><input className="field-input" type="text" value={d.cargoDescription} onChange={(e) => set('cargoDescription', e.target.value)} placeholder="e.g. Medical supplies" /></div>
       <div className="field-row"><label className="field-label">SCU required</label><input className="field-input" type="number" min="0" step="0.001" value={d.scuRequired} onChange={(e) => set('scuRequired', e.target.value)} placeholder="0" /></div>
     </>);
