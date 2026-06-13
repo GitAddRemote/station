@@ -16,9 +16,12 @@ export class DatabaseSeederAdminService {
   async seedAdmin(): Promise<void> {
     const email = this.configService.get<string>(
       'ADMIN_EMAIL',
-      'admin@example.com',
+      'super.admin@example.com',
     );
-    const username = this.configService.get<string>('ADMIN_USERNAME', 'admin');
+    const username = this.configService.get<string>(
+      'ADMIN_USERNAME',
+      'super.admin',
+    );
     const initialPassword = this.configService.get<string>(
       'ADMIN_INITIAL_PASSWORD',
       'ChangeMe!SecurePassword123',
