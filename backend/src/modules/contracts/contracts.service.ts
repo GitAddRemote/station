@@ -22,6 +22,7 @@ import {
   MilestoneState,
 } from './entities/contract-milestone.entity';
 import { ContractParty } from './entities/contract-party.entity';
+import { ContractStatusHistory } from './entities/contract-status-history.entity';
 import {
   Contract,
   ContractStatus,
@@ -49,6 +50,8 @@ export class ContractsService {
     private readonly partyRepository: Repository<ContractParty>,
     @InjectRepository(ContractItem)
     private readonly itemRepository: Repository<ContractItem>,
+    @InjectRepository(ContractStatusHistory)
+    private readonly statusHistoryRepository: Repository<ContractStatusHistory>,
     @InjectRepository(StationInventoryItem)
     private readonly inventoryItemRepository: Repository<StationInventoryItem>,
     private readonly dataSource: DataSource,
@@ -122,6 +125,23 @@ export class ContractsService {
     return contract;
   }
 
+  async getStatusHistory(
+    userId: string,
+    contractId: string,
+  ): Promise<ContractStatusHistory[]> {
+    const contract = await this.getContractOrThrow(contractId);
+    await this.assertPermission(
+      userId,
+      contract.orgId,
+      OrgPermission.CAN_VIEW_ORG_CONTRACTS,
+    );
+    return this.statusHistoryRepository.find({
+      where: { contractId },
+      relations: ['changedByUser'],
+      order: { changedAt: 'ASC' },
+    });
+  }
+
   async create(userId: string, dto: CreateContractDto): Promise<Contract> {
     await this.assertPermission(
       userId,
@@ -187,6 +207,14 @@ export class ContractsService {
 
       return saved;
     });
+
+    await this.recordStatusTransition(
+      contract.id,
+      null,
+      ContractStatus.DRAFT,
+      userId,
+      'Contract created',
+    );
 
     await this.auditLogsService.log({
       userId,
@@ -259,8 +287,15 @@ export class ContractsService {
       OrgPermission.CAN_MANAGE_CONTRACTS,
     );
 
+    const prevStatus = contract.status;
     contract.status = ContractStatus.CANCELLED;
     await this.contractRepository.save(contract);
+    await this.recordStatusTransition(
+      contract.id,
+      prevStatus,
+      ContractStatus.CANCELLED,
+      userId,
+    );
 
     await this.auditLogsService.log({
       userId,
@@ -286,6 +321,12 @@ export class ContractsService {
 
     contract.status = ContractStatus.OPEN;
     await this.contractRepository.save(contract);
+    await this.recordStatusTransition(
+      contract.id,
+      ContractStatus.DRAFT,
+      ContractStatus.OPEN,
+      userId,
+    );
 
     await this.auditLogsService.log({
       userId,
@@ -315,7 +356,6 @@ export class ContractsService {
       contract.status = ContractStatus.CLAIMED;
       await manager.save(Contract, contract);
 
-      // Add claimant as assignee party if not already a party
       const existing = await manager.findOne(ContractParty, {
         where: {
           contractId,
@@ -334,6 +374,12 @@ export class ContractsService {
         );
       }
     });
+    await this.recordStatusTransition(
+      contract.id,
+      ContractStatus.OPEN,
+      ContractStatus.CLAIMED,
+      userId,
+    );
 
     await this.auditLogsService.log({
       userId,
@@ -361,6 +407,12 @@ export class ContractsService {
 
     contract.status = ContractStatus.ACTIVE;
     await this.contractRepository.save(contract);
+    await this.recordStatusTransition(
+      contract.id,
+      ContractStatus.CLAIMED,
+      ContractStatus.ACTIVE,
+      userId,
+    );
 
     await this.auditLogsService.log({
       userId,
@@ -392,6 +444,12 @@ export class ContractsService {
       contract.status = ContractStatus.COMPLETED;
       await this.contractRepository.save(contract);
     }
+    await this.recordStatusTransition(
+      contract.id,
+      ContractStatus.ACTIVE,
+      ContractStatus.COMPLETED,
+      userId,
+    );
 
     await this.auditLogsService.log({
       userId,
@@ -503,8 +561,15 @@ export class ContractsService {
       );
     }
 
+    const prevStatusDispute = contract.status;
     contract.status = ContractStatus.DISPUTED;
     await this.contractRepository.save(contract);
+    await this.recordStatusTransition(
+      contract.id,
+      prevStatusDispute,
+      ContractStatus.DISPUTED,
+      userId,
+    );
 
     await this.auditLogsService.log({
       userId,
@@ -537,8 +602,15 @@ export class ContractsService {
       );
     }
 
+    const prevStatusCancel = contract.status;
     contract.status = ContractStatus.CANCELLED;
     await this.contractRepository.save(contract);
+    await this.recordStatusTransition(
+      contract.id,
+      prevStatusCancel,
+      ContractStatus.CANCELLED,
+      userId,
+    );
 
     await this.auditLogsService.log({
       userId,
@@ -651,5 +723,23 @@ export class ContractsService {
         `Missing required permission: ${permission}`,
       );
     }
+  }
+
+  private async recordStatusTransition(
+    contractId: string,
+    fromStatus: ContractStatus | null,
+    toStatus: ContractStatus,
+    changedBy: string,
+    note?: string,
+  ): Promise<void> {
+    await this.statusHistoryRepository.save(
+      this.statusHistoryRepository.create({
+        contractId,
+        fromStatus: fromStatus ?? null,
+        toStatus,
+        changedBy,
+        note: note ?? null,
+      }),
+    );
   }
 }

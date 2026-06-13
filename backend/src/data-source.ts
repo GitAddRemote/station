@@ -61,6 +61,7 @@ import { RemoveOrgInventorySharing1780170000000 } from './migrations/17801700000
 import { AddContractsTables1780170000000 } from './migrations/1780170000000-AddContractsTables';
 import { AddInventoryBatches1780180000000 } from './migrations/1780180000000-AddInventoryBatches';
 import { AddUuidDefaultsToMissingPkColumns1780190000000 } from './migrations/1780190000000-AddUuidDefaultsToMissingPkColumns';
+import { AddContractStatusHistory1780200000000 } from './migrations/1780200000000-AddContractStatusHistory';
 import { OrgGuildMapping } from './modules/station-bot-admin/entities/org-guild-mapping.entity';
 import { StationInventoryBatch } from './modules/inventory/entities/station-inventory-batch.entity';
 
@@ -135,6 +136,7 @@ export const AppDataSource = new DataSource({
     AddContractsTables1780170000000,
     AddInventoryBatches1780180000000,
     AddUuidDefaultsToMissingPkColumns1780190000000,
+    AddContractStatusHistory1780200000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },
