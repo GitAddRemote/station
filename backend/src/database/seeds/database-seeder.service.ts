@@ -425,7 +425,8 @@ export class DatabaseSeederService {
       children?: UnitSpec[];
     };
 
-    const HIERARCHY: UnitSpec[] = [
+    // Default hierarchy — used for Demo Organization and any generic org.
+    const DEFAULT_HIERARCHY: UnitSpec[] = [
       {
         name: 'Exploration Division',
         kind: 'division',
@@ -724,6 +725,403 @@ export class DatabaseSeederService {
       },
     ];
 
+    // Dreadnought Industries-specific hierarchy.
+    const DRDNT_HIERARCHY: UnitSpec[] = [
+      {
+        name: 'DreadSec',
+        kind: 'division',
+        description:
+          'Security operations, escort, patrol, and threat response.',
+        children: [
+          {
+            name: 'Combat Wing',
+            kind: 'department',
+            description: 'Fighter and interceptor assets.',
+            children: [
+              {
+                name: 'Raptor Squadron',
+                kind: 'squad',
+                description: 'Primary strike and intercept.',
+              },
+              {
+                name: 'Shield Squadron',
+                kind: 'squad',
+                description: 'Escort and defensive coverage.',
+              },
+            ],
+          },
+          {
+            name: 'Ground Operations',
+            kind: 'department',
+            description: 'Boarding, EVA, and base security.',
+            children: [
+              {
+                name: 'Breach Team',
+                kind: 'team',
+                description: 'Ship boarding and extraction.',
+              },
+              {
+                name: 'Perimeter Guard',
+                kind: 'team',
+                description: 'Facility and outpost defence.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Construction',
+        kind: 'division',
+        description:
+          'Outpost builds, habitat installations, and infrastructure projects.',
+        children: [
+          {
+            name: 'Site Planning',
+            kind: 'department',
+            description:
+              'Survey, design, and permits for construction projects.',
+            children: [
+              {
+                name: 'Survey Team',
+                kind: 'team',
+                description: 'Location assessment and feasibility.',
+              },
+            ],
+          },
+          {
+            name: 'Build Crews',
+            kind: 'department',
+            description: 'On-site construction and installation teams.',
+            children: [
+              {
+                name: 'Alpha Build Crew',
+                kind: 'team',
+                description: 'Primary construction team.',
+              },
+              {
+                name: 'Beta Build Crew',
+                kind: 'team',
+                description: 'Secondary construction team.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Manufacturing',
+        kind: 'division',
+        description: 'Component production, assembly, and quality assurance.',
+        children: [
+          {
+            name: 'Production Floor',
+            kind: 'department',
+            description: 'Active manufacturing lines and assembly.',
+            children: [
+              {
+                name: 'Assembly Line Alpha',
+                kind: 'team',
+                description: 'High-volume component production.',
+              },
+              {
+                name: 'Assembly Line Beta',
+                kind: 'team',
+                description: 'Precision parts and custom fabrication.',
+              },
+            ],
+          },
+          {
+            name: 'QA & Testing',
+            kind: 'department',
+            description: 'Product quality control and certification.',
+            children: [
+              {
+                name: 'QA Team',
+                kind: 'team',
+                description: 'Inspection, testing, and certification.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Engineering',
+        kind: 'division',
+        description: 'R&D, systems engineering, and technical operations.',
+        children: [
+          {
+            name: 'R&D',
+            kind: 'department',
+            description:
+              'Research and development of new technologies and processes.',
+            children: [
+              {
+                name: 'Skunkworks',
+                kind: 'team',
+                description: 'Experimental projects and rapid prototyping.',
+              },
+            ],
+          },
+          {
+            name: 'Systems & Maintenance',
+            kind: 'department',
+            description:
+              'Fleet maintenance, ship systems, and infrastructure upkeep.',
+            children: [
+              {
+                name: 'Fleet Technicians',
+                kind: 'team',
+                description: 'Ship repair and maintenance.',
+              },
+              {
+                name: 'Infrastructure Ops',
+                kind: 'team',
+                description: 'Station and outpost systems.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Logistics Corps',
+        kind: 'division',
+        description: 'Cargo transport, supply chain, and route management.',
+        children: [
+          {
+            name: 'Freight Operations',
+            kind: 'department',
+            description: 'Bulk cargo runs and delivery scheduling.',
+            children: [
+              {
+                name: 'Hauler Fleet',
+                kind: 'team',
+                description: 'Bulk commodity transport.',
+              },
+              {
+                name: 'Express Couriers',
+                kind: 'squad',
+                description: 'Priority small-cargo delivery.',
+              },
+            ],
+          },
+          {
+            name: 'Supply Chain',
+            kind: 'department',
+            description:
+              'Inventory management, procurement, and vendor relations.',
+            children: [
+              {
+                name: 'Procurement',
+                kind: 'team',
+                description: 'Sourcing and vendor contracts.',
+              },
+              {
+                name: 'Warehouse Ops',
+                kind: 'team',
+                description: 'Storage and inventory control.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Mining',
+        kind: 'division',
+        description: 'Asteroid and planetary extraction operations.',
+        children: [
+          {
+            name: 'Extraction',
+            kind: 'department',
+            description: 'Ship and hand mining operations.',
+            children: [
+              {
+                name: 'Rock Breakers',
+                kind: 'team',
+                description: 'Heavy ship-mining.',
+              },
+              {
+                name: 'Hand Mining Corps',
+                kind: 'team',
+                description: 'Cave and surface hand-mining.',
+              },
+              {
+                name: 'Deep Core Squad',
+                kind: 'squad',
+                description: 'Core-fracture specialists.',
+              },
+            ],
+          },
+          {
+            name: 'Refinery & Processing',
+            kind: 'department',
+            description: 'Ore refining, alloy production, and fuel processing.',
+            children: [
+              {
+                name: 'Refinery Crew',
+                kind: 'team',
+                description: 'Ore processing and refining.',
+              },
+              {
+                name: 'Quality Control',
+                kind: 'squad',
+                description: 'Yield auditing and purity checks.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Salvage',
+        kind: 'division',
+        description: 'Wreck recovery, scrapping, and materials reclamation.',
+        children: [
+          {
+            name: 'Field Salvage',
+            kind: 'department',
+            description: 'Active salvage operations in the field.',
+            children: [
+              {
+                name: 'Wreck Raiders',
+                kind: 'team',
+                description: 'Deep-space derelict salvage.',
+              },
+              {
+                name: 'Tow & Reclaim',
+                kind: 'team',
+                description: 'Ship towing and on-site recycling.',
+              },
+            ],
+          },
+          {
+            name: 'Yard Operations',
+            kind: 'department',
+            description: 'Breaker yard processing and material sorting.',
+            children: [
+              {
+                name: 'Yard Crew',
+                kind: 'team',
+                description: 'Material sorting and processing at yard.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Marketing',
+        kind: 'division',
+        description:
+          'Brand, recruitment marketing, and external communications.',
+        children: [
+          {
+            name: 'Brand & Comms',
+            kind: 'department',
+            description: 'Public image, announcements, and media.',
+            children: [
+              {
+                name: 'Content Team',
+                kind: 'team',
+                description: 'Content creation and social media.',
+              },
+              {
+                name: 'PR & Outreach',
+                kind: 'squad',
+                description: 'Press relations and community outreach.',
+              },
+            ],
+          },
+          {
+            name: 'Recruitment Marketing',
+            kind: 'department',
+            description: 'Attracting new members and promoting org growth.',
+            children: [
+              {
+                name: 'Talent Acquisition',
+                kind: 'team',
+                description: 'Active candidate sourcing.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Human Resources',
+        kind: 'division',
+        description: 'Member management, onboarding, conduct, and culture.',
+        children: [
+          {
+            name: 'Member Relations',
+            kind: 'department',
+            description: 'Onboarding, retention, and member support.',
+            children: [
+              {
+                name: 'Onboarding Team',
+                kind: 'team',
+                description: 'New member integration and training.',
+              },
+              {
+                name: 'Conduct Board',
+                kind: 'squad',
+                description: 'Discipline and code of conduct.',
+              },
+            ],
+          },
+          {
+            name: 'Training & Development',
+            kind: 'department',
+            description: 'Skills training, certifications, and career growth.',
+            children: [
+              {
+                name: 'Training Cadre',
+                kind: 'team',
+                description: 'Instruction and skill assessment.',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Finance',
+        kind: 'division',
+        description:
+          'Treasury, budgeting, contract accounting, and financial reporting.',
+        children: [
+          {
+            name: 'Treasury',
+            kind: 'department',
+            description: 'aUEC reserves, payroll, and fund management.',
+            children: [
+              {
+                name: 'Payroll',
+                kind: 'team',
+                description: 'Member compensation and payments.',
+              },
+              {
+                name: 'Reserves Management',
+                kind: 'squad',
+                description: 'Org fund allocation and oversight.',
+              },
+            ],
+          },
+          {
+            name: 'Accounting',
+            kind: 'department',
+            description: 'Contract billing, expense tracking, and auditing.',
+            children: [
+              {
+                name: 'Contract Billing',
+                kind: 'team',
+                description: 'Invoice and contract revenue tracking.',
+              },
+              {
+                name: 'Audit Team',
+                kind: 'squad',
+                description: 'Internal financial auditing.',
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
     // Upsert helper — finds by (orgId, name) or creates new.
     const upsertUnit = async (
       orgId: string,
@@ -759,8 +1157,10 @@ export class DatabaseSeederService {
 
     for (const org of orgs) {
       this.logger.info(`  Seeding business units for org: ${org.name}`);
-      for (let i = 0; i < HIERARCHY.length; i++) {
-        await upsertUnit(org.id, HIERARCHY[i], null, i);
+      const hierarchy =
+        org.slug === 'drdnt' ? DRDNT_HIERARCHY : DEFAULT_HIERARCHY;
+      for (let i = 0; i < hierarchy.length; i++) {
+        await upsertUnit(org.id, hierarchy[i], null, i);
       }
       this.logger.info(`  ✓ Done: ${org.name}`);
     }
