@@ -63,7 +63,7 @@ export class BatchService {
       .addSelect(['loc.id', 'loc.name'])
       .leftJoin('b.items', 'item')
       .addSelect('COUNT(item.id)', 'itemCount')
-      .where('b.owner_type = :ownerType AND b.owner_id = :ownerId', {
+      .where('b.ownerType = :ownerType AND b.ownerId = :ownerId', {
         ownerType: 'user',
         ownerId: userId,
       })
