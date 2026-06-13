@@ -9,8 +9,9 @@ const ProtectedRoute = () => {
   useEffect(() => {
     api
       .get('/auth/me')
-      .then(() => setAuthed(true))
+      .then((res) => { console.debug('[ProtectedRoute] /auth/me ok', res.status); setAuthed(true); })
       .catch((err) => {
+        console.debug('[ProtectedRoute] /auth/me failed', err?.response?.status, err?.response?.data);
         if (err?.response?.status === 401) {
           setAuthed(false);
         }
