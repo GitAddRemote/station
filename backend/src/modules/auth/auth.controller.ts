@@ -104,9 +104,6 @@ const FORCED_PW_LIMIT = toThrottleInt(
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  private readonly debugLog = (...args: unknown[]) =>
-    console.debug('[AuthController]', ...args);
-
   constructor(
     private authService: AuthService,
     private configService: ConfigService,
@@ -502,14 +499,6 @@ export class AuthController {
       req.cookies as Record<string, string> | undefined
     )?.[DISCORD_NONCE_COOKIE];
 
-    this.debugLog(
-      'callback: cookieName=%s stateFromQuery=%s stateFromCookie=%s allCookieKeys=%s',
-      DISCORD_NONCE_COOKIE,
-      stateFromQuery,
-      stateFromCookie,
-      Object.keys(req.cookies || {}).join(','),
-    );
-
     // Validate and consume the state (Redis GETDEL + cookie match)
     const stateValid = await this.authService.validateAndConsumeDiscordState(
       stateFromQuery,
@@ -519,7 +508,6 @@ export class AuthController {
     res.clearCookie(DISCORD_NONCE_COOKIE, { path: '/' });
 
     if (!stateValid) {
-      this.debugLog('callback: stateValid=false → /login?error=state_invalid');
       return res.redirect(`${frontendBase}/login?error=state_invalid`);
     }
 
@@ -527,13 +515,9 @@ export class AuthController {
 
     // Email and verified checks — applied before any DB lookup
     if (!profile.email) {
-      this.debugLog('callback: no email → /login?error=discord_no_email');
       return res.redirect(`${frontendBase}/login?error=discord_no_email`);
     }
     if (!profile.verified) {
-      this.debugLog(
-        'callback: unverified → /login?error=discord_unverified_email',
-      );
       return res.redirect(
         `${frontendBase}/login?error=discord_unverified_email`,
       );
@@ -547,18 +531,15 @@ export class AuthController {
     });
 
     if ('error' in result) {
-      this.debugLog('callback: handleDiscordCallback error=%s', result.error);
       return res.redirect(`${frontendBase}/login?error=${result.error}`);
     }
 
     const tokens = await this.authService.loginDiscordUser(result.user);
-    const cookieOpts = this.cookieOptions(15 * 60 * 1000);
-    this.debugLog(
-      'callback: success userId=%s cookieOpts=%j',
-      result.user.id,
-      cookieOpts,
+    res.cookie(
+      'access_token',
+      tokens.accessToken,
+      this.cookieOptions(15 * 60 * 1000),
     );
-    res.cookie('access_token', tokens.accessToken, cookieOpts);
     res.cookie(
       'refresh_token',
       tokens.refreshToken,

@@ -111,7 +111,7 @@ const Dashboard = () => {
     const load = async () => {
       try {
         const profileRes = await api.get('/users/profile');
-        const userId: string = profileRes.data.id;
+        const userId: string = profileRes.data.userId ?? profileRes.data.id;
         if (!userId) throw new Error('No user id in profile response');
         const orgsRes = await api.get(`/user-organization-roles/user/${userId}/organizations`).catch(() => ({ data: [] }));
         setUser(profileRes.data);
