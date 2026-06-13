@@ -263,6 +263,7 @@ const InventoryPage = () => {
   const [batchDrawerFromList, setBatchDrawerFromList] = useState(false);
   const [contractModalOpen, setContractModalOpen] = useState(false);
   const [contractModalTitle, setContractModalTitle] = useState('');
+  const [contractModalItem, setContractModalItem] = useState<InventoryItem | null>(null);
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
   const isOrgMode = viewMode === 'org';
@@ -2553,7 +2554,9 @@ const InventoryPage = () => {
               </MenuItem>
             )}
             <MenuItem onClick={() => {
-              setContractModalTitle((actionItem as InventoryItem | null)?.itemName ?? '');
+              const item = actionItem as InventoryItem | null;
+              setContractModalTitle(item?.itemName ?? '');
+              setContractModalItem(item ?? null);
               setContractModalOpen(true);
               closeActionMenu();
             }}>
@@ -2590,7 +2593,14 @@ const InventoryPage = () => {
         <CreateContractModal
           initialType="transfer"
           initialTitle={contractModalTitle}
-          onClose={() => setContractModalOpen(false)}
+          inventoryItem={contractModalItem ? {
+            id: contractModalItem.id,
+            itemName: contractModalItem.itemName,
+            quantity: contractModalItem.quantity,
+            catalogEntryId: contractModalItem.catalogEntryId,
+            itemSubtype: contractModalItem.catalogKind,
+          } : undefined}
+          onClose={() => { setContractModalOpen(false); setContractModalItem(null); }}
           onCreated={() => {}}
         />
       )}

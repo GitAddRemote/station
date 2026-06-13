@@ -125,12 +125,67 @@ function MilestoneIcon({ state }: { state: ContractMilestone['state'] }) {
   return <RadioButtonUncheckedIcon style={{ width: 14, height: 14 }} />;
 }
 
+const DETAILS_LABELS: Record<string, string> = {
+  pickupLocationName:  'Pickup location',
+  deliveryLocationName: 'Delivery location',
+  cargoDescription:    'Cargo',
+  scuRequired:         'SCU required',
+  targetSystem:        'Target system',
+  targetBody:          'Target body',
+  resourceType:        'Resource type',
+  targetScu:           'Target SCU',
+  miningMethod:        'Mining method',
+  missionKind:         'Mission kind',
+  areaDescription:     'Area',
+  threatLevel:         'Threat level',
+  headCount:           'Head count',
+  targetLocation:      'Target location',
+  scuEstimate:         'SCU estimate',
+  salvageKind:         'Salvage kind',
+  serviceKind:         'Service kind',
+  locationDescription: 'Location',
+  patientCount:        'Patients',
+  fuelType:            'Fuel type',
+};
+
+const DETAILS_ENUM_LABELS: Record<string, Record<string, string>> = {
+  miningMethod:  { hand: 'Hand mining', vehicle: 'Vehicle', ship: 'Ship' },
+  missionKind:   { escort: 'Escort', patrol: 'Patrol', 'base-defense': 'Base defense' },
+  threatLevel:   { low: 'Low', medium: 'Medium', high: 'High' },
+  salvageKind:   { wreck: 'Wreck salvage', recycle: 'Recycle', tow: 'Tow' },
+  serviceKind:   { rescue: 'Rescue', trauma: 'Trauma', support: 'Support' },
+  fuelType:      { hydrogen: 'Hydrogen', quantum: 'Quantum' },
+};
+
+function TypeDetailsSection({ details }: { details: Record<string, unknown> | null }) {
+  if (!details) return null;
+  const rows = Object.entries(details).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (rows.length === 0) return null;
+  return (
+    <div className="detail-section">
+      <div className="ds-cap">Details</div>
+      {rows.map(([key, val]) => {
+        const label = DETAILS_LABELS[key] ?? key;
+        const enumMap = DETAILS_ENUM_LABELS[key];
+        const display = enumMap ? (enumMap[String(val)] ?? String(val)) : String(val);
+        return (
+          <div key={key} className="kv">
+            <span className="k">{label}</span>
+            <span className="v">{display}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ContractDetail({ contract, onAction }: { contract: Contract; onAction: (action: string) => void }) {
   const ty = TYPE_META[contract.type] ?? TYPE_META.transport;
   const st = STATUS_META[contract.status] ?? STATUS_META.draft;
   const risk = contract.risk ? RISK_META[contract.risk] : null;
   const deadline = fmtDeadline(contract.deadline);
   const milestones = [...(contract.milestones ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+  const isTerminal = contract.status === 'completed' || contract.status === 'cancelled';
 
   return (
     <div className="panel con-detail">
@@ -181,6 +236,8 @@ function ContractDetail({ contract, onAction }: { contract: Contract; onAction: 
         </div>
       </div>
 
+      <TypeDetailsSection details={contract.details} />
+
       {milestones.length > 0 && (
         <div className="detail-section">
           <div className="ds-cap">Progress</div>
@@ -197,6 +254,11 @@ function ContractDetail({ contract, onAction }: { contract: Contract; onAction: 
       )}
 
       <div className="panel-body con-actions">
+        {contract.status === 'draft' && (
+          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('publish')}>
+            Publish
+          </button>
+        )}
         {contract.status === 'open' && (
           <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('claim')}>
             Claim contract
@@ -222,9 +284,11 @@ function ContractDetail({ contract, onAction }: { contract: Contract; onAction: 
             Resolve dispute
           </button>
         )}
-        <button className="btn btn-ghost btn-sm" onClick={() => onAction('cancel')} aria-label="Cancel contract">
-          ···
-        </button>
+        {!isTerminal && (
+          <button className="btn btn-ghost btn-sm" onClick={() => onAction('cancel')} aria-label="Cancel contract">
+            Cancel
+          </button>
+        )}
       </div>
     </div>
   );
