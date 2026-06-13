@@ -16,6 +16,7 @@ import {
   ListItemText,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import LayersIcon from '@mui/icons-material/Layers';
 import LocationPicker from './LocationPicker';
@@ -35,6 +36,8 @@ interface BatchDrawerProps {
   mode: BatchDrawerMode | null;
   onClose: () => void;
   onMutated: () => void;
+  onSelectBatch?: (batchId: string) => void;
+  onBack?: () => void;
 }
 
 interface ConflictState {
@@ -46,7 +49,7 @@ interface ConflictState {
 
 const DRAWER_WIDTH = 440;
 
-export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDrawerProps) {
+export default function BatchDrawer({ open, mode, onClose, onMutated, onSelectBatch, onBack }: BatchDrawerProps) {
   const [createName, setCreateName] = useState('');
   const [createLocation, setCreateLocation] = useState<LocationDto | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -247,8 +250,14 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
       }}
     >
       {/* Header */}
-      <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid var(--border-subtle)' }}>
-        <LayersIcon fontSize="small" sx={{ color: 'var(--text-muted)' }} />
+      <Box sx={{ px: 2, py: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid var(--border-subtle)' }}>
+        {onBack ? (
+          <IconButton size="small" onClick={onBack} aria-label="Back to batch list">
+            <ArrowBackIcon fontSize="small" />
+          </IconButton>
+        ) : (
+          <LayersIcon fontSize="small" sx={{ color: 'var(--text-muted)', ml: 1 }} />
+        )}
         <Typography variant="h6" sx={{ flex: 1, fontSize: '1rem', fontWeight: 600 }}>
           {title}
         </Typography>
@@ -335,27 +344,26 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
             {batches.map((batch) => (
               <Box
                 key={batch.id}
-                onClick={() => {
-                  // navigate to detail — reuse parent openBatchDrawer by closing and re-opening
-                  onClose();
-                  setTimeout(() => onMutated(), 0); // signal parent to open detail
-                }}
+                onClick={() => onSelectBatch?.(batch.id)}
                 sx={{
                   p: 2, borderRadius: 1, border: '1px solid var(--border-default)',
                   bgcolor: 'var(--surface-overlay)', cursor: 'pointer',
                   '&:hover': { borderColor: 'var(--brand)', bgcolor: 'var(--surface-raised)' },
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={1.5}>
-                  <LayersIcon sx={{ color: 'var(--brand)', fontSize: 20, flexShrink: 0 }} />
-                  <Box flex={1} minWidth={0}>
-                    <Typography variant="body2" fontWeight={600} color="var(--text-strong)" noWrap>
-                      {batch.name}
-                    </Typography>
-                    <Typography variant="caption" color="var(--text-faint)">
-                      {batch.locationName ?? 'Unknown location'} · {batch.itemCount} item{batch.itemCount !== 1 ? 's' : ''}
-                    </Typography>
-                  </Box>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
+                  <Stack direction="row" alignItems="center" spacing={1.5} minWidth={0}>
+                    <LayersIcon sx={{ color: 'var(--brand)', fontSize: 20, flexShrink: 0 }} />
+                    <Box minWidth={0}>
+                      <Typography variant="body2" fontWeight={600} color="var(--text-strong)" noWrap>
+                        {batch.name}
+                      </Typography>
+                      <Typography variant="caption" color="var(--text-faint)">
+                        {batch.locationName ?? 'Unknown location'} · {batch.itemCount} item{batch.itemCount !== 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Typography variant="caption" color="var(--text-faint)" sx={{ flexShrink: 0 }}>›</Typography>
                 </Stack>
               </Box>
             ))}

@@ -258,6 +258,7 @@ const InventoryPage = () => {
   const [newRowSaving, setNewRowSaving] = useState(false);
   const [batchDrawerOpen, setBatchDrawerOpen] = useState(false);
   const [batchDrawerMode, setBatchDrawerMode] = useState<BatchDrawerMode | null>(null);
+  const [batchDrawerFromList, setBatchDrawerFromList] = useState(false);
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
   const isOrgMode = viewMode === 'org';
@@ -472,8 +473,14 @@ const InventoryPage = () => {
   const openBatchDrawer = useCallback((mode: BatchDrawerMode) => {
     setBatchDrawerMode(mode);
     setBatchDrawerOpen(true);
+    setBatchDrawerFromList(false);
     setActionAnchor(null);
     setActionItem(null);
+  }, []);
+
+  const openBatchDetail = useCallback((batchId: string) => {
+    setBatchDrawerMode({ kind: 'detail', batchId });
+    setBatchDrawerFromList(true);
   }, []);
 
   const canViewOrgInventory = useMemo(
@@ -2548,8 +2555,10 @@ const InventoryPage = () => {
       <BatchDrawer
         open={batchDrawerOpen}
         mode={batchDrawerMode}
-        onClose={() => { setBatchDrawerOpen(false); setBatchDrawerMode(null); }}
+        onClose={() => { setBatchDrawerOpen(false); setBatchDrawerMode(null); setBatchDrawerFromList(false); }}
         onMutated={fetchInventory}
+        onSelectBatch={openBatchDetail}
+        onBack={batchDrawerFromList ? () => setBatchDrawerMode({ kind: 'list' }) : undefined}
       />
 
       <InventoryItemDrawer
