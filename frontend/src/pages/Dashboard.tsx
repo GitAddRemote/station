@@ -23,6 +23,8 @@ import InvitationsPortlet from '../components/dashboard/portlets/InvitationsPort
 import StubPortlet from '../components/dashboard/portlets/StubPortlet';
 import InventoryPortlet from '../components/inventory/InventoryPortlet';
 import ContractsPortlet from '../components/contracts/ContractsPortlet';
+import RefineryPortlet from '../components/refinery/RefineryPortlet';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import '../components/dashboard/Dashboard.css';
 import { api } from '../services/api.service';
 
@@ -58,6 +60,7 @@ const PORTLET_DEFS = [
   { id: 'salvage',     title: 'Salvage',          icon: <RecyclingIcon />,                            defaultSize: 'compact'  as PortletSize },
   { id: 'hauling',     title: 'Hauling & Trade',  icon: <LocalShippingIcon />,                        defaultSize: 'compact'  as PortletSize },
   { id: 'inventory',   title: 'My Inventory',     icon: <AccountBalanceIcon />, href: '/inventory',   defaultSize: 'full'     as PortletSize },
+  { id: 'refinery',   title: 'Refinery',         icon: <PrecisionManufacturingIcon />, href: '/refinery', defaultSize: 'compact' as PortletSize },
 ] as const;
 
 type PortletId = typeof PORTLET_DEFS[number]['id'];
@@ -67,7 +70,7 @@ const DEFAULT_ORDER: PortletId[] = [
   'profile', 'orgs', 'invitations',
   'workorders', 'fleet', 'contracts',
   'treasury', 'mining', 'salvage',
-  'hauling', 'inventory',
+  'hauling', 'refinery', 'inventory',
 ];
 
 function defaultSizes(): Record<PortletId, PortletSize> {
@@ -246,6 +249,8 @@ const Dashboard = () => {
         return <StubPortlet icon={<RecyclingIcon />} label="Salvage" />;
       case 'hauling':
         return <StubPortlet icon={<LocalShippingIcon />} label="Hauling & Trade" />;
+      case 'refinery':
+        return <RefineryPortlet />;
       default:
         return null;
     }

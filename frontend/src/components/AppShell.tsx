@@ -16,6 +16,7 @@ import {
   Group as MembersIcon,
   Inventory2 as InventoryIcon,
   AccountBalance as TreasuryIcon,
+  PrecisionManufacturing as RefineryIcon,
   SmartToy as StationBotIcon,
   Search as SearchIcon,
   Keyboard as KeyboardIcon,
@@ -43,15 +44,16 @@ interface NavItem {
 
 const NAV_PRIMARY: NavItem[] = [
   { id: 'dashboard',  label: 'Dashboard',   icon: <DashboardIcon />, href: '/dashboard',  key: 'd' },
-  { id: 'workorders', label: 'Work Orders',  icon: <PickaxeIcon />,   href: '/work-orders', key: 'w', soon: true },
+  { id: 'workorders', label: 'Work Orders',  icon: <PickaxeIcon />,   href: '/work-orders', key: 'w' },
   { id: 'contracts',  label: 'Contracts',    icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
-  { id: 'fleet',      label: 'Fleet',        icon: <FleetIcon />,     href: '/fleet',      key: 'f', soon: true },
-  { id: 'members',    label: 'Members',      icon: <MembersIcon />,   href: '/members',    key: 'm', soon: true },
+  { id: 'fleet',      label: 'Fleet',        icon: <FleetIcon />,     href: '/fleet',      key: 'f' },
+  { id: 'members',    label: 'Members',      icon: <MembersIcon />,   href: '/members',    key: 'm' },
 ];
 
 const NAV_ASSETS: NavItem[] = [
-  { id: 'inventory', label: 'Inventory', icon: <InventoryIcon />, href: '/inventory' },
-  { id: 'treasury',  label: 'Treasury',  icon: <TreasuryIcon />,  href: '/treasury', soon: true },
+  { id: 'inventory', label: 'Inventory',  icon: <InventoryIcon />, href: '/inventory' },
+  { id: 'treasury',  label: 'Treasury',   icon: <TreasuryIcon />,  href: '/treasury' },
+  { id: 'refinery',  label: 'Refinery',   icon: <RefineryIcon />,  href: '/refinery' },
 ];
 
 // ---- theme persistence -----------------------------------------------

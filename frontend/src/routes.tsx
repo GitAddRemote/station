@@ -12,6 +12,11 @@ import Profile from './pages/Profile';
 import Inventory from './pages/Inventory';
 import OrgInventory from './pages/OrgInventory';
 import Contracts from './pages/Contracts';
+import WorkOrders from './pages/WorkOrders';
+import Fleet from './pages/Fleet';
+import Members from './pages/Members';
+import Treasury from './pages/Treasury';
+import Refinery from './pages/Refinery';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const AppRoutes = () => (
@@ -31,6 +36,11 @@ const AppRoutes = () => (
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/org-inventory" element={<OrgInventory />} />
         <Route path="/contracts" element={<Contracts />} />
+        <Route path="/work-orders" element={<WorkOrders />} />
+        <Route path="/fleet" element={<Fleet />} />
+        <Route path="/members" element={<Members />} />
+        <Route path="/treasury" element={<Treasury />} />
+        <Route path="/refinery" element={<Refinery />} />
       </Route>
     </Routes>
   </Router>

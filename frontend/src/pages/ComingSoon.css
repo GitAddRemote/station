@@ -1,0 +1,107 @@
+.cs-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 120px);
+}
+
+.cs-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+  padding: var(--space-10) var(--space-8);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  gap: var(--space-4);
+}
+
+.cs-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+  color: var(--brand);
+  margin-bottom: var(--space-2);
+}
+.cs-icon svg { width: 30px; height: 30px; }
+
+.cs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+}
+.cs-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand);
+  opacity: 0.7;
+}
+
+.cs-title {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-3xl);
+  color: var(--text-strong);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.cs-sub {
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  margin: 0;
+  font-weight: var(--weight-medium);
+}
+
+.cs-desc {
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+  line-height: var(--leading-relaxed);
+  margin: 0;
+}
+
+.cs-features {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-4);
+}
+
+.cs-features li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.cs-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  flex: none;
+}
