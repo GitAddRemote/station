@@ -28,6 +28,8 @@ import {
   CheckCircleOutline as CheckIcon,
   UnfoldMoreDouble as ChevronUpDownIcon,
   Logout as LogoutIcon,
+  ChevronRight as ChevronRightIcon,
+  AccountTree as OrgIcon,
 } from '@mui/icons-material';
 import { api } from '../services/api.service';
 import './AppShell.css';
@@ -41,6 +43,7 @@ interface NavItem {
   key?: string;
   soon?: boolean;
   sub?: boolean;
+  children?: NavItem[];
 }
 
 const NAV_HOME: NavItem[] = [
@@ -49,7 +52,17 @@ const NAV_HOME: NavItem[] = [
 
 const NAV_PRIMARY: NavItem[] = [
   { id: 'contracts',  label: 'Contracts',        icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
-  { id: 'hr',         label: 'Human Resources',  icon: <MembersIcon />,   href: '/hr',         key: 'm' },
+  {
+    id: 'hr',
+    label: 'Human Resources',
+    icon: <MembersIcon />,
+    href: '/hr',
+    key: 'm',
+    children: [
+      { id: 'hr-members',        label: 'Members',        icon: <MembersIcon />, href: '/hr/members' },
+      { id: 'hr-business-units', label: 'Business Units', icon: <OrgIcon />,     href: '/hr/business-units' },
+    ],
+  },
   { id: 'refinery',   label: 'Refinery',         icon: <RefineryIcon />,  href: '/refinery' },
   { id: 'workorders', label: 'Work Orders',      icon: <PickaxeIcon />,   href: '/work-orders', key: 'w' },
 ];
@@ -263,6 +276,21 @@ export function AppShell({
   const [helpOpen, setHelpOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('station-nav-expanded');
+      return saved ? new Set(JSON.parse(saved)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
+
+  const toggleGroup = useCallback((id: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      try { localStorage.setItem('station-nav-expanded', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   const gPending = useRef(false);
   const navigate = useNavigate();
 
@@ -413,22 +441,53 @@ export function AppShell({
             ))}
 
             <div className="side-cap">Operations</div>
-            {NAV_PRIMARY.map((n) => (
-              <Link
-                key={n.id}
-                className={'side-link' + (n.id === active ? ' active' : '') + (n.soon ? ' soon' : '') + (n.sub ? ' side-link-sub' : '')}
-                to={n.soon ? '#' : n.href}
-                aria-current={n.id === active ? 'page' : undefined}
-                onClick={(e) => { if (n.soon) e.preventDefault(); if (!n.soon) setNavOpen(false); }}
-              >
-                {n.icon}
-                <span className="side-link-label">{n.label}</span>
-                {n.soon
-                  ? <span className="side-link-soon-tag">soon</span>
-                  : <span className="side-link-key">{n.key}</span>
-                }
-              </Link>
-            ))}
+            {NAV_PRIMARY.map((n) => {
+              const isActive = n.id === active || n.children?.some((c) => c.id === active);
+              const isExpanded = expandedGroups.has(n.id);
+              const hasChildren = !!n.children?.length;
+              return (
+                <div key={n.id} className="side-group">
+                  <div className={'side-link side-link-group' + (isActive ? ' active' : '') + (n.soon ? ' soon' : '')}>
+                    <Link
+                      className="side-link-group-main"
+                      to={n.soon ? '#' : n.href}
+                      aria-current={n.id === active ? 'page' : undefined}
+                      onClick={(e) => { if (n.soon) e.preventDefault(); else setNavOpen(false); }}
+                    >
+                      {n.icon}
+                      <span className="side-link-label">{n.label}</span>
+                    </Link>
+                    {hasChildren && (
+                      <button
+                        className={'side-group-toggle' + (isExpanded ? ' open' : '')}
+                        onClick={() => toggleGroup(n.id)}
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                      >
+                        <ChevronRightIcon style={{ width: 14, height: 14 }} />
+                      </button>
+                    )}
+                    {!hasChildren && n.key && <span className="side-link-key">{n.key}</span>}
+                    {n.soon && <span className="side-link-soon-tag">soon</span>}
+                  </div>
+                  {hasChildren && isExpanded && (
+                    <div className="side-children">
+                      {n.children!.map((child) => (
+                        <Link
+                          key={child.id}
+                          className={'side-link side-link-child' + (child.id === active ? ' active' : '')}
+                          to={child.href}
+                          aria-current={child.id === active ? 'page' : undefined}
+                          onClick={() => setNavOpen(false)}
+                        >
+                          {child.icon}
+                          <span className="side-link-label">{child.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             <div className="side-cap">Assets</div>
             {NAV_ASSETS.map((n) => (

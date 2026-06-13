@@ -148,40 +148,42 @@ export default function HumanResources() {
               <div>
                 <div className="hr-widget-title">Members</div>
                 <div className="hr-widget-sub">
-                  {loadingM ? '…' : `${members.length} member${members.length !== 1 ? 's' : ''}`}
+                  {loadingM ? '…' : members.length}
                 </div>
               </div>
               <button className="hr-view-all" onClick={() => navigate('/hr/members')}>
-                View all <ArrowForwardIcon style={{ width: 14, height: 14 }} />
+                View all <ArrowForwardIcon style={{ width: 13, height: 13 }} />
               </button>
             </div>
 
-            {loadingM ? (
-              <div className="hr-loading">Loading…</div>
-            ) : members.length === 0 ? (
-              <div className="hr-empty">No members yet.</div>
-            ) : (
-              <div className="hr-member-list">
-                {recentMembers.map((m) => (
-                  <div key={m.userId} className="hr-member-row" onClick={() => navigate('/hr/members')}>
-                    <div className="hr-avatar">{initials(m.user)}</div>
-                    <div className="hr-member-info">
-                      <div className="hr-member-name">{displayName(m.user)}</div>
-                      <div className="hr-member-meta">
-                        <span className="hr-role-badge">{m.roleName}</span>
-                        {m.user.discordId && <span className="hr-discord-dot"><LinkIcon style={{ width: 10, height: 10 }} /></span>}
+            <div className="hr-widget-body">
+              {loadingM ? (
+                <div className="hr-loading">Loading…</div>
+              ) : members.length === 0 ? (
+                <div className="hr-empty">No members yet.</div>
+              ) : (
+                <div className="hr-member-list">
+                  {recentMembers.map((m) => (
+                    <div key={m.userId} className="hr-member-row" onClick={() => navigate('/hr/members')}>
+                      <div className="hr-avatar">{initials(m.user)}</div>
+                      <div className="hr-member-info">
+                        <div className="hr-member-name">{displayName(m.user)}</div>
+                        <div className="hr-member-meta">
+                          <span className="hr-role-badge">{m.roleName}</span>
+                          {m.user.discordId && <span className="hr-discord-dot"><LinkIcon style={{ width: 10, height: 10 }} /></span>}
+                        </div>
                       </div>
+                      <div className="hr-member-date">{fmtDate(m.assignedAt)}</div>
                     </div>
-                    <div className="hr-member-date">{fmtDate(m.assignedAt)}</div>
-                  </div>
-                ))}
-                {members.length > 6 && (
-                  <div className="hr-more" onClick={() => navigate('/hr/members')}>
-                    +{members.length - 6} more — view all
-                  </div>
-                )}
-              </div>
-            )}
+                  ))}
+                  {members.length > 6 && (
+                    <div className="hr-more" onClick={() => navigate('/hr/members')}>
+                      +{members.length - 6} more — view all
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ---- Business Units widget ---- */}
@@ -191,34 +193,36 @@ export default function HumanResources() {
               <div>
                 <div className="hr-widget-title">Business Units</div>
                 <div className="hr-widget-sub">
-                  {loadingU ? '…' : `${totalUnits} unit${totalUnits !== 1 ? 's' : ''}`}
+                  {loadingU ? '…' : totalUnits}
                 </div>
               </div>
               <button className="hr-view-all" onClick={() => navigate('/hr/business-units')}>
-                View all <ArrowForwardIcon style={{ width: 14, height: 14 }} />
+                View all <ArrowForwardIcon style={{ width: 13, height: 13 }} />
               </button>
             </div>
 
-            {/* Kind summary pills */}
-            {!loadingU && totalUnits > 0 && (
-              <div className="hr-kind-pills">
-                {Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([kind, count]) => (
-                  <span key={kind} className={`hr-kind-pill hr-kind-${kind}`}>
-                    {count} {kind}{count !== 1 ? 's' : ''}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="hr-widget-body">
+              {/* Kind summary pills */}
+              {!loadingU && totalUnits > 0 && (
+                <div className="hr-kind-pills">
+                  {Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([kind, count]) => (
+                    <span key={kind} className={`hr-kind-pill hr-kind-${kind}`}>
+                      {count} {kind}{count !== 1 ? 's' : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-            {loadingU ? (
-              <div className="hr-loading">Loading…</div>
-            ) : units.length === 0 ? (
-              <div className="hr-empty">No business units yet.</div>
-            ) : (
-              <div className="hr-tree-preview" onClick={() => navigate('/hr/business-units')}>
-                <MiniTree nodes={units} />
-              </div>
-            )}
+              {loadingU ? (
+                <div className="hr-loading">Loading…</div>
+              ) : units.length === 0 ? (
+                <div className="hr-empty">No business units yet.</div>
+              ) : (
+                <div className="hr-tree-preview" onClick={() => navigate('/hr/business-units')}>
+                  <MiniTree nodes={units} />
+                </div>
+              )}
+            </div>
           </div>
 
         </div>
