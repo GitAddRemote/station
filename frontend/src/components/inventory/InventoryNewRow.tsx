@@ -114,7 +114,6 @@ export const InventoryNewRow = ({
           inputValue={itemInput}
           loading={itemLoading}
           autoHighlight
-          openOnFocus
           filterOptions={(options) => options}
           getOptionLabel={(option) => option?.name ?? ''}
           isOptionEqualToValue={(option, value) => option.id === value.id}
