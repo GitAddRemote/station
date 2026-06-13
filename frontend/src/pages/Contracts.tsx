@@ -19,8 +19,10 @@ import CloseIcon from '@mui/icons-material/Close';
 import ScrollTextIcon from '@mui/icons-material/Article';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CoinsIcon from '@mui/icons-material/MonetizationOn';
+import EditIcon from '@mui/icons-material/Edit';
 import AppShell from '../components/AppShell';
 import { api } from '../services/api.service';
+import { type TypeDetails, detailsFromRecord, buildDetailsPayload, TypeSpecificFields } from '../components/contracts/contractTypeFields';
 import './Contracts.css';
 
 type ContractStatus = 'draft' | 'open' | 'claimed' | 'active' | 'completed' | 'disputed' | 'cancelled';
@@ -188,8 +190,60 @@ function TypeDetailsSection({ details }: { details: Record<string, unknown> | nu
   );
 }
 
-function ContractDetail({ contract, onAction, onClose, currentUserId }: { contract: Contract; onAction: (action: string) => void; onClose: () => void; currentUserId: string | null }) {
+function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }: {
+  contract: Contract;
+  onAction: (action: string) => void;
+  onClose: () => void;
+  onSaved: () => void;
+  currentUserId: string | null;
+}) {
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // edit form state
+  const [editTitle, setEditTitle] = useState(contract.title);
+  const [editDescription, setEditDescription] = useState(contract.description ?? '');
+  const [editReward, setEditReward] = useState(contract.rewardAuec ?? '');
+  const [editRisk, setEditRisk] = useState<string>(contract.risk ?? '');
+  const [editDeadline, setEditDeadline] = useState(
+    contract.deadline ? new Date(contract.deadline).toISOString().slice(0, 16) : ''
+  );
+  const [editDetails, setEditDetails] = useState<TypeDetails>(() =>
+    detailsFromRecord(contract.type as import('../components/contracts/contractTypeFields').ContractType, contract.details)
+  );
+
+  const openEdit = () => {
+    setEditTitle(contract.title);
+    setEditDescription(contract.description ?? '');
+    setEditReward(contract.rewardAuec ?? '');
+    setEditRisk(contract.risk ?? '');
+    setEditDeadline(contract.deadline ? new Date(contract.deadline).toISOString().slice(0, 16) : '');
+    setEditDetails(detailsFromRecord(contract.type as import('../components/contracts/contractTypeFields').ContractType, contract.details));
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        title: editTitle.trim(),
+        description: editDescription.trim() || null,
+        rewardAuec: editReward !== '' ? parseFloat(editReward) : null,
+        risk: editRisk || null,
+        deadline: editDeadline || null,
+        details: buildDetailsPayload(contract.type as import('../components/contracts/contractTypeFields').ContractType, editDetails),
+      };
+      await api.patch(`/api/contracts/${contract.id}`, payload);
+      setEditing(false);
+      onSaved();
+    } catch {
+      // leave edit mode open so user can retry
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const ty = TYPE_META[contract.type] ?? TYPE_META.transport;
   const st = STATUS_META[contract.status] ?? STATUS_META.draft;
   const risk = contract.risk ? RISK_META[contract.risk] : null;
@@ -197,10 +251,67 @@ function ContractDetail({ contract, onAction, onClose, currentUserId }: { contra
   const milestones = [...(contract.milestones ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
   const isTerminal = contract.status === 'completed' || contract.status === 'cancelled';
   const isOwnContract = currentUserId !== null && contract.creatorId === currentUserId;
+  const canEdit = isOwnContract && (contract.status === 'draft' || contract.status === 'open');
+
+  if (editing) {
+    return (
+      <div className="panel con-detail">
+        <div className="con-detail-head">
+          <span className="con-edit-label">Editing contract</span>
+          <button className="con-detail-close" onClick={() => setEditing(false)} aria-label="Cancel edit">
+            <CloseIcon style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+        <div className="con-edit-body">
+          <div className="field-row">
+            <label className="field-label">Title</label>
+            <input className="field-input" type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+          </div>
+          <div className="field-row">
+            <label className="field-label">Description</label>
+            <textarea className="field-input" rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+          </div>
+          <div className="field-row">
+            <label className="field-label">Reward (aUEC)</label>
+            <input className="field-input" type="number" min="0" step="1" value={editReward} onChange={(e) => setEditReward(e.target.value)} placeholder="0" />
+          </div>
+          <div className="field-row">
+            <label className="field-label">Risk</label>
+            <select className="field-input" value={editRisk} onChange={(e) => setEditRisk(e.target.value)}>
+              <option value="">— unspecified —</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div className="field-row">
+            <label className="field-label">Deadline</label>
+            <input className="field-input" type="datetime-local" value={editDeadline} onChange={(e) => setEditDeadline(e.target.value)} />
+          </div>
+          <TypeSpecificFields
+            type={contract.type as import('../components/contracts/contractTypeFields').ContractType}
+            details={editDetails}
+            onChange={setEditDetails}
+          />
+        </div>
+        <div className="panel-body con-actions">
+          <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)} disabled={saving}>Discard</button>
+          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={saveEdit} disabled={saving || !editTitle.trim()}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="panel con-detail">
       <div className="con-detail-head">
+        {canEdit && (
+          <button className="con-detail-close" onClick={openEdit} aria-label="Edit contract" title="Edit contract">
+            <EditIcon style={{ width: 16, height: 16 }} />
+          </button>
+        )}
         <button className="con-detail-close" onClick={onClose} aria-label="Close">
           <CloseIcon style={{ width: 16, height: 16 }} />
         </button>
@@ -574,7 +685,7 @@ const Contracts = () => {
 
           {/* slide-in detail drawer */}
           <div className={`con-drawer${drawerOpen ? ' open' : ''}`} aria-hidden={!drawerOpen}>
-            {sel && <ContractDetail contract={sel} onAction={handleAction} onClose={() => setDrawerOpen(false)} currentUserId={currentUserId} />}
+            {sel && <ContractDetail contract={sel} onAction={handleAction} onClose={() => setDrawerOpen(false)} onSaved={fetchContracts} currentUserId={currentUserId} />}
           </div>
           {drawerOpen && <div className="con-drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
         </div>
