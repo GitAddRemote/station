@@ -69,6 +69,11 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
 
 
   useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
+
+  useEffect(() => {
     api.get('/users/profile').then((r) => {
       const uid = r.data.userId ?? r.data.id;
       if (!uid) return;

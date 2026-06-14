@@ -61,6 +61,11 @@ function BusinessUnitModal({ orgId, tree, editing, parentPreset, onClose, onSave
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
 
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
+
   const flatOptions = flattenTree(tree);
   const excluded = editing ? descendantIds(editing) : new Set<string>();
   const parentOptions = flatOptions.filter((o) => o.id !== editing?.id && !excluded.has(o.id));
@@ -167,6 +172,11 @@ interface DeleteConfirmProps {
 function DeleteConfirm({ node, orgId, onClose, onDeleted }: DeleteConfirmProps) {
   const [deleting, setDeleting] = useState(false);
   const childCount = node.children.length;
+
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => document.body.classList.remove('modal-open');
+  }, []);
 
   const handleDelete = async () => {
     setDeleting(true);

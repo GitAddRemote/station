@@ -262,3 +262,8 @@ a {
   text-decoration: none;
   color: inherit;
 }
+
+
+body.modal-open {
+  overflow: hidden;
+}

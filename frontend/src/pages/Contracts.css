@@ -313,6 +313,7 @@
   justify-content: center;
   z-index: 999;
   padding: var(--space-4);
+  overflow: hidden;
 }
 
 .modal-box {
@@ -372,6 +373,7 @@
   padding: var(--space-5);
   overflow-y: auto;
   flex: 1;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.2s;
