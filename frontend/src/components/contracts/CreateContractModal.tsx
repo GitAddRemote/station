@@ -150,8 +150,8 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
     (assigneeKind !== 'division' || assigneeDivisionId);
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop">
+      <div className="modal-box">
         <div className="modal-head">
           <span className="modal-title">New contract</span>
           <button className="btn-icon" onClick={onClose} aria-label="Close">✕</button>

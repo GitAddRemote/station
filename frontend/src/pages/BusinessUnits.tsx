@@ -92,8 +92,8 @@ function BusinessUnitModal({ orgId, tree, editing, parentPreset, onClose, onSave
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box bu-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop">
+      <div className="modal-box bu-modal">
         <div className="modal-head">
           <span className="modal-title">{editing ? 'Edit business unit' : 'New business unit'}</span>
           <button className="btn-icon" onClick={onClose} aria-label="Close">✕</button>
@@ -180,8 +180,8 @@ function DeleteConfirm({ node, orgId, onClose, onDeleted }: DeleteConfirmProps) 
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-box bu-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop">
+      <div className="modal-box bu-modal">
         <div className="modal-head">
           <span className="modal-title">Delete "{node.name}"?</span>
           <button className="btn-icon" onClick={onClose}>✕</button>
