@@ -16,6 +16,7 @@ import {
   ListItemText,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import LayersIcon from '@mui/icons-material/Layers';
 import LocationPicker from './LocationPicker';
@@ -26,6 +27,7 @@ import { api } from '../../services/api.service';
 
 export type BatchDrawerMode =
   | { kind: 'create' }
+  | { kind: 'list' }
   | { kind: 'add-to-batch'; item: InventoryItem }
   | { kind: 'detail'; batchId: string };
 
@@ -34,6 +36,8 @@ interface BatchDrawerProps {
   mode: BatchDrawerMode | null;
   onClose: () => void;
   onMutated: () => void;
+  onSelectBatch?: (batchId: string) => void;
+  onBack?: () => void;
 }
 
 interface ConflictState {
@@ -45,7 +49,7 @@ interface ConflictState {
 
 const DRAWER_WIDTH = 440;
 
-export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDrawerProps) {
+export default function BatchDrawer({ open, mode, onClose, onMutated, onSelectBatch, onBack }: BatchDrawerProps) {
   const [createName, setCreateName] = useState('');
   const [createLocation, setCreateLocation] = useState<LocationDto | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -91,7 +95,7 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
     if (!open) { reset(); return; }
     if (!mode) return;
 
-    if (mode.kind === 'add-to-batch') {
+    if (mode.kind === 'list' || mode.kind === 'add-to-batch') {
       setBatchesLoading(true);
       setBatchesError(null);
       batchService.list().then((r) => {
@@ -108,8 +112,8 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
       setDetailError(null);
       Promise.all([
         api.get<BatchDto>(`/api/inventory/batches/${mode.batchId}`).then((r) => r.data),
-        api.get<{ data: InventoryItem[] }>('/api/inventory/items', {
-          params: { batchId: mode.batchId, limit: 200 },
+        api.get<{ data: InventoryItem[] }>('/api/inventory', {
+          params: { batchId: mode.batchId, limit: 100 },
         }).then((r) => r.data.data).catch(() => [] as InventoryItem[]),
       ]).then(([b, items]) => {
         setDetail(b);
@@ -139,6 +143,14 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
     }
   };
 
+  const extractConflict = (err: unknown): BatchLocationConflictItem[] | null => {
+    const data = (err as { response?: { data?: unknown } })?.response?.data;
+    if (data && typeof data === 'object' && 'conflictingItems' in data) {
+      return (data as { conflictingItems: BatchLocationConflictItem[] }).conflictingItems;
+    }
+    return null;
+  };
+
   const handleAddToBatch = async (batch: BatchDto, item: InventoryItem, force = false) => {
     setAddWorking(batch.id);
     try {
@@ -146,15 +158,10 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
       onMutated();
       onClose();
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number; data?: unknown } })?.response?.status;
-      const data = (err as { response?: { data?: unknown } })?.response?.data;
-      if (status === 409 && data && typeof data === 'object' && 'conflictingItems' in data) {
-        setConflict({
-          batchId: batch.id,
-          itemIds: [item.id],
-          conflictingItems: (data as { conflictingItems: BatchLocationConflictItem[] }).conflictingItems,
-          force: false,
-        });
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const conflictingItems = status === 409 ? extractConflict(err) : null;
+      if (conflictingItems) {
+        setConflict({ batchId: batch.id, itemIds: [item.id], conflictingItems, force: false });
       } else {
         setBatchesError('Failed to add item to batch.');
       }
@@ -192,15 +199,10 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
       setEditLocation({ id: updated.locationId, name: updated.locationName ?? '' } as LocationDto);
       onMutated();
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number; data?: unknown } })?.response?.status;
-      const data = (err as { response?: { data?: unknown } })?.response?.data;
-      if (status === 409 && data && typeof data === 'object' && 'conflictingItems' in data) {
-        setConflict({
-          batchId: detail.id,
-          itemIds: [],
-          conflictingItems: (data as { conflictingItems: BatchLocationConflictItem[] }).conflictingItems,
-          force: false,
-        });
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const conflictingItems = status === 409 ? extractConflict(err) : null;
+      if (conflictingItems) {
+        setConflict({ batchId: detail.id, itemIds: [], conflictingItems, force: false });
       } else {
         setDetailError('Failed to update batch.');
       }
@@ -226,6 +228,7 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
 
   const title =
     mode?.kind === 'create' ? 'New batch'
+    : mode?.kind === 'list' ? 'My batches'
     : mode?.kind === 'add-to-batch' ? 'Add to batch'
     : detail?.name ?? 'Batch';
 
@@ -245,8 +248,14 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
       }}
     >
       {/* Header */}
-      <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid var(--border-subtle)' }}>
-        <LayersIcon fontSize="small" sx={{ color: 'var(--text-muted)' }} />
+      <Box sx={{ px: 2, py: 2, display: 'flex', alignItems: 'center', gap: 1, borderBottom: '1px solid var(--border-subtle)' }}>
+        {onBack ? (
+          <IconButton size="small" onClick={onBack} aria-label="Back to batch list">
+            <ArrowBackIcon fontSize="small" />
+          </IconButton>
+        ) : (
+          <LayersIcon fontSize="small" sx={{ color: 'var(--text-muted)', ml: 1 }} />
+        )}
         <Typography variant="h6" sx={{ flex: 1, fontSize: '1rem', fontWeight: 600 }}>
           {title}
         </Typography>
@@ -315,6 +324,47 @@ export default function BatchDrawer({ open, mode, onClose, onMutated }: BatchDra
             >
               Create batch
             </Button>
+          </Stack>
+        </Box>
+      )}
+
+      {/* Batch list */}
+      {!conflict && mode?.kind === 'list' && (
+        <Box sx={{ flex: 1, overflowY: 'auto', p: 3 }}>
+          <Stack spacing={1.5}>
+            {batchesError && <Alert severity="error">{batchesError}</Alert>}
+            {batchesLoading && <CircularProgress size={24} sx={{ mx: 'auto' }} />}
+            {!batchesLoading && batches.length === 0 && (
+              <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
+                No batches yet. Use the menu on any inventory item to create one.
+              </Typography>
+            )}
+            {batches.map((batch) => (
+              <Box
+                key={batch.id}
+                onClick={() => onSelectBatch?.(batch.id)}
+                sx={{
+                  p: 2, borderRadius: 1, border: '1px solid var(--border-default)',
+                  bgcolor: 'var(--surface-overlay)', cursor: 'pointer',
+                  '&:hover': { borderColor: 'var(--brand)', bgcolor: 'var(--surface-raised)' },
+                }}
+              >
+                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
+                  <Stack direction="row" alignItems="center" spacing={1.5} minWidth={0}>
+                    <LayersIcon sx={{ color: 'var(--brand)', fontSize: 20, flexShrink: 0 }} />
+                    <Box minWidth={0}>
+                      <Typography variant="body2" fontWeight={600} color="var(--text-strong)" noWrap>
+                        {batch.name}
+                      </Typography>
+                      <Typography variant="caption" color="var(--text-faint)">
+                        {batch.locationName ?? 'Unknown location'} · {batch.itemCount} item{batch.itemCount !== 1 ? 's' : ''}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Typography variant="caption" color="var(--text-faint)" sx={{ flexShrink: 0 }}>›</Typography>
+                </Stack>
+              </Box>
+            ))}
           </Stack>
         </Box>
       )}

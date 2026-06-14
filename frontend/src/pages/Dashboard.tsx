@@ -16,13 +16,15 @@ import MoveDownIcon from '@mui/icons-material/MoveDown';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
 import CheckIcon from '@mui/icons-material/Check';
 import AppShell from '../components/AppShell';
-import Portlet from '../components/dashboard/Portlet';
+import Portlet, { type PortletSize } from '../components/dashboard/Portlet';
 import ProfilePortlet from '../components/dashboard/portlets/ProfilePortlet';
 import OrganizationsPortlet from '../components/dashboard/portlets/OrganizationsPortlet';
 import InvitationsPortlet from '../components/dashboard/portlets/InvitationsPortlet';
 import StubPortlet from '../components/dashboard/portlets/StubPortlet';
 import InventoryPortlet from '../components/inventory/InventoryPortlet';
 import ContractsPortlet from '../components/contracts/ContractsPortlet';
+import RefineryPortlet from '../components/refinery/RefineryPortlet';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import '../components/dashboard/Dashboard.css';
 import { api } from '../services/api.service';
 
@@ -43,20 +45,22 @@ interface Org {
 }
 
 // ---- layout persistence ------------------------------------
-const LS_LAYOUT_KEY = 'station-dash-layout-v2';
+const LS_LAYOUT_KEY  = 'station-dash-layout-v2';
+const LS_SIZES_KEY   = 'station-dash-sizes-v1';
 
 const PORTLET_DEFS = [
-  { id: 'profile',     title: 'My Profile',      icon: <PersonIcon />,         href: '/profile' },
-  { id: 'orgs',        title: 'Organizations',    icon: <GroupsIcon /> },
-  { id: 'invitations', title: 'Invitations',      icon: <MailIcon /> },
-  { id: 'workorders',  title: 'Work Orders',      icon: <ConstructionIcon />,   href: '/work-orders' },
-  { id: 'fleet',       title: 'Fleet',            icon: <RocketLaunchIcon />,   href: '/fleet' },
-  { id: 'contracts',   title: 'Contracts',        icon: <ArticleIcon />,        href: '/contracts' },
-  { id: 'treasury',    title: 'Treasury',         icon: <AccountBalanceIcon />, href: '/treasury' },
-  { id: 'mining',      title: 'Mining',           icon: <TrendingUpIcon /> },
-  { id: 'salvage',     title: 'Salvage',          icon: <RecyclingIcon /> },
-  { id: 'hauling',     title: 'Hauling & Trade',  icon: <LocalShippingIcon /> },
-  { id: 'inventory',   title: 'My Inventory',     icon: <AccountBalanceIcon />, href: '/inventory', full: true },
+  { id: 'profile',     title: 'My Profile',      icon: <PersonIcon />,         href: '/profile',    defaultSize: 'compact'  as PortletSize },
+  { id: 'orgs',        title: 'Organizations',    icon: <GroupsIcon />,                              defaultSize: 'compact'  as PortletSize },
+  { id: 'invitations', title: 'Invitations',      icon: <MailIcon />,                                defaultSize: 'compact'  as PortletSize },
+  { id: 'workorders',  title: 'Work Orders',      icon: <ConstructionIcon />,   href: '/work-orders', defaultSize: 'compact'  as PortletSize },
+  { id: 'fleet',       title: 'Fleet',            icon: <RocketLaunchIcon />,   href: '/fleet',       defaultSize: 'compact'  as PortletSize },
+  { id: 'contracts',   title: 'Contracts',        icon: <ArticleIcon />,        href: '/contracts',   defaultSize: 'compact'  as PortletSize },
+  { id: 'treasury',    title: 'Treasury',         icon: <AccountBalanceIcon />, href: '/treasury',    defaultSize: 'compact'  as PortletSize },
+  { id: 'mining',      title: 'Mining',           icon: <TrendingUpIcon />,                           defaultSize: 'compact'  as PortletSize },
+  { id: 'salvage',     title: 'Salvage',          icon: <RecyclingIcon />,                            defaultSize: 'compact'  as PortletSize },
+  { id: 'hauling',     title: 'Hauling & Trade',  icon: <LocalShippingIcon />,                        defaultSize: 'compact'  as PortletSize },
+  { id: 'inventory',   title: 'My Inventory',     icon: <AccountBalanceIcon />, href: '/inventory',   defaultSize: 'full'     as PortletSize },
+  { id: 'refinery',   title: 'Refinery',         icon: <PrecisionManufacturingIcon />, href: '/refinery', defaultSize: 'compact' as PortletSize },
 ] as const;
 
 type PortletId = typeof PORTLET_DEFS[number]['id'];
@@ -66,8 +70,33 @@ const DEFAULT_ORDER: PortletId[] = [
   'profile', 'orgs', 'invitations',
   'workorders', 'fleet', 'contracts',
   'treasury', 'mining', 'salvage',
-  'hauling', 'inventory',
+  'hauling', 'refinery', 'inventory',
 ];
+
+function defaultSizes(): Record<PortletId, PortletSize> {
+  return Object.fromEntries(
+    PORTLET_DEFS.map((p) => [p.id, p.defaultSize])
+  ) as Record<PortletId, PortletSize>;
+}
+
+function loadSizes(): Record<PortletId, PortletSize> {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_SIZES_KEY) || 'null');
+    if (s && typeof s === 'object') {
+      const defaults = defaultSizes();
+      const valid: PortletSize[] = ['compact', 'standard', 'full'];
+      for (const id of ALL_IDS) {
+        if (valid.includes(s[id])) defaults[id] = s[id];
+      }
+      return defaults;
+    }
+  } catch { /* ignore */ }
+  return defaultSizes();
+}
+
+function saveSizes(sizes: Record<PortletId, PortletSize>) {
+  try { localStorage.setItem(LS_SIZES_KEY, JSON.stringify(sizes)); } catch { /* ignore */ }
+}
 
 function reconcile(arr: string[]): PortletId[] {
   const valid = new Set(ALL_IDS as readonly string[]);
@@ -102,6 +131,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   const [order, setOrder] = useState<PortletId[]>(loadLayout);
+  const [sizes, setSizes] = useState<Record<PortletId, PortletSize>>(loadSizes);
   const [editing, setEditing] = useState(false);
   const [editSnapshot, setEditSnapshot] = useState<PortletId[] | null>(null);
   const [dragId, setDragId] = useState<PortletId | null>(null);
@@ -111,11 +141,22 @@ const Dashboard = () => {
     const load = async () => {
       try {
         const profileRes = await api.get('/users/profile');
-        const userId: string = profileRes.data.id;
+        const userId: string = profileRes.data.userId ?? profileRes.data.id;
         if (!userId) throw new Error('No user id in profile response');
         const orgsRes = await api.get(`/user-organization-roles/user/${userId}/organizations`).catch(() => ({ data: [] }));
         setUser(profileRes.data);
-        setOrgs(Array.isArray(orgsRes.data) ? orgsRes.data : []);
+        const seen = new Set<string>();
+        const mappedOrgs: Org[] = Array.isArray(orgsRes.data)
+          ? (orgsRes.data as Array<{ organization?: { id: string; name: string }; role?: { name: string } }>)
+              .filter((row) => row.organization?.id && row.organization?.name)
+              .filter((row) => !seen.has(row.organization!.id) && seen.add(row.organization!.id))
+              .map((row) => ({
+                id: row.organization!.id,
+                name: row.organization!.name,
+                role: row.role?.name,
+              }))
+          : [];
+        setOrgs(mappedOrgs);
       } catch {
         navigate('/login');
       } finally {
@@ -131,8 +172,12 @@ const Dashboard = () => {
     setEditing(false); setDragId(null); setOverId(null);
   }, [editSnapshot]);
   const saveEdit = useCallback(() => {
-    saveLayout(order); setEditing(false); setDragId(null); setOverId(null);
-  }, [order]);
+    saveLayout(order); saveSizes(sizes); setEditing(false); setDragId(null); setOverId(null);
+  }, [order, sizes]);
+
+  const handleSizeChange = useCallback((id: PortletId, size: PortletSize) => {
+    setSizes((prev) => ({ ...prev, [id]: size }));
+  }, []);
   const resetLayout = useCallback(() => setOrder([...DEFAULT_ORDER]), []);
 
   const move = useCallback((drag: PortletId, target: PortletId) => {
@@ -180,7 +225,7 @@ const Dashboard = () => {
   const displayName = user?.firstName || user?.username || '';
   const userInitial = user?.firstName?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U';
 
-  const renderPortletBody = (id: PortletId) => {
+  const renderPortletBody = (id: PortletId, size: PortletSize) => {
     switch (id) {
       case 'profile':
         return <ProfilePortlet username={user?.username || ''} />;
@@ -195,7 +240,7 @@ const Dashboard = () => {
       case 'fleet':
         return <StubPortlet icon={<RocketLaunchIcon />} label="Fleet" />;
       case 'contracts':
-        return <ContractsPortlet />;
+        return <ContractsPortlet size={size} />;
       case 'treasury':
         return <StubPortlet icon={<AccountBalanceIcon />} label="Treasury" />;
       case 'mining':
@@ -204,6 +249,8 @@ const Dashboard = () => {
         return <StubPortlet icon={<RecyclingIcon />} label="Salvage" />;
       case 'hauling':
         return <StubPortlet icon={<LocalShippingIcon />} label="Hauling & Trade" />;
+      case 'refinery':
+        return <RefineryPortlet />;
       default:
         return null;
     }
@@ -259,13 +306,14 @@ const Dashboard = () => {
                 icon={def.icon}
                 title={def.title}
                 href={'href' in def ? (def as { href?: string }).href : undefined}
-                full={'full' in def && (def as { full?: boolean }).full}
+                size={sizes[id]}
                 editing={editing}
                 dragging={dragId === id}
                 dropTarget={editing && overId === id && dragId !== id}
                 dragProps={dragPropsFor(id)}
+                onSizeChange={(s) => handleSizeChange(id, s)}
               >
-                {renderPortletBody(id)}
+                {renderPortletBody(id, sizes[id])}
               </Portlet>
             );
           })}

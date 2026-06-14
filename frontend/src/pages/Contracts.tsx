@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import CreateContractModal from '../components/contracts/CreateContractModal';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import SecurityIcon from '@mui/icons-material/Security';
 import DiamondIcon from '@mui/icons-material/Diamond';
@@ -13,11 +15,14 @@ import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import BusinessIcon from '@mui/icons-material/Business';
 import PlusIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import ScrollTextIcon from '@mui/icons-material/Article';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CoinsIcon from '@mui/icons-material/MonetizationOn';
+import EditIcon from '@mui/icons-material/Edit';
 import AppShell from '../components/AppShell';
 import { api } from '../services/api.service';
+import { type TypeDetails, detailsFromRecord, buildDetailsPayload, TypeSpecificFields } from '../components/contracts/contractTypeFields';
 import './Contracts.css';
 
 type ContractStatus = 'draft' | 'open' | 'claimed' | 'active' | 'completed' | 'disputed' | 'cancelled';
@@ -35,6 +40,7 @@ interface ContractParty {
   id: string;
   userId: string;
   role: string;
+  user?: { id: string; username: string; firstName?: string; lastName?: string } | null;
 }
 
 interface Contract {
@@ -100,6 +106,12 @@ const TYPE_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'refueling', label: 'Refueling' },
 ];
 
+function partyName(parties: ContractParty[], role: string): string {
+  const p = parties?.find((x) => x.role === role);
+  if (!p?.user) return '—';
+  return p.user.firstName || p.user.username || '—';
+}
+
 function fmtAuec(val: string | null): string {
   if (!val) return '—';
   const n = parseFloat(val);
@@ -124,15 +136,275 @@ function MilestoneIcon({ state }: { state: ContractMilestone['state'] }) {
   return <RadioButtonUncheckedIcon style={{ width: 14, height: 14 }} />;
 }
 
-function ContractDetail({ contract, onAction }: { contract: Contract; onAction: (action: string) => void }) {
+const DETAILS_LABELS: Record<string, string> = {
+  cargoDescription:    'Cargo',
+  scuRequired:         'SCU required',
+  targetSystem:        'Target system',
+  targetBody:          'Target body',
+  resourceType:        'Resource type',
+  targetScu:           'Target SCU',
+  miningMethod:        'Mining method',
+  missionKind:         'Mission kind',
+  areaDescription:     'Area',
+  threatLevel:         'Threat level',
+  headCount:           'Head count',
+  targetLocation:      'Target location',
+  scuEstimate:         'SCU estimate',
+  salvageKind:         'Salvage kind',
+  serviceKind:         'Service kind',
+  locationDescription: 'Location',
+  patientCount:        'Patients',
+  fuelType:            'Fuel type',
+};
+
+const DETAILS_ENUM_LABELS: Record<string, Record<string, string>> = {
+  miningMethod:  { hand: 'Hand mining', vehicle: 'Vehicle', ship: 'Ship' },
+  missionKind:   { escort: 'Escort', patrol: 'Patrol', 'base-defense': 'Base defense' },
+  threatLevel:   { low: 'Low', medium: 'Medium', high: 'High' },
+  salvageKind:   { wreck: 'Wreck salvage', recycle: 'Recycle', tow: 'Tow' },
+  serviceKind:   { rescue: 'Rescue', trauma: 'Trauma', support: 'Support' },
+  fuelType:      { hydrogen: 'Hydrogen', quantum: 'Quantum' },
+};
+
+function locationDisplay(loc: { kind: string; locationName?: string } | null | undefined): string {
+  if (!loc) return '—';
+  const name = loc.locationName || '';
+  if (!name) return '—';
+  return loc.kind === 'space_marker' ? `${name} (space marker)` : name;
+}
+
+function TypeDetailsSection({ details, type }: { details: Record<string, unknown> | null; type?: ContractType }) {
+  if (!details) return null;
+
+  if (type === 'transport') {
+    const pickup = details['pickup'] as { kind: string; locationName?: string } | undefined;
+    const delivery = details['delivery'] as { kind: string; locationName?: string } | undefined;
+    const cargo = details['cargoDescription'] as string | undefined;
+    const scu = details['scuRequired'];
+    const rows = [
+      { label: 'Pickup', value: locationDisplay(pickup) },
+      { label: 'Delivery', value: locationDisplay(delivery) },
+      ...(cargo ? [{ label: 'Cargo', value: cargo }] : []),
+      ...(scu != null && scu !== '' ? [{ label: 'SCU required', value: String(scu) }] : []),
+    ];
+    return (
+      <div className="detail-section">
+        <div className="ds-cap">Details</div>
+        {rows.map(({ label, value }) => (
+          <div key={label} className="kv">
+            <span className="k">{label}</span>
+            <span className="v">{value}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const rows = Object.entries(details).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (rows.length === 0) return null;
+  return (
+    <div className="detail-section">
+      <div className="ds-cap">Details</div>
+      {rows.map(([key, val]) => {
+        const label = DETAILS_LABELS[key] ?? key;
+        const enumMap = DETAILS_ENUM_LABELS[key];
+        const display = enumMap ? (enumMap[String(val)] ?? String(val)) : String(val);
+        return (
+          <div key={key} className="kv">
+            <span className="k">{label}</span>
+            <span className="v">{display}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface Division { id: string; name: string; }
+
+function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }: {
+  contract: Contract;
+  onAction: (action: string) => void;
+  onClose: () => void;
+  onSaved: () => void;
+  currentUserId: string | null;
+}) {
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+
+  // edit form state
+  const [editTitle, setEditTitle] = useState(contract.title);
+  const [editDescription, setEditDescription] = useState(contract.description ?? '');
+  const [editReward, setEditReward] = useState(contract.rewardAuec ?? '');
+  const [editRisk, setEditRisk] = useState<string>(contract.risk ?? '');
+  const [editDeadline, setEditDeadline] = useState(
+    contract.deadline ? new Date(contract.deadline).toISOString().slice(0, 16) : ''
+  );
+  const [editDetails, setEditDetails] = useState<TypeDetails>(() =>
+    detailsFromRecord(contract.type as import('../components/contracts/contractTypeFields').ContractType, contract.details)
+  );
+  const [editAssigneeKind, setEditAssigneeKind] = useState<'open' | 'member' | 'division'>('open');
+  const [editAssigneeUserId, setEditAssigneeUserId] = useState('');
+  const [editAssigneeDivisionId, setEditAssigneeDivisionId] = useState('');
+  const [editMembers, setEditMembers] = useState<Array<{ userId: string; username: string }>>([]);
+
+  useEffect(() => {
+    if (!editing) return;
+    api.get<Array<{ id: string; name: string; parentId: string | null }>>(`/api/organizations/${contract.orgId}/business-units`)
+      .then((r) => setDivisions(Array.isArray(r.data) ? r.data.filter((u) => !u.parentId) : []))
+      .catch(() => setDivisions([]));
+    api.get<Array<{ user: { id: string; username: string } }>>(`/user-organization-roles/organization/${contract.orgId}/members`)
+      .then((r) => {
+        const list = Array.isArray(r.data)
+          ? r.data.map((row) => ({ userId: row.user?.id, username: row.user?.username })).filter((m) => m.userId)
+          : [];
+        setEditMembers(list as Array<{ userId: string; username: string }>);
+      })
+      .catch(() => setEditMembers([]));
+  }, [editing, contract.orgId]);
+
+  const openEdit = () => {
+    setEditTitle(contract.title);
+    setEditDescription(contract.description ?? '');
+    setEditReward(contract.rewardAuec ?? '');
+    setEditRisk(contract.risk ?? '');
+    setEditDeadline(contract.deadline ? new Date(contract.deadline).toISOString().slice(0, 16) : '');
+    setEditDetails(detailsFromRecord(contract.type as import('../components/contracts/contractTypeFields').ContractType, contract.details));
+    setEditAssigneeKind('open');
+    setEditAssigneeUserId('');
+    setEditAssigneeDivisionId('');
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        title: editTitle.trim(),
+        description: editDescription.trim() || null,
+        rewardAuec: editReward !== '' ? parseFloat(editReward) : null,
+        risk: editRisk || null,
+        deadline: editDeadline || null,
+        details: buildDetailsPayload(contract.type as import('../components/contracts/contractTypeFields').ContractType, editDetails),
+      };
+      await api.patch(`/api/contracts/${contract.id}`, payload);
+      if (editAssigneeKind === 'member' && editAssigneeUserId) {
+        await api.post(`/api/contracts/${contract.id}/parties`, { userId: editAssigneeUserId, role: 'assignee' });
+      } else if (editAssigneeKind === 'division' && editAssigneeDivisionId) {
+        await api.post(`/api/contracts/${contract.id}/parties`, { businessUnitId: editAssigneeDivisionId, role: 'assignee' });
+      }
+      setEditing(false);
+      onSaved();
+    } catch {
+      // leave edit mode open so user can retry
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const ty = TYPE_META[contract.type] ?? TYPE_META.transport;
   const st = STATUS_META[contract.status] ?? STATUS_META.draft;
   const risk = contract.risk ? RISK_META[contract.risk] : null;
   const deadline = fmtDeadline(contract.deadline);
   const milestones = [...(contract.milestones ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+  const isTerminal = contract.status === 'completed' || contract.status === 'cancelled';
+  const isOwnContract = currentUserId !== null && contract.creatorId === currentUserId;
+  const canEdit = isOwnContract && (contract.status === 'draft' || contract.status === 'open');
+
+  if (editing) {
+    return (
+      <div className="panel con-detail">
+        <div className="con-detail-head">
+          <span className="con-edit-label">Editing contract</span>
+          <button className="con-detail-close" onClick={() => setEditing(false)} aria-label="Cancel edit">
+            <CloseIcon style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+        <div className="con-edit-body">
+          <div className="field-row">
+            <label className="field-label">Title</label>
+            <input className="field-input" type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+          </div>
+          <div className="field-row">
+            <label className="field-label">Description</label>
+            <textarea className="field-input" rows={3} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+          </div>
+          <div className="field-row">
+            <label className="field-label">Reward (aUEC)</label>
+            <input className="field-input" type="number" min="0" step="1" value={editReward} onChange={(e) => setEditReward(e.target.value)} placeholder="0" />
+          </div>
+          <div className="field-row">
+            <label className="field-label">Risk</label>
+            <select className="field-input" value={editRisk} onChange={(e) => setEditRisk(e.target.value)}>
+              <option value="">— unspecified —</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div className="field-row">
+            <label className="field-label">Deadline</label>
+            <input className="field-input" type="datetime-local" value={editDeadline} onChange={(e) => setEditDeadline(e.target.value)} />
+          </div>
+          <div className="field-row">
+            <label className="field-label">Assignee</label>
+            <div className="assignee-radios">
+              {(['open', 'member', 'division'] as const).map((k) => (
+                <label key={k} className={`assignee-radio${editAssigneeKind === k ? ' selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="editAssigneeKind"
+                    value={k}
+                    checked={editAssigneeKind === k}
+                    onChange={() => { setEditAssigneeKind(k); setEditAssigneeUserId(''); setEditAssigneeDivisionId(''); }}
+                  />
+                  {k === 'open' ? 'Open — anyone can claim' : k === 'member' ? 'Specific member' : 'Division'}
+                </label>
+              ))}
+            </div>
+            {editAssigneeKind === 'member' && (
+              <select className="field-input" value={editAssigneeUserId} onChange={(e) => setEditAssigneeUserId(e.target.value)}>
+                <option value="">Select member…</option>
+                {editMembers.map((m) => <option key={m.userId} value={m.userId}>{m.username}</option>)}
+              </select>
+            )}
+            {editAssigneeKind === 'division' && (
+              <select className="field-input" value={editAssigneeDivisionId} onChange={(e) => setEditAssigneeDivisionId(e.target.value)}>
+                <option value="">{divisions.length === 0 ? 'No divisions found' : 'Select division…'}</option>
+                {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            )}
+          </div>
+          <TypeSpecificFields
+            type={contract.type as import('../components/contracts/contractTypeFields').ContractType}
+            details={editDetails}
+            onChange={setEditDetails}
+          />
+        </div>
+        <div className="panel-body con-actions">
+          <button className="btn btn-ghost btn-sm" onClick={() => setEditing(false)} disabled={saving}>Discard</button>
+          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={saveEdit} disabled={saving || !editTitle.trim()}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="panel con-detail">
+      <div className="con-detail-head">
+        {canEdit && (
+          <button className="con-detail-close" onClick={openEdit} aria-label="Edit contract" title="Edit contract">
+            <EditIcon style={{ width: 16, height: 16 }} />
+          </button>
+        )}
+        <button className="con-detail-close" onClick={onClose} aria-label="Close">
+          <CloseIcon style={{ width: 16, height: 16 }} />
+        </button>
+      </div>
       <div className="panel-body">
         <div className="con-hero">
           <span className={`big-ic ${ty.cls}`}>{ty.icon}</span>
@@ -180,6 +452,8 @@ function ContractDetail({ contract, onAction }: { contract: Contract; onAction: 
         </div>
       </div>
 
+      <TypeDetailsSection details={contract.details} type={contract.type} />
+
       {milestones.length > 0 && (
         <div className="detail-section">
           <div className="ds-cap">Progress</div>
@@ -196,47 +470,76 @@ function ContractDetail({ contract, onAction }: { contract: Contract; onAction: 
       )}
 
       <div className="panel-body con-actions">
-        {contract.status === 'open' && (
-          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('claim')}>
-            Claim contract
-          </button>
+        {confirmingCancel ? (
+          <div className="con-cancel-confirm">
+            <span className="con-cancel-msg">Cancel this contract? This cannot be undone.</span>
+            <div className="con-cancel-btns">
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmingCancel(false)}>Keep it</button>
+              <button className="btn btn-danger btn-sm" onClick={() => { setConfirmingCancel(false); onAction('cancel'); }}>Yes, cancel</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {contract.status === 'draft' && (
+              <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('publish')}>
+                Publish
+              </button>
+            )}
+            {contract.status === 'open' && !isOwnContract && (
+              <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('claim')}>
+                Claim contract
+              </button>
+            )}
+            {contract.status === 'claimed' && (
+              <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('start')}>
+                Start contract
+              </button>
+            )}
+            {contract.status === 'active' && (
+              <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('complete')}>
+                Mark complete
+              </button>
+            )}
+            {(contract.status === 'active' || contract.status === 'completed') && (
+              <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => onAction('dispute')}>
+                Dispute
+              </button>
+            )}
+            {contract.status === 'disputed' && (
+              <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
+                Resolve dispute
+              </button>
+            )}
+            {!isTerminal && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmingCancel(true)} aria-label="Cancel contract">
+                Cancel
+              </button>
+            )}
+          </>
         )}
-        {contract.status === 'claimed' && (
-          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('start')}>
-            Start contract
-          </button>
-        )}
-        {contract.status === 'active' && (
-          <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => onAction('complete')}>
-            Mark complete
-          </button>
-        )}
-        {(contract.status === 'active' || contract.status === 'completed') && (
-          <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => onAction('dispute')}>
-            Dispute
-          </button>
-        )}
-        {contract.status === 'disputed' && (
-          <button className="btn btn-ghost btn-sm" style={{ flex: 1 }}>
-            Resolve dispute
-          </button>
-        )}
-        <button className="btn btn-ghost btn-sm" onClick={() => onAction('cancel')} aria-label="Cancel contract">
-          ···
-        </button>
       </div>
     </div>
   );
 }
 
 const Contracts = () => {
+  const [searchParams] = useSearchParams();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [selId, setSelId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState('open');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selId, setSelId] = useState<string | null>(searchParams.get('contract'));
+  const [drawerOpen, setDrawerOpen] = useState(!!searchParams.get('contract'));
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const [showCreate, setShowCreate] = useState(false);
+
+  useEffect(() => {
+    api.get('/users/profile').then((res) => {
+      setCurrentUserId(res.data.userId ?? res.data.id ?? null);
+    }).catch(() => {});
+  }, []);
 
   const fetchContracts = useCallback(async () => {
     setLoading(true);
@@ -261,11 +564,11 @@ const Contracts = () => {
   );
 
   useEffect(() => {
-    if (!selId && visible.length > 0) setSelId(visible[0].id);
-    if (selId && visible.length > 0 && !visible.find((c) => c.id === selId)) {
-      setSelId(visible[0].id);
+    if (selId && !loading && contracts.length > 0 && !contracts.find((c) => c.id === selId)) {
+      setSelId(null);
+      setDrawerOpen(false);
     }
-  }, [visible, selId]);
+  }, [visible, selId, loading, contracts]);
 
   const sel = visible.find((c) => c.id === selId) ?? null;
 
@@ -276,6 +579,23 @@ const Contracts = () => {
     .reduce((s, c) => s + parseFloat(c.rewardAuec ?? '0'), 0);
   const done = contracts.filter((c) => c.status === 'completed').length;
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  const handleRowClick = useCallback((id: string) => {
+    if (selId === id && drawerOpen) {
+      setDrawerOpen(false);
+    } else {
+      setSelId(id);
+      setDrawerOpen(true);
+    }
+  }, [selId, drawerOpen]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!visible.length) return;
     const idx = visible.findIndex((c) => c.id === selId);
@@ -283,11 +603,13 @@ const Contracts = () => {
       e.preventDefault();
       const next = visible[Math.min(visible.length - 1, idx + 1)];
       setSelId(next.id);
+      setDrawerOpen(true);
       rowRefs.current[next.id]?.focus();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const prev = visible[Math.max(0, idx - 1)];
       setSelId(prev.id);
+      setDrawerOpen(true);
       rowRefs.current[prev.id]?.focus();
     }
   }, [visible, selId]);
@@ -314,7 +636,7 @@ const Contracts = () => {
           <p className="page-sub">Service contracts across every discipline — transport, security, mining, and salvage.</p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary btn-sm">
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
             <PlusIcon style={{ width: 16, height: 16 }} /> New contract
           </button>
         </div>
@@ -376,12 +698,12 @@ const Contracts = () => {
         <div className="con-empty">
           <ArticleIcon style={{ width: 40, height: 40, opacity: 0.25 }} />
           <p>No contracts yet.</p>
-          <button className="btn btn-primary btn-sm">
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
             <PlusIcon style={{ width: 16, height: 16 }} /> New contract
           </button>
         </div>
       ) : (
-        <div className="con-split">
+        <div className="con-layout">
           <div className="dtable-wrap">
             <table
               className="dtable"
@@ -392,8 +714,11 @@ const Contracts = () => {
               <thead>
                 <tr>
                   <th>Contract</th>
+                  <th>Type</th>
                   <th>Status</th>
                   <th>Deadline</th>
+                  <th>Claimed By</th>
+                  <th>Owned By</th>
                   <th className="num">Reward</th>
                 </tr>
               </thead>
@@ -407,20 +732,20 @@ const Contracts = () => {
                       key={c.id}
                       ref={(el) => { rowRefs.current[c.id] = el; }}
                       tabIndex={0}
-                      aria-selected={c.id === selId}
-                      className={c.id === selId ? 'selected' : ''}
-                      onClick={() => setSelId(c.id)}
-                      onFocus={() => setSelId(c.id)}
+                      aria-selected={c.id === selId && drawerOpen}
+                      className={c.id === selId && drawerOpen ? 'selected' : ''}
+                      onClick={() => handleRowClick(c.id)}
+                      onFocus={() => { setSelId(c.id); setDrawerOpen(true); }}
                     >
                       <td>
                         <div className="t-ent">
                           <span className={`ic ${ty.cls}`}>{ty.icon}</span>
                           <div>
                             <div className="nm">{c.title}</div>
-                            <div className="sub">{ty.label}</div>
                           </div>
                         </div>
                       </td>
+                      <td className="cell-muted">{ty.label}</td>
                       <td><span className={`chip-badge ${st.chip}`}>{st.label}</span></td>
                       <td>
                         <span className={`deadline${dl.urgent ? ' urgent' : ''}`}>
@@ -428,6 +753,8 @@ const Contracts = () => {
                           {dl.text}
                         </span>
                       </td>
+                      <td className="cell-muted">{partyName(c.parties, 'assignee')}</td>
+                      <td className="cell-muted">{partyName(c.parties, 'creator')}</td>
                       <td className="num">
                         <span className="reward">{fmtAuec(c.rewardAuec)} <small>aUEC</small></span>
                       </td>
@@ -441,8 +768,20 @@ const Contracts = () => {
               <span style={{ marginLeft: 'auto' }}>{visible.length} of {total} contracts</span>
             </div>
           </div>
-          {sel && <ContractDetail contract={sel} onAction={handleAction} />}
+
+          {/* slide-in detail drawer */}
+          <div className={`con-drawer${drawerOpen ? ' open' : ''}`} aria-hidden={!drawerOpen}>
+            {sel && <ContractDetail contract={sel} onAction={handleAction} onClose={() => setDrawerOpen(false)} onSaved={fetchContracts} currentUserId={currentUserId} />}
+          </div>
+          {drawerOpen && <div className="con-drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
         </div>
+      )}
+
+      {showCreate && (
+        <CreateContractModal
+          onClose={() => setShowCreate(false)}
+          onCreated={fetchContracts}
+        />
       )}
     </AppShell>
   );

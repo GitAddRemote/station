@@ -1,0 +1,161 @@
+/* ---- Page layout ---- */
+.bu-page { max-width: 900px; margin: 0 auto; padding: var(--space-6) var(--space-4); }
+
+.bu-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.bu-header-copy { flex: 1; }
+.bu-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+.bu-title { font-size: 24px; font-weight: 700; color: var(--text-primary); margin: 0 0 var(--space-1); }
+.bu-sub   { font-size: 13px; color: var(--text-muted); margin: 0; }
+
+/* ---- Empty state ---- */
+.bu-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-12) 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---- Table ---- */
+.bu-table-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+.bu-table-wrap { overflow-x: auto; }
+.bu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.bu-table thead th {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.bu-th-name    { width: 40%; }
+.bu-th-kind    { width: 120px; }
+.bu-th-desc    { }
+.bu-th-actions { width: 96px; }
+
+.bu-row { border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,.06)); }
+.bu-row:hover { background: var(--surface-hover, rgba(255,255,255,.03)); }
+
+.bu-row td { padding: var(--space-2) var(--space-3); vertical-align: middle; }
+
+/* ---- Depth tinting ---- */
+.bu-depth-1 td:first-child { background: rgba(255,255,255,.01); }
+.bu-depth-2 td:first-child { background: rgba(255,255,255,.02); }
+.bu-depth-3 td:first-child { background: rgba(255,255,255,.03); }
+
+/* ---- Name cell ---- */
+.bu-name-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.bu-expand-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+.bu-expand-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
+.bu-name { font-weight: 500; color: var(--text-primary); }
+.bu-inactive-chip { margin-left: var(--space-1); font-size: 10px; }
+
+/* ---- Kind badge ---- */
+.bu-kind-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+.bu-kind-division   { background: rgba(99,102,241,.18); color: #a5b4fc; }
+.bu-kind-department { background: rgba(20,184,166,.18); color: #5eead4; }
+.bu-kind-team       { background: rgba(251,191,36,.18); color: #fde68a; }
+.bu-kind-squad      { background: rgba(249,115,22,.18); color: #fdba74; }
+.bu-kind-wing       { background: rgba(236,72,153,.18); color: #f9a8d4; }
+.bu-kind-custom     { background: rgba(148,163,184,.18); color: #94a3b8; }
+
+/* ---- Description cell ---- */
+.bu-cell-desc {
+  color: var(--text-muted);
+  font-size: 12px;
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Action buttons ---- */
+.bu-cell-actions { white-space: nowrap; }
+.bu-action-btn {
+  opacity: 0;
+  transition: opacity 120ms;
+  color: var(--text-muted);
+  padding: 4px;
+}
+.bu-row:hover .bu-action-btn { opacity: 1; }
+.bu-action-btn:hover { color: var(--text-primary); }
+.bu-action-delete:hover { color: var(--color-danger, #f87171); }
+
+/* ---- Modal ---- */
+.bu-modal { width: 480px; }
+.bu-error {
+  background: rgba(239,68,68,.12);
+  border: 1px solid rgba(239,68,68,.3);
+  color: #fca5a5;
+  border-radius: 6px;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  margin-bottom: var(--space-3);
+}
+.bu-confirm-msg { font-size: 14px; color: var(--text-secondary); margin: 0; line-height: 1.6; }
+
+.btn-danger {
+  background: rgba(239,68,68,.15);
+  border: 1px solid rgba(239,68,68,.35);
+  color: #f87171;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.btn-danger:hover:not(:disabled) { background: rgba(239,68,68,.25); }
+.btn-danger:disabled { opacity: .5; cursor: default; }

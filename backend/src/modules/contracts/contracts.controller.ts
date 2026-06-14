@@ -58,6 +58,16 @@ export class ContractsController {
     return this.contractsService.findOne(req.user.userId, id);
   }
 
+  @ApiOperation({ summary: 'Get status history for a contract' })
+  @ApiResponse({ status: 200 })
+  @Get(':id/history')
+  getStatusHistory(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.contractsService.getStatusHistory(req.user.userId, id);
+  }
+
   @ApiOperation({ summary: 'Create a contract (starts in draft status)' })
   @ApiResponse({ status: 201 })
   @Post()

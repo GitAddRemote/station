@@ -59,16 +59,12 @@ export class BatchService {
   ): Promise<PaginatedBatchesDto> {
     const [batches, total] = await this.batchRepo
       .createQueryBuilder('b')
-      .leftJoin('b.location', 'loc')
-      .addSelect(['loc.id', 'loc.name'])
-      .leftJoin('b.items', 'item')
-      .addSelect('COUNT(item.id)', 'itemCount')
-      .where('b.owner_type = :ownerType AND b.owner_id = :ownerId', {
+      .leftJoinAndSelect('b.location', 'loc')
+      .where('b.ownerType = :ownerType AND b.ownerId = :ownerId', {
         ownerType: 'user',
         ownerId: userId,
       })
-      .groupBy('b.id, loc.id')
-      .orderBy('b.updated_at', 'DESC')
+      .orderBy('b.updatedAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();

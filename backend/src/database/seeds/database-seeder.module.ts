@@ -6,6 +6,13 @@ import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
 import { Game } from '../../modules/games/game.entity';
+import { BusinessUnit } from '../../modules/business-units/business-unit.entity';
+import { StationInventoryItem } from '../../modules/inventory/entities/station-inventory-item.entity';
+import { Contract } from '../../modules/contracts/entities/contract.entity';
+import { ContractItem } from '../../modules/contracts/entities/contract-item.entity';
+import { ContractMilestone } from '../../modules/contracts/entities/contract-milestone.entity';
+import { ContractParty } from '../../modules/contracts/entities/contract-party.entity';
+import { StationCatalogEntry } from '../../modules/catalog/entities/station-catalog-entry.entity';
 
 @Module({
   imports: [
@@ -15,6 +22,13 @@ import { Game } from '../../modules/games/game.entity';
       User,
       UserOrganizationRole,
       Game,
+      BusinessUnit,
+      StationInventoryItem,
+      Contract,
+      ContractItem,
+      ContractMilestone,
+      ContractParty,
+      StationCatalogEntry,
     ]),
   ],
   providers: [DatabaseSeederService],

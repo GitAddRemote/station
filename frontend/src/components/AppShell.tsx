@@ -7,6 +7,7 @@ import {
   ReactNode,
 } from 'react';
 import { ToastContext, PushToast } from '../contexts/ToastContext';
+import { useOrg, OrgEntry } from '../contexts/OrgContext';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Dashboard as DashboardIcon,
@@ -16,6 +17,7 @@ import {
   Group as MembersIcon,
   Inventory2 as InventoryIcon,
   AccountBalance as TreasuryIcon,
+  PrecisionManufacturing as RefineryIcon,
   SmartToy as StationBotIcon,
   Search as SearchIcon,
   Keyboard as KeyboardIcon,
@@ -24,9 +26,15 @@ import {
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
   Notifications as NotificationsIcon,
-  CheckCircleOutline as CheckIcon,
+  CheckCircleOutline as CheckCircleIcon,
+  Check as CheckIcon,
   UnfoldMoreDouble as ChevronUpDownIcon,
   Logout as LogoutIcon,
+  ChevronRight as ChevronRightIcon,
+  AccountTree as OrgIcon,
+  ArrowUpward as ArrowUpIcon,
+  ArrowDownward as ArrowDownIcon,
+  Star as StarIcon,
 } from '@mui/icons-material';
 import { api } from '../services/api.service';
 import './AppShell.css';
@@ -39,19 +47,35 @@ interface NavItem {
   href: string;
   key?: string;
   soon?: boolean;
+  sub?: boolean;
+  children?: NavItem[];
 }
 
-const NAV_PRIMARY: NavItem[] = [
+const NAV_HOME: NavItem[] = [
   { id: 'dashboard',  label: 'Dashboard',   icon: <DashboardIcon />, href: '/dashboard',  key: 'd' },
-  { id: 'workorders', label: 'Work Orders',  icon: <PickaxeIcon />,   href: '/work-orders', key: 'w', soon: true },
-  { id: 'contracts',  label: 'Contracts',    icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
-  { id: 'fleet',      label: 'Fleet',        icon: <FleetIcon />,     href: '/fleet',      key: 'f', soon: true },
-  { id: 'members',    label: 'Members',      icon: <MembersIcon />,   href: '/members',    key: 'm', soon: true },
+];
+
+const NAV_PRIMARY: NavItem[] = [
+  { id: 'contracts',  label: 'Contracts',        icon: <ContractsIcon />, href: '/contracts',  key: 'c' },
+  {
+    id: 'hr',
+    label: 'Human Resources',
+    icon: <MembersIcon />,
+    href: '/hr',
+    key: 'm',
+    children: [
+      { id: 'hr-members',        label: 'Members',        icon: <MembersIcon />, href: '/hr/members' },
+      { id: 'hr-business-units', label: 'Business Units', icon: <OrgIcon />,     href: '/hr/business-units' },
+    ],
+  },
+  { id: 'refinery',   label: 'Refinery',         icon: <RefineryIcon />,  href: '/refinery' },
+  { id: 'workorders', label: 'Work Orders',      icon: <PickaxeIcon />,   href: '/work-orders', key: 'w' },
 ];
 
 const NAV_ASSETS: NavItem[] = [
-  { id: 'inventory', label: 'Inventory', icon: <InventoryIcon />, href: '/inventory' },
-  { id: 'treasury',  label: 'Treasury',  icon: <TreasuryIcon />,  href: '/treasury', soon: true },
+  { id: 'fleet',      label: 'Fleet',      icon: <FleetIcon />,     href: '/fleet',      key: 'f' },
+  { id: 'inventory',  label: 'Inventory',  icon: <InventoryIcon />, href: '/inventory' },
+  { id: 'treasury',   label: 'Treasury',   icon: <TreasuryIcon />,  href: '/treasury' },
 ];
 
 // ---- theme persistence -----------------------------------------------
@@ -189,7 +213,7 @@ function KeyHelp({ open, onClose, extra = [] }: KeyHelpProps) {
       ['Command palette', ['⌘', 'K']], ['Search', ['/']], ['This help', ['?']], ['Close / back', ['Esc']],
     ] as Array<[string, string[]]> },
     { cap: 'Go to', rows: [
-      ['Dashboard', ['g', 'd']], ['Work Orders', ['g', 'w']], ['Contracts', ['g', 'c']], ['Fleet', ['g', 'f']], ['Members', ['g', 'm']],
+      ['Dashboard', ['g', 'd']], ['Work Orders', ['g', 'w']], ['Contracts', ['g', 'c']], ['Fleet', ['g', 'f']], ['Human Resources', ['g', 'm']],
     ] as Array<[string, string[]]> },
     { cap: 'Lists & tables', rows: [
       ['Move selection', ['↑', '↓']], ['Vim move', ['j', 'k']], ['First / last', ['Home', 'End']], ['Open row', ['↵']],
@@ -226,6 +250,70 @@ function KeyHelp({ open, onClose, extra = [] }: KeyHelpProps) {
   );
 }
 
+// ---- Org Switcher panel ----------------------------------------------
+function OrgSwitcher({ onClose }: { onClose: () => void }) {
+  const { orgs, activeOrg, setActiveOrg, reorderOrgs } = useOrg();
+  const [localOrgs, setLocalOrgs] = useState<OrgEntry[]>(orgs);
+  const navigate = useNavigate();
+
+  useEffect(() => { setLocalOrgs(orgs); }, [orgs]);
+
+  const move = (index: number, dir: -1 | 1) => {
+    const next = [...localOrgs];
+    const swap = index + dir;
+    if (swap < 0 || swap >= next.length) return;
+    [next[index], next[swap]] = [next[swap], next[index]];
+    setLocalOrgs(next);
+    reorderOrgs(next.map((o) => o.id));
+  };
+
+  const select = (org: OrgEntry) => {
+    setActiveOrg(org);
+    onClose();
+    navigate('/dashboard');
+  };
+
+  return (
+    <div className="org-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="org-panel-head">
+        <span className="org-panel-title">Organizations</span>
+        <span className="org-panel-hint">Drag priority order</span>
+      </div>
+      <ul className="org-panel-list">
+        {localOrgs.map((org, i) => (
+          <li key={org.id} className={'org-panel-item' + (org.id === activeOrg?.id ? ' selected' : '')}>
+            <button className="org-panel-select" onClick={() => select(org)}>
+              <span className="org-panel-badge">{org.name.slice(0, 2).toUpperCase()}</span>
+              <span className="org-panel-info">
+                <span className="org-panel-name">
+                  {org.name}
+                  {i === 0 && <span className="org-primary-chip"><StarIcon style={{ width: 9, height: 9 }} /> Primary</span>}
+                </span>
+                <span className="org-panel-role">{org.role}</span>
+              </span>
+              {org.id === activeOrg?.id && <CheckIcon style={{ width: 14, height: 14 }} className="org-panel-check" />}
+            </button>
+            <div className="org-panel-arrows">
+              <button
+                className="org-arrow-btn"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                aria-label="Move up"
+              ><ArrowUpIcon style={{ width: 12, height: 12 }} /></button>
+              <button
+                className="org-arrow-btn"
+                onClick={() => move(i, 1)}
+                disabled={i === localOrgs.length - 1}
+                aria-label="Move down"
+              ><ArrowDownIcon style={{ width: 12, height: 12 }} /></button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // ---- AppShell --------------------------------------------------------
 export interface AppShellProps {
   active: string;
@@ -235,8 +323,6 @@ export interface AppShellProps {
   onNew?: () => void;
   searchPlaceholder?: string;
   userInitial?: string;
-  orgName?: string;
-  orgRole?: string;
   showStationBotAdmin?: boolean;
 }
 
@@ -248,15 +334,30 @@ export function AppShell({
   onNew,
   searchPlaceholder = 'Search…',
   userInitial = 'U',
-  orgName = 'My Organization',
-  orgRole = 'Member',
   showStationBotAdmin = false,
 }: AppShellProps) {
   const { theme, setTheme, accent } = useChrome();
+  const { activeOrg } = useOrg();
   const [cmdOpen, setCmdOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('station-nav-expanded');
+      return saved ? new Set(JSON.parse(saved)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
+
+  const toggleGroup = useCallback((id: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      try { localStorage.setItem('station-nav-expanded', JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   const gPending = useRef(false);
   const navigate = useNavigate();
 
@@ -280,7 +381,7 @@ export function AppShell({
   }, [navigate]);
 
   const allCommands = useMemo<Command[]>(() => {
-    const navCmds = NAV_PRIMARY
+    const navCmds = [...NAV_HOME, ...NAV_PRIMARY, ...NAV_ASSETS]
       .filter((n) => !n.soon)
       .map((n) => ({
         id: 'nav-' + n.id,
@@ -334,6 +435,7 @@ export function AppShell({
         setCmdOpen(false);
         setHelpOpen(false);
         setNavOpen(false);
+        setOrgSwitcherOpen(false);
         return;
       }
       if (typing) return;
@@ -341,7 +443,7 @@ export function AppShell({
 
       if (gPending.current) {
         gPending.current = false;
-        const target = NAV_PRIMARY.find((n) => n.key === e.key.toLowerCase());
+        const target = [...NAV_HOME, ...NAV_PRIMARY].find((n) => n.key === e.key.toLowerCase());
         if (target && !target.soon) {
           e.preventDefault();
           go(target.href);
@@ -379,36 +481,96 @@ export function AppShell({
         {/* Sidebar */}
         <aside className="shell-sidebar">
           <div className="side-head">
-            <button className="side-org" aria-label="Switch organization">
-              <span className="side-org-badge">{orgName.slice(0, 2).toUpperCase()}</span>
-              <span>
-                <span className="side-org-name">{orgName}</span>
-                <span className="side-org-role">{orgRole}</span>
-              </span>
-              <span className="side-org-chev">
+            <div className="side-org-wrap">
+              <Link className="side-org-home" to="/dashboard" aria-label="Go to dashboard">
+                <span className="side-org-badge">
+                  {activeOrg ? activeOrg.name.slice(0, 2).toUpperCase() : '??'}
+                </span>
+                <span className="side-org-text">
+                  <span className="side-org-name">{activeOrg?.name ?? 'Loading…'}</span>
+                  <span className="side-org-role">{activeOrg?.role ?? ''}</span>
+                </span>
+              </Link>
+              <button
+                className={'side-org-switch' + (orgSwitcherOpen ? ' open' : '')}
+                onClick={() => setOrgSwitcherOpen((o) => !o)}
+                aria-label="Switch organization"
+                aria-expanded={orgSwitcherOpen}
+              >
                 <ChevronUpDownIcon style={{ width: 15, height: 15 }} />
-              </span>
-            </button>
+              </button>
+              {orgSwitcherOpen && (
+                <>
+                  <div className="org-panel-scrim" onClick={() => setOrgSwitcherOpen(false)} />
+                  <OrgSwitcher onClose={() => setOrgSwitcherOpen(false)} />
+                </>
+              )}
+            </div>
           </div>
 
           <nav className="side-nav" aria-label="Primary">
-            <div className="side-cap">Operations</div>
-            {NAV_PRIMARY.map((n) => (
+            {NAV_HOME.map((n) => (
               <Link
                 key={n.id}
-                className={'side-link' + (n.id === active ? ' active' : '') + (n.soon ? ' soon' : '')}
-                to={n.soon ? '#' : n.href}
+                className={'side-link' + (n.id === active ? ' active' : '')}
+                to={n.href}
                 aria-current={n.id === active ? 'page' : undefined}
-                onClick={(e) => { if (n.soon) e.preventDefault(); if (!n.soon) setNavOpen(false); }}
+                onClick={() => setNavOpen(false)}
               >
                 {n.icon}
                 <span className="side-link-label">{n.label}</span>
-                {n.soon
-                  ? <span className="side-link-soon-tag">soon</span>
-                  : <span className="side-link-key">{n.key}</span>
-                }
+                <span className="side-link-key">{n.key}</span>
               </Link>
             ))}
+
+            <div className="side-cap">Operations</div>
+            {NAV_PRIMARY.map((n) => {
+              const isActive = n.id === active || n.children?.some((c) => c.id === active);
+              const isExpanded = expandedGroups.has(n.id);
+              const hasChildren = !!n.children?.length;
+              return (
+                <div key={n.id} className="side-group">
+                  <div className={'side-link side-link-group' + (isActive ? ' active' : '') + (n.soon ? ' soon' : '')}>
+                    <Link
+                      className="side-link-group-main"
+                      to={n.soon ? '#' : n.href}
+                      aria-current={n.id === active ? 'page' : undefined}
+                      onClick={(e) => { if (n.soon) e.preventDefault(); else setNavOpen(false); }}
+                    >
+                      {n.icon}
+                      <span className="side-link-label">{n.label}</span>
+                    </Link>
+                    {hasChildren && (
+                      <button
+                        className={'side-group-toggle' + (isExpanded ? ' open' : '')}
+                        onClick={() => toggleGroup(n.id)}
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                      >
+                        <ChevronRightIcon style={{ width: 14, height: 14 }} />
+                      </button>
+                    )}
+                    {!hasChildren && n.key && <span className="side-link-key">{n.key}</span>}
+                    {n.soon && <span className="side-link-soon-tag">soon</span>}
+                  </div>
+                  {hasChildren && isExpanded && (
+                    <div className="side-children">
+                      {n.children!.map((child) => (
+                        <Link
+                          key={child.id}
+                          className={'side-link side-link-child' + (child.id === active ? ' active' : '')}
+                          to={child.href}
+                          aria-current={child.id === active ? 'page' : undefined}
+                          onClick={() => setNavOpen(false)}
+                        >
+                          {child.icon}
+                          <span className="side-link-label">{child.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             <div className="side-cap">Assets</div>
             {NAV_ASSETS.map((n) => (
@@ -524,7 +686,7 @@ export function AppShell({
         <div className="shell-toasts" aria-live="polite">
           {toasts.map((t) => (
             <div className="shell-toast" key={t.id}>
-              <CheckIcon style={{ width: 16, height: 16 }} />
+              <CheckCircleIcon style={{ width: 16, height: 16 }} />
               {t.msg}
             </div>
           ))}

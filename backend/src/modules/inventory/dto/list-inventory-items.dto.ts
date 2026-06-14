@@ -41,6 +41,11 @@ export class ListInventoryItemsDto {
   @IsUUID()
   orgId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  batchId?: string;
+
   @ApiPropertyOptional({ enum: ['item', 'commodity', 'vehicle'] })
   @IsOptional()
   @IsIn(['item', 'commodity', 'vehicle'])
@@ -63,7 +68,7 @@ export class ListInventoryItemsDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(500)
   limit?: number;
 
   @ApiPropertyOptional()

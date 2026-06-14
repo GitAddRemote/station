@@ -9,6 +9,13 @@ import { Organization } from '../../modules/organizations/organization.entity';
 import { User } from '../../modules/users/user.entity';
 import { UserOrganizationRole } from '../../modules/user-organization-roles/user-organization-role.entity';
 import { Game } from '../../modules/games/game.entity';
+import { BusinessUnit } from '../../modules/business-units/business-unit.entity';
+import { StationInventoryItem } from '../../modules/inventory/entities/station-inventory-item.entity';
+import { StationCatalogEntry } from '../../modules/catalog/entities/station-catalog-entry.entity';
+import { Contract } from '../../modules/contracts/entities/contract.entity';
+import { ContractItem } from '../../modules/contracts/entities/contract-item.entity';
+import { ContractMilestone } from '../../modules/contracts/entities/contract-milestone.entity';
+import { ContractParty } from '../../modules/contracts/entities/contract-party.entity';
 import { OrgPermission } from '../../modules/permissions/permissions.constants';
 import { defaultRoles } from './roles.seed';
 
@@ -107,6 +114,7 @@ describe('DatabaseSeederService', () => {
         {
           provide: getRepositoryToken(Organization),
           useValue: {
+            find: jest.fn().mockResolvedValue([]),
             findOne: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
@@ -115,6 +123,7 @@ describe('DatabaseSeederService', () => {
         {
           provide: getRepositoryToken(User),
           useValue: {
+            find: jest.fn(),
             findOne: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
@@ -135,6 +144,45 @@ describe('DatabaseSeederService', () => {
             create: jest.fn(),
             save: jest.fn(),
           },
+        },
+        {
+          provide: getRepositoryToken(BusinessUnit),
+          useValue: { findOne: jest.fn(), create: jest.fn(), save: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(StationInventoryItem),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+            count: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(StationCatalogEntry),
+          useValue: { findOne: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(Contract),
+          useValue: {
+            findOne: jest.fn(),
+            find: jest.fn(),
+            create: jest.fn(),
+            save: jest.fn(),
+          },
+        },
+        {
+          provide: getRepositoryToken(ContractItem),
+          useValue: { findOne: jest.fn(), create: jest.fn(), save: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(ContractMilestone),
+          useValue: { findOne: jest.fn(), create: jest.fn(), save: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(ContractParty),
+          useValue: { findOne: jest.fn(), create: jest.fn(), save: jest.fn() },
         },
       ],
     }).compile();

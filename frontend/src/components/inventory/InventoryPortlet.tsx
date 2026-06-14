@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import {
   inventoryService,
   InventoryItem,
@@ -21,22 +20,51 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-function categoryIcon(categoryPath: string) {
-  const p = (categoryPath || '').toLowerCase();
-  if (p.includes('weapon') || p.includes('arm'))  return <ShieldOutlinedIcon />;
-  if (p.includes('vehicle') || p.includes('ship')) return <Inventory2OutlinedIcon />;
+function itemIcon(item: InventoryItem) {
+  if (item.catalogKind === 'vehicle') return <DirectionsCarIcon />;
+  const p = (item.categoryPath || '').toLowerCase();
+  if (p.includes('weapon') || p.includes('arm')) return <ShieldOutlinedIcon />;
   return <Inventory2OutlinedIcon />;
 }
 
+interface GroupedRow {
+  catalogEntryId: string;
+  itemName: string;
+  categoryName: string;
+  totalQuantity: number;
+  totalContracted: number;
+  subRows: InventoryItem[];
+}
+
+function buildGroups(items: InventoryItem[]): GroupedRow[] {
+  const map = new Map<string, InventoryItem[]>();
+  for (const item of items) {
+    const bucket = map.get(item.catalogEntryId) ?? [];
+    bucket.push(item);
+    map.set(item.catalogEntryId, bucket);
+  }
+  return Array.from(map.values()).map((rows) => {
+    const sorted = [...rows].sort((a, b) => (a.locationName ?? '').localeCompare(b.locationName ?? ''));
+    const rep = sorted[0];
+    return {
+      catalogEntryId: rep.catalogEntryId,
+      itemName: rep.itemName || `Item #${rep.catalogEntryId}`,
+      categoryName: rep.categoryName,
+      totalQuantity: rows.reduce((s, r) => s + Number(r.quantity), 0),
+      totalContracted: rows.reduce((s, r) => s + (r.contractedQuantity ?? 0), 0),
+      subRows: sorted,
+    };
+  });
+}
+
 const InventoryPortlet = () => {
-  const [items, setItems]         = useState<InventoryItem[]>([]);
+  const [items, setItems]           = useState<InventoryItem[]>([]);
   const [categories, setCategories] = useState<InventoryCategory[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [search, setSearch]         = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [page, setPage]           = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [totalCount, setTotalCount]   = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [expanded, setExpanded]     = useState<Set<string>>(new Set());
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -48,8 +76,8 @@ const InventoryPortlet = () => {
     setLoading(true);
     try {
       const result = await inventoryService.getInventory({
-        limit: rowsPerPage,
-        page: page + 1,
+        limit: 500,
+        page: 1,
         search: debouncedSearch || undefined,
         categoryId: categoryId || undefined,
       });
@@ -60,18 +88,23 @@ const InventoryPortlet = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, categoryId, page, rowsPerPage]);
+  }, [debouncedSearch, categoryId]);
 
   useEffect(() => { fetchInventory(); }, [fetchInventory]);
-  useEffect(() => { setPage(0); }, [debouncedSearch, categoryId]);
+  useEffect(() => { setExpanded(new Set()); }, [debouncedSearch, categoryId]);
 
-  const totalPages = Math.ceil(totalCount / rowsPerPage);
-  const start = totalCount === 0 ? 0 : page * rowsPerPage + 1;
-  const end   = Math.min(totalCount, (page + 1) * rowsPerPage);
+  const groups = useMemo(() => buildGroups(items), [items]);
+
+  const toggle = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   return (
     <>
-      {/* Controls toolbar */}
       <div className="portlet-controls">
         <label className="search">
           <SearchIcon />
@@ -82,7 +115,6 @@ const InventoryPortlet = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-
         <div className="p-select">
           <select
             value={categoryId}
@@ -96,78 +128,98 @@ const InventoryPortlet = () => {
           </select>
           <ExpandMoreIcon />
         </div>
-
       </div>
 
-      {/* Table */}
       {loading ? (
-        <div className="p-empty">
-          <p>Loading…</p>
-        </div>
-      ) : items.length === 0 ? (
+        <div className="p-empty"><p>Loading…</p></div>
+      ) : groups.length === 0 ? (
         <div className="p-empty">
           <Inventory2OutlinedIcon />
           <p>{debouncedSearch || categoryId ? 'No items match your filters.' : 'No inventory items yet.'}</p>
         </div>
       ) : (
-        <table className="inv-table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Category</th>
-              <th className="num">Quantity</th>
-              <th>Location</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <div className="inv-item">
-                    <span className="thumb">
-                      {categoryIcon(item.categoryPath)}
-                    </span>
-                    <div>
-                      <div className="nm">{item.itemName || `Item #${item.catalogEntryId}`}</div>
-                      <div className="sku">{item.categoryPath || item.categoryName || '—'}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="cell-muted">{item.categoryName || '—'}</td>
-                <td className="cell-num">
-                  {item.quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                </td>
-                <td className="cell-muted">{item.locationName ?? '—'}</td>
-                <td>
-                  <span className="chip-badge neutral"><LockOutlinedIcon /> Private</span>
-                </td>
+        <div className="pcard-scroll">
+          <table className="inv-table inv-accordion">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th className="num">Qty</th>
+                <th>Location</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {groups.map((group) => {
+                const isOpen = expanded.has(group.catalogEntryId);
+                const multiLoc = group.subRows.length > 1;
+                return (
+                  <React.Fragment key={group.catalogEntryId}>
+                    <tr
+                      className={'inv-group-row' + (isOpen ? ' open' : '') + (multiLoc ? ' expandable' : '')}
+                      onClick={() => multiLoc && toggle(group.catalogEntryId)}
+                      style={{ cursor: multiLoc ? 'pointer' : 'default' }}
+                    >
+                      <td>
+                        <div className="inv-item">
+                          {multiLoc && (
+                            <span className="inv-toggle-ic" aria-hidden="true">
+                              {isOpen ? <ExpandMoreIcon style={{ width: 14, height: 14 }} /> : <ChevronRightIcon style={{ width: 14, height: 14 }} />}
+                            </span>
+                          )}
+                          {!multiLoc && <span className="inv-toggle-ic inv-toggle-spacer" />}
+                          <span className="thumb">{itemIcon(group.subRows[0])}</span>
+                          <div>
+                            <div className="nm">{group.itemName}</div>
+                            <div className="sku">{group.categoryName || '—'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="cell-num">
+                        {group.totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                        {group.totalContracted > 0 && (
+                          <span className="chip-badge warm" style={{ marginLeft: 6, fontSize: '10px', padding: '1px 5px' }}>
+                            {group.totalContracted.toLocaleString(undefined, { maximumFractionDigits: 6 })} ctr
+                          </span>
+                        )}
+                      </td>
+                      <td className="cell-muted">
+                        {multiLoc
+                          ? <span className="inv-multi-loc">{group.subRows.length} locations</span>
+                          : (group.subRows[0].locationName ?? '—')}
+                      </td>
+                    </tr>
+                    {isOpen && group.subRows.map((sub) => (
+                      <tr key={sub.id} className="inv-sub-row">
+                        <td>
+                          <div className="inv-item inv-item--sub">
+                            <span className="inv-toggle-ic inv-toggle-spacer" />
+                            <span className="inv-sub-indent" />
+                            <div className="nm inv-sub-name">{sub.locationName ?? '—'}</div>
+                          </div>
+                        </td>
+                        <td className="cell-num">
+                          {Number(sub.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                          {(sub.contractedQuantity ?? 0) > 0 && (
+                            <span className="chip-badge warm" style={{ marginLeft: 6, fontSize: '10px', padding: '1px 5px' }}>
+                              {sub.contractedQuantity!.toLocaleString(undefined, { maximumFractionDigits: 6 })} ctr
+                            </span>
+                          )}
+                        </td>
+                        <td className="cell-muted">{sub.locationName ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      {/* Pagination */}
       <div className="p-pagination">
-        <span className="p-count">{start}–{end} of {totalCount.toLocaleString()}</span>
-        <div className="rpp">
-          Rows per page:
-          <select
-            value={rowsPerPage}
-            onChange={(e) => { setRowsPerPage(Number(e.target.value)); setPage(0); }}
-          >
-            {[5, 10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-        <div className="pager">
-          <button disabled={page === 0} onClick={() => setPage((p) => p - 1)} aria-label="Previous page">
-            <ChevronLeftIcon style={{ width: 16, height: 16 }} />
-          </button>
-          <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)} aria-label="Next page">
-            <ChevronRightIcon style={{ width: 16, height: 16 }} />
-          </button>
-        </div>
+        <span className="p-count">
+          {groups.length} item type{groups.length === 1 ? '' : 's'}
+          {totalCount > items.length ? ` · ${items.length} of ${totalCount.toLocaleString()} records` : ` · ${items.length} record${items.length === 1 ? '' : 's'}`}
+        </span>
       </div>
     </>
   );

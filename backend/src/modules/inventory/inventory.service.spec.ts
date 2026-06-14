@@ -21,6 +21,7 @@ import { StationInventoryListItem } from './entities/station-inventory-list-item
 import { StationInventoryList } from './entities/station-inventory-list.entity';
 import { StationUnitOfMeasure } from './entities/station-unit-of-measure.entity';
 import { InventoryService } from './inventory.service';
+import { ContractItem } from '../contracts/entities/contract-item.entity';
 
 describe('InventoryService', () => {
   let service: InventoryService;
@@ -200,6 +201,22 @@ describe('InventoryService', () => {
         {
           provide: getRepositoryToken(StationInventoryListItem),
           useValue: mockInventoryListItemRepository,
+        },
+        {
+          provide: getRepositoryToken(ContractItem),
+          useValue: {
+            find: jest.fn().mockResolvedValue([]),
+            createQueryBuilder: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnThis(),
+              addSelect: jest.fn().mockReturnThis(),
+              innerJoin: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              groupBy: jest.fn().mockReturnThis(),
+              getRawMany: jest.fn().mockResolvedValue([]),
+              getMany: jest.fn().mockResolvedValue([]),
+            }),
+          },
         },
         {
           provide: DataSource,

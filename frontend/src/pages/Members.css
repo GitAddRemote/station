@@ -1,0 +1,230 @@
+/* ============================================================
+   Members page
+   ============================================================ */
+
+.mem-layout {
+  display: flex;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---- Main panel ---- */
+.mem-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-5);
+  transition: margin-right 220ms ease;
+}
+.mem-main.drawer-open {
+  margin-right: 440px;
+}
+
+.mem-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+.mem-title { font-size: 22px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.mem-sub   { font-size: 13px; color: var(--text-muted); margin: var(--space-1) 0 0; }
+
+/* ---- Filters ---- */
+.mem-filters {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  align-items: center;
+}
+.mem-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  flex: 1;
+  max-width: 360px;
+  color: var(--text-muted);
+}
+.mem-search {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 8px 0;
+  width: 100%;
+}
+.mem-search::placeholder { color: var(--text-muted); }
+.mem-role-filter { width: 160px; }
+
+/* ---- Empty state ---- */
+.mem-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-12) 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---- Table ---- */
+.mem-table-wrap { overflow-x: auto; }
+.mem-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.mem-table thead th {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.mem-row {
+  border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,.06));
+  cursor: pointer;
+  outline: none;
+}
+.mem-row:hover  { background: var(--surface-hover, rgba(255,255,255,.03)); }
+.mem-row.selected { background: var(--brand-subtle); }
+.mem-row td { padding: var(--space-2) var(--space-3); vertical-align: middle; }
+
+.mem-cell-user { display: flex; align-items: center; gap: var(--space-2); }
+.mem-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--brand-subtle);
+  color: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  flex-shrink: 0;
+}
+.mem-name     { font-weight: 500; color: var(--text-primary); }
+.mem-username { font-size: 11px; color: var(--text-muted); }
+
+.mem-role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+.mem-cell-unit, .mem-cell-date { color: var(--text-secondary); font-size: 12px; }
+.mem-unassigned { color: var(--text-muted); }
+
+.mem-cell-discord { font-size: 12px; }
+.mem-discord-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: #7289da;
+}
+.mem-no-discord { color: var(--text-muted); }
+
+/* ---- Drawer ---- */
+.mem-drawer {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 440px;
+  background: var(--surface-panel, var(--surface-raised));
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  transition: transform 220ms ease;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+}
+.mem-drawer.open { transform: translateX(0); }
+
+.mem-drawer-inner { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+
+.mem-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.mem-avatar-lg {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--brand-subtle);
+  color: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 700;
+  flex-shrink: 0;
+}
+.mem-drawer-name-wrap { flex: 1; min-width: 0; }
+.mem-drawer-name  { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.mem-drawer-username { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.mem-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ---- Drawer sections ---- */
+.mem-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.mem-section-cap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+.mem-kv  { display: flex; justify-content: space-between; align-items: center; font-size: 13px; gap: var(--space-3); }
+.mem-k   { color: var(--text-muted); flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+.mem-v   { color: var(--text-primary); text-align: right; word-break: break-all; }
+.mem-discord { font-family: var(--font-mono); font-size: 12px; }
+.mem-saving { font-size: 12px; color: var(--text-muted); margin: var(--space-1) 0 0; }
+
+/* ---- Danger zone ---- */
+.mem-section-danger { border-top: 1px solid var(--border); padding-top: var(--space-4); }
+.btn-danger-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(239,68,68,.35);
+  background: transparent;
+  color: #f87171;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.btn-danger-outline:hover { background: rgba(239,68,68,.1); }
+.mem-confirm { display: flex; flex-direction: column; gap: var(--space-3); }
+.mem-confirm-msg { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
+.mem-confirm-btns { display: flex; gap: var(--space-2); }
+
+/* ---- Backdrop ---- */
+.mem-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+  background: rgba(0,0,0,.3);
+}
+@media (min-width: 900px) {
+  .mem-backdrop { display: none; }
+  .mem-drawer { top: 0; }
+}

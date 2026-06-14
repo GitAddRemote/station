@@ -61,6 +61,9 @@ export class InventoryItemDto {
   @ApiPropertyOptional({ nullable: true })
   notes!: string | null;
 
+  @ApiPropertyOptional({ nullable: true })
+  contractedQuantity!: number | null;
+
   @ApiProperty()
   createdAt!: Date;
 

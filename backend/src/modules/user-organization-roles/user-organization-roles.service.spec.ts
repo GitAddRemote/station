@@ -285,6 +285,7 @@ describe('UserOrganizationRolesService', () => {
       expect(mockUorRepository.find).toHaveBeenCalledWith({
         where: { userId: USER_ID },
         relations: ['organization', 'role'],
+        order: { orgPriority: 'ASC', assignedAt: 'ASC' },
       });
     });
   });
@@ -316,7 +317,7 @@ describe('UserOrganizationRolesService', () => {
       expect(result).toEqual(assignments);
       expect(mockUorRepository.find).toHaveBeenCalledWith({
         where: { organizationId: ORG_ID },
-        relations: ['user', 'role'],
+        relations: ['user', 'role', 'businessUnit'],
       });
     });
   });

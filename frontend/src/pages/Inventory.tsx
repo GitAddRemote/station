@@ -53,6 +53,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import PackageIcon from '@mui/icons-material/Inventory2';
 import LayersIcon from '@mui/icons-material/Layers';
+import ArticleIcon from '@mui/icons-material/Article';
 import './Inventory.css';
 import {
   inventoryService,
@@ -69,6 +70,7 @@ import { useFocusController } from '../hooks/useFocusController';
 import InventoryInlineRow from '../components/inventory/InventoryInlineRow';
 import InventoryNewRow from '../components/inventory/InventoryNewRow';
 import BatchDrawer, { BatchDrawerMode } from '../components/inventory/BatchDrawer';
+import CreateContractModal from '../components/contracts/CreateContractModal';
 import {
   OrgPermission,
   permissionsService,
@@ -258,6 +260,10 @@ const InventoryPage = () => {
   const [newRowSaving, setNewRowSaving] = useState(false);
   const [batchDrawerOpen, setBatchDrawerOpen] = useState(false);
   const [batchDrawerMode, setBatchDrawerMode] = useState<BatchDrawerMode | null>(null);
+  const [batchDrawerFromList, setBatchDrawerFromList] = useState(false);
+  const [contractModalOpen, setContractModalOpen] = useState(false);
+  const [contractModalTitle, setContractModalTitle] = useState('');
+  const [contractModalItem, setContractModalItem] = useState<InventoryItem | null>(null);
   const debouncedSearch = useDebounce(filters.search, 350);
   const debouncedCatalogSearch = useDebounce(catalogSearch, 350);
   const isOrgMode = viewMode === 'org';
@@ -472,8 +478,14 @@ const InventoryPage = () => {
   const openBatchDrawer = useCallback((mode: BatchDrawerMode) => {
     setBatchDrawerMode(mode);
     setBatchDrawerOpen(true);
+    setBatchDrawerFromList(false);
     setActionAnchor(null);
     setActionItem(null);
+  }, []);
+
+  const openBatchDetail = useCallback((batchId: string) => {
+    setBatchDrawerMode({ kind: 'detail', batchId });
+    setBatchDrawerFromList(true);
   }, []);
 
   const canViewOrgInventory = useMemo(
@@ -548,6 +560,7 @@ const InventoryPage = () => {
       ).filter((org): org is { id: string; name: string } => org !== null);
       setOrgOptions(viewableOrgs);
       orgsLoaded.current = true;
+      setSelectedOrgId((prev) => prev ?? viewableOrgs[0]?.id ?? null);
     } catch (err) {
       console.error('Error loading organizations', err);
     }
@@ -2020,6 +2033,15 @@ const InventoryPage = () => {
             <ExpandMoreIcon className="chev" style={{ width: 15, height: 15 }} />
           </span>
           <span className="inv-spacer" />
+          {viewMode === 'personal' && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => openBatchDrawer({ kind: 'list' })}
+              title="View my batches"
+            >
+              <LayersIcon style={{ width: 15, height: 15 }} /> Batches
+            </button>
+          )}
           {(viewMode === 'personal' || canManageOrgInventory) && (
             <div className="density-toggle" role="group" aria-label="Density">
               <button
@@ -2214,7 +2236,7 @@ const InventoryPage = () => {
                         <div role="rowgroup">
                           {groupEntries.map((group) => {
                             const isExpanded = expandedEntries.has(group.catalogEntryId);
-                            const hasSubs = group.subRows.length > 1;
+                            const hasSubs = group.subRows.length >= 1;
                             return (
                               <div key={group.catalogEntryId} className="acc-entry">
                                 {/* Parent row */}
@@ -2233,12 +2255,17 @@ const InventoryPage = () => {
                                   </button>
                                   <span className="acc-name" title={group.itemName}>
                                     {group.itemName}
-                                    <span className="chip-badge neutral" style={{ marginLeft: 8 }}>Private</span>
+                                    {(() => {
+                                      const rolledUp = group.subRows.reduce((sum, r) => sum + (r.contractedQuantity ?? 0), 0);
+                                      return rolledUp > 0 ? (
+                                        <span className="chip-badge warm" style={{ marginLeft: 8 }}>Contracted | {rolledUp.toLocaleString(undefined, { maximumFractionDigits: 6 })}</span>
+                                      ) : null;
+                                    })()}
                                   </span>
                                   <span className="acc-location">
-                                    {group.subRows.length === 1
-                                      ? (group.subRows[0].locationName ?? <>&mdash;</>)
-                                      : <span className="acc-multi">{group.subRows.length} locations</span>}
+                                    <span className="acc-multi">
+                                      {group.subRows.length} {group.subRows.length === 1 ? 'location' : 'locations'}
+                                    </span>
                                   </span>
                                   <span className="acc-quality">
                                     {group.maxQuality != null ? (
@@ -2526,6 +2553,16 @@ const InventoryPage = () => {
                 <ListItemText>Add to batch</ListItemText>
               </MenuItem>
             )}
+            <MenuItem onClick={() => {
+              const item = actionItem as InventoryItem | null;
+              setContractModalTitle(item?.itemName ?? '');
+              setContractModalItem(item ?? null);
+              setContractModalOpen(true);
+              closeActionMenu();
+            }}>
+              <ListItemIcon><ArticleIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Create contract</ListItemText>
+            </MenuItem>
           </>
         )}
         <MenuItem onClick={() => openActionDialog('delete')}>
@@ -2539,8 +2576,10 @@ const InventoryPage = () => {
       <BatchDrawer
         open={batchDrawerOpen}
         mode={batchDrawerMode}
-        onClose={() => { setBatchDrawerOpen(false); setBatchDrawerMode(null); }}
+        onClose={() => { setBatchDrawerOpen(false); setBatchDrawerMode(null); setBatchDrawerFromList(false); }}
         onMutated={fetchInventory}
+        onSelectBatch={openBatchDetail}
+        onBack={batchDrawerFromList ? () => setBatchDrawerMode({ kind: 'list' }) : undefined}
       />
 
       <InventoryItemDrawer
@@ -2549,6 +2588,22 @@ const InventoryPage = () => {
         onClose={() => setSelectedDrawerGroup(null)}
         onMutated={fetchInventory}
       />
+
+      {contractModalOpen && (
+        <CreateContractModal
+          initialType="transfer"
+          initialTitle={contractModalTitle}
+          inventoryItem={contractModalItem ? {
+            id: contractModalItem.id,
+            itemName: contractModalItem.itemName,
+            quantity: contractModalItem.quantity,
+            catalogEntryId: contractModalItem.catalogEntryId,
+            itemSubtype: contractModalItem.catalogKind,
+          } : undefined}
+          onClose={() => { setContractModalOpen(false); setContractModalItem(null); }}
+          onCreated={() => {}}
+        />
+      )}
     </AppShell>
   );
 };

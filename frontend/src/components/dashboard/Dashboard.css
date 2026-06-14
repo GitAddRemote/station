@@ -83,7 +83,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-5);
 }
-.dash-pgrid .pcard--full { grid-column: 1 / -1; }
+/* size variants — names reflect intent, not raw fractions */
+.dash-pgrid .pcard--compact  { grid-column: span 1; } /* 1/3 — Compact    */
+.dash-pgrid .pcard--standard { grid-column: span 2; } /* 2/3 — Standard   */
+.dash-pgrid .pcard--full     { grid-column: 1 / -1; } /* 3/3 — Full width */
 
 /* ---- portlet shell --------------------------------------- */
 .pcard {
@@ -93,13 +96,17 @@
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
+  height: 420px;
   min-height: 168px;
+  overflow: hidden;
   transition:
     transform var(--dur-base) var(--ease-out),
     border-color var(--dur-base) var(--ease-out),
     box-shadow var(--dur-base) var(--ease-out),
     opacity var(--dur-base) var(--ease-out);
 }
+.pcard.pcard--standard { height: 420px; }
+.pcard.pcard--full     { height: 480px; }
 .pcard-head {
   display: flex;
   align-items: center;
@@ -118,6 +125,12 @@
 .pcard-grip:active { cursor: grabbing; }
 .pcard-grip:hover { color: var(--text-muted); }
 .pcard-grip svg { width: 16px; height: 16px; }
+
+.pcard-size-btn {
+  display: none;
+}
+.dash-pgrid.editing .pcard-size-btn { display: grid; }
+
 .pcard-ico {
   width: 34px;
   height: 34px;
@@ -155,8 +168,43 @@
 .pcard-body {
   padding: var(--space-5);
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---- portlet status filter bar --------------------------- */
+.cp-filter-bar {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  margin-bottom: var(--space-3);
+}
+.cp-filter-pill {
+  appearance: none;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
+}
+.cp-filter-pill:hover { color: var(--text-muted); background: var(--surface-raised); }
+.cp-filter-pill.active { color: var(--brand); background: var(--brand-subtle); }
+
+/* scrollable content area inside a portlet body */
+.pcard-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 calc(-1 * var(--space-5));
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
 }
 
 /* ---- edit mode ------------------------------------------- */
@@ -280,10 +328,11 @@
 
 /* ---- inventory portlet overrides (full-bleed table inside pcard-body) --- */
 .pcard .portlet-controls {
-  padding: var(--space-4) var(--space-5) var(--space-3);
+  padding: var(--space-3) var(--space-5);
   display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
   margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 0;
   border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 .pcard .portlet-controls .search {
   flex: 1; min-width: 200px;
@@ -334,8 +383,6 @@
 /* inv-table inside portlet */
 .pcard .inv-table {
   width: 100%; border-collapse: collapse;
-  margin: 0 calc(-1 * var(--space-5));
-  width: calc(100% + 2 * var(--space-5));
 }
 .pcard .inv-table thead th {
   text-align: left;
@@ -345,31 +392,68 @@
   border-block: 1px solid var(--border-subtle); white-space: nowrap;
 }
 .pcard .inv-table thead th.num { text-align: right; }
-.pcard .inv-table tbody td { padding: 13px var(--space-5); border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.pcard .inv-table tbody td { padding: 7px var(--space-5); border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
 .pcard .inv-table tbody tr { transition: background var(--dur-fast) var(--ease-out); }
 .pcard .inv-table tbody tr:hover { background: var(--surface-sunken); }
 .pcard .inv-table tbody tr:last-child td { border-bottom: none; }
 .inv-item { display: flex; align-items: center; gap: var(--space-3); }
 .inv-item .thumb {
-  width: 34px; height: 34px; flex: none; border-radius: 8px;
+  width: 26px; height: 26px; flex: none; border-radius: 6px;
   display: grid; place-items: center;
   background: var(--surface-raised); color: var(--text-faint);
   border: 1px solid var(--border-subtle);
 }
-.inv-item .thumb svg { width: 16px; height: 16px; }
+.inv-item .thumb svg { width: 13px; height: 13px; }
 .inv-item > div { min-width: 0; }
 .inv-item .nm { font-weight: var(--weight-medium); color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .inv-item .sku { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-faint); margin-top: 1px; }
 .cell-muted { color: var(--text-muted); }
 .cell-num { text-align: right; font-family: var(--font-mono); font-weight: var(--weight-semibold); color: var(--text-body); font-variant-numeric: tabular-nums; }
 
-/* portlet pagination */
+/* ---- inventory accordion portlet ------------------------- */
+.inv-toggle-ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+.inv-toggle-spacer { visibility: hidden; }
+.inv-group-row.expandable:hover .inv-toggle-ic { color: var(--text-muted); }
+.inv-group-row.open > td:first-child { color: var(--brand); }
+.inv-multi-loc {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-faint);
+}
+.inv-sub-row td {
+  background: var(--surface-sunken);
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+.inv-sub-row:last-child td { border-bottom: 1px solid var(--border-subtle) !important; }
+.inv-sub-row td:last-child { border-bottom: 1px solid var(--border-subtle); }
+.inv-item--sub { gap: var(--space-2); }
+.inv-sub-indent {
+  width: 18px;
+  height: 1px;
+  flex: none;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 1px;
+  align-self: center;
+}
+.inv-sub-name { font-size: var(--text-xs); color: var(--text-muted); font-weight: var(--weight-regular); }
+
+/* portlet pagination — always pinned to bottom of pcard-body */
 .pcard .p-pagination {
-  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4);
-  padding: var(--space-3) var(--space-5);
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
   font-size: var(--text-sm); color: var(--text-muted);
   margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
   border-top: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  flex-shrink: 0;
 }
 .pcard .p-pagination .rpp { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); }
 .pcard .p-pagination .rpp select {

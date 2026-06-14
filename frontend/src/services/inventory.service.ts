@@ -21,6 +21,7 @@ export interface InventoryItem {
   quality: number | null;
   alias: string | null;
   notes: string | null;
+  contractedQuantity: number | null;
   createdAt: Date;
   updatedAt: Date;
 }

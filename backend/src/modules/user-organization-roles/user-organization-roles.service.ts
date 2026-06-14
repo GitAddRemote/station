@@ -106,7 +106,24 @@ export class UserOrganizationRolesService {
     return this.userOrgRoleRepository.find({
       where: { userId },
       relations: ['organization', 'role'],
+      order: { orgPriority: 'ASC', assignedAt: 'ASC' },
     });
+  }
+
+  async updateOrgPriorities(
+    userId: string,
+    orderedOrgIds: string[],
+  ): Promise<void> {
+    await Promise.all(
+      orderedOrgIds.map((orgId, index) =>
+        this.userOrgRoleRepository.manager.query(
+          `UPDATE "user_organization_role"
+             SET "org_priority" = $1
+           WHERE "userId" = $2 AND "organizationId" = $3 AND "deleted_at" IS NULL`,
+          [index, userId, orgId],
+        ),
+      ),
+    );
   }
 
   async getOrganizationMembers(
@@ -114,8 +131,40 @@ export class UserOrganizationRolesService {
   ): Promise<UserOrganizationRole[]> {
     return this.userOrgRoleRepository.find({
       where: { organizationId },
-      relations: ['user', 'role'],
+      relations: ['user', 'role', 'businessUnit'],
     });
+  }
+
+  async updateMemberBusinessUnit(
+    organizationId: string,
+    userId: string,
+    businessUnitId: string | null,
+  ): Promise<void> {
+    const memberships = await this.userOrgRoleRepository.find({
+      where: { organizationId, userId },
+    });
+    if (memberships.length === 0) {
+      throw new NotFoundException('Member not found in this organization');
+    }
+    await this.userOrgRoleRepository.manager.query(
+      `UPDATE "user_organization_role"
+         SET "business_unit_id" = $1
+       WHERE "organizationId" = $2 AND "userId" = $3 AND "deleted_at" IS NULL`,
+      [businessUnitId, organizationId, userId],
+    );
+  }
+
+  async removeMemberFromOrg(
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    const memberships = await this.userOrgRoleRepository.find({
+      where: { organizationId, userId },
+    });
+    if (memberships.length === 0) {
+      throw new NotFoundException('Member not found in this organization');
+    }
+    await this.userOrgRoleRepository.softRemove(memberships);
   }
 
   async getUsersWithRole(

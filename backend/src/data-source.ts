@@ -61,8 +61,14 @@ import { RemoveOrgInventorySharing1780170000000 } from './migrations/17801700000
 import { AddContractsTables1780170000000 } from './migrations/1780170000000-AddContractsTables';
 import { AddInventoryBatches1780180000000 } from './migrations/1780180000000-AddInventoryBatches';
 import { AddUuidDefaultsToMissingPkColumns1780190000000 } from './migrations/1780190000000-AddUuidDefaultsToMissingPkColumns';
+import { AddContractStatusHistory1780200000000 } from './migrations/1780200000000-AddContractStatusHistory';
 import { OrgGuildMapping } from './modules/station-bot-admin/entities/org-guild-mapping.entity';
 import { StationInventoryBatch } from './modules/inventory/entities/station-inventory-batch.entity';
+import { BusinessUnit } from './modules/business-units/business-unit.entity';
+import { AddBusinessUnits1780210000000 } from './migrations/1780210000000-AddBusinessUnits';
+import { AddSoftDeleteToUsersAndMemberships1780220000000 } from './migrations/1780220000000-AddSoftDeleteToUsersAndMemberships';
+import { AddOrgPriorityToUserOrganizationRole1780230000000 } from './migrations/1780230000000-AddOrgPriorityToUserOrganizationRole';
+import { AddBusinessUnitToContractParty1780240000000 } from './migrations/1780240000000-AddBusinessUnitToContractParty';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -105,6 +111,7 @@ export const AppDataSource = new DataSource({
     StationInventoryList,
     StationInventoryListItem,
     OrgGuildMapping,
+    BusinessUnit,
   ],
   migrations: [
     BigBangBaselineMigration1748000000000,
@@ -135,6 +142,11 @@ export const AppDataSource = new DataSource({
     AddContractsTables1780170000000,
     AddInventoryBatches1780180000000,
     AddUuidDefaultsToMissingPkColumns1780190000000,
+    AddContractStatusHistory1780200000000,
+    AddBusinessUnits1780210000000,
+    AddSoftDeleteToUsersAndMemberships1780220000000,
+    AddOrgPriorityToUserOrganizationRole1780230000000,
+    AddBusinessUnitToContractParty1780240000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },
