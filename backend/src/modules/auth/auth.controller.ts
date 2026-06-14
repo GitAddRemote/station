@@ -8,6 +8,7 @@ import {
   Headers,
   Res,
   Req,
+  Query,
   HttpCode,
   HttpStatus,
   UnauthorizedException,
@@ -48,6 +49,8 @@ import {
   LocalLoginEnabledGuard,
   LocalRegisterEnabledGuard,
 } from './local-feature-flags.guard';
+import { InviteOnlyGuard } from './guards/invite-only.guard';
+import { AuthInvitesService } from '../auth-invites/auth-invites.service';
 
 // Parse throttle config once at module load time.
 // Number() handles numeric strings and NaN from non-numeric input; the
@@ -108,6 +111,7 @@ export class AuthController {
     private authService: AuthService,
     private configService: ConfigService,
     private oauthClientsService: OauthClientsService,
+    private authInvitesService: AuthInvitesService,
   ) {}
 
   private cookieOptions(maxAge: number) {
@@ -210,6 +214,7 @@ export class AuthController {
       localLoginEnabled: this.authService.isLocalLoginEnabled(),
       localRegisterEnabled: this.authService.isLocalRegisterEnabled(),
       discordEnabled: this.authService.isDiscordEnabled(),
+      inviteOnly: this.authInvitesService.isInviteOnly(),
     };
   }
 
@@ -231,7 +236,7 @@ export class AuthController {
       'Local login is disabled, or password change/expiry required (X-Pre-Auth-Token header set)',
   })
   @Throttle({ default: { ttl: LOGIN_TTL, limit: LOGIN_LIMIT } })
-  @UseGuards(LocalLoginEnabledGuard, LocalAuthGuard)
+  @UseGuards(InviteOnlyGuard, LocalLoginEnabledGuard, LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(
@@ -271,12 +276,29 @@ export class AuthController {
   @ApiOperation({ summary: 'Register new user' })
   @ApiResponse({ status: 201, description: 'User successfully registered' })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
-  @ApiResponse({ status: 403, description: 'Local registration is disabled' })
+  @ApiResponse({
+    status: 403,
+    description: 'Local registration is disabled or invite required',
+  })
   @Throttle({ default: { ttl: REGISTER_TTL, limit: REGISTER_LIMIT } })
-  @UseGuards(LocalRegisterEnabledGuard)
+  @UseGuards(InviteOnlyGuard, LocalRegisterEnabledGuard)
   @Post('register')
-  async register(@Body() userDto: UserDto) {
-    return this.authService.register(userDto);
+  async register(
+    @Body() userDto: UserDto,
+    @Query('invite') inviteToken?: string,
+  ) {
+    const user = await this.authService.register(userDto);
+    if (this.authInvitesService.isInviteOnly() && inviteToken) {
+      try {
+        await this.authInvitesService.consumeToken(
+          inviteToken,
+          (user as { id?: string }).id ?? '',
+        );
+      } catch {
+        // Token was valid when guard checked; consume failure is non-fatal
+      }
+    }
+    return user;
   }
 
   @ApiOperation({ summary: 'Get current authenticated user' })
@@ -448,8 +470,12 @@ export class AuthController {
   })
   @ApiResponse({ status: 404, description: 'Discord auth is disabled' })
   @Throttle({ default: { ttl: DISCORD_TTL, limit: DISCORD_LIMIT } })
+  @UseGuards(InviteOnlyGuard)
   @Get('discord')
-  async discordLogin(@Res({ passthrough: false }) res: Response) {
+  async discordLogin(
+    @Res({ passthrough: false }) res: Response,
+    @Query('invite') inviteToken?: string,
+  ) {
     if (!this.authService.isDiscordEnabled()) {
       throw new NotFoundException('Discord auth is disabled');
     }
@@ -461,6 +487,17 @@ export class AuthController {
       path: '/',
       maxAge: DISCORD_STATE_TTL_MS,
     });
+
+    if (this.authInvitesService.isInviteOnly() && inviteToken) {
+      res.cookie('oauth_invite', inviteToken, {
+        httpOnly: true,
+        secure: this.configService.get<string>('NODE_ENV') === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+        maxAge: 15 * 60 * 1000,
+      });
+    }
+
     const clientId = this.configService.get<string>('DISCORD_CLIENT_ID', '');
     const callbackUrl = this.configService.get<string>(
       'DISCORD_CALLBACK_URL',
@@ -526,6 +563,22 @@ export class AuthController {
       );
     }
 
+    const oauthInviteToken = (
+      req.cookies as Record<string, string> | undefined
+    )?.['oauth_invite'];
+
+    if (this.authInvitesService.isInviteOnly()) {
+      if (!oauthInviteToken) {
+        return res.redirect(`${frontendBase}/login?error=invite_required`);
+      }
+      try {
+        await this.authInvitesService.validateToken(oauthInviteToken);
+      } catch {
+        res.clearCookie('oauth_invite', { path: '/' });
+        return res.redirect(`${frontendBase}/login?error=invite_required`);
+      }
+    }
+
     const result = await this.authService.handleDiscordCallback({
       discordId: profile.discordId,
       email: profile.email,
@@ -535,6 +588,18 @@ export class AuthController {
 
     if ('error' in result) {
       return res.redirect(`${frontendBase}/login?error=${result.error}`);
+    }
+
+    if (this.authInvitesService.isInviteOnly() && oauthInviteToken) {
+      try {
+        await this.authInvitesService.consumeToken(
+          oauthInviteToken,
+          result.user.id,
+        );
+      } catch {
+        // Token already consumed on a retry — not fatal, user is authenticated
+      }
+      res.clearCookie('oauth_invite', { path: '/' });
     }
 
     const tokens = await this.authService.loginDiscordUser(result.user);

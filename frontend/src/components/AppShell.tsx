@@ -377,7 +377,7 @@ export function AppShell({
 
   const handleSignOut = useCallback(async () => {
     try { await api.post('/auth/logout', {}); } catch { /* ignore */ }
-    navigate('/login');
+    navigate('/');
   }, [navigate]);
 
   const allCommands = useMemo<Command[]>(() => {
@@ -611,6 +611,10 @@ export function AppShell({
               <KeyboardIcon style={{ width: 15, height: 15 }} />
               Keyboard shortcuts
               <span className="shell-kbd side-help-kbd"><kbd>?</kbd></span>
+            </button>
+            <button className="side-help-btn" onClick={handleSignOut} aria-label="Sign out">
+              <LogoutIcon style={{ width: 15, height: 15 }} />
+              Sign out
             </button>
           </div>
         </aside>
