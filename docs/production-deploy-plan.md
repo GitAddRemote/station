@@ -285,7 +285,7 @@ certbot --nginx \
 cd /opt/station
 
 # Pull all images (STATION_VERSION must match the tag pushed to GHCR)
-STATION_VERSION=v0.1.0 docker compose --env-file .env.production -f docker-compose.prod.yml pull
+STATION_VERSION=v0.4.0-alpha docker compose --env-file .env.production -f docker-compose.prod.yml pull
 
 # Start in dependency order
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d loki

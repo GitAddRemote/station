@@ -170,8 +170,8 @@ docker compose --env-file .env.production -f docker-compose.prod.yml ps
 Push a `release/vX.Y.Z` branch to trigger the release workflow:
 
 ```bash
-git checkout -b release/v0.1.0
-git push origin release/v0.1.0
+git checkout -b release/v0.4.0-alpha
+git push origin release/v0.4.0-alpha
 ```
 
 The workflow validates, builds images, pushes to GHCR, SSHes into the VPS to pull and restart
@@ -194,8 +194,8 @@ Deploys are triggered by pushing a `release/vX.Y.Z` branch. The workflow derives
 from the branch name — no `package.json` bump is required.
 
 ```bash
-git checkout -b release/v0.2.0
-git push origin release/v0.2.0
+git checkout -b release/vX.Y.Z
+git push origin release/vX.Y.Z
 ```
 
 What happens in GitHub Actions:
@@ -232,7 +232,7 @@ If a deploy goes wrong, redeploy the last known-good tag:
 ```bash
 # On the VPS (as the deploy user):
 export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
-STATION_VERSION="v0.1.9" \
+STATION_VERSION="v0.3.0" \
   docker compose \
     --env-file /opt/station/.env.production \
     -f /opt/station/docker-compose.prod.yml \
