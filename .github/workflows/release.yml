@@ -196,12 +196,12 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
           echo "$VPS_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "$VPS_SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          echo "$VPS_KNOWN_HOSTS" >> ~/.ssh/known_hosts
 
           # Build .env.production from GitHub Secrets
           cat > /tmp/.env.production <<'ENVEOF'
@@ -218,7 +218,8 @@ jobs:
           REDIS_PORT=6379
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           USE_REDIS_CACHE=true
-          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          ALLOWED_ORIGIN=${{ secrets.ALLOWED_ORIGIN }}
+          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           INTERNAL_API_KEY=${{ secrets.INTERNAL_API_KEY }}
           GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GF_SECURITY_ADMIN_PASSWORD }}
           GF_ALERT_EMAIL=${{ secrets.GF_ALERT_EMAIL }}
