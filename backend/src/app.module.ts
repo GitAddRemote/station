@@ -34,6 +34,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { StationBotAdminModule } from './modules/station-bot-admin/station-bot-admin.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
 import { BusinessUnitsModule } from './modules/business-units/business-units.module';
+import { AuthInvitesModule } from './modules/auth-invites/auth-invites.module';
 
 const isTest =
   process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined;
@@ -185,6 +186,7 @@ if (!isTest) {
     StationBotAdminModule,
     ContractsModule,
     BusinessUnitsModule,
+    AuthInvitesModule,
   ],
   controllers: [AppController],
   providers: [

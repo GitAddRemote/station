@@ -17,6 +17,9 @@ export enum OrgPermission {
   CAN_MANAGE_CONTRACTS = 'can_manage_contracts',
   CAN_CLAIM_CONTRACT = 'can_claim_contract',
 
+  // Member Management Permissions
+  CAN_MANAGE_MEMBERS = 'can_manage_members',
+
   // Station-Bot Administration Permissions (guild-scoped)
   CAN_VIEW_STATION_BOT_ADMIN = 'can_view_station_bot_admin',
   CAN_MANAGE_STATION_BOT_VERIFICATION = 'can_manage_station_bot_verification',
@@ -43,6 +46,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
     [OrgPermission.CAN_MANAGE_CONTRACTS]: true,
     [OrgPermission.CAN_CLAIM_CONTRACT]: true,
+    [OrgPermission.CAN_MANAGE_MEMBERS]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: true,
@@ -58,6 +62,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
     [OrgPermission.CAN_MANAGE_CONTRACTS]: true,
     [OrgPermission.CAN_CLAIM_CONTRACT]: true,
+    [OrgPermission.CAN_MANAGE_MEMBERS]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: true,
@@ -73,6 +78,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
     [OrgPermission.CAN_MANAGE_CONTRACTS]: true,
     [OrgPermission.CAN_CLAIM_CONTRACT]: true,
+    [OrgPermission.CAN_MANAGE_MEMBERS]: true,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: true,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
@@ -88,6 +94,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
     [OrgPermission.CAN_MANAGE_CONTRACTS]: false,
     [OrgPermission.CAN_CLAIM_CONTRACT]: true,
+    [OrgPermission.CAN_MANAGE_MEMBERS]: false,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
@@ -103,6 +110,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: true,
     [OrgPermission.CAN_MANAGE_CONTRACTS]: false,
     [OrgPermission.CAN_CLAIM_CONTRACT]: true,
+    [OrgPermission.CAN_MANAGE_MEMBERS]: false,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
@@ -118,6 +126,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     [OrgPermission.CAN_VIEW_ORG_CONTRACTS]: false,
     [OrgPermission.CAN_MANAGE_CONTRACTS]: false,
     [OrgPermission.CAN_CLAIM_CONTRACT]: false,
+    [OrgPermission.CAN_MANAGE_MEMBERS]: false,
     [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]: false,
     [OrgPermission.CAN_MANAGE_STATION_BOT_NOMINATIONS]: false,
@@ -144,6 +153,8 @@ export const PERMISSION_DESCRIPTIONS: Record<OrgPermission, string> = {
     'Create, update, publish, cancel, and dispute contracts',
   [OrgPermission.CAN_CLAIM_CONTRACT]:
     'Claim open contracts and mark them active or complete',
+  [OrgPermission.CAN_MANAGE_MEMBERS]:
+    'Lock, unlock, and invalidate sessions for members in this organization',
   [OrgPermission.CAN_VIEW_STATION_BOT_ADMIN]:
     'View the Station-Bot administration area for this guild',
   [OrgPermission.CAN_MANAGE_STATION_BOT_VERIFICATION]:

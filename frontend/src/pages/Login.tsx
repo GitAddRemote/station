@@ -29,6 +29,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 interface AuthConfig {
   discordEnabled: boolean;
   localLoginEnabled: boolean;
+  inviteOnly: boolean;
 }
 
 const Login = () => {
@@ -52,7 +53,7 @@ const Login = () => {
       .then((cfg: AuthConfig) => setConfig(cfg))
       .catch(() =>
         // Fail open so the page is not blank if the backend is unreachable
-        setConfig({ discordEnabled: true, localLoginEnabled: true }),
+        setConfig({ discordEnabled: true, localLoginEnabled: true, inviteOnly: false }),
       );
   }, []);
 

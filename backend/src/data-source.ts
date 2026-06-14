@@ -6,6 +6,7 @@ import { Organization } from './modules/organizations/organization.entity';
 import { Role } from './modules/roles/role.entity';
 import { UserOrganizationRole } from './modules/user-organization-roles/user-organization-role.entity';
 import { PasswordReset } from './modules/auth/password-reset.entity';
+import { AuthInvite } from './modules/auth/auth-invite.entity';
 import { AuditLog } from './modules/audit-logs/audit-log.entity';
 import { Game } from './modules/games/game.entity';
 import { UexCommodity } from './modules/uex/entities/uex-commodity.entity';
@@ -45,6 +46,7 @@ import { AddUniqueUuidToStationItem1780010901444 } from './migrations/1780010901
 import { MakeItemFksDeferrable1780020000000 } from './migrations/1780020000000-MakeItemFksDeferrable';
 import { MigrateTablePksToUuidV71780030000000 } from './migrations/1780030000000-MigrateTablePksToUuidV7';
 import { AddStationCatalogCategory1780040000000 } from './migrations/1780040000000-AddStationCatalogCategory';
+import { DropCategoryAttributeFkAndAddPoiSubtype1780040000000 } from './migrations/1780040000000-DropCategoryAttributeFkAndAddPoiSubtype';
 import { AddStationLocationProjection1780050000000 } from './migrations/1780050000000-AddStationLocationProjection';
 import { AddCatalogCategoryMaps1780060000000 } from './migrations/1780060000000-AddCatalogCategoryMaps';
 import { AddStationCatalogEntry1780070000000 } from './migrations/1780070000000-AddStationCatalogEntry';
@@ -69,6 +71,7 @@ import { AddBusinessUnits1780210000000 } from './migrations/1780210000000-AddBus
 import { AddSoftDeleteToUsersAndMemberships1780220000000 } from './migrations/1780220000000-AddSoftDeleteToUsersAndMemberships';
 import { AddOrgPriorityToUserOrganizationRole1780230000000 } from './migrations/1780230000000-AddOrgPriorityToUserOrganizationRole';
 import { AddBusinessUnitToContractParty1780240000000 } from './migrations/1780240000000-AddBusinessUnitToContractParty';
+import { AddAuthInvite1780250000000 } from './migrations/1780250000000-AddAuthInvite';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -83,6 +86,7 @@ export const AppDataSource = new DataSource({
     Role,
     UserOrganizationRole,
     PasswordReset,
+    AuthInvite,
     AuditLog,
     Game,
     UexCommodity,
@@ -126,6 +130,7 @@ export const AppDataSource = new DataSource({
     MakeItemFksDeferrable1780020000000,
     MigrateTablePksToUuidV71780030000000,
     AddStationCatalogCategory1780040000000,
+    DropCategoryAttributeFkAndAddPoiSubtype1780040000000,
     AddStationLocationProjection1780050000000,
     AddCatalogCategoryMaps1780060000000,
     AddStationCatalogEntry1780070000000,
@@ -147,6 +152,7 @@ export const AppDataSource = new DataSource({
     AddSoftDeleteToUsersAndMemberships1780220000000,
     AddOrgPriorityToUserOrganizationRole1780230000000,
     AddBusinessUnitToContractParty1780240000000,
+    AddAuthInvite1780250000000,
   ],
   synchronize: false,
   extra: { parseInt8: true },

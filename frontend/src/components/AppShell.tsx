@@ -35,6 +35,7 @@ import {
   ArrowUpward as ArrowUpIcon,
   ArrowDownward as ArrowDownIcon,
   Star as StarIcon,
+  LinkOutlined as InviteIcon,
 } from '@mui/icons-material';
 import { api } from '../services/api.service';
 import './AppShell.css';
@@ -323,7 +324,6 @@ export interface AppShellProps {
   onNew?: () => void;
   searchPlaceholder?: string;
   userInitial?: string;
-  showStationBotAdmin?: boolean;
 }
 
 export function AppShell({
@@ -334,7 +334,6 @@ export function AppShell({
   onNew,
   searchPlaceholder = 'Search…',
   userInitial = 'U',
-  showStationBotAdmin = false,
 }: AppShellProps) {
   const { theme, setTheme, accent } = useChrome();
   const { activeOrg } = useOrg();
@@ -343,6 +342,13 @@ export function AppShell({
   const [navOpen, setNavOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    api.get<{ isSuperAdmin?: boolean }>('/users/profile')
+      .then((r) => setIsSuperAdmin(r.data.isSuperAdmin === true))
+      .catch(() => {});
+  }, []);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('station-nav-expanded');
@@ -377,7 +383,7 @@ export function AppShell({
 
   const handleSignOut = useCallback(async () => {
     try { await api.post('/auth/logout', {}); } catch { /* ignore */ }
-    navigate('/login');
+    navigate('/');
   }, [navigate]);
 
   const allCommands = useMemo<Command[]>(() => {
@@ -590,7 +596,7 @@ export function AppShell({
               </Link>
             ))}
 
-            {showStationBotAdmin && (
+            {isSuperAdmin && (
               <>
                 <div className="side-cap">Administration</div>
                 <Link
@@ -602,6 +608,15 @@ export function AppShell({
                   <StationBotIcon />
                   <span className="side-link-label">Station Bot</span>
                 </Link>
+                <Link
+                  className={'side-link' + ('admin-invites' === active ? ' active' : '')}
+                  to="/admin/invites"
+                  aria-current={'admin-invites' === active ? 'page' : undefined}
+                  onClick={() => setNavOpen(false)}
+                >
+                  <InviteIcon />
+                  <span className="side-link-label">Invites</span>
+                </Link>
               </>
             )}
           </nav>
@@ -611,6 +626,10 @@ export function AppShell({
               <KeyboardIcon style={{ width: 15, height: 15 }} />
               Keyboard shortcuts
               <span className="shell-kbd side-help-kbd"><kbd>?</kbd></span>
+            </button>
+            <button className="side-help-btn" onClick={handleSignOut} aria-label="Sign out">
+              <LogoutIcon style={{ width: 15, height: 15 }} />
+              Sign out
             </button>
           </div>
         </aside>

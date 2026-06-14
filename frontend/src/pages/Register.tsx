@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -10,17 +10,62 @@ import {
   CardContent,
   Alert,
   Stack,
+  Divider,
 } from '@mui/material';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { API_URL } from '../config/api';
 
+const DISCORD_BLUE = '#5865F2';
+
+interface AuthConfig {
+  discordEnabled: boolean;
+  localLoginEnabled: boolean;
+  inviteOnly: boolean;
+}
+
 const Register = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite') ?? '';
+
+  const [config, setConfig] = useState<AuthConfig | null>(null);
+  const [inviteValid, setInviteValid] = useState<boolean | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_URL}/auth/config`)
+      .then((res) => res.json())
+      .then((cfg: AuthConfig) => setConfig(cfg))
+      .catch(() =>
+        setConfig({ discordEnabled: true, localLoginEnabled: true, inviteOnly: false }),
+      );
+  }, []);
+
+  useEffect(() => {
+    if (!config) return;
+    if (!config.inviteOnly) {
+      setInviteValid(true);
+      return;
+    }
+    if (!inviteToken) {
+      setInviteValid(false);
+      return;
+    }
+    fetch(`${API_URL}/auth-invites/validate/${encodeURIComponent(inviteToken)}`)
+      .then((res) => res.json())
+      .then((data: { valid: boolean }) => setInviteValid(data.valid))
+      .catch(() => setInviteValid(false));
+  }, [config, inviteToken]);
+
+  const handleDiscordLogin = () => {
+    const url = new URL(`${API_URL}/auth/discord`);
+    if (inviteToken) url.searchParams.set('invite', inviteToken);
+    window.location.href = url.toString();
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -28,11 +73,12 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const registerResponse = await fetch(`${API_URL}/auth/register`, {
+      const registerUrl = new URL(`${API_URL}/auth/register`);
+      if (inviteToken) registerUrl.searchParams.set('invite', inviteToken);
+
+      const registerResponse = await fetch(registerUrl.toString(), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ username, password, email }),
       });
@@ -40,9 +86,7 @@ const Register = () => {
       if (registerResponse.ok) {
         const loginResponse = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ username, password }),
         });
@@ -50,16 +94,13 @@ const Register = () => {
         if (loginResponse.ok) {
           navigate('/dashboard');
         } else {
-          // Registration succeeded but login failed, redirect to login page
           navigate('/login');
         }
       } else {
         const errorData = await registerResponse.json();
-        console.error('Registration error:', errorData);
         setError(errorData.message || errorData.error || 'Registration failed');
       }
     } catch (err: unknown) {
-      console.error('Registration error:', err);
       setError(
         err instanceof Error
           ? err.message
@@ -69,6 +110,47 @@ const Register = () => {
       setLoading(false);
     }
   };
+
+  if (!config || inviteValid === null) return null;
+
+  if (!inviteValid) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          backgroundColor: '#1e2328',
+        }}
+      >
+        <Container maxWidth="sm">
+          <Box textAlign="center" sx={{ mb: 4 }}>
+            <Typography
+              variant="h3"
+              sx={{
+                fontWeight: 700,
+                background:
+                  'linear-gradient(135deg, #4A9EFF 0%, #7ABDFF 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 1,
+              }}
+            >
+              STATION
+            </Typography>
+          </Box>
+          <Card>
+            <CardContent sx={{ p: 4 }}>
+              <Alert severity="error">
+                This invite link is invalid or has expired. Please request a
+                new invite.
+              </Alert>
+            </CardContent>
+          </Card>
+        </Container>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -96,9 +178,15 @@ const Register = () => {
           <Typography variant="h5" sx={{ color: '#e8eaed', mb: 1 }}>
             Create Your Account
           </Typography>
-          <Typography sx={{ color: '#9aa0a6' }}>
-            Join thousands of gaming organizations
-          </Typography>
+          {config.inviteOnly ? (
+            <Typography sx={{ color: '#9aa0a6' }}>
+              You have a valid invite. Welcome to Station.
+            </Typography>
+          ) : (
+            <Typography sx={{ color: '#9aa0a6' }}>
+              Join thousands of gaming organizations
+            </Typography>
+          )}
         </Box>
 
         <Card>
@@ -109,91 +197,131 @@ const Register = () => {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit}>
-              <Stack spacing={3}>
-                <TextField
-                  label="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  fullWidth
-                  required
-                  autoFocus
-                  inputProps={{
-                    'aria-label': 'Username',
-                    'aria-required': 'true',
-                  }}
-                />
-
-                <TextField
-                  label="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  fullWidth
-                  required
-                  inputProps={{
-                    'aria-label': 'Email',
-                    'aria-required': 'true',
-                  }}
-                />
-
-                <TextField
-                  label="Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  fullWidth
-                  required
-                  helperText="Minimum 6 characters"
-                  inputProps={{
-                    minLength: 6,
-                    'aria-label': 'Password',
-                    'aria-required': 'true',
-                  }}
-                />
-
+            {config.discordEnabled && (
+              <>
                 <Button
-                  type="submit"
                   variant="contained"
                   size="large"
                   fullWidth
-                  disabled={loading}
-                  startIcon={<PersonAddIcon />}
-                >
-                  {loading ? 'Creating Account...' : 'Create Account'}
-                </Button>
-              </Stack>
-            </form>
-
-            <Box sx={{ mt: 3, textAlign: 'center' }}>
-              <Typography sx={{ color: '#9aa0a6' }}>
-                Already have an account?{' '}
-                <Link
-                  to="/login"
-                  style={{
-                    color: '#4A9EFF',
-                    textDecoration: 'none',
-                    fontWeight: 500,
+                  onClick={handleDiscordLogin}
+                  sx={{
+                    backgroundColor: DISCORD_BLUE,
+                    '&:hover': { backgroundColor: '#4752c4' },
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    py: 1.5,
+                    mb: config.localLoginEnabled ? 2 : 0,
                   }}
+                  startIcon={
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                    </svg>
+                  }
                 >
-                  Sign In
-                </Link>
-              </Typography>
-            </Box>
+                  Register with Discord
+                </Button>
+                {config.localLoginEnabled && (
+                  <Divider sx={{ my: 2, color: '#9aa0a6' }}>or</Divider>
+                )}
+              </>
+            )}
+
+            {config.localLoginEnabled && (
+              <form onSubmit={handleSubmit}>
+                <Stack spacing={3}>
+                  <TextField
+                    label="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    fullWidth
+                    required
+                    autoFocus={!config.discordEnabled}
+                    inputProps={{
+                      'aria-label': 'Username',
+                      'aria-required': 'true',
+                    }}
+                  />
+
+                  <TextField
+                    label="Email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    fullWidth
+                    required
+                    inputProps={{
+                      'aria-label': 'Email',
+                      'aria-required': 'true',
+                    }}
+                  />
+
+                  <TextField
+                    label="Password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    fullWidth
+                    required
+                    helperText="Minimum 6 characters"
+                    inputProps={{
+                      minLength: 6,
+                      'aria-label': 'Password',
+                      'aria-required': 'true',
+                    }}
+                  />
+
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    size="large"
+                    fullWidth
+                    disabled={loading}
+                    startIcon={<PersonAddIcon />}
+                  >
+                    {loading ? 'Creating Account...' : 'Create Account'}
+                  </Button>
+                </Stack>
+              </form>
+            )}
+
+            {!config.inviteOnly && (
+              <Box sx={{ mt: 3, textAlign: 'center' }}>
+                <Typography sx={{ color: '#9aa0a6' }}>
+                  Already have an account?{' '}
+                  <Link
+                    to="/login"
+                    style={{
+                      color: '#4A9EFF',
+                      textDecoration: 'none',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Sign In
+                  </Link>
+                </Typography>
+              </Box>
+            )}
           </CardContent>
         </Card>
 
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
-          <Link
-            to="/"
-            style={{
-              color: '#9aa0a6',
-              textDecoration: 'none',
-            }}
-          >
-            ← Back to Home
-          </Link>
-        </Box>
+        {!config.inviteOnly && (
+          <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Link
+              to="/"
+              style={{
+                color: '#9aa0a6',
+                textDecoration: 'none',
+              }}
+            >
+              ← Back to Home
+            </Link>
+          </Box>
+        )}
       </Container>
     </Box>
   );

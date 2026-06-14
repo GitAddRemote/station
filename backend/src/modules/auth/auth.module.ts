@@ -16,18 +16,23 @@ import {
 import { UsersModule } from '../users/users.module';
 import { OauthClientsModule } from '../oauth-clients/oauth-clients.module';
 import { PasswordReset } from './password-reset.entity';
+import { AuthInvite } from './auth-invite.entity';
 import { RefreshTokenAuthGuard } from './refresh-token-auth.guard';
 import { ClientAuthGuard } from './guards/client-auth.guard';
 import { ScopesGuard } from './guards/scopes.guard';
+import { InviteOnlyGuard } from './guards/invite-only.guard';
+import { SuperAdminGuard } from './guards/super-admin.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { createClient } from 'redis';
+import { AuthInvitesModule } from '../auth-invites/auth-invites.module';
 
 @Module({
   imports: [
     UsersModule,
     OauthClientsModule,
     PassportModule,
-    TypeOrmModule.forFeature([PasswordReset]),
+    TypeOrmModule.forFeature([PasswordReset, AuthInvite]),
+    AuthInvitesModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -50,6 +55,8 @@ import { createClient } from 'redis';
     RefreshTokenAuthGuard,
     ClientAuthGuard,
     ScopesGuard,
+    InviteOnlyGuard,
+    SuperAdminGuard,
     {
       provide: REDIS_CLIENT,
       inject: [ConfigService],
@@ -75,6 +82,12 @@ import { createClient } from 'redis';
       },
     },
   ],
-  exports: [AuthService, ClientAuthGuard, ScopesGuard],
+  exports: [
+    AuthService,
+    ClientAuthGuard,
+    ScopesGuard,
+    InviteOnlyGuard,
+    SuperAdminGuard,
+  ],
 })
 export class AuthModule {}
