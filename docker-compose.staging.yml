@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/gitaddremote/station-backend:${STATION_VERSION:-staging}
+    image: ghcr.io/presstronic/station-backend:${STATION_VERSION:-staging}
     restart: unless-stopped
     env_file:
       - .env.staging
@@ -20,7 +20,7 @@ services:
     stop_grace_period: 30s
 
   frontend:
-    image: ghcr.io/gitaddremote/station-frontend:${STATION_VERSION:-staging}
+    image: ghcr.io/presstronic/station-frontend:${STATION_VERSION:-staging}
     restart: unless-stopped
     ports:
       - '127.0.0.1:3003:80'

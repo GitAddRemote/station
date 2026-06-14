@@ -14,8 +14,8 @@ permissions:
   packages: write
 
 env:
-  BACKEND_IMAGE: ghcr.io/gitaddremote/station-backend
-  FRONTEND_IMAGE: ghcr.io/gitaddremote/station-frontend
+  BACKEND_IMAGE: ghcr.io/presstronic/station-backend
+  FRONTEND_IMAGE: ghcr.io/presstronic/station-frontend
 
 jobs:
   validate-release:
