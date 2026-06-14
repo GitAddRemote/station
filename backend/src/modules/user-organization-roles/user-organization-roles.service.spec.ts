@@ -285,6 +285,7 @@ describe('UserOrganizationRolesService', () => {
       expect(mockUorRepository.find).toHaveBeenCalledWith({
         where: { userId: USER_ID },
         relations: ['organization', 'role'],
+        order: { orgPriority: 'ASC', assignedAt: 'ASC' },
       });
     });
   });

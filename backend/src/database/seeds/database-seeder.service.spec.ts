@@ -114,6 +114,7 @@ describe('DatabaseSeederService', () => {
         {
           provide: getRepositoryToken(Organization),
           useValue: {
+            find: jest.fn(),
             findOne: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
@@ -122,6 +123,7 @@ describe('DatabaseSeederService', () => {
         {
           provide: getRepositoryToken(User),
           useValue: {
+            find: jest.fn(),
             findOne: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
