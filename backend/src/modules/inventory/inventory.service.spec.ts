@@ -208,8 +208,12 @@ describe('InventoryService', () => {
             find: jest.fn().mockResolvedValue([]),
             createQueryBuilder: jest.fn().mockReturnValue({
               select: jest.fn().mockReturnThis(),
+              addSelect: jest.fn().mockReturnThis(),
+              innerJoin: jest.fn().mockReturnThis(),
               where: jest.fn().mockReturnThis(),
               andWhere: jest.fn().mockReturnThis(),
+              groupBy: jest.fn().mockReturnThis(),
+              getRawMany: jest.fn().mockResolvedValue([]),
               getMany: jest.fn().mockResolvedValue([]),
             }),
           },

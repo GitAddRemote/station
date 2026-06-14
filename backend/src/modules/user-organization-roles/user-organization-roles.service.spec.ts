@@ -317,7 +317,7 @@ describe('UserOrganizationRolesService', () => {
       expect(result).toEqual(assignments);
       expect(mockUorRepository.find).toHaveBeenCalledWith({
         where: { organizationId: ORG_ID },
-        relations: ['user', 'role'],
+        relations: ['user', 'role', 'businessUnit'],
       });
     });
   });
