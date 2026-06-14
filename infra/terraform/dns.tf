@@ -72,3 +72,83 @@ resource "linode_domain_record" "bot" {
     }
   }
 }
+
+resource "linode_domain_record" "apex" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = ""
+  record_type = "A"
+  target      = local.vps_ipv4
+  ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+    precondition {
+      condition     = local.vps_ipv4 != null && trim(local.vps_ipv4) != ""
+      error_message = "Provide vps_ip until the imported VPS exposes a non-empty public IPv4 address, otherwise DNS records cannot be created safely."
+    }
+  }
+}
+
+resource "linode_domain_record" "discord" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "discord"
+  record_type = "A"
+  target      = local.vps_ipv4
+  ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+    precondition {
+      condition     = local.vps_ipv4 != null && trim(local.vps_ipv4) != ""
+      error_message = "Provide vps_ip until the imported VPS exposes a non-empty public IPv4 address, otherwise DNS records cannot be created safely."
+    }
+  }
+}
+
+resource "linode_domain_record" "grafana" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "grafana"
+  record_type = "A"
+  target      = local.vps_ipv4
+  ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+    precondition {
+      condition     = local.vps_ipv4 != null && trim(local.vps_ipv4) != ""
+      error_message = "Provide vps_ip until the imported VPS exposes a non-empty public IPv4 address, otherwise DNS records cannot be created safely."
+    }
+  }
+}
+
+resource "linode_domain_record" "staging_api" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "staging.api"
+  record_type = "A"
+  target      = local.vps_ipv4
+  ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+    precondition {
+      condition     = local.vps_ipv4 != null && trim(local.vps_ipv4) != ""
+      error_message = "Provide vps_ip until the imported VPS exposes a non-empty public IPv4 address, otherwise DNS records cannot be created safely."
+    }
+  }
+}
+
+resource "linode_domain_record" "staging_station" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "staging.station"
+  record_type = "A"
+  target      = local.vps_ipv4
+  ttl_sec     = 300
+
+  lifecycle {
+    prevent_destroy = true
+    precondition {
+      condition     = local.vps_ipv4 != null && trim(local.vps_ipv4) != ""
+      error_message = "Provide vps_ip until the imported VPS exposes a non-empty public IPv4 address, otherwise DNS records cannot be created safely."
+    }
+  }
+}

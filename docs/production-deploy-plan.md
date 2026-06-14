@@ -51,16 +51,19 @@ A single bridge network named `station` is declared in Station's compose. The bo
 
 ## Domain & Nginx Layout
 
-| Domain                      | Routes to                         | Notes                     |
-| --------------------------- | --------------------------------- | ------------------------- |
-| `drdnt.org`                 | frontend (127.0.0.1:3000)         | Apex domain → Station SPA |
-| `api.drdnt.org`             | backend (127.0.0.1:3001)          | REST API                  |
-| `bot.drdnt.org`             | (placeholder / future)            | Reserved, currently 3999  |
-| `grafana.drdnt.org`         | grafana (127.0.0.1:3010)          | Monitoring dashboard      |
-| `staging.station.drdnt.org` | staging frontend (127.0.0.1:3003) | Staging SPA               |
-| `staging.api.drdnt.org`     | staging backend (127.0.0.1:3002)  | Staging API               |
+| Domain                      | Routes to                         | Notes                      |
+| --------------------------- | --------------------------------- | -------------------------- |
+| `drdnt.org`                 | frontend (127.0.0.1:3000)         | Apex domain → Station SPA  |
+| `api.drdnt.org`             | backend (127.0.0.1:3001)          | REST API                   |
+| `discord.drdnt.org`         | nginx 301 redirect                | → https://discord.gg/drdnt |
+| `bot.drdnt.org`             | (placeholder / future)            | Reserved, currently 3999   |
+| `grafana.drdnt.org`         | grafana (127.0.0.1:3010)          | Monitoring dashboard       |
+| `staging.station.drdnt.org` | staging frontend (127.0.0.1:3003) | Staging SPA                |
+| `staging.api.drdnt.org`     | staging backend (127.0.0.1:3002)  | Staging API                |
 
-DNS is managed at Namecheap (not Terraform/Linode DNS). All records are `A` records pointing to the Linode VPS IP. Certbot (Let's Encrypt) handles TLS — nginx configs start as HTTP and are updated by Certbot in place.
+DNS is managed by Terraform via the Linode DNS provider (`infra/terraform/dns.tf`). All records are `A` records pointing to the Linode VPS IP. Namecheap is the registrar — its nameservers must be switched to Linode's (`ns1–ns5.linode.com`) as part of the pre-flight steps below. Certbot (Let's Encrypt) handles TLS — nginx configs start as HTTP and are updated by Certbot in place.
+
+The `discord.drdnt.org` redirect previously lived as a Namecheap URL redirect. After the nameserver switch it is served by nginx (`infra/nginx/discord.drdnt.org.conf`).
 
 ---
 
@@ -103,14 +106,17 @@ All application code runs from Docker images pulled from GHCR. CD automation (on
 
 These are one-time code changes that must be merged to `main` before the first deploy:
 
-- [ ] Transfer GitHub repo from `GitAddRemote` → `Presstronic`
-- [ ] Update `BACKEND_IMAGE` / `FRONTEND_IMAGE` in `release.yml` to `ghcr.io/presstronic/...`
-- [ ] Update image refs in `docker-compose.prod.yml` to `ghcr.io/presstronic/...`
+- [x] Transfer GitHub repo from `GitAddRemote` → `Presstronic` _(done 2026-06-13)_
+- [x] Update `BACKEND_IMAGE` / `FRONTEND_IMAGE` in `release.yml` to `ghcr.io/presstronic/...` _(done 2026-06-13)_
+- [x] Update image refs in `docker-compose.prod.yml` and `docker-compose.staging.yml` to `ghcr.io/presstronic/...` _(done 2026-06-13)_
 - [ ] Add `station` network declaration to `docker-compose.prod.yml` and attach all services to it
 - [ ] Update Station-bot `docker-compose.prod.yml`: remove its `postgres` service, replace `bot-network` with external `station` network
-- [ ] Add `infra/nginx/drdnt.org.conf` (apex domain config — file does not exist yet)
+- [x] Add `infra/nginx/discord.drdnt.org.conf` (replaces Namecheap URL redirect) _(done 2026-06-14)_
+- [ ] Add `infra/nginx/drdnt.org.conf` (apex domain → frontend)
+- [x] Add missing DNS records to `infra/terraform/dns.tf`: apex, discord, grafana, staging.api, staging.station _(done 2026-06-14)_
 - [ ] Write the CD deploy job in `release.yml` (SSH → pull → migrate → restart)
 - [ ] Add GitHub Secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_KNOWN_HOSTS`
+- [ ] Switch Namecheap nameservers to Linode (`ns1–ns5.linode.com`) and run `terraform apply`
 - [ ] Push a `release/vX.Y.Z` branch to trigger CI → build → GHCR push
 
 ---
@@ -140,27 +146,47 @@ sudo sshd -T | grep -E "passwordauthentication|permitrootlogin|pubkeyauthenticat
 
 Expected: `station-bot` and `station-bot-postgres` running, nginx active, certbot available.
 
-### Step 2 — DNS (Namecheap)
+### Step 2 — Switch Nameservers to Linode and Apply Terraform
 
-Add these `A` records in Namecheap pointing to the Linode VPS IP. Do this early — propagation can take up to 30 min.
+DNS is managed by Terraform via the Linode DNS provider. Before `terraform apply` can create records that resolve, Namecheap must delegate to Linode's nameservers.
 
-| Host              | Type | Value      |
-| ----------------- | ---- | ---------- |
-| `@`               | A    | `<VPS IP>` |
-| `api`             | A    | `<VPS IP>` |
-| `bot`             | A    | `<VPS IP>` |
-| `grafana`         | A    | `<VPS IP>` |
-| `staging.station` | A    | `<VPS IP>` |
-| `staging.api`     | A    | `<VPS IP>` |
+**In Namecheap → Domain → Nameservers**, switch from "Namecheap PremiumDNS" to "Custom DNS" and enter:
 
-Verify propagation before continuing: `dig +short api.drdnt.org`
+```
+ns1.linode.com
+ns2.linode.com
+ns3.linode.com
+ns4.linode.com
+ns5.linode.com
+```
+
+> **Note:** The `discord.drdnt.org` Namecheap URL redirect stops working the moment you save this. The nginx-based redirect (`infra/nginx/discord.drdnt.org.conf`) takes over once Terraform creates the DNS record and nginx is configured in Step 6. Downtime window is nameserver propagation time (~5–30 min).
+
+Then run Terraform from your local machine:
+
+```bash
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars
+# Fill in: linode_token, vps_label, vps_region, vps_type, vps_image, vps_ip
+terraform init
+terraform apply
+```
+
+**Verify:**
+
+```bash
+# Wait for propagation (can take 5–30 min after nameserver switch)
+dig +short api.drdnt.org       # should return VPS IP
+dig +short grafana.drdnt.org   # should return VPS IP
+dig +short discord.drdnt.org   # should return VPS IP
+```
 
 ### Step 3 — Create `/opt/station` scaffold
 
-No git clone. Copy the necessary files from your local machine:
+No git clone. The VPS only needs the compose file, env file, and infra configs. Copy from your local machine:
 
 ```bash
-# On local machine — copy infra files to VPS
+# On local machine — from the root of the station repo
 scp docker-compose.prod.yml deploy@<VPS_IP>:/opt/station/docker-compose.prod.yml
 scp -r infra/ deploy@<VPS_IP>:/opt/station/infra/
 ```
@@ -168,10 +194,19 @@ scp -r infra/ deploy@<VPS_IP>:/opt/station/infra/
 Then on the VPS, create the env file:
 
 ```bash
-# On VPS
-mkdir -p /opt/station
+ssh deploy@<VPS_IP>
+mkdir -p /opt/station/logs
 nano /opt/station/.env.production   # fill in all values
 chmod 600 /opt/station/.env.production
+```
+
+> On subsequent deploys, the CD workflow writes `.env.production` from GitHub Secrets automatically. The `scp` above is only needed once for the initial bootstrap.
+
+**Verify:**
+
+```bash
+ls -la /opt/station/
+# Expected: docker-compose.prod.yml  .env.production  infra/  logs/
 ```
 
 ### Step 4 — Authenticate Docker with GHCR
@@ -349,7 +384,7 @@ A: Presstronic. Station repo was transferred from GitAddRemote to Presstronic on
 A: Yes, actively running from that directory.
 
 **Q4: DNS — who manages `drdnt.org`?**
-A: Namecheap registrar. DNS records need to be created manually in Namecheap (not via Terraform/Linode DNS). Subdomains needed: `api`, `bot`, `grafana`, `staging.station`, `staging.api`, and the apex `@` record.
+A: Namecheap is the registrar, but DNS records are managed by Terraform via the Linode DNS provider. Nameservers on Namecheap must be switched from "Namecheap PremiumDNS" to `ns1–ns5.linode.com` as a one-time step before `terraform apply` creates resolving records. The existing `discord.drdnt.org` URL redirect (Namecheap-proprietary) is replaced by an nginx 301 in `infra/nginx/discord.drdnt.org.conf`.
 
 **Q5: Does the bot currently use Redis?**
 A: No. It may in the future and will share Station's Redis instance when it does.
