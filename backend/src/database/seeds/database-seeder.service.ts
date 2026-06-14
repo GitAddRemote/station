@@ -11,6 +11,7 @@ import { UserOrganizationRole } from '../../modules/user-organization-roles/user
 import { Game } from '../../modules/games/game.entity';
 import { BusinessUnit } from '../../modules/business-units/business-unit.entity';
 import { StationInventoryItem } from '../../modules/inventory/entities/station-inventory-item.entity';
+import { StationCatalogEntry } from '../../modules/catalog/entities/station-catalog-entry.entity';
 import {
   Contract,
   ContractType,
@@ -154,6 +155,8 @@ export class DatabaseSeederService {
     private contractMilestoneRepository: Repository<ContractMilestone>,
     @InjectRepository(ContractParty)
     private contractPartyRepository: Repository<ContractParty>,
+    @InjectRepository(StationCatalogEntry)
+    private catalogEntryRepository: Repository<StationCatalogEntry>,
   ) {}
 
   async seedAll(): Promise<void> {
@@ -1173,6 +1176,17 @@ export class DatabaseSeederService {
   private async seedInventory(): Promise<void> {
     this.logger.info('Seeding inventory...');
 
+    // These UUIDs are only present after the UEX ETL has run. Skip on fresh/test DBs.
+    const catalogCheck = await this.catalogEntryRepository.findOne({
+      where: { id: '019ebf08-f82f-715e-be26-7a4ca799327c' },
+    });
+    if (!catalogCheck) {
+      this.logger.info(
+        '  ⊙ Skipping inventory seed — catalog entries not present (run UEX ETL first)',
+      );
+      return;
+    }
+
     // All IDs are stable — sourced from the live DB at seed-write time.
     const LOC = {
       area18: '019ebf08-3d13-7ab4-86b2-e3aa5b3416ef',
@@ -1573,6 +1587,17 @@ export class DatabaseSeederService {
 
   private async seedContracts(): Promise<void> {
     this.logger.info('Seeding contracts...');
+
+    // These UUIDs are only present after the UEX ETL has run. Skip on fresh/test DBs.
+    const catalogCheck = await this.catalogEntryRepository.findOne({
+      where: { id: '019ebf08-f82f-715e-be26-7a4ca799327c' },
+    });
+    if (!catalogCheck) {
+      this.logger.info(
+        '  ⊙ Skipping contracts seed — catalog entries not present (run UEX ETL first)',
+      );
+      return;
+    }
 
     const LOC = {
       area18: '019ebf08-3d13-7ab4-86b2-e3aa5b3416ef',

@@ -12,6 +12,7 @@ import { Contract } from '../../modules/contracts/entities/contract.entity';
 import { ContractItem } from '../../modules/contracts/entities/contract-item.entity';
 import { ContractMilestone } from '../../modules/contracts/entities/contract-milestone.entity';
 import { ContractParty } from '../../modules/contracts/entities/contract-party.entity';
+import { StationCatalogEntry } from '../../modules/catalog/entities/station-catalog-entry.entity';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ContractParty } from '../../modules/contracts/entities/contract-party.e
       ContractItem,
       ContractMilestone,
       ContractParty,
+      StationCatalogEntry,
     ]),
   ],
   providers: [DatabaseSeederService],

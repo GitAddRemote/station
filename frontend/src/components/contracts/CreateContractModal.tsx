@@ -144,6 +144,7 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
       onCreated();
       onClose();
     } catch {
+      // submission error — leave saving=false, keep modal open for retry
     } finally {
       setSaving(false);
     }
