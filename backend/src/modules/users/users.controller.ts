@@ -24,8 +24,13 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
-  getProfile(@Req() req: AuthenticatedRequest) {
-    return { userId: req.user.userId, username: req.user.username };
+  async getProfile(@Req() req: AuthenticatedRequest) {
+    const user = await this.usersService.findById(req.user.userId);
+    return {
+      userId: req.user.userId,
+      username: req.user.username,
+      isSuperAdmin: user?.isSuperAdmin ?? false,
+    };
   }
 
   @UseGuards(AuthGuard('jwt'))
