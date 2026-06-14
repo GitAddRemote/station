@@ -4,103 +4,111 @@
 
 Before a first-time deploy you need:
 
-- A Linode account with an API token (DNS for `drdnt.org` is managed in Terraform — see `infra/terraform/dns.tf`)
-- A Backblaze B2 account with a bucket and application key
-- A GitHub repository with Actions enabled and a GHCR package registry
+- SSH access to the Linode VPS as the `deploy` user
+- DNS access in Namecheap for `drdnt.org`
+- A Backblaze B2 account with a `station-backups` bucket and application key
+- A GitHub PAT with `read:packages` scope (for GHCR pulls on the VPS)
 - All GitHub Secrets configured — see [docs/cicd.md](cicd.md) for the full secrets table
+
+> **Deploy model:** There is no git clone on the VPS. Application code runs from Docker images
+> pulled from GHCR (`ghcr.io/presstronic/station-backend`, `ghcr.io/presstronic/station-frontend`).
+> Only infra scaffold files (`docker-compose.prod.yml`, `.env.production`, nginx configs, etc.)
+> live on the VPS and are copied there once from your local machine.
 
 ---
 
 ## First-time setup
 
-### 1. Provision the VPS with Terraform
+### 1. DNS (Namecheap)
+
+Add these `A` records in Namecheap pointing to the Linode VPS IP. Do this first — propagation
+can take up to 30 minutes.
+
+| Host              | Type | Value      |
+| ----------------- | ---- | ---------- |
+| `@`               | A    | `<VPS IP>` |
+| `api`             | A    | `<VPS IP>` |
+| `bot`             | A    | `<VPS IP>` |
+| `grafana`         | A    | `<VPS IP>` |
+| `staging.station` | A    | `<VPS IP>` |
+| `staging.api`     | A    | `<VPS IP>` |
+
+Verify propagation before continuing:
 
 ```bash
-cd infra/terraform
-cp terraform.tfvars.example terraform.tfvars
-# Fill in linode_token, vps_ip, ssh_public_key, etc.
-terraform init
-terraform apply
+dig +short api.drdnt.org
 ```
 
-Terraform creates the VPS. Note the public IP from the output.
+### 2. Create `/opt/station` scaffold on the VPS
 
-### 2. Bootstrap the VPS
-
-The bootstrap script references companion scripts via `$(dirname "$0")`, so it must be run from within the repository — not piped over SSH. Clone the repo as root first (temporary), run bootstrap, then hand ownership to the deploy user:
+No git clone. Copy the necessary files from your local machine:
 
 ```bash
-ssh root@<vps-ip>
-
-# git is not pre-installed on a fresh Linode image; install it first
-apt update && apt install -y git
-
-# Clone the repo so companion scripts (setup-swap.sh, logrotate config) are present
-git clone https://github.com/GitAddRemote/station.git /opt/station
-
-# bootstrap-vps.sh reads DEPLOY_SSH_PUBLIC_KEY to populate authorized_keys.
-# Without it, authorized_keys is created empty and SSH deploys will fail.
-export DEPLOY_SSH_PUBLIC_KEY="ssh-ed25519 AAAA... your-deploy-public-key"
-bash /opt/station/infra/scripts/bootstrap-vps.sh
-
-# Hand ownership of the repo to the deploy user (bootstrap created /opt/station
-# with deploy ownership, but the git clone above was run as root)
-chown -R deploy:deploy /opt/station
+# On local machine — from the root of the station repo
+scp docker-compose.prod.yml deploy@<VPS_IP>:/opt/station/docker-compose.prod.yml
+scp -r infra/ deploy@<VPS_IP>:/opt/station/infra/
 ```
 
-The script installs rootless Docker, sets up the `deploy` user, enables linger, starts the rootless Docker daemon, and sets `/opt/station` and `/opt/station/logs` to `deploy` ownership. See [infra/docs/vps-setup.md](../infra/docs/vps-setup.md) for security properties.
+Then on the VPS, create the env file:
 
-### 3. Set up Nginx and TLS
+```bash
+ssh deploy@<VPS_IP>
+mkdir -p /opt/station/logs
+nano /opt/station/.env.production   # fill in all values
+chmod 600 /opt/station/.env.production
+```
+
+### 3. Authenticate Docker with GHCR
+
+```bash
+# On VPS as deploy user
+echo <github_pat> | docker login ghcr.io -u <github_username> --password-stdin
+```
+
+The PAT needs `read:packages` scope. Credentials are cached in `~/.docker/config.json`.
+
+### 4. Set up Nginx and TLS
 
 ```bash
 # As root on the VPS
-apt install -y nginx certbot python3-certbot-nginx
+sudo bash
 
-# Copy all Nginx configs
-for conf in api.drdnt.org station.drdnt.org bot.drdnt.org staging.api.drdnt.org staging.station.drdnt.org grafana.drdnt.org; do
+for conf in api.drdnt.org station.drdnt.org bot.drdnt.org grafana.drdnt.org \
+            staging.api.drdnt.org staging.station.drdnt.org drdnt.org; do
   cp /opt/station/infra/nginx/${conf}.conf /etc/nginx/sites-available/${conf}
-  ln -s /etc/nginx/sites-available/${conf} /etc/nginx/sites-enabled/${conf}
+  ln -sf /etc/nginx/sites-available/${conf} /etc/nginx/sites-enabled/${conf}
 done
+
 nginx -t && systemctl reload nginx
 
-# Issue TLS certificates for the Terraform-managed domains (api, station, bot
-# all have A records after `terraform apply` in step 1)
-certbot --nginx -d api.drdnt.org -d station.drdnt.org -d bot.drdnt.org
-
-# staging.* and grafana.drdnt.org are NOT in infra/terraform/dns.tf yet.
-# Add their A records to dns.tf and re-run `terraform apply` before step 6, then:
-# certbot --nginx -d staging.api.drdnt.org -d staging.station.drdnt.org -d grafana.drdnt.org
+# Issue TLS certs (DNS must be propagated first — verify with dig)
+certbot --nginx \
+  -d drdnt.org \
+  -d api.drdnt.org \
+  -d bot.drdnt.org \
+  -d grafana.drdnt.org \
+  -d staging.api.drdnt.org \
+  -d staging.station.drdnt.org
 ```
 
-> **Important:** The release workflow's staging job hits `https://staging.api.drdnt.org/health`
-> before gating production. `staging.api.drdnt.org` must resolve and have a valid TLS certificate
-> before you push the first release branch. Add `staging.api.drdnt.org` and
-> `staging.station.drdnt.org` A records to `infra/terraform/dns.tf` and run `terraform apply`,
-> then run the `certbot` command above, before triggering the first deploy in step 6.
+### 5. Configure GitHub Secrets
 
-### 4. Configure GitHub Secrets
+In the GitHub repository settings, create both a `staging` and a `production` environment.
+Follow the per-environment requirements in [docs/cicd.md](cicd.md) and
+[infra/docs/secrets.md](../infra/docs/secrets.md). Required secrets for CD:
+`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_KNOWN_HOSTS`.
 
-In the GitHub repository settings, create both a `staging` and a `production` environment. Follow the per-environment requirements in [docs/cicd.md](cicd.md) and [infra/docs/secrets.md](../infra/docs/secrets.md) — several secrets are environment-specific (e.g. Grafana secrets are production-only; B2, Sentry, and UEX keys are optional in staging). The deploy workflow runs staging first; production is gated on the staging health check passing.
+### 6. Start stateful services
 
-### 5. Start the stateful services on the VPS
-
-The deploy scripts use `--no-deps backend frontend` — they do not start PostgreSQL or Redis. The pre-deploy backup step also runs `docker compose exec postgres`, which will fail if PostgreSQL has never been started. Additionally, `.env.production` and `.env.staging` do not exist until the workflow writes them — so they must be seeded manually before the first deploy.
-
-SSH in as the `deploy` user and bootstrap both stacks:
+The deploy scripts use `--no-deps backend frontend` — they do not start PostgreSQL or Redis.
+Bootstrap them manually before the first deploy:
 
 ```bash
-ssh deploy@<vps-ip>
+ssh deploy@<VPS_IP>
 export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 cd /opt/station
 
-# Create minimal env files from your GitHub Secrets values
-# (the workflow will overwrite these on every subsequent deploy)
-cp /dev/stdin .env.staging   # paste your staging env vars, Ctrl-D when done
-cp /dev/stdin .env.production # paste your production env vars, Ctrl-D when done
-chmod 600 .env.staging .env.production
-
-# Bring up staging postgres and redis only — app images haven't been built yet
-# (staging-up.sh would try to pull the backend/frontend images which don't exist yet)
+# Bring up staging postgres and redis only (app images don't exist yet)
 docker compose --project-name station-staging --env-file .env.staging \
   -f docker-compose.staging.yml up -d postgres redis
 
@@ -108,9 +116,9 @@ docker compose --project-name station-staging --env-file .env.staging \
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d postgres redis
 ```
 
-Wait for both postgres containers to report healthy before proceeding (`docker compose ... ps`).
+Wait for both postgres containers to report healthy (`docker compose ... ps`) before continuing.
 
-### 6. Trigger the first deploy
+### 7. Trigger the first deploy
 
 Push a `release/vX.Y.Z` branch to trigger the release workflow:
 
@@ -119,13 +127,15 @@ git checkout -b release/v0.1.0
 git push origin release/v0.1.0
 ```
 
-The workflow derives the version from the branch name, validates, builds images, pushes to GHCR, takes a pre-deploy backup, deploys to the VPS, creates the git tag, and verifies the container is running.
+The workflow validates, builds images, pushes to GHCR, creates a GitHub Release, then SSHes
+into the VPS to pull new images and restart containers.
 
 ---
 
 ## Routine deploys
 
-Deploys are triggered by pushing a `release/vX.Y.Z` branch. The workflow derives the version from the branch name — no `package.json` bump is required by the workflow itself.
+Deploys are triggered by pushing a `release/vX.Y.Z` branch. The workflow derives the version
+from the branch name — no `package.json` bump is required.
 
 ```bash
 git checkout -b release/v0.2.0
@@ -134,14 +144,10 @@ git push origin release/v0.2.0
 
 What happens in GitHub Actions:
 
-1. Run quality gate (lint, typecheck, tests against Postgres)
-2. Build Docker images and push to GHCR
-3. Write `.env.production` from GitHub Secrets to the VPS
-4. Take a pre-deploy PostgreSQL backup (labelled with the git SHA)
-5. Verify the backup exists in Backblaze B2
-6. Run `deploy.sh` on the VPS (pulls new images, restarts containers — migrations must be run manually before or after if needed)
-7. Verify the backend container is running and healthy
-8. Create a GitHub Release with auto-generated release notes
+1. Run quality gate (lint, typecheck, unit tests, E2E tests against Postgres)
+2. Build Docker images and push to GHCR (`ghcr.io/presstronic/station-backend:vX.Y.Z`)
+3. SSH into VPS — pull new images, run migrations, restart containers
+4. Create a GitHub Release with auto-generated release notes (git-cliff)
 
 Watch the workflow: **Actions → Release → [your release branch]**
 
@@ -152,19 +158,17 @@ Watch the workflow: **Actions → Release → [your release branch]**
 If a deploy goes wrong, redeploy the last known-good tag:
 
 ```bash
-# Find the previous release tag on GitHub
-PREVIOUS_TAG="v0.1.9"
-
 # On the VPS (as the deploy user):
 export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
-STATION_VERSION="${PREVIOUS_TAG}" \
+STATION_VERSION="v0.1.9" \
   docker compose \
     --env-file /opt/station/.env.production \
     -f /opt/station/docker-compose.prod.yml \
     up -d
 ```
 
-If the rollback involves a bad migration, follow the migration rollback runbook first: [infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md).
+If the rollback involves a bad migration, follow the migration rollback runbook first:
+[infra/docs/migration-rollback.md](../infra/docs/migration-rollback.md).
 
 ---
 
@@ -177,9 +181,11 @@ Secrets live in two places:
 | GitHub Secrets (production environment) | VPS SSH key, database credentials, JWT secret, Redis password, B2 keys, CORS origins, `INTERNAL_API_KEY` (required — min 32 chars, protects the OAuth client admin endpoint) |
 | `/opt/station/.env.production` on VPS   | Written by the deploy workflow from GitHub Secrets on every deploy                                                                                                           |
 
-The `.env.production` file is created with `chmod 600` and owned by the `deploy` user. It is never committed to the repository.
+The `.env.production` file is created with `chmod 600` and owned by the `deploy` user. It is
+never committed to the repository.
 
-For per-secret rotation procedures (including safe ordering for database passwords and JWT secrets), see [infra/docs/secrets.md](../infra/docs/secrets.md).
+For per-secret rotation procedures (including safe ordering for database passwords and JWT
+secrets), see [infra/docs/secrets.md](../infra/docs/secrets.md).
 
 ---
 
@@ -210,7 +216,8 @@ curl -f https://api.drdnt.org/health && echo OK
 
 ## Backups
 
-Production deploys create a pre-deploy PostgreSQL backup before the backend rollout starts. Nightly backups also run on the VPS at `03:00 UTC` via the `deploy` user's cron.
+Production deploys create a pre-deploy PostgreSQL backup before the backend rollout starts.
+Nightly backups also run on the VPS at `03:00 UTC` via the `deploy` user's cron.
 
 ### Verify nightly backups
 
@@ -221,7 +228,8 @@ tail -f /opt/station/logs/backup.log
 
 ### List backups in Backblaze B2
 
-See **[infra/docs/restore.md §2](../infra/docs/restore.md#2-list-available-backups)** for the full listing command, including how to derive `B2_BUCKET` from `.env.production`.
+See **[infra/docs/restore.md §2](../infra/docs/restore.md#2-list-available-backups)** for the
+full listing command, including how to derive `B2_BUCKET` from `.env.production`.
 
 ### Trigger a manual backup
 
@@ -239,9 +247,10 @@ cd /opt/station
 bash infra/scripts/restore-db.sh postgres/202605/20260510_030000_nightly.sql.gz
 ```
 
-The restore script stops the backend, restores into the running production Postgres container, and starts the backend again after the import finishes. It replays the SQL dump into the current database. If you need a clean replacement restore, drop and recreate the target database first.
-
-For the full procedure — including how to list and download backups, run a zero-risk restore drill, and verify row counts after a restore — see **[infra/docs/restore.md](../infra/docs/restore.md)**.
+The restore script stops the backend, restores into the running production Postgres container,
+and starts the backend again after the import finishes. For the full procedure — including how
+to list and download backups, run a zero-risk restore drill, and verify row counts after a
+restore — see **[infra/docs/restore.md](../infra/docs/restore.md)**.
 
 ---
 
