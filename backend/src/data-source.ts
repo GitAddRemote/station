@@ -46,6 +46,7 @@ import { AddUniqueUuidToStationItem1780010901444 } from './migrations/1780010901
 import { MakeItemFksDeferrable1780020000000 } from './migrations/1780020000000-MakeItemFksDeferrable';
 import { MigrateTablePksToUuidV71780030000000 } from './migrations/1780030000000-MigrateTablePksToUuidV7';
 import { AddStationCatalogCategory1780040000000 } from './migrations/1780040000000-AddStationCatalogCategory';
+import { DropCategoryAttributeFkAndAddPoiSubtype1780040000000 } from './migrations/1780040000000-DropCategoryAttributeFkAndAddPoiSubtype';
 import { AddStationLocationProjection1780050000000 } from './migrations/1780050000000-AddStationLocationProjection';
 import { AddCatalogCategoryMaps1780060000000 } from './migrations/1780060000000-AddCatalogCategoryMaps';
 import { AddStationCatalogEntry1780070000000 } from './migrations/1780070000000-AddStationCatalogEntry';
@@ -129,6 +130,7 @@ export const AppDataSource = new DataSource({
     MakeItemFksDeferrable1780020000000,
     MigrateTablePksToUuidV71780030000000,
     AddStationCatalogCategory1780040000000,
+    DropCategoryAttributeFkAndAddPoiSubtype1780040000000,
     AddStationLocationProjection1780050000000,
     AddCatalogCategoryMaps1780060000000,
     AddStationCatalogEntry1780070000000,
