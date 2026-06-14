@@ -6,8 +6,8 @@ export class AddAuthInvite1780250000000 implements MigrationInterface {
       CREATE TABLE auth_invite (
         id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         token        TEXT UNIQUE NOT NULL,
-        created_by   uuid REFERENCES users(id),
-        used_by      uuid REFERENCES users(id) NULL,
+        created_by   uuid REFERENCES "user"(id),
+        used_by      uuid REFERENCES "user"(id) NULL,
         created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
         expires_at   TIMESTAMPTZ NOT NULL,
         used_at      TIMESTAMPTZ NULL,
