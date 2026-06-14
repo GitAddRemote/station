@@ -472,6 +472,9 @@ export class AuthController {
     authorizeUrl.searchParams.set('response_type', 'code');
     authorizeUrl.searchParams.set('scope', 'identify email');
     authorizeUrl.searchParams.set('state', state);
+    // Prevents Discord from showing the "Open in app" interstitial that hands
+    // off to the native desktop client. The flow stays in the browser.
+    authorizeUrl.searchParams.set('prompt', 'none');
     return res.redirect(authorizeUrl.toString());
   }
 
