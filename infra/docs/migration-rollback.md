@@ -71,7 +71,7 @@ source /opt/station/.env.production
 docker run --rm \
   --env-file /opt/station/.env.production \
   --network station_default \
-  ghcr.io/gitaddremote/station-backend:${STATION_VERSION} \
+  ghcr.io/presstronic/station-backend:${STATION_VERSION} \
   sh -c "node node_modules/.bin/typeorm migration:revert -d dist/data-source.js"
 ```
 

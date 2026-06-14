@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-17
 **Status:** Accepted
-**Deciders:** Demian (gitaddremote)
+**Deciders:** Demian (presstronic)
 
 ---
 

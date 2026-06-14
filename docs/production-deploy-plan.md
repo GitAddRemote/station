@@ -66,7 +66,7 @@ DNS is managed at Namecheap (not Terraform/Linode DNS). All records are `A` reco
 
 ## GHCR Image Names
 
-Images currently push to `gitaddremote` (repo not yet transferred). After transfer to Presstronic:
+Images push to the Presstronic org on GHCR:
 
 ```
 ghcr.io/presstronic/station-backend
@@ -74,19 +74,14 @@ ghcr.io/presstronic/station-frontend
 ghcr.io/presstronic/station-bot
 ```
 
-**Current (pre-transfer) names in code:**
-
-- `release.yml` env vars: `ghcr.io/gitaddremote/station-backend` / `ghcr.io/gitaddremote/station-frontend`
-- `docker-compose.prod.yml` image refs: same
-
 ---
 
 ## Code Changes Required (before first deploy)
 
-1. **`docker-compose.prod.yml` (Station)** — update image names from `gitaddremote` to `presstronic` (after repo transfer), add explicit `station` network to all services, declare the network at the bottom.
+1. **`docker-compose.prod.yml` (Station)** — add explicit `station` network to all services, declare the network at the bottom.
 2. **`docker-compose.prod.yml` (Station-bot)** — remove `postgres` service, remove `bot-network`, replace with external `station` network. Update `DATABASE_URL` host to still use `postgres` (same service name, works because they share the network).
 3. **Nginx** — add `drdnt.org` apex config pointing to the frontend container. The file does **not** yet exist in `infra/nginx/` — only these configs are present: `api.drdnt.org.conf`, `bot.drdnt.org.conf`, `grafana.drdnt.org.conf`, `staging.api.drdnt.org.conf`, `staging.station.drdnt.org.conf`, `station.drdnt.org.conf`. Need to add `drdnt.org.conf`.
-4. **`.github/workflows/release.yml`** — update `BACKEND_IMAGE` and `FRONTEND_IMAGE` env vars to `ghcr.io/presstronic/...` after repo transfer. Currently hardcoded to `gitaddremote`.
+4. **`.github/workflows/release.yml`** — add SSH deploy step and required GitHub Secrets (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_KNOWN_HOSTS`). Image refs are already `ghcr.io/presstronic/...`.
 5. **`infra/scripts/deploy.sh`** — currently only handles Station services. Will need to remain Station-only; the bot has its own separate deploy.
 6. **GitHub Secrets** — the release workflow currently only uses `secrets.GITHUB_TOKEN` (built-in). No custom VPS deploy step exists yet — CD automation (SSH deploy, migration run, container restart) has not been written into the workflow. This is the largest missing piece for full CD.
 
@@ -348,7 +343,7 @@ Items to address in a follow-up pass:
 A: Shared. Station Bot is secondary functionality; Station owns the shared infrastructure. Both apps use the same Postgres instance, same Redis instance. Bot will eventually use Station's tables/APIs directly where it makes sense (inventory, source data, etc.).
 
 **Q2: GHCR org — `presstronic` vs `gitaddremote`?**
-A: Presstronic is the correct org going forward. Transfer of Station repo from GitAddRemote to Presstronic is happening today. Station-bot is already at `ghcr.io/presstronic/station-bot`.
+A: Presstronic. Station repo was transferred from GitAddRemote to Presstronic on 2026-06-13. All image refs updated to `ghcr.io/presstronic/...`.
 
 **Q3: Is Station Bot currently running from `/opt/station-bot`?**
 A: Yes, actively running from that directory.
