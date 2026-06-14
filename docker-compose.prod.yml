@@ -11,6 +11,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - station
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/health']
       interval: 15s
@@ -24,6 +26,8 @@ services:
     restart: unless-stopped
     ports:
       - '127.0.0.1:3000:80'
+    networks:
+      - station
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:80']
       interval: 15s
@@ -40,6 +44,8 @@ services:
       POSTGRES_DB: ${DATABASE_NAME:?DATABASE_NAME is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - station
     healthcheck:
       test:
         [
@@ -64,6 +70,8 @@ services:
       ]
     volumes:
       - redis_aof:/data
+    networks:
+      - station
     healthcheck:
       test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping']
       interval: 10s
@@ -79,6 +87,8 @@ services:
     volumes:
       - ./infra/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
+    networks:
+      - station
     command: -config.file=/etc/loki/local-config.yaml
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://localhost:3100/ready || exit 1']
@@ -94,6 +104,8 @@ services:
       - ./infra/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
       - ${DOCKER_HOST_SOCKET:-/run/user/1001/docker.sock}:/var/run/docker.sock:ro
       - promtail_positions:/var/promtail
+    networks:
+      - station
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       loki:
@@ -120,6 +132,8 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - station
     depends_on:
       loki:
         condition: service_healthy
@@ -129,6 +143,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+networks:
+  station:
+    name: station
+    driver: bridge
 
 volumes:
   postgres_data:
