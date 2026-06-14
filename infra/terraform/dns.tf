@@ -152,3 +152,37 @@ resource "linode_domain_record" "staging_station" {
     }
   }
 }
+
+# Resend email — mail.drdnt.org (transactional + Grafana alert email)
+resource "linode_domain_record" "resend_dkim" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "resend._domainkey.mail"
+  record_type = "TXT"
+  target      = "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCvj8tRhNsvOPgc9ZqqN4X7kKTca0GTSdIWi01qNIAtasVCfz/oW7UvP4Hw2snpSGUnxXWrYrLVDeKVIfwyatA+fszYKF7owR7YGi0ElNBhIK60NTcSrVzcMXXh45lRY3EHn27CNBG3oKSlAsHJmpWYMV8FT/eTTxCrpxexRen5/QIDAQAB"
+  ttl_sec     = 300
+}
+
+resource "linode_domain_record" "resend_mx" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "send.mail"
+  record_type = "MX"
+  target      = "feedback-smtp.us-east-1.amazonses.com"
+  priority    = 10
+  ttl_sec     = 300
+}
+
+resource "linode_domain_record" "resend_spf" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "send.mail"
+  record_type = "TXT"
+  target      = "v=spf1 include:amazonses.com ~all"
+  ttl_sec     = 300
+}
+
+resource "linode_domain_record" "resend_dmarc" {
+  domain_id   = linode_domain.drdnt_org.id
+  name        = "_dmarc"
+  record_type = "TXT"
+  target      = "v=DMARC1; p=none;"
+  ttl_sec     = 300
+}
