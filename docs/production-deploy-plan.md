@@ -3,13 +3,17 @@
 ## Target Architecture
 
 ```
-/opt/station/               ← Station repo clone + ALL shared infrastructure
+/opt/station/               ← infra scaffold (no git clone — app code runs from GHCR images)
   docker-compose.prod.yml   ← postgres, redis, backend, frontend, loki, grafana, promtail
   .env.production
   rclone.conf
-  infra/scripts/
+  infra/nginx/              ← nginx configs (copied from repo on local machine)
+  infra/scripts/            ← backup script (copied from repo on local machine)
+  infra/loki/
+  infra/promtail/
+  infra/grafana/
 
-/opt/station-bot/           ← Bot repo clone (application only)
+/opt/station-bot/           ← Bot infra scaffold (no git clone — app code runs from GHCR images)
   docker-compose.prod.yml   ← discord-bot only, joins station network as external
   .env.production
   logs/
@@ -60,7 +64,9 @@ DNS is managed at Namecheap (not Terraform/Linode DNS). All records are `A` reco
 
 ---
 
-## GHCR Image Names (post Presstronic transfer)
+## GHCR Image Names
+
+Images currently push to `gitaddremote` (repo not yet transferred). After transfer to Presstronic:
 
 ```
 ghcr.io/presstronic/station-backend
@@ -68,50 +74,80 @@ ghcr.io/presstronic/station-frontend
 ghcr.io/presstronic/station-bot
 ```
 
+**Current (pre-transfer) names in code:**
+
+- `release.yml` env vars: `ghcr.io/gitaddremote/station-backend` / `ghcr.io/gitaddremote/station-frontend`
+- `docker-compose.prod.yml` image refs: same
+
 ---
 
 ## Code Changes Required (before first deploy)
 
-1. **`docker-compose.prod.yml` (Station)** — update image names from `gitaddremote` to `presstronic`, add explicit `station` network to all services, declare the network at the bottom.
+1. **`docker-compose.prod.yml` (Station)** — update image names from `gitaddremote` to `presstronic` (after repo transfer), add explicit `station` network to all services, declare the network at the bottom.
 2. **`docker-compose.prod.yml` (Station-bot)** — remove `postgres` service, remove `bot-network`, replace with external `station` network. Update `DATABASE_URL` host to still use `postgres` (same service name, works because they share the network).
-3. **Nginx** — add `drdnt.org` apex config pointing to the frontend container. Update `station.drdnt.org.conf` if needed (may be retired in favor of apex).
-4. **`.github/workflows/release.yml`** — update `BACKEND_IMAGE` and `FRONTEND_IMAGE` env vars to `ghcr.io/presstronic/...`.
+3. **Nginx** — add `drdnt.org` apex config pointing to the frontend container. The file does **not** yet exist in `infra/nginx/` — only these configs are present: `api.drdnt.org.conf`, `bot.drdnt.org.conf`, `grafana.drdnt.org.conf`, `staging.api.drdnt.org.conf`, `staging.station.drdnt.org.conf`, `station.drdnt.org.conf`. Need to add `drdnt.org.conf`.
+4. **`.github/workflows/release.yml`** — update `BACKEND_IMAGE` and `FRONTEND_IMAGE` env vars to `ghcr.io/presstronic/...` after repo transfer. Currently hardcoded to `gitaddremote`.
 5. **`infra/scripts/deploy.sh`** — currently only handles Station services. Will need to remain Station-only; the bot has its own separate deploy.
+6. **GitHub Secrets** — the release workflow currently only uses `secrets.GITHUB_TOKEN` (built-in). No custom VPS deploy step exists yet — CD automation (SSH deploy, migration run, container restart) has not been written into the workflow. This is the largest missing piece for full CD.
 
 ---
 
-## Postgres Migration Plan (one-time, ~5 min downtime)
+## Deploy Model
 
-The bot currently runs `station-bot-postgres` with data in a Docker named volume `station-bot_postgres-data`. We need to move ownership to Station's compose.
+There is **no git clone on the VPS**. The VPS only needs:
 
-Steps (to be executed on VPS):
+- `/opt/station/docker-compose.prod.yml` — the compose file (copied once, updated manually on breaking changes)
+- `/opt/station/.env.production` — all secrets and env vars (created once, never in git)
+- `/opt/station/infra/` — nginx configs, loki/promtail/grafana config files (copied once from the repo on your local machine)
 
-1. Take a `pg_dump` from the running bot Postgres container — safety net.
-2. Stop `discord-bot` container (Postgres can stay up during dump).
-3. `pg_dump` from `station-bot-postgres` into a file.
-4. Bring up Station's `postgres` service (new container, empty volume).
-5. `pg_restore` / `psql` the dump into Station's Postgres.
-6. Create the Station application database and user inside the same Postgres instance.
-7. Update the bot's `.env.production` so `DATABASE_URL` points to `postgres` (same hostname — no change needed since both composes share the `station` network and the service is still named `postgres`).
-8. Remove the old `station-bot-postgres` container and `station-bot_postgres-data` volume after verifying the bot is healthy on the new instance.
+All application code runs from Docker images pulled from GHCR. CD automation (once written) will SSH in, set `STATION_VERSION`, and run `docker compose pull && docker compose up -d`. The VPS never touches the git repo.
 
 ---
 
-## Manual First-Deploy Sequence (before CD is wired up)
+## Pre-Flight Checklist (local machine — do this first)
 
-This is the ordered sequence for the very first Station deployment. CD automation comes after this works manually.
+These are one-time code changes that must be merged to `main` before the first deploy:
 
-### Phase 0 — Pre-flight (local machine)
+- [ ] Transfer GitHub repo from `GitAddRemote` → `Presstronic`
+- [ ] Update `BACKEND_IMAGE` / `FRONTEND_IMAGE` in `release.yml` to `ghcr.io/presstronic/...`
+- [ ] Update image refs in `docker-compose.prod.yml` to `ghcr.io/presstronic/...`
+- [ ] Add `station` network declaration to `docker-compose.prod.yml` and attach all services to it
+- [ ] Update Station-bot `docker-compose.prod.yml`: remove its `postgres` service, replace `bot-network` with external `station` network
+- [ ] Add `infra/nginx/drdnt.org.conf` (apex domain config — file does not exist yet)
+- [ ] Write the CD deploy job in `release.yml` (SSH → pull → migrate → restart)
+- [ ] Add GitHub Secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_SSH_KNOWN_HOSTS`
+- [ ] Push a `release/vX.Y.Z` branch to trigger CI → build → GHCR push
 
-1. Transfer GitHub repo ownership from `GitAddRemote` to `Presstronic`.
-2. Update `BACKEND_IMAGE` / `FRONTEND_IMAGE` in `release.yml` and image refs in `docker-compose.prod.yml` to `ghcr.io/presstronic/...`.
-3. Update Station-bot `docker-compose.prod.yml` to remove its `postgres` service and join the `station` external network.
-4. Add apex domain nginx config (`drdnt.org`).
-5. Commit and push all of the above to `main`.
+---
 
-### Phase 1 — DNS (Namecheap)
+## VPS Manual Steps (one-time bootstrap)
 
-Add the following `A` records pointing to your Linode VPS IP:
+Everything below is run on the VPS over SSH. After this is done once, CD handles all future deploys automatically.
+
+### Step 1 — Verify VPS state
+
+```bash
+# Confirm rootless Docker is healthy
+systemctl --user status docker
+
+# Confirm what's currently running
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+# Confirm nginx is installed and running
+sudo systemctl status nginx
+
+# Check certbot is available
+certbot --version
+
+# Verify SSH is locked down
+sudo sshd -T | grep -E "passwordauthentication|permitrootlogin|pubkeyauthentication"
+```
+
+Expected: `station-bot` and `station-bot-postgres` running, nginx active, certbot available.
+
+### Step 2 — DNS (Namecheap)
+
+Add these `A` records in Namecheap pointing to the Linode VPS IP. Do this early — propagation can take up to 30 min.
 
 | Host              | Type | Value      |
 | ----------------- | ---- | ---------- |
@@ -122,93 +158,87 @@ Add the following `A` records pointing to your Linode VPS IP:
 | `staging.station` | A    | `<VPS IP>` |
 | `staging.api`     | A    | `<VPS IP>` |
 
-Allow up to 30 minutes to propagate. Verify with: `dig +short api.drdnt.org`
+Verify propagation before continuing: `dig +short api.drdnt.org`
 
-### Phase 2 — VPS setup verification
+### Step 3 — Create `/opt/station` scaffold
 
-SSH in as `deploy` and run these to confirm current state:
+No git clone. Copy the necessary files from your local machine:
 
 ```bash
-# Verify SSH password auth is disabled
-sudo sshd -T | grep -E "passwordauthentication|permitrootlogin|pubkeyauthentication"
-
-# Confirm rootless Docker is healthy
-systemctl --user status docker
-
-# Confirm what's running
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-# Confirm nginx is installed and running
-sudo systemctl status nginx
-
-# Check if certbot is available
-certbot --version
+# On local machine — copy infra files to VPS
+scp docker-compose.prod.yml deploy@<VPS_IP>:/opt/station/docker-compose.prod.yml
+scp -r infra/ deploy@<VPS_IP>:/opt/station/infra/
 ```
 
-### Phase 3 — Clone Station repo & create env file
+Then on the VPS, create the env file:
 
 ```bash
-# As deploy user
-cd /opt
-git clone https://github.com/Presstronic/station.git station
-cd /opt/station
-
-# Create .env.production from example — fill in all values
-cp .env.production.example .env.production
-nano .env.production
-chmod 600 .env.production
+# On VPS
+mkdir -p /opt/station
+nano /opt/station/.env.production   # fill in all values
+chmod 600 /opt/station/.env.production
 ```
 
-### Phase 4 — Postgres migration (bot → Station)
+### Step 4 — Authenticate Docker with GHCR
 
 ```bash
-# Dump the bot's existing database (bot can keep running during this)
+# On VPS as deploy user
+echo <github_pat> | docker login ghcr.io -u <github_username> --password-stdin
+```
+
+The PAT needs `read:packages` scope. This is a one-time login — credentials are cached in `~/.docker/config.json`.
+
+### Step 5 — Postgres migration (bot → Station)
+
+The bot currently runs its own `station-bot-postgres` container. We move the data into Station's Postgres, which becomes the single shared instance.
+
+```bash
+# Dump the bot's database (bot stays running during this)
 docker exec station-bot-postgres pg_dump \
   -U station_bot -d station_bot \
   > /tmp/station_bot_backup_$(date +%Y%m%d_%H%M%S).sql
 
-# Stop the bot (not Postgres yet)
+# Stop just the bot application (leave its Postgres up for the dump)
 cd /opt/station-bot
 docker compose -f docker-compose.prod.yml stop discord-bot
 
-# Bring up Station's Postgres
+# Bring up Station's Postgres only
 cd /opt/station
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d postgres
-# Wait for healthy:
-docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.prod.yml ps  # wait for healthy
 
-# Create the bot's database and user inside Station's Postgres
-# (Station's own DB is created automatically by POSTGRES_DB env var)
+# Create the bot's DB and user inside Station's Postgres
+# (Station's own DB is auto-created by POSTGRES_DB env var on first start)
 docker compose --env-file .env.production -f docker-compose.prod.yml exec postgres \
-  psql -U <DATABASE_USER> -c "CREATE USER station_bot WITH PASSWORD '<bot_pg_password>';"
+  psql -U ${DATABASE_USER} -c "CREATE USER station_bot WITH PASSWORD '<bot_pg_password>';"
 docker compose --env-file .env.production -f docker-compose.prod.yml exec postgres \
-  psql -U <DATABASE_USER> -c "CREATE DATABASE station_bot OWNER station_bot;"
+  psql -U ${DATABASE_USER} -c "CREATE DATABASE station_bot OWNER station_bot;"
 
-# Restore bot data into new Postgres
+# Restore bot data
 cat /tmp/station_bot_backup_*.sql | docker exec -i \
   $(docker compose --env-file .env.production -f docker-compose.prod.yml ps -q postgres) \
   psql -U station_bot -d station_bot
 
-# Run Station's own TypeORM migrations
+# Run Station's TypeORM migrations (creates the Station schema)
 docker compose --env-file .env.production -f docker-compose.prod.yml \
   run --rm backend node dist/main migration:run
 ```
 
-### Phase 5 — Install nginx configs and issue TLS certs
+### Step 6 — Install nginx configs and issue TLS certs
 
 ```bash
-# As root (sudo -i or sudo su)
-# Copy all nginx configs
+# As root
+sudo bash
+
 for conf in api.drdnt.org station.drdnt.org bot.drdnt.org grafana.drdnt.org \
             staging.api.drdnt.org staging.station.drdnt.org drdnt.org; do
   cp /opt/station/infra/nginx/${conf}.conf /etc/nginx/sites-available/${conf}
   ln -sf /etc/nginx/sites-available/${conf} /etc/nginx/sites-enabled/${conf}
 done
 
-# Test and reload
 nginx -t && systemctl reload nginx
 
-# Issue TLS certs (DNS must be propagated first — verify with dig)
+# Issue TLS certs (DNS must be propagated — verify with dig first)
 certbot --nginx \
   -d drdnt.org \
   -d api.drdnt.org \
@@ -218,127 +248,77 @@ certbot --nginx \
   -d staging.station.drdnt.org
 ```
 
-### Phase 6 — Build Station images (trigger CI)
-
-On local machine:
+### Step 7 — Pull images and start Station
 
 ```bash
-git checkout -b release/v0.1.0
-git push origin release/v0.1.0
-```
-
-This triggers the GitHub Actions release workflow: lint → test → build → push to GHCR. Watch it at: `https://github.com/Presstronic/station/actions`
-
-Once images are pushed to GHCR, the CD steps in the workflow will attempt to deploy — those will fail until the VPS is fully wired up (GitHub Secrets not yet set). That's expected for the first manual run.
-
-### Phase 7 — Pull images and start Station
-
-```bash
-# As deploy user on VPS
+# On VPS as deploy user
 cd /opt/station
-export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 
-# Authenticate Docker with GHCR
-echo <your_github_pat> | docker login ghcr.io -u <github_username> --password-stdin
+# Pull all images (STATION_VERSION must match the tag pushed to GHCR)
+STATION_VERSION=v0.1.0 docker compose --env-file .env.production -f docker-compose.prod.yml pull
 
-# Pull all images
-docker compose --env-file .env.production -f docker-compose.prod.yml pull
-
-# Start monitoring stack first
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d loki grafana promtail
-
-# Start Redis
+# Start in dependency order
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d loki
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d grafana promtail
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d redis
-
-# Start backend
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d backend
 
-# Watch logs until healthy
+# Watch until healthy before starting frontend
 docker compose --env-file .env.production -f docker-compose.prod.yml logs -f backend
 
-# Start frontend
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d frontend
 ```
 
-### Phase 8 — Reconnect the bot
+### Step 8 — Reconnect the bot
 
-Update `/opt/station-bot/.env.production` — `DATABASE_URL` host stays `postgres` (same service name on shared network). Then:
+The bot's `DATABASE_URL` host stays `postgres` — same service name, now on the shared `station` network.
 
 ```bash
+# Update bot's compose to use the station external network (if not already done in pre-flight)
 cd /opt/station-bot
+nano docker-compose.prod.yml   # remove postgres service, update network to station external
+
 docker compose -f docker-compose.prod.yml up -d discord-bot
 docker logs station-bot --tail=50
 ```
 
-### Phase 9 — Verify everything
+### Step 9 — Verify everything
 
 ```bash
-# Health checks
-curl -f https://api.drdnt.org/health && echo "API OK"
-curl -f https://drdnt.org && echo "Frontend OK"
+curl -sf https://api.drdnt.org/health && echo "API OK"
+curl -sf https://drdnt.org && echo "Frontend OK"
 
-# All containers
 docker ps --format "table {{.Names}}\t{{.Status}}"
 
-# Clean up old bot Postgres volume (only after confirming bot is healthy for 30+ min)
+# Only after bot has been healthy for 30+ min:
+docker stop station-bot-postgres
 docker rm station-bot-postgres
 docker volume rm station-bot_postgres-data
 ```
 
----
+### Step 10 — Set up nightly backup cron
 
-## Backblaze B2 Backup Setup
-
-### Verify existing B2 config
-
-```bash
-# Check if rclone config exists
-ls -la /opt/station-bot/rclone.conf 2>/dev/null || echo "no rclone config found"
-
-# If it exists, verify B2 connectivity
-RCLONE_CONFIG=/opt/station-bot/rclone.conf rclone lsd b2:
-```
-
-### Set up B2 for Station
-
-Create a dedicated application key in the Backblaze B2 console scoped to a `station-backups` bucket. Then:
+> **Pre-req:** Create a dedicated application key in the Backblaze B2 console scoped to a `station-backups` bucket, then write `/opt/station/rclone.conf`:
+>
+> ```ini
+> [b2]
+> type = b2
+> account = <B2_ACCOUNT_ID>
+> key = <B2_APPLICATION_KEY>
+> hard_delete = false
+> ```
+>
+> `chmod 600 /opt/station/rclone.conf`
 
 ```bash
-# Create rclone.conf for Station (CD will overwrite this on every deploy)
-cat > /opt/station/rclone.conf <<EOF
-[b2]
-type = b2
-account = <B2_ACCOUNT_ID>
-key = <B2_APPLICATION_KEY>
-hard_delete = false
-EOF
-chmod 600 /opt/station/rclone.conf
-
-# Test connectivity
+# Verify B2 is reachable
 RCLONE_CONFIG=/opt/station/rclone.conf rclone lsd b2:station-backups
 
-# Trigger a manual backup to verify end-to-end
-cd /opt/station
-bash infra/scripts/backup-db.sh manual
-```
-
-### Verify nightly cron is scheduled
-
-```bash
-# Check deploy user's crontab
-crontab -l | grep backup
-```
-
-Expected entry (added by bootstrap script):
-
-```
-0 3 * * * cd /opt/station && bash infra/scripts/backup-db.sh >> /opt/station/logs/backup.log 2>&1
-```
-
-If missing, add it:
-
-```bash
+# Add cron job (as deploy user)
 (crontab -l 2>/dev/null; echo "0 3 * * * cd /opt/station && bash infra/scripts/backup-db.sh >> /opt/station/logs/backup.log 2>&1") | crontab -
+
+# Trigger a manual backup to verify end-to-end
+bash /opt/station/infra/scripts/backup-db.sh manual
 ```
 
 ---

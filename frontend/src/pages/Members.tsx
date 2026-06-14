@@ -5,6 +5,9 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SearchIcon from '@mui/icons-material/Search';
 import LinkIcon from '@mui/icons-material/Link';
+import LogoutIcon from '@mui/icons-material/Logout';
+import LockIcon from '@mui/icons-material/Lock';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
 import AppShell from '../components/AppShell';
 import { api } from '../services/api.service';
 import { businessUnitsService, type BusinessUnitNode } from '../services/business-units.service';
@@ -60,21 +63,57 @@ function flattenUnits(nodes: BusinessUnitNode[], depth = 0): Array<{ id: string;
   return out;
 }
 
+// ---- Confirm modal ---------------------------------------
+interface ConfirmModalProps {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  danger?: boolean;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmModal({ title, body, confirmLabel, danger = false, busy = false, onConfirm, onCancel }: ConfirmModalProps) {
+  return (
+    <div className="confirm-modal-backdrop" onClick={onCancel}>
+      <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+        <div className={`confirm-modal-head${danger ? ' danger' : ''}`}>{title}</div>
+        <div className="confirm-modal-body">{body}</div>
+        <div className="confirm-modal-foot">
+          <button className="btn btn-ghost btn-sm" onClick={onCancel} disabled={busy}>Cancel</button>
+          <button
+            className={danger ? 'btn-danger btn-sm' : 'btn btn-primary btn-sm'}
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {busy ? 'Working…' : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- Member drawer ---------------------------------------
 interface DrawerProps {
   member: MemberRow;
   orgId: string;
   units: BusinessUnitNode[];
+  canManageMembers: boolean;
   onClose: () => void;
   onRemoved: () => void;
-  onUnitChanged: () => void;
+  onUnitChanged: (updated: { isActive: boolean }) => void;
 }
 
-function MemberDrawer({ member, orgId, units, onClose, onRemoved, onUnitChanged }: DrawerProps) {
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const [removing, setRemoving]           = useState(false);
-  const [savingUnit, setSavingUnit]       = useState(false);
-  const [selectedUnit, setSelectedUnit]   = useState<string>(member.businessUnitId ?? '');
+function MemberDrawer({ member, orgId, units, canManageMembers, onClose, onRemoved, onUnitChanged }: DrawerProps) {
+  const [confirmRemove, setConfirmRemove]   = useState(false);
+  const [removing, setRemoving]             = useState(false);
+  const [savingUnit, setSavingUnit]         = useState(false);
+  const [selectedUnit, setSelectedUnit]     = useState<string>(member.businessUnitId ?? '');
+  const [confirm, setConfirm]               = useState<'revoke' | 'lock' | 'unlock' | null>(null);
+  const [actioning, setActioning]           = useState(false);
+  const [isActive, setIsActive]             = useState(member.user.isActive);
   const flatUnits = flattenUnits(units);
 
   const handleUnitChange = async (unitId: string) => {
@@ -84,7 +123,7 @@ function MemberDrawer({ member, orgId, units, onClose, onRemoved, onUnitChanged 
       await api.patch(`/user-organization-roles/organization/${orgId}/members/${member.userId}/business-unit`, {
         businessUnitId: unitId || null,
       });
-      onUnitChanged();
+      onUnitChanged({ isActive });
     } catch {
       setSelectedUnit(member.businessUnitId ?? '');
     } finally {
@@ -100,6 +139,19 @@ function MemberDrawer({ member, orgId, units, onClose, onRemoved, onUnitChanged 
       onClose();
     } finally {
       setRemoving(false);
+    }
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirm) return;
+    setActioning(true);
+    try {
+      await api.post(`/user-organization-roles/organization/${orgId}/members/${member.userId}/${confirm === 'revoke' ? 'revoke-sessions' : confirm}`);
+      if (confirm === 'lock') setIsActive(false);
+      if (confirm === 'unlock') setIsActive(true);
+      setConfirm(null);
+    } finally {
+      setActioning(false);
     }
   };
 
@@ -133,7 +185,7 @@ function MemberDrawer({ member, orgId, units, onClose, onRemoved, onUnitChanged 
             )}
             <div className="mem-kv">
               <span className="mem-k">Account status</span>
-              <span className={`chip chip-${u.isActive ? 'success' : 'neutral'}`}>{u.isActive ? 'Active' : 'Inactive'}</span>
+              <span className={`chip chip-${isActive ? 'success' : 'danger'}`}>{isActive ? 'Active' : 'Locked'}</span>
             </div>
           </div>
 
@@ -153,6 +205,39 @@ function MemberDrawer({ member, orgId, units, onClose, onRemoved, onUnitChanged 
             </select>
             {savingUnit && <p className="mem-saving">Saving…</p>}
           </div>
+
+          {/* Member actions — Director+ only */}
+          {canManageMembers && (
+            <div className="mem-section">
+              <div className="mem-section-cap">Member actions</div>
+              <div className="mem-actions-btns">
+                <button
+                  className="btn-warning-outline"
+                  onClick={() => setConfirm('revoke')}
+                  disabled={actioning}
+                >
+                  <LogoutIcon style={{ width: 15, height: 15 }} /> Invalidate sessions
+                </button>
+                {isActive ? (
+                  <button
+                    className="btn-danger-outline"
+                    onClick={() => setConfirm('lock')}
+                    disabled={actioning}
+                  >
+                    <LockIcon style={{ width: 15, height: 15 }} /> Lock account
+                  </button>
+                ) : (
+                  <button
+                    className="btn-warning-outline"
+                    onClick={() => setConfirm('unlock')}
+                    disabled={actioning}
+                  >
+                    <LockOpenIcon style={{ width: 15, height: 15 }} /> Unlock account
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Remove from org */}
           <div className="mem-section mem-section-danger">
@@ -178,29 +263,69 @@ function MemberDrawer({ member, orgId, units, onClose, onRemoved, onUnitChanged 
           </div>
         </div>
       </div>
+
+      {confirm === 'revoke' && (
+        <ConfirmModal
+          title="Invalidate sessions?"
+          body={`This will immediately end all active sessions for ${displayName(u)}. They will be signed out on all devices within minutes. This action is logged.`}
+          confirmLabel="Invalidate sessions"
+          danger
+          busy={actioning}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+      {confirm === 'lock' && (
+        <ConfirmModal
+          title="Lock account?"
+          body={`This will immediately end all active sessions for ${displayName(u)} and prevent them from logging in until unlocked. This action is logged.`}
+          confirmLabel="Lock account"
+          danger
+          busy={actioning}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+      {confirm === 'unlock' && (
+        <ConfirmModal
+          title="Unlock account?"
+          body={`${displayName(u)} will be able to log in again immediately.`}
+          confirmLabel="Unlock account"
+          busy={actioning}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   );
 }
 
 // ---- Page ------------------------------------------------
 export default function Members() {
-  const [orgId, setOrgId]           = useState<string | null>(null);
-  const [members, setMembers]       = useState<MemberRow[]>([]);
-  const [units, setUnits]           = useState<BusinessUnitNode[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [selId, setSelId]           = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [orgId, setOrgId]                   = useState<string | null>(null);
+  const [members, setMembers]               = useState<MemberRow[]>([]);
+  const [units, setUnits]                   = useState<BusinessUnitNode[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [search, setSearch]                 = useState('');
+  const [roleFilter, setRoleFilter]         = useState('');
+  const [selId, setSelId]                   = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen]         = useState(false);
+  const [canManageMembers, setCanManageMembers] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // load org id
+  // load org id and permissions
   useEffect(() => {
     api.get('/users/profile').then((r) => {
       const uid = r.data.userId ?? r.data.id;
       return api.get<Array<{ organization: { id: string } }>>(`/user-organization-roles/user/${uid}/organizations`);
     }).then((r) => {
-      setOrgId(r.data?.[0]?.organization?.id ?? null);
+      const oid = r.data?.[0]?.organization?.id ?? null;
+      setOrgId(oid);
+      if (oid) {
+        api.get<Record<string, boolean>>(`/permissions/organization/${oid}`)
+          .then((p) => setCanManageMembers(p.data?.can_manage_members === true))
+          .catch(() => {});
+      }
     }).catch(() => {});
   }, []);
 
@@ -343,7 +468,10 @@ export default function Members() {
                         <div className="mem-cell-user">
                           <div className="mem-avatar">{initials(m.user)}</div>
                           <div>
-                            <div className="mem-name">{displayName(m.user)}</div>
+                            <div className="mem-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {displayName(m.user)}
+                              {!m.user.isActive && <span className="chip chip-danger" style={{ fontSize: 10 }}>Locked</span>}
+                            </div>
                             <div className="mem-username">@{m.user.username}</div>
                           </div>
                         </div>
@@ -370,9 +498,10 @@ export default function Members() {
             member={sel}
             orgId={orgId}
             units={units}
+            canManageMembers={canManageMembers}
             onClose={() => setDrawerOpen(false)}
             onRemoved={fetchMembers}
-            onUnitChanged={fetchMembers}
+            onUnitChanged={() => fetchMembers()}
           />
         )}
         {drawerOpen && <div className="mem-backdrop" onClick={() => setDrawerOpen(false)} />}

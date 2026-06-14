@@ -6,6 +6,8 @@ import { User } from '../users/user.entity';
 import { Organization } from '../organizations/organization.entity';
 import { Role } from '../roles/role.entity';
 import { NotFoundException, ConflictException } from '@nestjs/common';
+import { AuthService } from '../auth/auth.service';
+import { UsersService } from '../users/users.service';
 
 const USER_ID = '00000000-0000-0000-0000-000000000001';
 const USER_ID_2 = '00000000-0000-0000-0000-000000000002';
@@ -27,10 +29,14 @@ describe('UserOrganizationRolesService', () => {
     find: jest.fn(),
     findOne: jest.fn(),
     remove: jest.fn(),
+    softRemove: jest.fn(),
+    manager: { query: jest.fn() },
   };
-  const mockUserRepository = { findOne: jest.fn() };
+  const mockUserRepository = { findOne: jest.fn(), update: jest.fn() };
   const mockOrgRepository = { findOne: jest.fn() };
   const mockRoleRepository = { findOne: jest.fn(), findByIds: jest.fn() };
+  const mockAuthService = { revokeAllUserSessions: jest.fn() };
+  const mockUsersService = { setActive: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -46,6 +52,8 @@ describe('UserOrganizationRolesService', () => {
           useValue: mockOrgRepository,
         },
         { provide: getRepositoryToken(Role), useValue: mockRoleRepository },
+        { provide: AuthService, useValue: mockAuthService },
+        { provide: UsersService, useValue: mockUsersService },
       ],
     }).compile();
 
@@ -319,6 +327,64 @@ describe('UserOrganizationRolesService', () => {
         where: { organizationId: ORG_ID },
         relations: ['user', 'role', 'businessUnit'],
       });
+    });
+  });
+
+  describe('revokeMemberSessions', () => {
+    it('should revoke sessions for a member', async () => {
+      mockUorRepository.findOne.mockResolvedValue({
+        id: UOR_ID,
+        organizationId: ORG_ID,
+        userId: USER_ID,
+      });
+      mockAuthService.revokeAllUserSessions.mockResolvedValue(undefined);
+
+      await service.revokeMemberSessions(ORG_ID, USER_ID);
+
+      expect(mockAuthService.revokeAllUserSessions).toHaveBeenCalledWith(
+        USER_ID,
+      );
+    });
+
+    it('should throw NotFoundException if member not in org', async () => {
+      mockUorRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.revokeMemberSessions(ORG_ID, USER_ID),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('lockMember', () => {
+    it('should lock member and revoke sessions', async () => {
+      mockUorRepository.findOne.mockResolvedValue({
+        id: UOR_ID,
+        organizationId: ORG_ID,
+        userId: USER_ID,
+      });
+      mockUsersService.setActive.mockResolvedValue(undefined);
+      mockAuthService.revokeAllUserSessions.mockResolvedValue(undefined);
+
+      await service.lockMember(ORG_ID, USER_ID);
+
+      expect(mockUsersService.setActive).toHaveBeenCalledWith(USER_ID, false);
+      expect(mockAuthService.revokeAllUserSessions).toHaveBeenCalledWith(
+        USER_ID,
+      );
+    });
+  });
+
+  describe('unlockMember', () => {
+    it('should unlock member', async () => {
+      mockUorRepository.findOne.mockResolvedValue({
+        id: UOR_ID,
+        organizationId: ORG_ID,
+        userId: USER_ID,
+      });
+      mockUsersService.setActive.mockResolvedValue(undefined);
+
+      await service.unlockMember(ORG_ID, USER_ID);
+
+      expect(mockUsersService.setActive).toHaveBeenCalledWith(USER_ID, true);
     });
   });
 });

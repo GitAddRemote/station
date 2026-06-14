@@ -15,6 +15,9 @@ import { AuthGuard } from '@nestjs/passport';
 import { UserOrganizationRolesService } from './user-organization-roles.service';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { AssignRolesDto } from './dto/assign-roles.dto';
+import { PermissionsGuard } from '../permissions/guards/permissions.guard';
+import { RequirePermission } from '../permissions/decorators/require-permission.decorator';
+import { OrgPermission } from '../permissions/permissions.constants';
 
 @Controller('user-organization-roles')
 @UseGuards(AuthGuard('jwt'))
@@ -100,6 +103,39 @@ export class UserOrganizationRolesController {
     @Param('userId', ParseUUIDPipe) userId: string,
   ) {
     await this.userOrgRolesService.removeMemberFromOrg(organizationId, userId);
+  }
+
+  @Post('organization/:organizationId/members/:userId/revoke-sessions')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(PermissionsGuard)
+  @RequirePermission(OrgPermission.CAN_MANAGE_MEMBERS)
+  async revokeMemberSessions(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    await this.userOrgRolesService.revokeMemberSessions(organizationId, userId);
+  }
+
+  @Post('organization/:organizationId/members/:userId/lock')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(PermissionsGuard)
+  @RequirePermission(OrgPermission.CAN_MANAGE_MEMBERS)
+  async lockMember(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    await this.userOrgRolesService.lockMember(organizationId, userId);
+  }
+
+  @Post('organization/:organizationId/members/:userId/unlock')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(PermissionsGuard)
+  @RequirePermission(OrgPermission.CAN_MANAGE_MEMBERS)
+  async unlockMember(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    await this.userOrgRolesService.unlockMember(organizationId, userId);
   }
 
   @Get('organization/:organizationId/role/:roleId/users')

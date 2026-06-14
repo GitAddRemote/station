@@ -160,6 +160,16 @@ export class UsersService {
     await this.usersRepository.update(userId, { discordAvatarUrl });
   }
 
+  async setActive(userId: string, isActive: boolean): Promise<void> {
+    const result = await this.usersRepository.update(
+      { id: userId },
+      { isActive },
+    );
+    if (result.affected === 0) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+  }
+
   async createFromDiscord(params: {
     username: string;
     email: string;

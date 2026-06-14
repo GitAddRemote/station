@@ -11,6 +11,8 @@ import { Organization } from '../organizations/organization.entity';
 import { Role } from '../roles/role.entity';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { AssignRolesDto } from './dto/assign-roles.dto';
+import { AuthService } from '../auth/auth.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class UserOrganizationRolesService {
@@ -23,6 +25,8 @@ export class UserOrganizationRolesService {
     private organizationRepository: Repository<Organization>,
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
+    private authService: AuthService,
+    private usersService: UsersService,
   ) {}
 
   async assignRole(
@@ -175,6 +179,43 @@ export class UserOrganizationRolesService {
       where: { organizationId, roleId },
       relations: ['user'],
     });
+  }
+
+  async revokeMemberSessions(
+    organizationId: string,
+    targetUserId: string,
+  ): Promise<void> {
+    await this.assertMembership(organizationId, targetUserId);
+    await this.authService.revokeAllUserSessions(targetUserId);
+  }
+
+  async lockMember(
+    organizationId: string,
+    targetUserId: string,
+  ): Promise<void> {
+    await this.assertMembership(organizationId, targetUserId);
+    await this.usersService.setActive(targetUserId, false);
+    await this.authService.revokeAllUserSessions(targetUserId);
+  }
+
+  async unlockMember(
+    organizationId: string,
+    targetUserId: string,
+  ): Promise<void> {
+    await this.assertMembership(organizationId, targetUserId);
+    await this.usersService.setActive(targetUserId, true);
+  }
+
+  private async assertMembership(
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    const membership = await this.userOrgRoleRepository.findOne({
+      where: { organizationId, userId },
+    });
+    if (!membership) {
+      throw new NotFoundException('Member not found in this organization');
+    }
   }
 
   private async verifyEntitiesExist(

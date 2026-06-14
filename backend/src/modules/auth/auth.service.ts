@@ -117,6 +117,13 @@ export class AuthService implements OnModuleDestroy {
       return null;
     }
 
+    if (user && !user.isActive) {
+      this.logger.warn(`Locked account attempted login: ${username}.`);
+      throw new ForbiddenException(
+        'This account has been locked. Please contact an administrator.',
+      );
+    }
+
     // Local login is a break-glass path — only the super admin may use it.
     // All other users must authenticate through Discord OAuth2.
     if (user && !user.isSuperAdmin) {
@@ -720,7 +727,7 @@ return 1`,
   }
 
   /** Revokes all active sessions for a user via the user-sessions reverse index. */
-  private async revokeAllUserSessions(userId: string): Promise<void> {
+  async revokeAllUserSessions(userId: string): Promise<void> {
     if (!this.redisClient) return;
     const sids = await this.redisClient.sMembers(`user-sessions:${userId}`);
     for (const sid of sids) {
@@ -824,6 +831,9 @@ return 1`,
       profile.discordId,
     );
     if (byDiscordId) {
+      if (!byDiscordId.isActive) {
+        return { error: 'account_locked' };
+      }
       await this.usersService.updateDiscordAvatar(
         byDiscordId.id,
         profile.avatarUrl,
@@ -835,6 +845,9 @@ return 1`,
     // Step 2 & 3: email match
     const byEmail = await this.usersService.findByEmail(profile.email);
     if (byEmail) {
+      if (!byEmail.isActive) {
+        return { error: 'account_locked' };
+      }
       if (byEmail.discordId != null) {
         // Already linked to a different Discord account
         return { error: 'email_conflict' };
