@@ -13,6 +13,7 @@ type AssigneeKind = 'open' | 'member' | 'division';
 
 interface Org { id: string; name: string; }
 interface OrgMember { userId: string; username: string; }
+interface Division { id: string; name: string; kind: string; }
 
 const TYPE_LABELS: Record<ContractType, string> = {
   transport: 'Transport',
@@ -49,6 +50,7 @@ interface CreateContractModalProps {
 export default function CreateContractModal({ onClose, onCreated, initialType = 'transfer', initialTitle = '', inventoryItem }: CreateContractModalProps) {
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [members, setMembers] = useState<OrgMember[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -61,7 +63,7 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
   const [description, setDescription] = useState('');
   const [assigneeKind, setAssigneeKind] = useState<AssigneeKind>('open');
   const [assigneeUserId, setAssigneeUserId] = useState('');
-  const [assigneeOrgId, setAssigneeOrgId] = useState('');
+  const [assigneeDivisionId, setAssigneeDivisionId] = useState('');
   const [itemQty, setItemQty] = useState<string>(inventoryItem ? String(inventoryItem.quantity) : '');
   const [details, setDetails] = useState<TypeDetails>(() => defaultDetails(initialType));
 
@@ -85,7 +87,7 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
   }, []);
 
   useEffect(() => {
-    if (!orgId) { setMembers([]); return; }
+    if (!orgId) { setMembers([]); setDivisions([]); return; }
     setMembersLoading(true);
     api.get<Array<{ user: { id: string; username: string } }>>(`/user-organization-roles/organization/${orgId}/members`)
       .then((r) => {
@@ -96,6 +98,13 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
       })
       .catch(() => setMembers([]))
       .finally(() => setMembersLoading(false));
+
+    api.get<Array<{ id: string; name: string; kind: string; parentId: string | null }>>(`/api/organizations/${orgId}/business-units`)
+      .then((r) => {
+        const topLevel = Array.isArray(r.data) ? r.data.filter((u) => !u.parentId) : [];
+        setDivisions(topLevel);
+      })
+      .catch(() => setDivisions([]));
   }, [orgId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -124,8 +133,8 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
       const res = await api.post<{ id: string }>('/api/contracts', body);
       if (assigneeKind === 'member' && assigneeUserId) {
         await api.post(`/api/contracts/${res.data.id}/parties`, { userId: assigneeUserId, role: 'assignee' });
-      } else if (assigneeKind === 'division' && assigneeOrgId) {
-        await api.post(`/api/contracts/${res.data.id}/parties`, { orgId: assigneeOrgId, role: 'assignee' });
+      } else if (assigneeKind === 'division' && assigneeDivisionId) {
+        await api.post(`/api/contracts/${res.data.id}/parties`, { businessUnitId: assigneeDivisionId, role: 'assignee' });
       }
       onCreated();
       onClose();
@@ -133,12 +142,12 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
     } finally {
       setSaving(false);
     }
-  }, [title, type, orgId, donation, rewardAuec, deadline, description, assigneeKind, assigneeUserId, assigneeOrgId, details, inventoryItem, itemQty, onCreated, onClose]);
+  }, [title, type, orgId, donation, rewardAuec, deadline, description, assigneeKind, assigneeUserId, assigneeDivisionId, details, inventoryItem, itemQty, onCreated, onClose]);
 
   const canSubmit =
     !saving && title.trim() && orgId &&
     (assigneeKind !== 'member' || assigneeUserId) &&
-    (assigneeKind !== 'division' || assigneeOrgId);
+    (assigneeKind !== 'division' || assigneeDivisionId);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -178,7 +187,7 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
               <select
                 className="field-input"
                 value={orgId}
-                onChange={(e) => { setOrgId(e.target.value); setAssigneeUserId(''); setAssigneeOrgId(''); }}
+                onChange={(e) => { setOrgId(e.target.value); setAssigneeUserId(''); setAssigneeDivisionId(''); }}
                 required
               >
                 {orgs.length === 0 && <option value="">No organizations found</option>}
@@ -196,7 +205,7 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
                       name="assigneeKind"
                       value={k}
                       checked={assigneeKind === k}
-                      onChange={() => { setAssigneeKind(k); setAssigneeUserId(''); setAssigneeOrgId(''); }}
+                      onChange={() => { setAssigneeKind(k); setAssigneeUserId(''); setAssigneeDivisionId(''); }}
                     />
                     {k === 'open' ? 'Open — anyone can claim' : k === 'member' ? 'Specific member' : 'Division'}
                   </label>
@@ -216,12 +225,12 @@ export default function CreateContractModal({ onClose, onCreated, initialType = 
               {assigneeKind === 'division' && (
                 <select
                   className="field-input"
-                  value={assigneeOrgId}
-                  onChange={(e) => setAssigneeOrgId(e.target.value)}
+                  value={assigneeDivisionId}
+                  onChange={(e) => setAssigneeDivisionId(e.target.value)}
                   required
                 >
-                  <option value="">Select division…</option>
-                  {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  <option value="">{divisions.length === 0 ? 'No divisions found' : 'Select division…'}</option>
+                  {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               )}
             </div>

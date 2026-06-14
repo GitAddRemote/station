@@ -13,6 +13,11 @@ export class AddContractPartyDto {
   @IsUUID()
   orgId?: string | null;
 
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  businessUnitId?: string | null;
+
   @ApiProperty({ enum: ContractPartyRole })
   @IsEnum(ContractPartyRole)
   role!: ContractPartyRole;

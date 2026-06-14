@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { Contract } from './contract.entity';
 import { User } from '../../users/user.entity';
 import { Organization } from '../../organizations/organization.entity';
+import { BusinessUnit } from '../../business-units/business-unit.entity';
 
 export enum ContractPartyRole {
   CREATOR = 'creator',
@@ -37,6 +38,13 @@ export class ContractParty {
   @ManyToOne(() => Organization, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'org_id' })
   org!: Organization | null;
+
+  @Column({ name: 'business_unit_id', type: 'uuid', nullable: true })
+  businessUnitId!: string | null;
+
+  @ManyToOne(() => BusinessUnit, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'business_unit_id' })
+  businessUnit!: BusinessUnit | null;
 
   @Column({ type: 'varchar', length: 30 })
   role!: ContractPartyRole;

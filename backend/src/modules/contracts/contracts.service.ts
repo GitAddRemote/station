@@ -670,6 +670,7 @@ export class ContractsService {
       contractId,
       userId: dto.userId ?? null,
       orgId: dto.orgId ?? null,
+      businessUnitId: dto.businessUnitId ?? null,
       role: dto.role,
     });
 

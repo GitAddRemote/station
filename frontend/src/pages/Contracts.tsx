@@ -220,6 +220,8 @@ function TypeDetailsSection({ details, type }: { details: Record<string, unknown
   );
 }
 
+interface Division { id: string; name: string; }
+
 function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }: {
   contract: Contract;
   onAction: (action: string) => void;
@@ -230,6 +232,7 @@ function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }:
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [divisions, setDivisions] = useState<Division[]>([]);
 
   // edit form state
   const [editTitle, setEditTitle] = useState(contract.title);
@@ -242,6 +245,25 @@ function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }:
   const [editDetails, setEditDetails] = useState<TypeDetails>(() =>
     detailsFromRecord(contract.type as import('../components/contracts/contractTypeFields').ContractType, contract.details)
   );
+  const [editAssigneeKind, setEditAssigneeKind] = useState<'open' | 'member' | 'division'>('open');
+  const [editAssigneeUserId, setEditAssigneeUserId] = useState('');
+  const [editAssigneeDivisionId, setEditAssigneeDivisionId] = useState('');
+  const [editMembers, setEditMembers] = useState<Array<{ userId: string; username: string }>>([]);
+
+  useEffect(() => {
+    if (!editing) return;
+    api.get<Array<{ id: string; name: string; parentId: string | null }>>(`/api/organizations/${contract.orgId}/business-units`)
+      .then((r) => setDivisions(Array.isArray(r.data) ? r.data.filter((u) => !u.parentId) : []))
+      .catch(() => setDivisions([]));
+    api.get<Array<{ user: { id: string; username: string } }>>(`/user-organization-roles/organization/${contract.orgId}/members`)
+      .then((r) => {
+        const list = Array.isArray(r.data)
+          ? r.data.map((row) => ({ userId: row.user?.id, username: row.user?.username })).filter((m) => m.userId)
+          : [];
+        setEditMembers(list as Array<{ userId: string; username: string }>);
+      })
+      .catch(() => setEditMembers([]));
+  }, [editing, contract.orgId]);
 
   const openEdit = () => {
     setEditTitle(contract.title);
@@ -250,6 +272,9 @@ function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }:
     setEditRisk(contract.risk ?? '');
     setEditDeadline(contract.deadline ? new Date(contract.deadline).toISOString().slice(0, 16) : '');
     setEditDetails(detailsFromRecord(contract.type as import('../components/contracts/contractTypeFields').ContractType, contract.details));
+    setEditAssigneeKind('open');
+    setEditAssigneeUserId('');
+    setEditAssigneeDivisionId('');
     setEditing(true);
   };
 
@@ -265,6 +290,11 @@ function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }:
         details: buildDetailsPayload(contract.type as import('../components/contracts/contractTypeFields').ContractType, editDetails),
       };
       await api.patch(`/api/contracts/${contract.id}`, payload);
+      if (editAssigneeKind === 'member' && editAssigneeUserId) {
+        await api.post(`/api/contracts/${contract.id}/parties`, { userId: editAssigneeUserId, role: 'assignee' });
+      } else if (editAssigneeKind === 'division' && editAssigneeDivisionId) {
+        await api.post(`/api/contracts/${contract.id}/parties`, { businessUnitId: editAssigneeDivisionId, role: 'assignee' });
+      }
       setEditing(false);
       onSaved();
     } catch {
@@ -317,6 +347,35 @@ function ContractDetail({ contract, onAction, onClose, onSaved, currentUserId }:
           <div className="field-row">
             <label className="field-label">Deadline</label>
             <input className="field-input" type="datetime-local" value={editDeadline} onChange={(e) => setEditDeadline(e.target.value)} />
+          </div>
+          <div className="field-row">
+            <label className="field-label">Assignee</label>
+            <div className="assignee-radios">
+              {(['open', 'member', 'division'] as const).map((k) => (
+                <label key={k} className={`assignee-radio${editAssigneeKind === k ? ' selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="editAssigneeKind"
+                    value={k}
+                    checked={editAssigneeKind === k}
+                    onChange={() => { setEditAssigneeKind(k); setEditAssigneeUserId(''); setEditAssigneeDivisionId(''); }}
+                  />
+                  {k === 'open' ? 'Open — anyone can claim' : k === 'member' ? 'Specific member' : 'Division'}
+                </label>
+              ))}
+            </div>
+            {editAssigneeKind === 'member' && (
+              <select className="field-input" value={editAssigneeUserId} onChange={(e) => setEditAssigneeUserId(e.target.value)}>
+                <option value="">Select member…</option>
+                {editMembers.map((m) => <option key={m.userId} value={m.userId}>{m.username}</option>)}
+              </select>
+            )}
+            {editAssigneeKind === 'division' && (
+              <select className="field-input" value={editAssigneeDivisionId} onChange={(e) => setEditAssigneeDivisionId(e.target.value)}>
+                <option value="">{divisions.length === 0 ? 'No divisions found' : 'Select division…'}</option>
+                {divisions.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            )}
           </div>
           <TypeSpecificFields
             type={contract.type as import('../components/contracts/contractTypeFields').ContractType}
