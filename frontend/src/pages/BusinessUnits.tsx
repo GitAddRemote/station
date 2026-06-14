@@ -320,7 +320,8 @@ export default function BusinessUnits() {
     const walk = (nodes: BusinessUnitNode[]) => nodes.forEach((n) => { ids.add(n.id); walk(n.children); });
     walk(tree);
     setExpanded(ids);
-  }, [tree.length > 0 ? tree[0].id : '']);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tree[0]?.id ?? '']);
 
   const toggle = (id: string) => setExpanded((prev) => {
     const next = new Set(prev);
