@@ -9,6 +9,7 @@ import { ContractsService } from './contracts.service';
 import { ContractItem } from './entities/contract-item.entity';
 import { ContractMilestone } from './entities/contract-milestone.entity';
 import { ContractParty } from './entities/contract-party.entity';
+import { ContractStatusHistory } from './entities/contract-status-history.entity';
 import {
   Contract,
   ContractRisk,
@@ -87,6 +88,10 @@ describe('ContractsService', () => {
         {
           provide: getRepositoryToken(StationInventoryItem),
           useValue: createMockRepository<StationInventoryItem>(),
+        },
+        {
+          provide: getRepositoryToken(ContractStatusHistory),
+          useValue: createMockRepository<ContractStatusHistory>(),
         },
         {
           provide: DataSource,

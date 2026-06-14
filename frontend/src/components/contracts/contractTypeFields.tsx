@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { LocationPicker } from './LocationPicker';
 
 export type ContractType = 'transport' | 'transfer' | 'mining' | 'security' | 'salvage' | 'medical' | 'refueling';
